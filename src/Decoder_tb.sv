@@ -6,7 +6,7 @@ reg clk = 0;
 reg[31:0] instr = 0;
 reg[31:0] pc = 0;
 
-wire[55:0] uop;
+wire[88:0] uop;
 wire[2:0] fu;
 
 Decoder dec(
@@ -34,11 +34,12 @@ initial begin
     #period;
     clk = 0;
     #period;
-    instr = 32'h830b3921;
+    instr = 32'h00f62023; //sw	a5,0(a2)
     clk = 1;
     #period;
     clk = 0;
     #period;
+    instr = 32'hfeb7fce3;
     clk = 1;
     #period;
     clk = 0;
