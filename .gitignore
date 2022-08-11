@@ -1,3 +1,4 @@
 a.out
 *.vcd
 sv2v
+obj_dir

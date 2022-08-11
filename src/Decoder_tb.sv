@@ -6,15 +6,15 @@ reg clk = 0;
 reg[31:0] instr = 0;
 reg[31:0] pc = 0;
 
-wire[88:0] uop;
+wire[90:0] uop;
 wire[2:0] fu;
 
 Decoder dec(
     .clk(clk),
     .IN_instr(instr),
     .IN_pc(pc),
-    .OUT_uop(uop),
-    .OUT_idFU(fu)
+    .OUT_uop(uop)
+    
     );
 
 initial begin
