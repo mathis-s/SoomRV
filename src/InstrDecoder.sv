@@ -22,19 +22,21 @@ typedef struct packed
     logic[6:0] opcode;
 } Instr32;
 
-module Decoder
+module InstrDecoder
 (
-    input wire clk,
     input wire[31:0] IN_instr,
     input wire[31:0] IN_pc,
 
     output D_UOp OUT_uop,
-    output reg OUT_invalid
+    output wire OUT_invalid
 );
 
 D_UOp uop;
 reg invalidEnc;
 Instr32 instr;
+
+assign OUT_uop = uop;
+assign OUT_invalid = invalidEnc;
 
 always@(*) begin
 
@@ -216,10 +218,10 @@ always@(*) begin
     endcase
 end
 
-always_ff@(posedge clk) begin
-    $display("Instr: %h | INV: %h | SRCA: %h | SRCB: %h | IMMB: %b | DST: %h | OPC: %h | FU: %x | IMM: %0d", instr, invalidEnc, uop.rs0, uop.rs1, uop.immB, uop.rd, uop.opcode, uop.fu, $signed(uop.imm));
-    OUT_uop <= uop;
-    OUT_invalid <= invalidEnc;
-end
+//always_ff@(posedge clk) begin
+//    $display("Instr: %h | INV: %h | SRCA: %h | SRCB: %h | IMMB: %b | DST: %h | OPC: %h | FU: %x | IMM: %0d", instr, invalidEnc, uop.rs0, uop.rs1, uop.immB, uop.rd, uop.opcode, uop.fu, $signed(uop.imm));
+//    OUT_uop <= uop;
+//    OUT_invalid <= invalidEnc;
+//end
 
 endmodule

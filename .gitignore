@@ -2,3 +2,5 @@ a.out
 *.vcd
 sv2v
 obj_dir
+compile_flags.txt
+view.gtkw

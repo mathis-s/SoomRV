@@ -53,10 +53,10 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[31:0] immPC;
-    logic[5:0] rs0; 
-    logic[5:0] rs1; 
+    logic[4:0] rs0; 
+    logic[4:0] rs1; 
     logic immB;
-    logic[5:0] rd;
+    logic[4:0] rd;
     logic[5:0] opcode;
     FuncUnit fu;
 } D_UOp;
@@ -66,8 +66,10 @@ typedef struct packed
     logic[31:0] imm;
     logic[31:0] immPC;
     logic[31:0] srcA;
+    logic[5:0] tagA;
     logic[31:0] srcB;
-    logic[5:0] rd;
+    logic[5:0] tagB;
+    logic[5:0] tagDst;
     logic[5:0] opcode;
     FuncUnit fu;
 } UOp;

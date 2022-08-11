@@ -1,26 +1,34 @@
 `timescale 1 ns / 10 ps
 localparam period = 10;
-module Decoder_tb;
+module Decode_tb;
 
 reg clk = 0;
 reg[31:0] instr = 0;
 reg[31:0] pc = 0;
 
-wire[90:0] uop;
-wire[2:0] fu;
+reg wbResult[31:0] = 0;
+reg wbRegNm[4:0] = 0;
 
-Decoder dec(
+UOp uop;
+
+// can you also not assign all of these fields explicitly?
+Decode dec
+(
     .clk(clk),
     .IN_instr(instr),
     .IN_pc(pc),
-    .OUT_uop(uop)
+
+    .IN_wbResult(wbResult),
+    .IN_wbValid(0),
+    .IN_wbRegNm(wbRegNm),
     
-    );
+    .OUT_uop(uop)
+);
 
 initial begin
     
-    $dumpfile("Decoder_tb.vcd");
-    $dumpvars(0, Decoder_tb);
+    $dumpfile("Decode_tb.vcd");
+    $dumpvars(0, Decode_tb);
 
     clk = 0;
     #period
