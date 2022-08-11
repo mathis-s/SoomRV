@@ -9,8 +9,8 @@ typedef struct packed
 
 module RAT
 #(
-    parameter WIDTH_RD=2,
-    parameter WIDTH_WR=1
+    parameter WIDTH_RD = 2,
+    parameter WIDTH_WR = 1
 )
 (
     input wire clk,
@@ -47,6 +47,9 @@ end
 always@(posedge clk) begin
     if (rst) begin
         tagCnt <= 1;
+        // set all regs as avail on rst
+        for (i = 0; i < 32; i++)
+            rat[i].avail <= 1;
     end
     else begin
         // Commit results from ROB.

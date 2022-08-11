@@ -31,6 +31,7 @@ int main(int argc, char** argv)
         0x40B787B3,
         0x00f62023,
         0xfeb7fce3,
+        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);

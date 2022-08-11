@@ -1,5 +1,3 @@
-`include "src/Include.sv"
-
 `timescale 1 ns / 10 ps
 
 `define OPC_LUI 7'b0110111
@@ -45,58 +43,63 @@ always@(*) begin
     case (instr.opcode)
         `OPC_LUI,
         `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
-        `OPC_JAL:        uop.imm = $signed({instr[31], instr[19:12], instr[20], instr[30:21], 1'b0});
+        `OPC_JAL:        uop.imm = IN_pc + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0}); // TODO: pc is only 31 bits, fix this later
         `OPC_JALR,          
         `OPC_LOAD,
-        `OPC_REG_IMM:    uop.imm = $signed({instr[31:20]});
-        `OPC_BRANCH:     uop.imm = $signed({instr[31], instr[7], instr[30:25], instr[11:8], 1'b0});
-        `OPC_REG_REG:    uop.imm = $signed({instr[31:25], instr[11:7]});
-        //`OPC_STORE,
+        `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
+        `OPC_BRANCH:     uop.imm = IN_pc + $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
+        `OPC_STORE:    uop.imm = $signed({{20{instr[31]}}, instr[31:25], instr[11:7]});
+        //`OPC_REG_REG,
         default:      uop.imm = 0;
     endcase
-
-    uop.immPC = IN_pc;
 
     case (instr.opcode)
         `OPC_LUI: begin
             uop.fu = FU_INT;
             uop.rs0 = 0;
             uop.rs1 = 0;
+            uop.pcA = 0;
             uop.immB = 1;
             uop.rd = instr.rd;
-            uop.opcode = 0;
+            uop.opcode = INT_LUI;
             invalidEnc = 0;
         end
         `OPC_AUIPC: begin
             uop.fu = FU_INT;
             uop.rs0 = 0;
             uop.rs1 = 0;
+            uop.pcA = 1;
             uop.immB = 1;
             uop.rd = instr.rd;
-            uop.opcode = 0;
+            uop.opcode = INT_AUIPC;
             invalidEnc = 0;
         end
         `OPC_JAL: begin
             uop.fu = FU_INT;
             uop.rs0 = 0;
             uop.rs1 = 0;
+            uop.pcA = 1;
             uop.immB = 1;
             uop.rd = instr.rd;
-            uop.opcode = 0;
+            uop.opcode = INT_JAL;
             invalidEnc = 0;
         end
         `OPC_JALR: begin
             uop.fu = FU_INT;
-            uop.rs0 = instr.rs0;
-            uop.rs1 = 0;
-            uop.immB = 1;
+            // (!) inverted rs0/rs1 here, to be able to pass
+            // rs1, imm and pc in (resp.) srcB, imm, srcA
+            uop.rs0 = 0;
+            uop.rs1 = instr.rs0;
+            uop.pcA = 1;
+            uop.immB = 0;
             uop.rd = instr.rd;
-            uop.opcode = 0; 
+            uop.opcode = INT_JALR; 
             invalidEnc = 0;
         end
         `OPC_LOAD: begin
             uop.rs0 = instr.rs0;
             uop.rs1 = 0;
+            uop.pcA = 0;
             uop.immB = 1;
             uop.rd = instr.rd;
 
@@ -116,6 +119,7 @@ always@(*) begin
         `OPC_STORE: begin
             uop.rs0 = instr.rs0;
             uop.rs1 = instr.rs1;
+            uop.pcA = 0;
             uop.immB = 0;
             uop.rd = 0;
 
@@ -132,6 +136,7 @@ always@(*) begin
         `OPC_BRANCH: begin
             uop.rs0 = instr.rs0;
             uop.rs1 = instr.rs1;
+            uop.pcA = 0;
             uop.immB = 0;
             uop.rd = 0;
             
@@ -150,6 +155,7 @@ always@(*) begin
         `OPC_REG_IMM: begin
             uop.rs0 = instr.rs0;
             uop.rs1 = 0;
+            uop.pcA = 0;
             uop.immB = 1;
             uop.rd = instr.rd;
             
@@ -170,6 +176,7 @@ always@(*) begin
         `OPC_REG_REG: begin
             uop.rs0 = instr.rs0;
             uop.rs1 = instr.rs1;
+            uop.pcA = 0;
             uop.immB = 0;
             uop.rd = instr.rd;
             if (instr.funct7 == 0) begin

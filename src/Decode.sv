@@ -14,15 +14,18 @@ module Decode
 
 D_UOp decodedInstr;
 wire invalidInstr;
+wire[31:0] registerSrcA;
 wire[31:0] registerSrcB;
+
 UOp uop;
 
 assign OUT_uop = uop;
 
 assign uop.imm = decodedInstr.imm;
-assign uop.immPC = decodedInstr.immPC;
 assign uop.opcode = decodedInstr.opcode;
 assign uop.fu = decodedInstr.fu;
+
+assign uop.srcA = decodedInstr.pcA ? IN_pc : registerSrcA;
 assign uop.srcB = decodedInstr.immB ? decodedInstr.imm : registerSrcB;
 
 // todo immb field
@@ -47,7 +50,7 @@ RAT rat
     .wbValid('{IN_wbValid}),
     .wbRegNm('{IN_wbRegNm}),
 
-    .rdRegValue('{uop.srcA, registerSrcB}),
+    .rdRegValue('{registerSrcA, registerSrcB}),
     .rdRegTag('{uop.tagA, uop.tagB}),
 
     .wrRegTag('{uop.tagDst})

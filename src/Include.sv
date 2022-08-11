@@ -16,7 +16,11 @@ typedef enum logic[5:0]
     INT_BLT,
     INT_BGE,
     INT_BLTU,
-    INT_BGEU
+    INT_BGEU,
+    INT_LUI,
+    INT_AUIPC,
+    INT_JAL,
+    INT_JALR
 } OPCode_INT;
 
 typedef enum logic[5:0]
@@ -52,9 +56,10 @@ typedef enum logic[1:0] {FU_INT, FU_MUL, FU_DIV, FU_LSU} FuncUnit;
 typedef struct packed
 {
     logic[31:0] imm;
-    logic[31:0] immPC;
     logic[4:0] rs0; 
-    logic[4:0] rs1; 
+    logic[4:0] rs1;
+    logic pcA;
+    // only useful when we otherwise need a duplicate opcode -> maybe rework some things
     logic immB;
     logic[4:0] rd;
     logic[5:0] opcode;
@@ -64,7 +69,6 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
-    logic[31:0] immPC;
     logic[31:0] srcA;
     logic[5:0] tagA;
     logic[31:0] srcB;
