@@ -32,6 +32,7 @@ int main(int argc, char** argv)
         0x00f62023,
         0xfeb7fce3,
         0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
+        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
@@ -55,7 +56,7 @@ int main(int argc, char** argv)
         {
             if (i >= sizeof(instrs) / sizeof(instrs[0])) break;
             top->IN_instr = instrs[i++];
-            top->IN_pc = i;
+            top->IN_pc = i*2;
             top->IN_wbRegNm = 0;
             top->IN_wbResult = 0;
             top->IN_wbValid = 0;

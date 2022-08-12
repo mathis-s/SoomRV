@@ -75,5 +75,5 @@ typedef struct packed
     logic[5:0] tagB;
     logic[5:0] tagDst;
     logic[5:0] opcode;
-    FuncUnit fu;
+    logic valid;
 } UOp;

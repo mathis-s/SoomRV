@@ -57,16 +57,16 @@ always@(posedge clk) begin
             if (wbValid[i] && (wbRegNm[i] != 0)) begin
                 // iverilog gives up here unless using explicit indexing.
                 //rat[wbRegNm[i]].value <= wbResult[i];
-                rat[wbRegNm[i]][31:0] <= wbResult[i];
-                rat[wbRegNm[i]][38] = 1; // blocking as might be undone
+                rat[wbRegNm[i]].value <= wbResult[i];
+                rat[wbRegNm[i]].avail = 1; // blocking as might be undone
             end
         end
 
         // Mark regs used by newly issued instructions as unavailable/pending.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             if (wrRegNm[i] != 0) begin
-                rat[wrRegNm[i]][38] = 0;
-                rat[wrRegNm[i]][37:32] <= wrRegTag[i];
+                rat[wrRegNm[i]].avail = 0;
+                rat[wrRegNm[i]].tag <= wrRegTag[i];
             end
         end
 

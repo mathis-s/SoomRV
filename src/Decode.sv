@@ -9,8 +9,18 @@ module Decode
     input wire IN_wbValid,
     input wire[4:0] IN_wbRegNm,
 
-    output UOp OUT_uop
+    output UOp OUT_uop,
+    output FuncUnit OUT_fu
 );
+
+reg stateValid;
+
+always@(posedge clk) begin
+    if (rst)
+        stateValid <= 0;
+    else
+        stateValid <= 1;
+end
 
 D_UOp decodedInstr;
 wire invalidInstr;
@@ -20,10 +30,12 @@ wire[31:0] registerSrcB;
 UOp uop;
 
 assign OUT_uop = uop;
+assign OUT_fu = decodedInstr.fu;
+
+assign uop.valid = stateValid;
 
 assign uop.imm = decodedInstr.imm;
 assign uop.opcode = decodedInstr.opcode;
-assign uop.fu = decodedInstr.fu;
 
 assign uop.srcA = decodedInstr.pcA ? IN_pc : registerSrcA;
 assign uop.srcB = decodedInstr.immB ? decodedInstr.imm : registerSrcB;
@@ -54,6 +66,29 @@ RAT rat
     .rdRegTag('{uop.tagA, uop.tagB}),
 
     .wrRegTag('{uop.tagDst})
+);
+
+
+// Later fuse the RV here with the actual integer alu, and only have integer FU
+// instantiated here.
+wire[31:0] INT_operands[2:0];
+wire[5:0] INT_tagDst;
+wire[5:0] INT_opcode;
+wire INT_full;
+
+ReservationStation rv
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_uop(uop),
+    .IN_resultBus('{32'b0}),
+    .IN_resultTag('{6'b0}),
+
+    .OUT_operands(INT_operands),
+    .OUT_tagDst(INT_tagDst),
+    .OUT_opcode(INT_opcode),
+    .OUT_full(INT_full)
 );
 
 endmodule
