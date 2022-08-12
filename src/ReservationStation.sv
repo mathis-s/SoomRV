@@ -13,8 +13,8 @@ module ReservationStation
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
 
     output reg[31:0] OUT_operands[2:0],
-    output reg[5:0] OUT_tagDst,
     output reg[5:0] OUT_opcode,
+    output reg[5:0] OUT_tagDst,
     output reg OUT_full
 );
 

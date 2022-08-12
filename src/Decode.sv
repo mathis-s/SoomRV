@@ -86,9 +86,25 @@ ReservationStation rv
     .IN_resultTag('{6'b0}),
 
     .OUT_operands(INT_operands),
-    .OUT_tagDst(INT_tagDst),
     .OUT_opcode(INT_opcode),
+    .OUT_tagDst(INT_tagDst),
     .OUT_full(INT_full)
 );
+
+
+wire[31:0] INT_result;
+wire[5:0] INT_resTag;
+IntALU ialu
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_operands(INT_operands),
+    .IN_opcode(INT_opcode),
+    .IN_tagDst(INT_tagDst),
+    
+    .OUT_result(INT_result),
+    .OUT_tagDst(INT_resTag)
+);  
 
 endmodule
