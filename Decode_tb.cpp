@@ -39,6 +39,8 @@ int main(int argc, char** argv)
         0x00a50513,//                addi    a0,a0,10
         0x00510113,//                addi    sp,sp,5
         0xfff10593,//                addi    a1,sp,-1
+        0x00000013,//                nop
+        0x00000013,//                nop
         0x00250533,//                add     a0,a0,sp
         0x00000013,//                nop
         0x00000013,//                nop

@@ -22,8 +22,6 @@ end
 
 D_UOp decodedInstr;
 wire invalidInstr;
-wire[31:0] registerSrcA;
-wire[31:0] registerSrcB;
 
 UOp uop;
 
@@ -35,10 +33,57 @@ assign uop.valid = stateValid;
 assign uop.imm = decodedInstr.imm;
 assign uop.opcode = decodedInstr.opcode;
 
-assign uop.srcA = decodedInstr.pcA ? IN_pc : registerSrcA;
-assign uop.srcB = decodedInstr.immB ? decodedInstr.imm : registerSrcB;
+wire[5:0]  ratLookupTagA;
+wire[5:0]  ratLookupTagB;
 
-// todo immb field
+wire[31:0] ratLookupSrcA;
+wire[31:0] ratLookupSrcB;
+
+wire[31:0] robLookupSrcA;
+wire robAvailA;
+wire[31:0] robLookupSrcB;
+wire robAvailB;
+
+// We will very likely want to transition to doing
+// ROB lookup in the next pipeline stage.
+// Like this, critical path is quite long, as 
+// the tag from RAT lookup is required for ROB lookup.
+always_comb begin
+    if (decodedInstr.pcA) begin
+        uop.srcA = IN_pc;
+        uop.tagA = 0;
+    end
+    else if (ratLookupTagA == 0) begin
+        uop.srcA = ratLookupSrcA;
+        uop.tagA = 0;
+    end
+    else if (robAvailA) begin
+        uop.srcA = robLookupSrcA;
+        uop.tagA = 0;
+    end
+    else begin
+        uop.srcA = {32{1'bx}};
+        uop.tagA = ratLookupTagA;
+    end
+
+
+    if (decodedInstr.immB) begin
+        uop.srcB = uop.imm;
+        uop.tagB = 0;
+    end
+    else if (ratLookupTagB == 0) begin
+        uop.srcB = ratLookupSrcB;
+        uop.tagB = 0;
+    end
+    else if (robAvailB) begin
+        uop.srcB = robLookupSrcB;
+        uop.tagB = 0;
+    end
+    else begin
+        uop.srcB = {32{1'bx}};
+        uop.tagB = ratLookupTagB;
+    end
+end
 
 InstrDecoder idec
 (
@@ -48,7 +93,6 @@ InstrDecoder idec
     .OUT_uop(decodedInstr),
     .OUT_invalid(invalidInstr)
 );
-
 
 RAT rat
 (
@@ -60,8 +104,8 @@ RAT rat
     .wbValid('{wbValid}),
     .wbRegNm('{wbRegNm}),
 
-    .rdRegValue('{registerSrcA, registerSrcB}),
-    .rdRegTag('{uop.tagA, uop.tagB}),
+    .rdRegValue('{ratLookupSrcA, ratLookupSrcB}),
+    .rdRegTag('{ratLookupTagA, ratLookupTagB}),
 
     .wrRegTag('{uop.tagDst})
 );
@@ -118,14 +162,14 @@ ROB rob
     .IN_tags('{INT_resTag}),
     .IN_names('{17}), // placeholder
     .IN_flags('{0}), // placeholder
-    .IN_read_tags('{0, 0}), // placeholder
+    .IN_read_tags('{ratLookupTagA, ratLookupTagB}),
     
     .OUT_full(ROB_full),
     .OUT_results('{wbResult}),
     .OUT_names('{wbRegNm}),
 
-    .OUT_read_results(),
-    .OUT_read_avail()
+    .OUT_read_results('{robLookupSrcA, robLookupSrcB}),
+    .OUT_read_avail('{robAvailA, robAvailB})
 );
 
 endmodule

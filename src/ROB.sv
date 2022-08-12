@@ -36,7 +36,7 @@ module ROB
     output reg[4:0] OUT_names[WIDTH-1:0],
 
     output reg[31:0] OUT_read_results[READ_WIDTH-1:0],
-    output reg[31:0] OUT_read_avail[READ_WIDTH-1:0]
+    output reg OUT_read_avail[READ_WIDTH-1:0]
 );
 
 assign OUT_full = 0; // placeholder
