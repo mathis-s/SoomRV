@@ -74,7 +74,11 @@ RAT rat
 wire[31:0] INT_operands[2:0];
 wire[5:0] INT_tagDst;
 wire[5:0] INT_opcode;
+wire INT_valid;
 wire INT_full;
+
+wire[31:0] INT_result;
+wire[5:0] INT_resTag;
 
 ReservationStation rv
 (
@@ -82,23 +86,22 @@ ReservationStation rv
     .rst(rst),
 
     .IN_uop(uop),
-    .IN_resultBus('{32'b0}),
-    .IN_resultTag('{6'b0}),
+    .IN_resultBus('{INT_result}),
+    .IN_resultTag('{INT_resTag}),
 
+    .OUT_valid(INT_valid),
     .OUT_operands(INT_operands),
     .OUT_opcode(INT_opcode),
     .OUT_tagDst(INT_tagDst),
     .OUT_full(INT_full)
 );
 
-
-wire[31:0] INT_result;
-wire[5:0] INT_resTag;
 IntALU ialu
 (
     .clk(clk),
     .rst(rst),
     
+    .IN_valid(INT_valid),
     .IN_operands(INT_operands),
     .IN_opcode(INT_opcode),
     .IN_tagDst(INT_tagDst),

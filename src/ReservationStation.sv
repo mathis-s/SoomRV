@@ -12,6 +12,7 @@ module ReservationStation
     input wire[31:0] IN_resultBus[RESULT_BUS_COUNT-1:0],
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
 
+    output reg OUT_valid,
     output reg[31:0] OUT_operands[2:0],
     output reg[5:0] OUT_opcode,
     output reg[5:0] OUT_tagDst,
@@ -74,6 +75,8 @@ always@(posedge clk) begin
                 deqValid = 1;
             end
         end
+        // if an op was dequeued, output is valid, otherwise not.
+        OUT_valid <= deqValid;
 
         // enqueue new uop
         if (enqUOp.valid) begin

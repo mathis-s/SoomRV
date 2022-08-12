@@ -1,15 +1,17 @@
 module IntALU
 (
-   input wire clk,
-   input wire rst,
+    input wire clk,
+    input wire rst,
 
-   input wire[31:0] IN_operands[2:0],
-   input OPCode_INT IN_opcode,
-   input wire[5:0] IN_tagDst,
+    input wire IN_valid,
+    input wire[31:0] IN_operands[2:0],
+    input OPCode_INT IN_opcode,
+    input wire[5:0] IN_tagDst,
 
-   output reg[31:0] OUT_result,
-   output reg[5:0] OUT_tagDst
+    output reg[31:0] OUT_result,
+    output reg[5:0] OUT_tagDst
 );
+
 
 reg[31:0] resC;
 always@(*) begin
@@ -37,11 +39,15 @@ always@(*) begin
         INT_JALR,
         INT_JAL: resC = IN_operands[0] + 4;
         default: resC = 0;
-    endcase 
+    endcase
+
+    OUT_tagDst = IN_valid ? IN_tagDst : 0;
+    OUT_result = resC;
 end
 
-always@(posedge clk) begin
-    OUT_result <= resC;
-    OUT_tagDst <= IN_tagDst;
-end
+//always@(posedge clk) begin
+//    OUT_tagDst <= IN_valid ? IN_tagDst : 0;
+//    OUT_result <= resC;
+//    
+//end
 endmodule;

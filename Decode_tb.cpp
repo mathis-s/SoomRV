@@ -27,12 +27,24 @@ int main(int argc, char** argv)
     size_t i = 0;
     const uint32_t instrs[] = 
     {
-        0xFF010113,
+        /*0xFF010113,
         0x40B787B3,
         0x00f62023,
         0xfeb7fce3,
         0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
         0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
+        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
+        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>*/
+        
+        0x00a50513,//                addi    a0,a0,10
+        0x00510113,//                addi    sp,sp,5
+        0xfff10593,//                addi    a1,sp,-1
+        0x00250533,//                add     a0,a0,sp
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
