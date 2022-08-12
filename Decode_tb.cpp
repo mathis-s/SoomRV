@@ -69,9 +69,6 @@ int main(int argc, char** argv)
             if (i >= sizeof(instrs) / sizeof(instrs[0])) break;
             top->IN_instr = instrs[i++];
             top->IN_pc = i*2;
-            top->IN_wbRegNm = 0;
-            top->IN_wbResult = 0;
-            top->IN_wbValid = 0;
         }
         if (top->clk == 1)
         {

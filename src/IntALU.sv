@@ -14,7 +14,7 @@ module IntALU
 
 
 reg[31:0] resC;
-always@(*) begin
+always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_opcode)
         INT_AUIPC,
@@ -45,7 +45,7 @@ always@(*) begin
     OUT_result = resC;
 end
 
-//always@(posedge clk) begin
+//always_ff@(posedge clk) begin
 //    OUT_tagDst <= IN_valid ? IN_tagDst : 0;
 //    OUT_result <= resC;
 //    

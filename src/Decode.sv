@@ -5,21 +5,19 @@ module Decode
     input wire[31:0] IN_instr,
     input wire[31:0] IN_pc,
 
-    input wire[31:0] IN_wbResult,
-    input wire IN_wbValid,
-    input wire[4:0] IN_wbRegNm,
-
     output UOp OUT_uop,
     output FuncUnit OUT_fu
 );
 
+
+wire[31:0] wbResult;
+wire[4:0] wbRegNm;
+wire wbValid = (wbRegNm != 0);
+
 reg stateValid;
 
-always@(posedge clk) begin
-    if (rst)
-        stateValid <= 0;
-    else
-        stateValid <= 1;
+always_ff@(posedge clk) begin
+    stateValid <= !rst;
 end
 
 D_UOp decodedInstr;
@@ -58,9 +56,9 @@ RAT rat
     .rst(rst),
     .rdRegNm('{decodedInstr.rs0, decodedInstr.rs1}),
     .wrRegNm('{decodedInstr.rd}),
-    .wbResult('{IN_wbResult}),
-    .wbValid('{IN_wbValid}),
-    .wbRegNm('{IN_wbRegNm}),
+    .wbResult('{wbResult}),
+    .wbValid('{wbValid}),
+    .wbRegNm('{wbRegNm}),
 
     .rdRegValue('{registerSrcA, registerSrcB}),
     .rdRegTag('{uop.tagA, uop.tagB}),
@@ -108,6 +106,26 @@ IntALU ialu
     
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag)
-);  
+);
+
+wire ROB_full;
+ROB rob
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_valid('{stateValid && INT_resTag != 0}),
+    .IN_results('{INT_result}),
+    .IN_tags('{INT_resTag}),
+    .IN_names('{17}), // placeholder
+    .IN_flags('{0}), // placeholder
+    .IN_read_tags('{0, 0}), // placeholder
+    
+    .OUT_full(ROB_full),
+    .OUT_results('{wbResult}),
+    .OUT_names('{wbRegNm}),
+
+    .OUT_read_results(),
+    .OUT_read_avail()
+);
 
 endmodule

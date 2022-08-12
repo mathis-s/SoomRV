@@ -29,7 +29,7 @@ UOp queue[QUEUE_SIZE-1:0];
 reg enqValid;
 reg deqValid;
 
-always@(*) begin
+always_comb begin
     OUT_full = 1;
     for (i = 0; i < QUEUE_SIZE; i=i+1) begin
         if (!queue[i].valid)
@@ -37,7 +37,7 @@ always@(*) begin
     end
 end
 
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
 
     if (rst) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin

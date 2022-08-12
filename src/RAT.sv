@@ -34,7 +34,7 @@ integer i;
 
 bit[5:0] tagCnt;
 
-always@(*) begin
+always_comb begin
     for (i = 0; i < WIDTH_RD; i=i+1) begin
         temp = rat[rdRegNm[i]];
         rdRegValue[i] = temp.value;
@@ -44,7 +44,7 @@ end
 
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
     if (rst) begin
         tagCnt <= 1;
         // set all regs as avail on rst

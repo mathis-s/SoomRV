@@ -36,7 +36,7 @@ Instr32 instr;
 assign OUT_uop = uop;
 assign OUT_invalid = invalidEnc;
 
-always@(*) begin
+always_comb begin
 
     instr = IN_instr;
 
