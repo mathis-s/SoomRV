@@ -7,9 +7,11 @@ module IntALU
     input wire[31:0] IN_operands[2:0],
     input OPCode_INT IN_opcode,
     input wire[5:0] IN_tagDst,
+    input wire[4:0] IN_nmDst,
 
     output reg[31:0] OUT_result,
-    output reg[5:0] OUT_tagDst
+    output reg[5:0] OUT_tagDst,
+    output reg[4:0] OUT_nmDst
 );
 
 
@@ -42,11 +44,13 @@ always_comb begin
     endcase
 
     OUT_tagDst = IN_valid ? IN_tagDst : 0;
+    OUT_nmDst = IN_nmDst;
     OUT_result = resC;
 end
 
 //always_ff@(posedge clk) begin
 //    OUT_tagDst <= IN_valid ? IN_tagDst : 0;
+//    OUT_nmDst <= IN_nmDst;
 //    OUT_result <= resC;
 //    
 //end

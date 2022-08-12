@@ -47,6 +47,16 @@ int main(int argc, char** argv)
         0x00000013,//                nop
         0x00000013,//                nop
         0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00510113,//                addi    sp,sp,5
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);

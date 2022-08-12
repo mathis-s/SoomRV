@@ -12,6 +12,7 @@ module Decode
 
 wire[31:0] wbResult;
 wire[4:0] wbRegNm;
+wire[5:0] wbRegTag;
 wire wbValid = (wbRegNm != 0);
 
 reg stateValid;
@@ -27,11 +28,6 @@ UOp uop;
 
 assign OUT_uop = uop;
 assign OUT_fu = decodedInstr.fu;
-
-assign uop.valid = stateValid;
-
-assign uop.imm = decodedInstr.imm;
-assign uop.opcode = decodedInstr.opcode;
 
 wire[5:0]  ratLookupTagA;
 wire[5:0]  ratLookupTagB;
@@ -49,6 +45,12 @@ wire robAvailB;
 // Like this, critical path is quite long, as 
 // the tag from RAT lookup is required for ROB lookup.
 always_comb begin
+
+    uop.valid = stateValid;
+    uop.imm = decodedInstr.imm;
+    uop.opcode = decodedInstr.opcode;
+    uop.nmDst = decodedInstr.rd;
+
     if (decodedInstr.pcA) begin
         uop.srcA = IN_pc;
         uop.tagA = 0;
@@ -103,6 +105,7 @@ RAT rat
     .wbResult('{wbResult}),
     .wbValid('{wbValid}),
     .wbRegNm('{wbRegNm}),
+    .wbRegTag('{wbRegTag}),
 
     .rdRegValue('{ratLookupSrcA, ratLookupSrcB}),
     .rdRegTag('{ratLookupTagA, ratLookupTagB}),
@@ -115,12 +118,14 @@ RAT rat
 // instantiated here.
 wire[31:0] INT_operands[2:0];
 wire[5:0] INT_tagDst;
+wire[4:0] INT_nmDst;
 wire[5:0] INT_opcode;
 wire INT_valid;
 wire INT_full;
 
 wire[31:0] INT_result;
 wire[5:0] INT_resTag;
+wire[4:0] INT_resName;
 
 ReservationStation rv
 (
@@ -135,6 +140,7 @@ ReservationStation rv
     .OUT_operands(INT_operands),
     .OUT_opcode(INT_opcode),
     .OUT_tagDst(INT_tagDst),
+    .OUT_nmDst(INT_nmDst),
     .OUT_full(INT_full)
 );
 
@@ -147,9 +153,11 @@ IntALU ialu
     .IN_operands(INT_operands),
     .IN_opcode(INT_opcode),
     .IN_tagDst(INT_tagDst),
+    .IN_nmDst(INT_nmDst),
     
     .OUT_result(INT_result),
-    .OUT_tagDst(INT_resTag)
+    .OUT_tagDst(INT_resTag),
+    .OUT_nmDst(INT_resName)
 );
 
 wire ROB_full;
@@ -160,13 +168,14 @@ ROB rob
     .IN_valid('{stateValid && INT_resTag != 0}),
     .IN_results('{INT_result}),
     .IN_tags('{INT_resTag}),
-    .IN_names('{17}), // placeholder
+    .IN_names('{INT_resName}), // placeholder
     .IN_flags('{0}), // placeholder
     .IN_read_tags('{ratLookupTagA, ratLookupTagB}),
     
     .OUT_full(ROB_full),
     .OUT_results('{wbResult}),
     .OUT_names('{wbRegNm}),
+    .OUT_tags('{wbRegTag}),
 
     .OUT_read_results('{robLookupSrcA, robLookupSrcB}),
     .OUT_read_avail('{robAvailA, robAvailB})

@@ -34,6 +34,7 @@ module ROB
 
     output reg[31:0] OUT_results[WIDTH-1:0],
     output reg[4:0] OUT_names[WIDTH-1:0],
+    output reg[5:0] OUT_tags[WIDTH-1:0],
 
     output reg[31:0] OUT_read_results[READ_WIDTH-1:0],
     output reg OUT_read_avail[READ_WIDTH-1:0]
@@ -85,6 +86,7 @@ always_ff@(posedge clk) begin
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_results[i] <= entries[i].result;
                 OUT_names[i] <= entries[i].valid ? entries[i].name : 0;
+                OUT_tags[i] <= entries[i].tag;
                 // TODO: handle exceptions here.
             end
         end

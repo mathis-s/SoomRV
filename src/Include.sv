@@ -74,6 +74,7 @@ typedef struct packed
     logic[31:0] srcB;
     logic[5:0] tagB;
     logic[5:0] tagDst;
+    logic[4:0] nmDst;
     logic[5:0] opcode;
     logic valid;
 } UOp;
