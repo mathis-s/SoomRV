@@ -30,7 +30,7 @@ module ROB
 
     input wire[5:0] IN_read_tags[READ_WIDTH-1:0],
 
-    output wire OUT_full,
+    output wire[5:0] OUT_maxTag,
 
     output reg[31:0] OUT_results[WIDTH-1:0],
     output reg[4:0] OUT_names[WIDTH-1:0],
@@ -40,9 +40,10 @@ module ROB
     output reg OUT_read_avail[READ_WIDTH-1:0]
 );
 
-assign OUT_full = 0; // placeholder
-
 ROBEntry entries[LENGTH-1:0];
+reg[5:0] baseIndex;
+
+assign OUT_maxTag = baseIndex + LENGTH - 1;
 
 integer i;
 integer j;
@@ -66,11 +67,20 @@ always @(*) begin
     end
 end
 
+reg headValid;
+always_comb begin
+    headValid = 1;
+    for (i = 0; i < WIDTH; i=i+1) begin
+        if (!entries[i].valid)
+            headValid = 0;
+    end
+end
 
-wire doDequeue = 1; // placeholder
+wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
 
     if (rst) begin
+        baseIndex = 1;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
         end
@@ -87,19 +97,30 @@ always_ff@(posedge clk) begin
                 OUT_results[i] <= entries[i].result;
                 OUT_names[i] <= entries[i].valid ? entries[i].name : 0;
                 OUT_tags[i] <= entries[i].tag;
+                //$assert(entries[i].tag == baseIndex + i);
                 // TODO: handle exceptions here.
             end
+
+            // Blocking for proper insertion
+            baseIndex = baseIndex + WIDTH;
         end
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH; i=i+1) begin
-            if ((doDequeue || !entries[LENGTH - i - 1].valid)) begin
+            if (IN_valid[i]) begin
+                entries[IN_tags[i][2:0] - baseIndex[2:0]].valid <= 1;
+                entries[IN_tags[i][2:0] - baseIndex[2:0]].flags <= 0;
+                entries[IN_tags[i][2:0] - baseIndex[2:0]].tag <= IN_tags[i];
+                entries[IN_tags[i][2:0] - baseIndex[2:0]].name <= IN_names[i];
+                entries[IN_tags[i][2:0] - baseIndex[2:0]].result <= IN_results[i];
+            end
+            /*if ((doDequeue || !entries[LENGTH - i - 1].valid)) begin
                 entries[LENGTH - i - 1].valid <= IN_valid[i];
                 entries[LENGTH - i - 1].flags <= 0;
                 entries[LENGTH - i - 1].tag <= IN_tags[i];
                 entries[LENGTH - i - 1].name <= IN_names[i];
                 entries[LENGTH - i - 1].result <= IN_results[i];
-            end
+            end*/
         end
     end
 end

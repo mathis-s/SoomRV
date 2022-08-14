@@ -79,8 +79,10 @@ int main(int argc, char** argv)
         if (top->clk == 0)
         {
             if (i >= sizeof(instrs) / sizeof(instrs[0])) break;
-            top->IN_instr = instrs[i++];
-            top->IN_pc = i*2;
+            size_t index = top->OUT_pc / 4;
+            if (index > (sizeof(instrs) / sizeof(instrs[0])))
+                break;
+            top->IN_instr = instrs[index];
         }
         if (top->clk == 1)
         {

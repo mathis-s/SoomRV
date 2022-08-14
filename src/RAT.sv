@@ -14,6 +14,7 @@ module RAT
 )
 (
     input wire clk,
+    input wire en,
     input wire rst,
 
     input wire[4:0] rdRegNm[WIDTH_RD-1:0],
@@ -52,7 +53,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < 32; i++)
             rat[i].avail <= 1;
     end
-    else begin
+    else if (en) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             if (wbValid[i] && (wbRegNm[i] != 0)) begin

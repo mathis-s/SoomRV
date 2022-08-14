@@ -3,8 +3,8 @@ module Decode
     input wire clk,
     input wire rst,
     input wire[31:0] IN_instr,
-    input wire[31:0] IN_pc,
-
+    
+    output wire[31:0] OUT_pc,
     output UOp OUT_uop,
     output FuncUnit OUT_fu
 );
@@ -15,7 +15,19 @@ wire[4:0] wbRegNm;
 wire[5:0] wbRegTag;
 wire wbValid = (wbRegNm != 0);
 
+wire DEC_enable;
 reg stateValid;
+wire PC_enable = DEC_enable && stateValid;
+
+wire[31:0] pc;
+assign OUT_pc = pc;
+ProgramCounter progCnt
+(
+    .clk(clk),
+    .en(PC_enable),
+    .rst(rst),
+    .OUT_pc(pc)
+);
 
 always_ff@(posedge clk) begin
     stateValid <= !rst;
@@ -28,6 +40,8 @@ UOp uop;
 
 assign OUT_uop = uop;
 assign OUT_fu = decodedInstr.fu;
+
+wire[5:0] RAT_dstTag;
 
 wire[5:0]  ratLookupTagA;
 wire[5:0]  ratLookupTagB;
@@ -46,17 +60,22 @@ wire robAvailB;
 // the tag from RAT lookup is required for ROB lookup.
 always_comb begin
 
-    uop.valid = stateValid;
+    uop.valid = stateValid && DEC_enable;
     uop.imm = decodedInstr.imm;
     uop.opcode = decodedInstr.opcode;
     uop.nmDst = decodedInstr.rd;
+    uop.tagDst = RAT_dstTag;
 
     if (decodedInstr.pcA) begin
-        uop.srcA = IN_pc;
+        uop.srcA = pc;
         uop.tagA = 0;
     end
     else if (ratLookupTagA == 0) begin
         uop.srcA = ratLookupSrcA;
+        uop.tagA = 0;
+    end
+    else if (ratLookupTagA == wbRegTag) begin
+        uop.srcA = wbResult;
         uop.tagA = 0;
     end
     else if (robAvailA) begin
@@ -77,6 +96,10 @@ always_comb begin
         uop.srcB = ratLookupSrcB;
         uop.tagB = 0;
     end
+    else if (ratLookupTagB == wbRegTag) begin
+        uop.srcB = wbResult;
+        uop.tagB = 0;
+    end
     else if (robAvailB) begin
         uop.srcB = robLookupSrcB;
         uop.tagB = 0;
@@ -90,7 +113,7 @@ end
 InstrDecoder idec
 (
     .IN_instr(IN_instr),
-    .IN_pc(IN_pc),
+    .IN_pc(pc),
 
     .OUT_uop(decodedInstr),
     .OUT_invalid(invalidInstr)
@@ -99,6 +122,7 @@ InstrDecoder idec
 RAT rat
 (
     .clk(clk),
+    .en(DEC_enable),
     .rst(rst),
     .rdRegNm('{decodedInstr.rs0, decodedInstr.rs1}),
     .wrRegNm('{decodedInstr.rd}),
@@ -110,7 +134,7 @@ RAT rat
     .rdRegValue('{ratLookupSrcA, ratLookupSrcB}),
     .rdRegTag('{ratLookupTagA, ratLookupTagB}),
 
-    .wrRegTag('{uop.tagDst})
+    .wrRegTag('{RAT_dstTag})
 );
 
 
@@ -160,7 +184,8 @@ IntALU ialu
     .OUT_nmDst(INT_resName)
 );
 
-wire ROB_full;
+wire[5:0] ROB_maxTag;
+
 ROB rob
 (
     .clk(clk),
@@ -172,7 +197,7 @@ ROB rob
     .IN_flags('{0}), // placeholder
     .IN_read_tags('{ratLookupTagA, ratLookupTagB}),
     
-    .OUT_full(ROB_full),
+    .OUT_maxTag(ROB_maxTag),
     .OUT_results('{wbResult}),
     .OUT_names('{wbRegNm}),
     .OUT_tags('{wbRegTag}),
@@ -180,5 +205,7 @@ ROB rob
     .OUT_read_results('{robLookupSrcA, robLookupSrcB}),
     .OUT_read_avail('{robAvailA, robAvailB})
 );
+
+assign DEC_enable = !INT_full && (RAT_dstTag < ROB_maxTag);
 
 endmodule
