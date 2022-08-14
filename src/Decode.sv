@@ -78,6 +78,10 @@ always_comb begin
         uop.srcA = wbResult;
         uop.tagA = 0;
     end
+    else if (ratLookupTagA == INT_resTag) begin
+        uop.srcA = INT_result;
+        uop.tagA = 0;
+    end
     else if (robAvailA) begin
         uop.srcA = robLookupSrcA;
         uop.tagA = 0;
@@ -98,6 +102,10 @@ always_comb begin
     end
     else if (ratLookupTagB == wbRegTag) begin
         uop.srcB = wbResult;
+        uop.tagB = 0;
+    end
+    else if (ratLookupTagB == INT_resTag) begin
+        uop.srcB = INT_result;
         uop.tagB = 0;
     end
     else if (robAvailB) begin

@@ -1,6 +1,6 @@
 module ReservationStation
 #(
-    parameter QUEUE_SIZE = 2,
+    parameter QUEUE_SIZE = 4,
     parameter RESULT_BUS_COUNT = 1
 )
 (
@@ -26,8 +26,9 @@ integer j;
 UOp enqUOp;
 UOp queue[QUEUE_SIZE-1:0];
 
-
 reg enqValid;
+
+reg[1:0] deqIndex;
 reg deqValid;
 
 always_comb begin
@@ -35,6 +36,17 @@ always_comb begin
     for (i = 0; i < QUEUE_SIZE; i=i+1) begin
         if (!queue[i].valid)
             OUT_full = 0;
+    end
+end
+
+always_comb begin
+    deqValid = 0;
+    deqIndex = 0;
+    for (i = 0; i < QUEUE_SIZE; i=i+1) begin
+        if (queue[i].valid && queue[i].tagA == 0 && queue[i].tagB == 0 && (!deqValid || queue[i].tagDst < queue[deqIndex].tagDst)) begin
+            deqValid = 1;
+            deqIndex = i[1:0];
+        end
     end
 end
 
@@ -61,22 +73,18 @@ always_ff@(posedge clk) begin
                 end
             end
 
-        // dequeue old uop
-        deqValid = 0;
-        for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-            if (deqValid == 0 && queue[i].valid && queue[i].tagA == 0 && queue[i].tagB == 0) begin
-                OUT_operands[0] <= queue[i].srcA;
-                OUT_operands[1] <= queue[i].srcB;
-                OUT_operands[2] <= queue[i].imm;
-                OUT_tagDst <= queue[i].tagDst;
-                OUT_opcode <= queue[i].opcode;
-                OUT_nmDst <= queue[i].nmDst;
-                // TODO: it might be worth it to construct this in such a manner that a queue entry
-                // can be enqueued and dequeued in the same cycle, ie have this be blocking assignment. 
-                // (Did this for now)
-                queue[i].valid = 0;
-                deqValid = 1;
-            end
+        // dequeue old uop (should always dequeue smallest tag one...)
+        if (deqValid) begin
+            OUT_operands[0] <= queue[deqIndex].srcA;
+            OUT_operands[1] <= queue[deqIndex].srcB;
+            OUT_operands[2] <= queue[deqIndex].imm;
+            OUT_tagDst <= queue[deqIndex].tagDst;
+            OUT_opcode <= queue[deqIndex].opcode;
+            OUT_nmDst <= queue[deqIndex].nmDst;
+            // TODO: it might be worth it to construct this in such a manner that a queue entry
+            // can be enqueued and dequeued in the same cycle, ie have this be blocking assignment. 
+            // (Did this for now)
+            queue[deqIndex].valid = 0;
         end
         // if an op was dequeued, output is valid, otherwise not.
         OUT_valid <= deqValid;
