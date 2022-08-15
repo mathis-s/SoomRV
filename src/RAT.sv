@@ -78,6 +78,13 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             wrRegTag[i] <= (IN_branchTag + i[5:0] + 1);
         end
+
+        // TODO: this is incorrect! Should be reverted to the last 
+        // tag. Either keep tag history or let pipeline run dry after branch to fix this.
+        for (i = 0; i < 32; i=i+1) begin
+            if (!rat[i].avail && $signed(rat[i].tag - IN_branchTag) > 0)
+                rat[i].avail <= 1;
+        end
     end
     else if (en) begin
         // Mark regs used by newly issued instructions as unavailable/pending.

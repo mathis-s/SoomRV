@@ -160,6 +160,37 @@ InstrDecoder idec
     .OUT_invalid(invalidInstr)
 );
 
+// jumps also in here for now
+wire isBranch = 
+    decodedInstr.opcode == INT_BEQ || 
+    decodedInstr.opcode == INT_BNE || 
+    decodedInstr.opcode == INT_BLT || 
+    decodedInstr.opcode == INT_BGE || 
+    decodedInstr.opcode == INT_BLTU || 
+    decodedInstr.opcode == INT_BGEU || 
+    decodedInstr.opcode == INT_JAL || 
+    decodedInstr.opcode == INT_JALR;
+
+wire[5:0] BQ_maxCommitTag;
+wire BQ_maxCommitTagValid;
+
+BranchQueue bq
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_valid(stateValid[0] && DEC_enable && !pcWrite),
+    .IN_isBranch(isBranch),
+    .IN_tag(RAT_dstTag),
+    
+    .IN_checkedValid(INTALU_valid && INTALU_isBranch),
+    .IN_checkedTag(branchTag),
+    .IN_checkedCorrect(!pcWrite),
+    
+    .OUT_full(),
+    .OUT_commitLimitValid(BQ_maxCommitTagValid),
+    .OUT_commitLimitTag(BQ_maxCommitTag)
+);
+
 RAT rat
 (
     .clk(clk),
@@ -217,6 +248,7 @@ ReservationStation rv
 );
 
 wire INTALU_valid;
+wire INTALU_isBranch;
 IntALU ialu
 (
     .clk(clk),
@@ -229,6 +261,7 @@ IntALU ialu
     .IN_tagDst(INT_tagDst),
     .IN_nmDst(INT_nmDst),
 
+    .OUT_isBranch(INTALU_isBranch),
     .OUT_valid(INTALU_valid),
     .OUT_branchTaken(pcWrite),
     .OUT_branchAddress(pcIn),
@@ -253,6 +286,9 @@ ROB rob
 
     .IN_invalidate(pcWrite),
     .IN_invalidateTag(branchTag),
+
+    .IN_maxCommitTagValid(BQ_maxCommitTagValid),
+    .IN_maxCommitTag(BQ_maxCommitTag),
     
     .OUT_maxTag(ROB_maxTag),
     .OUT_results('{wbResult}),

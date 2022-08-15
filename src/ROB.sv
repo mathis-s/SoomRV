@@ -32,6 +32,9 @@ module ROB
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateTag,
 
+    input wire IN_maxCommitTagValid,
+    input wire[5:0] IN_maxCommitTag,
+
     output wire[5:0] OUT_maxTag,
 
     output reg[31:0] OUT_results[WIDTH-1:0],
@@ -74,7 +77,7 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[i].valid)
+        if (!entries[i].valid || (IN_maxCommitTagValid && $signed(entries[i].tag - IN_maxCommitTag) > 0))
             headValid = 0;
     end
 end

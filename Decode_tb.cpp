@@ -77,6 +77,7 @@ int main(int argc, char** argv)
         0x08000593,//                li      a1,128
         0x00150513,//                addi    a0,a0,1
         0xfeb54ee3,//                blt     a0,a1,1007c <.loop>
+        0x00158593,//                addi    a1,a1,1
         0x00000013,//                nop
         0x00000013,//                nop
         0x00000013,//                nop
