@@ -9,6 +9,7 @@ module ReservationStation
 
     input UOp IN_uop,
 
+    input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input wire[31:0] IN_resultBus[RESULT_BUS_COUNT-1:0],
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
 
@@ -46,7 +47,7 @@ always_comb begin
     deqValid = 0;
     deqIndex = 0;
     for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-        if (queue[i].valid && queue[i].availA && queue[i].availB && (!deqValid || queue[i].tagDst < queue[deqIndex].tagDst)) begin
+        if (queue[i].valid && queue[i].availA && queue[i].availB && (!deqValid || $signed(queue[i].tagDst - queue[deqIndex].tagDst) < 0)) begin
             deqValid = 1;
             deqIndex = i[1:0];
         end
@@ -71,15 +72,17 @@ always_ff@(posedge clk) begin
     else begin
         // Get relevant results from common data buses
         for (i = 0; i < RESULT_BUS_COUNT; i=i+1) 
-            for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                if (queue[j].availA == 0 && queue[j].tagA == IN_resultTag[i]) begin
-                    queue[j].availA <= 1;
-                    queue[j].srcA <= IN_resultBus[i];
-                end
+            if (IN_resultValid[i]) begin
+                for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+                    if (queue[j].availA == 0 && queue[j].tagA == IN_resultTag[i]) begin
+                        queue[j].availA <= 1;
+                        queue[j].srcA <= IN_resultBus[i];
+                    end
 
-                if (queue[j].availB == 0 && queue[j].tagB == IN_resultTag[i]) begin
-                    queue[j].availB <= 1;
-                    queue[j].srcB <= IN_resultBus[i];
+                    if (queue[j].availB == 0 && queue[j].tagB == IN_resultTag[i]) begin
+                        queue[j].availB <= 1;
+                        queue[j].srcB <= IN_resultBus[i];
+                    end
                 end
             end
 

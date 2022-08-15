@@ -1,6 +1,7 @@
 module IntALU
 (
     input wire clk,
+    input wire en,
     input wire rst,
 
     input wire IN_valid,
@@ -48,9 +49,9 @@ always_comb begin
         default: resC = 'bx;
     endcase
 
-    OUT_tagDst = IN_valid ? IN_tagDst : 0;
-    OUT_nmDst = IN_nmDst;
-    OUT_result = resC;
+    //OUT_tagDst = IN_valid ? IN_tagDst : 0;
+    //OUT_nmDst = IN_nmDst;
+    //OUT_result = resC;
 end
 
 
@@ -82,6 +83,12 @@ always_ff@(posedge clk) begin
             OUT_branchTaken <= 0;
             OUT_branchAddress <= 32'bx;
             OUT_branchTag <= 6'bx;
+        end
+
+        if (!OUT_branchTaken) begin
+            OUT_tagDst <= IN_tagDst;
+            OUT_nmDst <= IN_nmDst;
+            OUT_result <= resC;
         end
     end
 end

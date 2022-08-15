@@ -102,7 +102,7 @@ always_comb begin
         uop.tagA = 6'bx;
         uop.availA = 1;
     end
-    else if (INT_valid && ratLookupTagA == INT_resTag) begin
+    else if (INTALU_valid && ratLookupTagA == INT_resTag) begin
         uop.srcA = INT_result;
         uop.tagA = 6'bx;
         uop.availA = 1;
@@ -134,7 +134,7 @@ always_comb begin
         uop.tagB = 6'bx;
         uop.availB = 1;
     end
-    else if (INT_valid && ratLookupTagB == INT_resTag) begin
+    else if (INTALU_valid && ratLookupTagB == INT_resTag) begin
         uop.srcB = INT_result;
         uop.tagB = 6'bx;
         uop.availB = 1;
@@ -201,6 +201,7 @@ ReservationStation rv
     .rst(rst),
 
     .IN_uop(uop),
+    .IN_resultValid('{INTALU_valid}),
     .IN_resultBus('{INT_result}),
     .IN_resultTag('{INT_resTag}),
 
@@ -219,6 +220,7 @@ wire INTALU_valid;
 IntALU ialu
 (
     .clk(clk),
+    .en(1),
     .rst(rst),
     
     .IN_valid(INT_valid && stateValid[2]),
@@ -242,7 +244,7 @@ ROB rob
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid('{INT_valid && stateValid[2]}),
+    .IN_valid('{INTALU_valid}),
     .IN_results('{INT_result}),
     .IN_tags('{INT_resTag}),
     .IN_names('{INT_resName}),
