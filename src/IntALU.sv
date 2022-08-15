@@ -9,6 +9,7 @@ module IntALU
     input wire[5:0] IN_tagDst,
     input wire[4:0] IN_nmDst,
 
+    output reg OUT_valid,
     output reg OUT_branchTaken,
     output reg[31:0] OUT_branchAddress,
     output reg[5:0] OUT_branchTag,
@@ -69,16 +70,19 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    if (branchTaken) begin
-        OUT_branchTaken <= 1;
-        // TODO: jalr has different addr here
-        OUT_branchAddress <= IN_operands[2];
-        OUT_branchTag <= IN_tagDst;
-    end
-    else begin
-        OUT_branchTaken <= 0;
-        OUT_branchAddress <= 32'bx;
-        OUT_branchTag <= 6'bx;
+    OUT_valid <= IN_valid;
+    if (IN_valid) begin
+        if (branchTaken) begin
+            OUT_branchTaken <= 1;
+            // TODO: jalr has different addr here
+            OUT_branchAddress <= IN_operands[2];
+            OUT_branchTag <= IN_tagDst;
+        end
+        else begin
+            OUT_branchTaken <= 0;
+            OUT_branchAddress <= 32'bx;
+            OUT_branchTag <= 6'bx;
+        end
     end
 end
 

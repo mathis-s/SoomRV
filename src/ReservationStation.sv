@@ -26,7 +26,7 @@ module ReservationStation
 integer i;
 integer j;
 
-UOp enqUOp;
+//UOp enqUOp;
 UOp queue[QUEUE_SIZE-1:0];
 
 reg enqValid;
@@ -58,7 +58,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
             queue[i].valid <= 0;
-            enqUOp.valid <= 0;
+            //enqUOp.valid <= 0;
         end
     end
     else if (IN_invalidate) begin
@@ -66,7 +66,7 @@ always_ff@(posedge clk) begin
             if ($signed(queue[i].tagDst - IN_invalidateTag) > 0)
                 queue[i].valid <= 0;
         end
-        enqUOp.valid <= 0;
+        //enqUOp.valid <= 0;
     end
     else begin
         // Get relevant results from common data buses
@@ -100,17 +100,17 @@ always_ff@(posedge clk) begin
         OUT_valid <= deqValid;
 
         // enqueue new uop
-        if (enqUOp.valid) begin
+        if (IN_uop.valid) begin
             enqValid = 0;
             for (i = 0; i < QUEUE_SIZE; i=i+1) begin
                 if (enqValid == 0 && !queue[i].valid) begin
-                    queue[i] <= enqUOp;
+                    queue[i] <= IN_uop;
                     enqValid = 1;
                 end
             end
         end
 
-        enqUOp <= IN_uop;
+        //enqUOp <= IN_uop;
     end
 end
 

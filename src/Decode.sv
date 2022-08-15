@@ -13,7 +13,7 @@ module Decode
 wire[31:0] wbResult;
 wire[4:0] wbRegNm;
 wire[5:0] wbRegTag;
-wire wbValid = (wbRegNm != 0);
+wire wbValid;
 
 wire DEC_enable;
 
@@ -97,12 +97,12 @@ always_comb begin
         uop.tagA = 6'bx;
         uop.availA = 1;
     end
-    else if (ratLookupTagA == wbRegTag) begin
+    else if (wbValid && ratLookupTagA == wbRegTag) begin
         uop.srcA = wbResult;
         uop.tagA = 6'bx;
         uop.availA = 1;
     end
-    else if (ratLookupTagA == INT_resTag) begin
+    else if (INT_valid && ratLookupTagA == INT_resTag) begin
         uop.srcA = INT_result;
         uop.tagA = 6'bx;
         uop.availA = 1;
@@ -129,12 +129,12 @@ always_comb begin
         uop.tagB = 6'bx;
         uop.availB = 1;
     end
-    else if (ratLookupTagB == wbRegTag) begin
+    else if (wbValid && ratLookupTagB == wbRegTag) begin
         uop.srcB = wbResult;
         uop.tagB = 6'bx;
         uop.availB = 1;
     end
-    else if (ratLookupTagB == INT_resTag) begin
+    else if (INT_valid && ratLookupTagB == INT_resTag) begin
         uop.srcB = INT_result;
         uop.tagB = 6'bx;
         uop.availB = 1;
@@ -215,6 +215,7 @@ ReservationStation rv
     .OUT_full(INT_full)
 );
 
+wire INTALU_valid;
 IntALU ialu
 (
     .clk(clk),
@@ -226,6 +227,7 @@ IntALU ialu
     .IN_tagDst(INT_tagDst),
     .IN_nmDst(INT_nmDst),
 
+    .OUT_valid(INTALU_valid),
     .OUT_branchTaken(pcWrite),
     .OUT_branchAddress(pcIn),
     .OUT_branchTag(branchTag),
@@ -236,12 +238,11 @@ IntALU ialu
 );
 
 wire[5:0] ROB_maxTag;
-
 ROB rob
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid('{stateValid[3]}),
+    .IN_valid('{INT_valid && stateValid[2]}),
     .IN_results('{INT_result}),
     .IN_tags('{INT_resTag}),
     .IN_names('{INT_resName}),
@@ -255,6 +256,7 @@ ROB rob
     .OUT_results('{wbResult}),
     .OUT_names('{wbRegNm}),
     .OUT_tags('{wbRegTag}),
+    .OUT_wbValid('{wbValid}),
 
     .OUT_read_results('{robLookupSrcA, robLookupSrcB}),
     .OUT_read_avail('{robAvailA, robAvailB})

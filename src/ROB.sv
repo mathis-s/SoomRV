@@ -37,6 +37,7 @@ module ROB
     output reg[31:0] OUT_results[WIDTH-1:0],
     output reg[4:0] OUT_names[WIDTH-1:0],
     output reg[5:0] OUT_tags[WIDTH-1:0],
+    output reg OUT_wbValid[WIDTH-1:0],
 
     output reg[31:0] OUT_read_results[READ_WIDTH-1:0],
     output reg OUT_read_avail[READ_WIDTH-1:0]
@@ -51,7 +52,7 @@ integer i;
 integer j;
 
 // Read logic, for forwarding uncommitted values to execution.
-always @(*) begin
+always_comb begin
     for (i = 0; i < READ_WIDTH; i=i+1)
     begin
         OUT_read_avail[i] = 0;
@@ -86,6 +87,9 @@ always_ff@(posedge clk) begin
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
         end
+        for (i = 0; i < WIDTH; i=i+1) begin
+            OUT_wbValid[i] <= 0;
+        end
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -93,7 +97,11 @@ always_ff@(posedge clk) begin
                 entries[i].valid <= 0;
             end
         end
-        baseIndex = IN_invalidateTag;
+        if ($signed(baseIndex - IN_invalidateTag) > 0)
+            baseIndex = IN_invalidateTag;
+        for (i = 0; i < WIDTH; i=i+1) begin
+            OUT_wbValid[i] <= 0;
+        end
     end
     else begin
         // Dequeue and push forward fifo entries
@@ -103,10 +111,15 @@ always_ff@(posedge clk) begin
                 entries[i] <= entries[i + WIDTH];
             end
 
+            for (i = LENGTH - WIDTH; i < LENGTH; i=i+1) begin
+                entries[i].valid <= 0;
+            end
+
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_results[i] <= entries[i].result;
-                OUT_names[i] <= entries[i].valid ? entries[i].name : 0;
+                OUT_names[i] <= entries[i].name;
                 OUT_tags[i] <= entries[i].tag;
+                OUT_wbValid[i] <= entries[i].valid;
                 //$assert(entries[i].tag == baseIndex + i);
                 // TODO: handle exceptions here.
             end
@@ -118,19 +131,12 @@ always_ff@(posedge clk) begin
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH; i=i+1) begin
             if (IN_valid[i]) begin
-                entries[IN_tags[i][2:0] - baseIndex[2:0]].valid <= 1;
-                entries[IN_tags[i][2:0] - baseIndex[2:0]].flags <= 0;
-                entries[IN_tags[i][2:0] - baseIndex[2:0]].tag <= IN_tags[i];
-                entries[IN_tags[i][2:0] - baseIndex[2:0]].name <= IN_names[i];
-                entries[IN_tags[i][2:0] - baseIndex[2:0]].result <= IN_results[i];
+                entries[{IN_tags[i][5:0] - baseIndex[5:0]}[2:0]].valid <= 1;
+                entries[{IN_tags[i][5:0] - baseIndex[5:0]}[2:0]].flags <= 0;
+                entries[{IN_tags[i][5:0] - baseIndex[5:0]}[2:0]].tag <= IN_tags[i];
+                entries[{IN_tags[i][5:0] - baseIndex[5:0]}[2:0]].name <= IN_names[i];
+                entries[{IN_tags[i][5:0] - baseIndex[5:0]}[2:0]].result <= IN_results[i];
             end
-            /*if ((doDequeue || !entries[LENGTH - i - 1].valid)) begin
-                entries[LENGTH - i - 1].valid <= IN_valid[i];
-                entries[LENGTH - i - 1].flags <= 0;
-                entries[LENGTH - i - 1].tag <= IN_tags[i];
-                entries[LENGTH - i - 1].name <= IN_names[i];
-                entries[LENGTH - i - 1].result <= IN_results[i];
-            end*/
         end
     end
 end

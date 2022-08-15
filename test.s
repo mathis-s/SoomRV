@@ -1,6 +1,13 @@
 .text
+.main:
+    addi a1, zero, 128
 .loop:
 	addi a0, a0, 1
     #addi sp, sp, 2
-    j .loop
+    blt a0, a1, .loop
+    nop
+    nop
+    nop
+    nop
+    nop
 

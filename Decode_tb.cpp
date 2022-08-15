@@ -74,19 +74,19 @@ int main(int argc, char** argv)
         0x00000013,                //nop
         0x00000013,                //nop*/
 
-        //0x00150513,  //              addi   a0,a0,1
-        //0x00210113,  //              addi   sp,sp,2
-        //0xff9ff06f,  //              j      10078 <.loop>
+        0x08000593,//                li      a1,128
         0x00150513,//                addi    a0,a0,1
-        0xffdff06f,//                j       10078 <.loop>
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
+        0xfeb54ee3,//                blt     a0,a1,1007c <.loop>
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
+        0x00000013,//                nop
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);

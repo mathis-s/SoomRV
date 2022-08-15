@@ -35,17 +35,15 @@ module RAT
     output reg[5:0] wrRegTag[WIDTH_WR-1:0]
 );
 RATEntry rat[31:0];
-RATEntry temp;
 integer i;
 
 bit[5:0] tagCnt;
 
 always_comb begin
     for (i = 0; i < WIDTH_RD; i=i+1) begin
-        temp = rat[rdRegNm[i]];
-        rdRegValue[i] = temp.value;
-        rdRegTag[i] = temp.tag;
-        rdRegAvail[i] = temp.avail;
+        rdRegValue[i] = rat[rdRegNm[i]].value;
+        rdRegTag[i] = rat[rdRegNm[i]].tag;
+        rdRegAvail[i] = rat[rdRegNm[i]].avail;
     end
 end
 
