@@ -26,8 +26,12 @@ module RAT
     input wire[4:0] wbRegNm[WIDTH_WR-1:0],
     input wire[5:0] wbRegTag[WIDTH_WR-1:0],
 
+    input wire IN_branchTaken,
+    input wire[5:0] IN_branchTag,
+
     output reg[31:0] rdRegValue[WIDTH_RD-1:0],
     output reg[5:0] rdRegTag[WIDTH_RD-1:0],
+    output reg rdRegAvail[WIDTH_RD-1:0],
     output reg[5:0] wrRegTag[WIDTH_WR-1:0]
 );
 RATEntry rat[31:0];
@@ -40,20 +44,16 @@ always_comb begin
     for (i = 0; i < WIDTH_RD; i=i+1) begin
         temp = rat[rdRegNm[i]];
         rdRegValue[i] = temp.value;
-        rdRegTag[i] = temp.avail ? 0 : temp.tag;
+        rdRegTag[i] = temp.tag;
+        rdRegAvail[i] = temp.avail;
     end
 end
 
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
 always_ff@(posedge clk) begin
-    if (rst) begin
-        tagCnt <= 1;
-        // set all regs as avail on rst
-        for (i = 0; i < 32; i++)
-            rat[i].avail <= 1;
-    end
-    else if (en) begin
+
+    if (!rst && !IN_branchTaken) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             if (wbValid[i] && (wbRegNm[i] != 0)) begin
@@ -65,7 +65,23 @@ always_ff@(posedge clk) begin
                     rat[wbRegNm[i]].avail = 1; // blocking as might be undone
             end
         end
+    end
 
+    if (rst) begin
+        tagCnt <= WIDTH_WR;
+        // set all regs as avail on rst
+        for (i = 0; i < 32; i=i+1)
+            rat[i].avail <= 1;
+        for (i = 0; i < WIDTH_WR; i=i+1)
+            wrRegTag[i] <= i[5:0];
+    end
+    else if (IN_branchTaken) begin
+        tagCnt <= IN_branchTag + 1 + WIDTH_WR;
+        for (i = 0; i < WIDTH_WR; i=i+1) begin
+            wrRegTag[i] <= (IN_branchTag + i[5:0] + 1);
+        end
+    end
+    else if (en) begin
         // Mark regs used by newly issued instructions as unavailable/pending.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             if (wrRegNm[i] != 0) begin
@@ -81,10 +97,7 @@ always_ff@(posedge clk) begin
 
         // need to handle this better, maybe just have
         // an extra bit for invalid instead of zero.
-        if (tagCnt == 63)
-            tagCnt <= 1;
-        else
-            tagCnt <= tagCnt + WIDTH_WR[5:0];
+        tagCnt <= tagCnt + WIDTH_WR[5:0];
     end
     
 end

@@ -70,8 +70,10 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[31:0] srcA;
+    logic availA;
     logic[5:0] tagA;
     logic[31:0] srcB;
+    logic availB;
     logic[5:0] tagB;
     logic[5:0] tagDst;
     logic[4:0] nmDst;

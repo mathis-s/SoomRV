@@ -36,7 +36,7 @@ int main(int argc, char** argv)
         0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
         0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>*/
         
-        0x00a50513,//                addi    a0,a0,10
+        /*0x00a50513,//                addi    a0,a0,10
         0x00510113,//                addi    sp,sp,5
         0xfff10593,//                addi    a1,sp,-1
         0x00000013,//                nop
@@ -56,7 +56,37 @@ int main(int argc, char** argv)
         0x00000013,//                nop
         0x00000013,//                nop
         0x00000013,//                nop
-        0x00000013,//                nop
+        0x00000013,//                nop*/
+
+        /*0x00a50513,                //addi    a0,a0,10
+        0x00a585b3,                //add     a1,a1,a0
+        0x00b60633,                //add     a2,a2,a1
+        0x00a10113,                //addi    sp,sp,10
+        0x00a68693,                //addi    a3,a3,10
+        0x40c10133,                //sub     sp,sp,a2
+        0x00d10133,                //add     sp,sp,a3
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop*/
+
+        //0x00150513,  //              addi   a0,a0,1
+        //0x00210113,  //              addi   sp,sp,2
+        //0xff9ff06f,  //              j      10078 <.loop>
+        0x00150513,//                addi    a0,a0,1
+        0xffdff06f,//                j       10078 <.loop>
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
+        0x00000013,                //nop
     };
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
@@ -70,8 +100,8 @@ int main(int argc, char** argv)
         top->eval();
         tfp->dump(main_time);
         main_time++;
+        top->rst = (j < 2);
     }
-    top->rst = 0;
 
     // Run
     while (!Verilated::gotFinish())

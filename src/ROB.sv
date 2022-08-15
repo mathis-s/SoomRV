@@ -27,8 +27,10 @@ module ROB
     input wire[5:0] IN_tags[WIDTH-1:0],
     input wire[4:0] IN_names[WIDTH-1:0],
     input wire IN_flags[WIDTH-1:0],
-
     input wire[5:0] IN_read_tags[READ_WIDTH-1:0],
+
+    input wire IN_invalidate,
+    input wire[5:0] IN_invalidateTag,
 
     output wire[5:0] OUT_maxTag,
 
@@ -80,10 +82,18 @@ wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
 
     if (rst) begin
-        baseIndex = 1;
+        baseIndex = 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
         end
+    end
+    else if (IN_invalidate) begin
+        for (i = 0; i < LENGTH; i=i+1) begin
+            if ($signed((i[5:0] + baseIndex) - IN_invalidateTag) > 0) begin
+                entries[i].valid <= 0;
+            end
+        end
+        baseIndex = IN_invalidateTag;
     end
     else begin
         // Dequeue and push forward fifo entries
