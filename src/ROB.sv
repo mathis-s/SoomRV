@@ -123,9 +123,12 @@ always_ff@(posedge clk) begin
                 //$assert(entries[i].tag == baseIndex + i);
                 // TODO: handle exceptions here.
             end
-
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
+        end
+        else begin
+            for (i = 0; i < WIDTH; i=i+1)
+                OUT_wbValid[i] <= 0;
         end
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
