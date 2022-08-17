@@ -227,6 +227,10 @@ IntALU ialu
 assign RF_writeEnable[0] = INTALU_valid;
 assign RF_writeAddress[0] = INT_resTag;
 assign RF_writeData[0] = INT_result;
+assign wbValid = INTALU_valid;
+assign wbRegNm = INT_resName;
+assign wbRegTag = INT_resTag;
+assign wbResult = INT_result;
 
 wire[5:0] ROB_maxTag;
 ROB rob

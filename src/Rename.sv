@@ -111,6 +111,7 @@ always_ff@(posedge clk) begin
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
+            OUT_uop[i].nmDst <= IN_uop[i].rd;
             OUT_uopValid[i] <= 1;
 
             OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
@@ -130,7 +131,7 @@ always_ff@(posedge clk) begin
                 // Mark regs written to by newly issued instructions as unavailable/pending.
                 rat[IN_uop[i].rd].avail <= 0;
                 rat[IN_uop[i].rd].specTag <= freeTags[freeTagOutputIndex];
-                rat[IN_uop[i].rd].specTag <= counterSqN + i[5:0];
+                rat[IN_uop[i].rd].newSqN <= counterSqN + i[5:0];
 
                 freeTagOutputIndex = freeTagOutputIndex + 1;
             end

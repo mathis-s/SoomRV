@@ -48,7 +48,7 @@ always_comb begin
     deqValid = 0;
     deqIndex = 0;
     for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-        if (queue[i].valid && queue[i].availA && queue[i].availB && (!deqValid || $signed(queue[i].tagDst - queue[deqIndex].tagDst) < 0)) begin
+        if (queue[i].valid && queue[i].availA && queue[i].availB && (!deqValid || $signed(queue[i].sqN - queue[deqIndex].sqN) < 0)) begin
             deqValid = 1;
             deqIndex = i[1:0];
         end
