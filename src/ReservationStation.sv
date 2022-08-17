@@ -21,6 +21,7 @@ module ReservationStation
     output reg[5:0] OUT_opcode,
     output reg[5:0] OUT_tagDst,
     output reg[4:0] OUT_nmDst,
+    output reg[5:0] OUT_sqN,
     output reg OUT_full
 );
 
@@ -94,6 +95,7 @@ always_ff@(posedge clk) begin
             OUT_tagDst <= queue[deqIndex].tagDst;
             OUT_opcode <= queue[deqIndex].opcode;
             OUT_nmDst <= queue[deqIndex].nmDst;
+            OUT_sqN <= queue[deqIndex].sqN;
             // TODO: it might be worth it to construct this in such a manner that a queue entry
             // can be enqueued and dequeued in the same cycle, ie have this be blocking assignment. 
             // (Did this for now)

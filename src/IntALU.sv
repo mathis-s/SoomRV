@@ -9,6 +9,7 @@ module IntALU
     input OPCode_INT IN_opcode,
     input wire[5:0] IN_tagDst,
     input wire[4:0] IN_nmDst,
+    input reg[5:0] IN_sqN,
 
     output reg OUT_valid,
 
@@ -19,7 +20,8 @@ module IntALU
 
     output reg[31:0] OUT_result,
     output reg[5:0] OUT_tagDst,
-    output reg[4:0] OUT_nmDst
+    output reg[4:0] OUT_nmDst,
+    output reg[5:0] OUT_sqN
 );
 
 
@@ -105,6 +107,7 @@ always_ff@(posedge clk) begin
             OUT_tagDst <= IN_tagDst;
             OUT_nmDst <= IN_nmDst;
             OUT_result <= resC;
+            OUT_sqN <= IN_sqN;
         end
     end
 end

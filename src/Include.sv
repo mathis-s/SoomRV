@@ -69,12 +69,27 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
+    logic availA;
+    logic[5:0] tagA;
+    logic availB;
+    logic[5:0] tagB;
+    logic[5:0] sqN;
+    logic[5:0] tagDst;
+    logic[4:0] nmDst;
+    logic[5:0] opcode;
+    FuncUnit fu;
+} R_UOp;
+
+typedef struct packed
+{
+    logic[31:0] imm;
     logic[31:0] srcA;
     logic availA;
     logic[5:0] tagA;
     logic[31:0] srcB;
     logic availB;
     logic[5:0] tagB;
+    logic[5:0] sqN;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
     logic[5:0] opcode;
