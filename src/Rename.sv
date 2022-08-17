@@ -32,7 +32,7 @@ module Rename
 
     // Taken branch
     input wire IN_branchTaken,
-    input wire[5:0] IN_branchTag,
+    input wire[5:0] IN_branchSqN,
     
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
     output R_UOp OUT_uop[WIDTH_UOPS-1:0]
@@ -91,16 +91,16 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branchTaken) begin
         
-        counterSqN <= IN_branchTag + 1 + WIDTH_UOPS;
+        counterSqN <= IN_branchSqN + 1 + WIDTH_UOPS;
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].sqN <= (IN_branchTag + i[5:0] + 1);
+            OUT_uop[i].sqN <= (IN_branchSqN + i[5:0] + 1);
             OUT_uopValid[i] <= 0;
         end
 
         // TODO: this is incorrect! Should be reverted to the last pre-branch
         // comTag. Either keep comTag history or let pipeline run dry after branch to fix this.
         for (i = 0; i < 32; i=i+1) begin
-            if (!rat[i].avail && $signed(rat[i].newSqN - IN_branchTag) > 0)
+            if (!rat[i].avail && $signed(rat[i].newSqN - IN_branchSqN) > 0)
                 rat[i].avail <= 1;
         end
     end

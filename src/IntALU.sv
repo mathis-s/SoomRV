@@ -16,7 +16,7 @@ module IntALU
     output wire OUT_isBranch,
     output reg OUT_branchTaken,
     output reg[31:0] OUT_branchAddress,
-    output reg[5:0] OUT_branchTag,
+    output reg[5:0] OUT_branchSqN,
 
     output reg[31:0] OUT_result,
     output reg[5:0] OUT_tagDst,
@@ -88,9 +88,9 @@ always_ff@(posedge clk) begin
     if (IN_valid) begin
 
         if (OUT_isBranch)
-            OUT_branchTag <= IN_tagDst;
+            OUT_branchSqN <= IN_sqN;
         else
-            OUT_branchTag <= 6'bx;
+            OUT_branchSqN <= 6'bx;
 
         if (branchTaken) begin
             OUT_branchTaken <= 1;
@@ -100,7 +100,7 @@ always_ff@(posedge clk) begin
         else begin
             OUT_branchTaken <= 0;
             OUT_branchAddress <= 32'bx;
-            OUT_branchTag <= 6'bx;
+            OUT_branchSqN <= 6'bx;
         end
 
         if (!OUT_branchTaken) begin

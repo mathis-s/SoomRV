@@ -64,17 +64,6 @@ InstrDecoder idec
     .OUT_invalid(invalidInstr)
 );
 
-// jumps also in here for now
-wire isBranch = 
-    DE_uop.opcode == INT_BEQ || 
-    DE_uop.opcode == INT_BNE || 
-    DE_uop.opcode == INT_BLT || 
-    DE_uop.opcode == INT_BGE || 
-    DE_uop.opcode == INT_BLTU || 
-    DE_uop.opcode == INT_BGEU || 
-    DE_uop.opcode == INT_JAL || 
-    DE_uop.opcode == INT_JALR;
-
 wire[5:0] BQ_maxCommitSqN;
 wire BQ_maxCommitSqNValid;
 
@@ -97,12 +86,22 @@ Rename rn
     .IN_wbNm('{wbRegNm}),
 
     .IN_branchTaken(pcWrite),
-    .IN_branchTag(branchSqN),    
+    .IN_branchSqN(branchSqN),    
 
     .OUT_uopValid(RN_uopValid),
     .OUT_uop('{RN_uop})
 );
 
+// jumps also in here for now
+wire isBranch = 
+    RN_uop.opcode == INT_BEQ || 
+    RN_uop.opcode == INT_BNE || 
+    RN_uop.opcode == INT_BLT || 
+    RN_uop.opcode == INT_BGE || 
+    RN_uop.opcode == INT_BLTU || 
+    RN_uop.opcode == INT_BGEU || 
+    RN_uop.opcode == INT_JAL || 
+    RN_uop.opcode == INT_JALR;
 BranchQueue bq
 (
     .clk(clk),
@@ -185,7 +184,7 @@ ReservationStation rv
     .IN_resultTag('{INT_resTag}),
 
     .IN_invalidate(pcWrite),
-    .IN_invalidateTag(branchSqN),
+    .IN_invalidateSqN(branchSqN),
 
     .OUT_valid(INT_valid),
     .OUT_operands(INT_operands),
@@ -216,7 +215,7 @@ IntALU ialu
     .OUT_valid(INTALU_valid),
     .OUT_branchTaken(pcWrite),
     .OUT_branchAddress(pcIn),
-    .OUT_branchTag(branchSqN),
+    .OUT_branchSqN(branchSqN),
     
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag),
@@ -232,7 +231,7 @@ assign wbRegNm = INT_resName;
 assign wbRegTag = INT_resTag;
 assign wbResult = INT_result;
 
-wire[5:0] ROB_maxTag;
+wire[5:0] ROB_maxSqN;
 ROB rob
 (
     .clk(clk),
@@ -249,13 +248,13 @@ ROB rob
     .IN_maxCommitSqNValid(BQ_maxCommitSqNValid),
     .IN_maxCommitSqN(BQ_maxCommitSqN),
     
-    .OUT_maxTag(ROB_maxTag),
+    .OUT_maxTag(ROB_maxSqN),
 
     .OUT_comNames('{comRegNm}),
     .OUT_comTags('{comRegTag}),
     .OUT_comValid('{comValid})
 );
 
-assign DEC_enable = !INT_full && ($signed(RN_uop.sqN - ROB_maxTag) <= 0);
+assign DEC_enable = !INT_full && ($signed(RN_uop.sqN - ROB_maxSqN) <= 0);
 
 endmodule

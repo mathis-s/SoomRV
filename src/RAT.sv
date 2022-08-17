@@ -27,7 +27,7 @@ module RAT
     input wire[5:0] wbRegTag[WIDTH_WR-1:0],
 
     input wire IN_branchTaken,
-    input wire[5:0] IN_branchTag,
+    input wire[5:0] IN_branchSqN,
 
     output reg[31:0] rdRegValue[WIDTH_RD-1:0],
     output reg[5:0] rdRegTag[WIDTH_RD-1:0],
@@ -74,15 +74,15 @@ always_ff@(posedge clk) begin
             wrRegTag[i] <= i[5:0];
     end
     else if (IN_branchTaken) begin
-        tagCnt <= IN_branchTag + 1 + WIDTH_WR;
+        tagCnt <= IN_branchSqN + 1 + WIDTH_WR;
         for (i = 0; i < WIDTH_WR; i=i+1) begin
-            wrRegTag[i] <= (IN_branchTag + i[5:0] + 1);
+            wrRegTag[i] <= (IN_branchSqN + i[5:0] + 1);
         end
 
         // TODO: this is incorrect! Should be reverted to the last 
         // tag. Either keep tag history or let pipeline run dry after branch to fix this.
         for (i = 0; i < 32; i=i+1) begin
-            if (!rat[i].avail && $signed(rat[i].tag - IN_branchTag) > 0)
+            if (!rat[i].avail && $signed(rat[i].sqN - IN_branchSqN) > 0)
                 rat[i].avail <= 1;
         end
     end

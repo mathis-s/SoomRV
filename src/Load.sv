@@ -50,7 +50,6 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
                 OUT_uop[i].valid <= 1;
-                //OUT_uop[i].valid = IN_uop[i].valid;
 
                 // Default is operand unavailable
                 OUT_uop[i].availA <= 0;
@@ -70,7 +69,7 @@ always_ff@(posedge clk) begin
                     reg found = 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: ignore contention here instead of handling it.
-                        if (!found && !OUT_uop[i].availA && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
+                        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
                             OUT_uop[i].srcA <= IN_wbResult[j];
                             OUT_uop[i].availA <= 1;
                             found = 1;
@@ -95,7 +94,7 @@ always_ff@(posedge clk) begin
                     reg found = 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: ignore contention here instead of handling it.
-                        if (!found && !OUT_uop[i].availB && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
+                        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
                             OUT_uop[i].srcB <= IN_wbResult[j];
                             OUT_uop[i].availB <= 1;
                             found = 1;

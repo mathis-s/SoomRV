@@ -14,7 +14,7 @@ module ReservationStation
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
 
     input wire IN_invalidate,
-    input wire[5:0] IN_invalidateTag,
+    input wire[5:0] IN_invalidateSqN,
 
     output reg OUT_valid,
     output reg[31:0] OUT_operands[2:0],
@@ -65,7 +65,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-            if ($signed(queue[i].tagDst - IN_invalidateTag) > 0)
+            if ($signed(queue[i].sqN - IN_invalidateSqN) > 0)
                 queue[i].valid <= 0;
         end
         //enqUOp.valid <= 0;
@@ -109,7 +109,21 @@ always_ff@(posedge clk) begin
             enqValid = 0;
             for (i = 0; i < QUEUE_SIZE; i=i+1) begin
                 if (enqValid == 0 && !queue[i].valid) begin
-                    queue[i] <= IN_uop;
+                    UOp temp = IN_uop;
+
+                    for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
+                        if (!temp.availA && temp.tagA == IN_resultTag[j]) begin
+                            temp.availA = 1;
+                            temp.srcA = IN_resultBus[j];
+                        end
+
+                        if (!temp.availB && temp.tagB == IN_resultTag[j]) begin
+                            temp.availB = 1;
+                            temp.srcB = IN_resultBus[j];
+                        end
+                    end
+                    
+                    queue[i] <= temp;//IN_uop;
                     enqValid = 1;
                 end
             end
