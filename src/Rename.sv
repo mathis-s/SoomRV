@@ -112,6 +112,10 @@ always_ff@(posedge clk) begin
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
             OUT_uop[i].nmDst <= IN_uop[i].rd;
+            OUT_uop[i].pc <= IN_uop[i].pc;
+            OUT_uop[i].immB <= IN_uop[i].immB;
+            OUT_uop[i].pcA <= IN_uop[i].pcA;
+
             OUT_uopValid[i] <= 1;
 
             OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;

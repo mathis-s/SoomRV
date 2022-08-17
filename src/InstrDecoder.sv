@@ -39,6 +39,7 @@ assign OUT_invalid = invalidEnc;
 always_comb begin
 
     instr = IN_instr;
+    uop.pc = IN_pc;
 
     case (instr.opcode)
         `OPC_LUI,

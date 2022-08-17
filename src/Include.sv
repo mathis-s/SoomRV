@@ -56,6 +56,7 @@ typedef enum logic[1:0] {FU_INT, FU_MUL, FU_DIV, FU_LSU} FuncUnit;
 typedef struct packed
 {
     logic[31:0] imm;
+    logic[31:0] pc;
     logic[4:0] rs0; 
     logic[4:0] rs1;
     logic pcA;
@@ -69,10 +70,13 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
+    logic[31:0] pc;
     logic availA;
     logic[5:0] tagA;
     logic availB;
     logic[5:0] tagB;
+    logic pcA;
+    logic immB;
     logic[5:0] sqN;
     logic[5:0] tagDst;
     logic[4:0] nmDst;

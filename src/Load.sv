@@ -52,11 +52,16 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].valid <= 1;
                 //OUT_uop[i].valid = IN_uop[i].valid;
 
-                // Default operand is unavailable
+                // Default is operand unavailable
                 OUT_uop[i].availA <= 0;
 
+                // Some instructions just use the pc as an operand.             
+                if (IN_uop[i].pcA) begin
+                    OUT_uop[i].availA <= 1;
+                    OUT_uop[i].srcA <= IN_uop[i].pc;
+                end
                 // Try to get from register file
-                if (IN_uop[i].availA) begin
+                else if (IN_uop[i].availA) begin
                     OUT_uop[i].availA <= 1;
                     OUT_uop[i].srcA <= IN_rfReadData[i];
                 end
@@ -73,11 +78,15 @@ always_ff@(posedge clk) begin
                     end
                 end
 
-                // Default operand is unavailable
+                // Default is operand unavailable
                 OUT_uop[i].availB <= 0;
 
+                if (IN_uop[i].immB) begin
+                    OUT_uop[i].availB <= 1;
+                    OUT_uop[i].srcB <= IN_uop[i].imm;
+                end
                 // Try to get from register file
-                if (IN_uop[i].availB) begin
+                else if (IN_uop[i].availB) begin
                     OUT_uop[i].availB <= 1;
                     OUT_uop[i].srcB <= IN_rfReadData[i];
                 end
