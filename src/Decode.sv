@@ -232,7 +232,8 @@ IntALU ialu
     .en(1),
     .rst(rst),
     
-    .IN_valid(LD_uop.valid && enabledXUs[0] && !LSU_wbReq),
+    .IN_valid(LD_uop.valid && enabledXUs[0]),
+    .IN_wbStall(LSU_wbReq),
     .IN_operands('{LD_uop.imm, LD_uop.srcB, LD_uop.srcA}),
     .IN_opcode(LD_uop.opcode),
     .IN_tagDst(LD_uop.tagDst),
@@ -256,7 +257,7 @@ IntALU ialu
 
 wire LSU_uopValid;
 RES_UOp LSU_uop;
-assign wbStall = LSU_wbReq && (LD_uop.valid && enabledXUs[0]);
+assign wbStall = LSU_wbReq && INTALU_wbReq;
 LSU lsu
 (
     .clk(clk),

@@ -5,6 +5,7 @@ module IntALU
     input wire rst,
 
     input wire IN_valid,
+    input wire IN_wbStall,
     input wire[31:0] IN_operands[2:0],
     input OPCode_INT IN_opcode,
     input wire[5:0] IN_tagDst,
@@ -89,8 +90,8 @@ always_ff@(posedge clk) begin
 end
 
 always_ff@(posedge clk) begin
-    OUT_valid <= IN_valid;
-    if (IN_valid) begin
+    OUT_valid <= IN_valid && !IN_wbStall;
+    if (IN_valid && !IN_wbStall) begin
 
         if (OUT_isBranch)
             OUT_branchSqN <= IN_sqN;
