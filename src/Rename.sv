@@ -33,9 +33,11 @@ module Rename
     // Taken branch
     input wire IN_branchTaken,
     input wire[5:0] IN_branchSqN,
+    input wire IN_mispredFlush,
     
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
-    output R_UOp OUT_uop[WIDTH_UOPS-1:0]
+    output R_UOp OUT_uop[WIDTH_UOPS-1:0],
+    output wire[5:0] OUT_nextSqN
 );
 
 reg[4:0] freeTagInsertIndex;
@@ -46,6 +48,7 @@ RATEntry rat[31:0];
 integer i;
 
 bit[5:0] counterSqN;
+assign OUT_nextSqN = counterSqN;
 
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
@@ -56,8 +59,11 @@ always_ff@(posedge clk) begin
             if (comValid[i] && (comRegNm[i] != 0)) begin
                 freeTags[freeTagInsertIndex] <= rat[comRegNm[i]].comTag;
                 freeTagInsertIndex = freeTagInsertIndex + 1;
-
+                
                 rat[comRegNm[i]].comTag <= comRegTag[i];
+
+                if (IN_mispredFlush) 
+                    rat[comRegNm[i]].specTag <= comRegTag[i];
             end
         end
 
@@ -97,15 +103,13 @@ always_ff@(posedge clk) begin
             OUT_uopValid[i] <= 0;
         end
 
-        // TODO: this is incorrect! Should be reverted to the last pre-branch
-        // comTag. Either keep comTag history or let pipeline run dry after branch to fix this.
         for (i = 0; i < 32; i=i+1) begin
             if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
                 rat[i].avail <= 1;
                 // free tag
                 freeTags[freeTagInsertIndex] <= rat[i].specTag;
                 freeTagInsertIndex = freeTagInsertIndex + 1;
-                // TODO: incorrect!
+
                 rat[i].specTag <= rat[i].comTag;
             end
         end

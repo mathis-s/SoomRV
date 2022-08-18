@@ -32,7 +32,8 @@ module ROB
     input wire IN_maxCommitSqNValid,
     input wire[5:0] IN_maxCommitSqN,
 
-    output wire[5:0] OUT_maxTag,
+    output wire[5:0] OUT_maxSqN,
+    output wire[5:0] OUT_curSqN,
 
     output reg[4:0] OUT_comNames[WIDTH-1:0],
     output reg[5:0] OUT_comTags[WIDTH-1:0],
@@ -42,7 +43,8 @@ module ROB
 ROBEntry entries[LENGTH-1:0];
 reg[5:0] baseIndex;
 
-assign OUT_maxTag = baseIndex + LENGTH - 1;
+assign OUT_maxSqN = baseIndex + LENGTH - 1;
+assign OUT_curSqN = baseIndex;
 
 integer i;
 integer j;

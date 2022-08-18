@@ -21,11 +21,13 @@ wire DEC_enable;
 // (IF ->) DE -> RN -> (RS -> LD -> EX -> ROB -> WB)
 reg[1:0] stateValid;
 
-wire PC_enable = !pcWrite;
+wire PC_enable = !pcWrite && !mispredFlush;
 
 wire[31:0] pcIn;
 wire pcWrite;
 wire[5:0] branchSqN;
+
+reg mispredFlush;
 
 wire[31:0] IF_pc;
 reg [31:0] DE_pc;
@@ -41,11 +43,24 @@ ProgramCounter progCnt
     .OUT_pc(IF_pc)
 );
 
+wire[5:0] RN_nextSqN;
+wire[5:0] ROB_curSqN;
+
 always_ff@(posedge clk) begin
-    if (rst)
+    if (rst) begin
         stateValid <= 0;
-    else if (pcWrite)
+        mispredFlush <= 0;
+    end
+    else if (pcWrite) begin
         stateValid <= 2'b00;
+        mispredFlush <= (ROB_curSqN != RN_nextSqN);
+    end
+    // When a branch mispredict happens, we need to let the pipeline
+    // run entirely dry.
+    else if (mispredFlush) begin
+        stateValid <= 2'b00;
+        mispredFlush <= (ROB_curSqN != RN_nextSqN);
+    end
     else
         stateValid <= {DEC_enable, 1'b1};
 
@@ -86,10 +101,12 @@ Rename rn
     .IN_wbNm('{wbRegNm}),
 
     .IN_branchTaken(pcWrite),
-    .IN_branchSqN(branchSqN),    
+    .IN_branchSqN(branchSqN), 
+    .IN_mispredFlush(mispredFlush),   
 
     .OUT_uopValid(RN_uopValid),
-    .OUT_uop('{RN_uop})
+    .OUT_uop('{RN_uop}),
+    .OUT_nextSqN(RN_nextSqN)
 );
 
 // jumps also in here for now
@@ -102,6 +119,7 @@ wire isBranch =
     RN_uop.opcode == INT_BGEU || 
     RN_uop.opcode == INT_JAL || 
     RN_uop.opcode == INT_JALR;
+    
 BranchQueue bq
 (
     .clk(clk),
@@ -243,7 +261,8 @@ ROB rob
     .IN_maxCommitSqNValid(BQ_maxCommitSqNValid),
     .IN_maxCommitSqN(BQ_maxCommitSqN),
     
-    .OUT_maxTag(ROB_maxSqN),
+    .OUT_maxSqN(ROB_maxSqN),
+    .OUT_curSqN(ROB_curSqN),
 
     .OUT_comNames('{comRegNm}),
     .OUT_comTags('{comRegTag}),
