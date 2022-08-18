@@ -1,8 +1,8 @@
-VERILATOR_FLAGS = --cc --trace-structs --build --trace
+VERILATOR_FLAGS = --cc --trace-structs --build --trace --unroll-stmts 99999 -unroll-count 9999
 
 
 decoder_tb:
-	verilator $(VERILATOR_FLAGS) --exe Decode_tb.cpp --top-module Decode src/Include.sv src/InstrDecoder.sv src/Rename.sv src/Decode.sv src/ReservationStation.sv src/IntALU.sv src/ProgramCounter.sv src/BranchQueue.sv src/RF.sv src/Load.sv src/ROB.sv
+	verilator $(VERILATOR_FLAGS) --exe Decode_tb.cpp --top-module Decode src/Include.sv src/InstrDecoder.sv src/Rename.sv src/Decode.sv src/ReservationStation.sv src/IntALU.sv src/ProgramCounter.sv src/BranchQueue.sv src/RF.sv src/Load.sv src/ROB.sv src/LSU.sv
 
 clean:
-	rm -r obj_dir
+	rm -r obj_dirs

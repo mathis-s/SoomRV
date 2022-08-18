@@ -3,6 +3,14 @@ module Decode
     input wire clk,
     input wire rst,
     input wire[31:0] IN_instr,
+
+    input wire[31:0] IN_MEM_readData,
+    
+    output wire[31:0] OUT_MEM_addr,
+    output wire[31:0] OUT_MEM_writeData,
+    output wire OUT_MEM_writeEnable,
+    output wire OUT_MEM_readEnable,
+    output wire[3:0] OUT_MEM_writeMask,
     
     output wire[31:0] OUT_pc
 );
@@ -148,11 +156,14 @@ wire[4:0] INT_resName;
 wire RV_uopValid;
 R_UOp RV_uop;
 
+wire wbStall;
+
 ReservationStation rv
 (
     .clk(clk),
     .rst(rst),
 
+    .IN_wbStall(wbStall),
     .IN_uopValid(RN_uopValid[0]),
     .IN_uop(RN_uop),
     .IN_resultValid('{INTALU_valid}),
@@ -188,11 +199,13 @@ RF rf
     .IN_writeData(RF_writeData)
 );
 
-UOp LD_uop;
+EX_UOp LD_uop;
+wire[3:0] enabledXUs;
 Load ld
 (
     .clk(clk),
     .rst(rst),
+    .IN_wbStall('{wbStall}),
     .IN_uopValid('{RV_uopValid}),
     .IN_uop('{RV_uop}),
     
@@ -204,28 +217,32 @@ Load ld
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
 
+    .OUT_enableXU('{enabledXUs}),
     .OUT_uop('{LD_uop})
 );
-
+wire LSU_wbReq;
 
 wire INTALU_valid;
 wire INTALU_isBranch;
 wire[5:0] INTALU_sqN;
+wire INTALU_wbReq;
 IntALU ialu
 (
     .clk(clk),
     .en(1),
     .rst(rst),
     
-    .IN_valid(LD_uop.valid),
+    .IN_valid(LD_uop.valid && enabledXUs[0] && !LSU_wbReq),
     .IN_operands('{LD_uop.imm, LD_uop.srcB, LD_uop.srcA}),
     .IN_opcode(LD_uop.opcode),
     .IN_tagDst(LD_uop.tagDst),
     .IN_nmDst(LD_uop.nmDst),
     .IN_sqN(LD_uop.sqN),    
 
-    .OUT_isBranch(INTALU_isBranch),
+    .OUT_wbReq(INTALU_wbReq),
     .OUT_valid(INTALU_valid),
+
+    .OUT_isBranch(INTALU_isBranch),
     .OUT_branchTaken(pcWrite),
     .OUT_branchAddress(pcIn),
     .OUT_branchSqN(branchSqN),
@@ -236,23 +253,64 @@ IntALU ialu
     .OUT_sqN(INTALU_sqN)
     
 );
-assign RF_writeEnable[0] = INTALU_valid && (INT_resName != 0);
-assign RF_writeAddress[0] = INT_resTag;
-assign RF_writeData[0] = INT_result;
-assign wbValid = INTALU_valid;
-assign wbRegNm = INT_resName;
-assign wbRegTag = INT_resTag;
-assign wbResult = INT_result;
+
+wire LSU_uopValid;
+RES_UOp LSU_uop;
+assign wbStall = LSU_wbReq && (LD_uop.valid && enabledXUs[0]);
+LSU lsu
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_valid(LD_uop.valid && enabledXUs[1]),
+    .IN_uop(LD_uop),
+
+    .IN_MEM_readData(IN_MEM_readData),
+    .OUT_MEM_addr(OUT_MEM_addr),
+    .OUT_MEM_writeData(OUT_MEM_writeData),
+    .OUT_MEM_writeEnable(OUT_MEM_writeEnable),
+    .OUT_MEM_writeMask(OUT_MEM_writeMask),
+    .OUT_MEM_readEnable(OUT_MEM_readEnable),
+
+    .OUT_wbReq(LSU_wbReq),
+
+    .OUT_valid(LSU_uopValid),
+    .OUT_uop(LSU_uop)
+);
+
+assign RF_writeEnable[0] = !LSU_uopValid ? 
+    (INT_resName != 0) :
+    (LSU_uopValid && LSU_uop.nmDst != 0);
+
+assign RF_writeAddress[0] = !LSU_uopValid ? 
+    INT_resTag :
+    LSU_uop.tagDst;
+assign RF_writeData[0] = !LSU_uopValid ? 
+    INT_result :
+    LSU_uop.result;
+assign wbValid = INTALU_valid || LSU_uopValid;
+assign wbRegNm = !LSU_uopValid ? 
+    INT_resName :
+    LSU_uop.nmDst;
+assign wbRegTag = !LSU_uopValid ? 
+    INT_resTag :
+    LSU_uop.tagDst;
+assign wbResult = !LSU_uopValid ? 
+    INT_result :
+    LSU_uop.result;
+
+wire[5:0] wbRegSqN = !LSU_uopValid ? 
+    INTALU_sqN :
+    LSU_uop.sqN;
 
 wire[5:0] ROB_maxSqN;
 ROB rob
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid('{INTALU_valid}),
-    .IN_tags('{INT_resTag}),
-    .IN_names('{INT_resName}),
-    .IN_sqNs('{INTALU_sqN}),
+    .IN_valid('{wbValid}),
+    .IN_tags('{wbRegTag}),
+    .IN_names('{wbRegNm}),
+    .IN_sqNs('{wbRegSqN}),
     .IN_flags('{0}), // placeholder
 
     .IN_invalidate(pcWrite),

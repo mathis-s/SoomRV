@@ -7,6 +7,7 @@ module ReservationStation
     input wire clk,
     input wire rst,
 
+    input wire IN_wbStall,
     input wire IN_uopValid,
     input R_UOp IN_uop,
 
@@ -87,23 +88,13 @@ always_ff@(posedge clk) begin
                 end
             end
 
-        // dequeue old uop (should always dequeue smallest tag one...)
-        if (deqValid) begin
-            OUT_uop <= queue[deqIndex];
-            //OUT_operands[0] <= queue[deqIndex].srcA;
-            //OUT_operands[1] <= queue[deqIndex].srcB;
-            //OUT_operands[2] <= queue[deqIndex].imm;
-            //OUT_tagDst <= queue[deqIndex].tagDst;
-            //OUT_opcode <= queue[deqIndex].opcode;
-            //OUT_nmDst <= queue[deqIndex].nmDst;
-            //OUT_sqN <= queue[deqIndex].sqN;
-            // TODO: it might be worth it to construct this in such a manner that a queue entry
-            // can be enqueued and dequeued in the same cycle, ie have this be blocking assignment. 
-            // (Did this for now)
-            valid[deqIndex] = 0;
+        if (!IN_wbStall) begin
+            if (deqValid) begin
+                OUT_uop <= queue[deqIndex];
+                valid[deqIndex] = 0;
+            end
+            OUT_valid <= deqValid;
         end
-        // if an op was dequeued, output is valid, otherwise not.
-        OUT_valid <= deqValid;
 
         // enqueue new uop
         if (IN_uopValid) begin

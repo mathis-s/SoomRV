@@ -11,9 +11,10 @@ module IntALU
     input wire[4:0] IN_nmDst,
     input reg[5:0] IN_sqN,
 
+    output wire OUT_wbReq,
     output reg OUT_valid,
 
-    output wire OUT_isBranch,
+    output reg OUT_isBranch,
     output reg OUT_branchTaken,
     output reg[31:0] OUT_branchAddress,
     output reg[5:0] OUT_branchSqN,
@@ -24,6 +25,7 @@ module IntALU
     output reg[5:0] OUT_sqN
 );
 
+assign OUT_wbReq = IN_valid;
 
 reg[31:0] resC;
 always_comb begin
@@ -56,19 +58,9 @@ always_comb begin
     //OUT_tagDst = IN_valid ? IN_tagDst : 0;
     //OUT_nmDst = IN_nmDst;
     //OUT_result = resC;
-end
+end 
 
-assign OUT_isBranch = 
-    IN_opcode == INT_BEQ || 
-    IN_opcode == INT_BNE || 
-    IN_opcode == INT_BLT || 
-    IN_opcode == INT_BGE || 
-    IN_opcode == INT_BLTU || 
-    IN_opcode == INT_BGEU || 
-    IN_opcode == INT_JAL || 
-    IN_opcode == INT_JALR;
 
-reg branchTaken;
 always_comb begin
     case (IN_opcode)
         INT_JAL,
@@ -81,6 +73,19 @@ always_comb begin
         INT_BGEU: branchTaken = !(IN_operands[0] < IN_operands[1]);
         default: branchTaken = 0;
     endcase
+end
+
+reg branchTaken;
+always_ff@(posedge clk) begin
+    OUT_isBranch <= 
+        IN_opcode == INT_BEQ || 
+        IN_opcode == INT_BNE || 
+        IN_opcode == INT_BLT || 
+        IN_opcode == INT_BGE || 
+        IN_opcode == INT_BLTU || 
+        IN_opcode == INT_BGEU || 
+        IN_opcode == INT_JAL || 
+        IN_opcode == INT_JALR;
 end
 
 always_ff@(posedge clk) begin

@@ -13,6 +13,8 @@ double sc_time_stamp()
                       // what SystemC does
 }
 
+uint32_t ram[1024];
+
 int main(int argc, char** argv)
 {
     Verilated::commandArgs(argc, argv); // Remember args
@@ -76,8 +78,9 @@ int main(int argc, char** argv)
 
         0x08000593,//                li      a1,128
         0x00150513,//                addi    a0,a0,1
-        0xfeb54ee3,//                blt     a0,a1,1007c <.loop>
-        0x00158593,//                addi    a1,a1,1
+        0x3ea02fa3,//                sw      a0,1023(zero) # 3ff <.main-0xfc79>
+        0xfeb54ce3,//                blt     a0,a1,1007c <.loop>
+        0x00160613,//                addi    a2,a2,1
         0x00000013,//                nop
         0x00000013,//                nop
         0x00000013,//                nop
@@ -114,10 +117,33 @@ int main(int argc, char** argv)
             if (index > (sizeof(instrs) / sizeof(instrs[0])))
                 break;
             top->IN_instr = instrs[index];
-        }
-        if (top->clk == 1)
-        {
-            //printf("instr %.8x | imm %x | immpc %x | srcA %x\n", (uint32_t)top->IN_instr, (uint32_t)top->OUT_uop.at(0), (uint32_t)top->OUT_uop.at(1), (uint32_t)top->OUT_uop.at(2));
+            
+            index = top->OUT_MEM_addr;
+            if (index > (sizeof(ram) / sizeof(ram[0]))) break;
+
+            if (top->OUT_MEM_readEnable)
+                top->IN_MEM_readData = ram[index];
+            else if (top->OUT_MEM_writeEnable)
+            {
+                if (index == 255)
+                    printf("%u\n", top->OUT_MEM_writeData);
+
+                if (top->OUT_MEM_writeMask == 0b1111) 
+                    ram[index] = top->OUT_MEM_writeData;
+                else
+                {
+                    uint32_t word = ram[index];
+                    for (int i = 0; i < 4; i++)
+                        if (top->OUT_MEM_writeMask & (1 << i))
+                        {
+                            uint32_t mask = (1 << (8 * i)) - 1;
+                            if (i != 0)
+                                mask &= ~((1 << (8 * (i - 1))) - 1);
+                            word = (word & mask) | (top->OUT_MEM_writeData & ~mask);
+                        }
+                    ram[index] = word;
+                }
+            }
         }
 
         top->clk = !top->clk;

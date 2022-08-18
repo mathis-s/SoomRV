@@ -51,7 +51,7 @@ typedef enum logic[5:0]
     LSU_SW
 } OPCode_LSU;
 
-typedef enum logic[1:0] {FU_INT, FU_MUL, FU_DIV, FU_LSU} FuncUnit;
+typedef enum logic[1:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV} FuncUnit;
 
 typedef struct packed
 {
@@ -100,3 +100,23 @@ typedef struct packed
     logic[5:0] opcode;
     logic valid;
 } UOp;
+
+typedef struct packed
+{
+    logic[31:0] srcA;
+    logic[31:0] srcB;
+    logic[31:0] imm;
+    logic[5:0] opcode;
+    logic[5:0] tagDst;
+    logic[4:0] nmDst;
+    logic[5:0] sqN;
+    logic valid;
+} EX_UOp;
+
+typedef struct packed
+{
+    bit[31:0] result;
+    bit[5:0] tagDst;
+    bit[4:0] nmDst;
+    bit[5:0] sqN;
+} RES_UOp;
