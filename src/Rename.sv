@@ -91,17 +91,23 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branchTaken) begin
         
-        counterSqN <= IN_branchSqN + 1 + WIDTH_UOPS;
+        counterSqN <= IN_branchSqN + WIDTH_UOPS;
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].sqN <= (IN_branchSqN + i[5:0] + 1);
+            OUT_uop[i].sqN <= (IN_branchSqN + i[5:0]);
             OUT_uopValid[i] <= 0;
         end
 
         // TODO: this is incorrect! Should be reverted to the last pre-branch
         // comTag. Either keep comTag history or let pipeline run dry after branch to fix this.
         for (i = 0; i < 32; i=i+1) begin
-            if (!rat[i].avail && $signed(rat[i].newSqN - IN_branchSqN) > 0)
+            if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
                 rat[i].avail <= 1;
+                // free tag
+                freeTags[freeTagInsertIndex] <= rat[i].specTag;
+                freeTagInsertIndex = freeTagInsertIndex + 1;
+                // TODO: incorrect!
+                rat[i].specTag <= rat[i].comTag;
+            end
         end
     end
 

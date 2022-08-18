@@ -65,17 +65,17 @@ always_ff@(posedge clk) begin
                     OUT_uop[i].srcA <= IN_rfReadData[i];
                 end
                 // Try to get from current WB
-                else begin
-                    reg found = 0;
-                    for (j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: ignore contention here instead of handling it.
-                        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
-                            OUT_uop[i].srcA <= IN_wbResult[j];
-                            OUT_uop[i].availA <= 1;
-                            found = 1;
-                        end
-                    end
-                end
+                //else begin
+                //    reg found = 0;
+                //    for (j = 0; j < NUM_WBS; j=j+1) begin
+                //        // TODO: ignore contention here instead of handling it.
+                //        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
+                //            OUT_uop[i].srcA <= IN_wbResult[j];
+                //            OUT_uop[i].availA <= 1;
+                //            found = 1;
+                //        end
+                //    end
+                //end
 
                 // Default is operand unavailable
                 OUT_uop[i].availB <= 0;
@@ -87,20 +87,20 @@ always_ff@(posedge clk) begin
                 // Try to get from register file
                 else if (IN_uop[i].availB) begin
                     OUT_uop[i].availB <= 1;
-                    OUT_uop[i].srcB <= IN_rfReadData[i];
+                    OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                 end
                 // Try to get from current WB
-                else begin
-                    reg found = 0;
-                    for (j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: ignore contention here instead of handling it.
-                        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
-                            OUT_uop[i].srcB <= IN_wbResult[j];
-                            OUT_uop[i].availB <= 1;
-                            found = 1;
-                        end
-                    end
-                end
+                //else begin
+                //    reg found = 0;
+                //    for (j = 0; j < NUM_WBS; j=j+1) begin
+                //        // TODO: ignore contention here instead of handling it.
+                //        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
+                //            OUT_uop[i].srcB <= IN_wbResult[j];
+                //            OUT_uop[i].availB <= 1;
+                //            found = 1;
+                //        end
+                //    end
+                //end
             end
             else begin
                 OUT_uop[i].valid <= 0;

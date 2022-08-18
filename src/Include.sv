@@ -84,6 +84,7 @@ typedef struct packed
     FuncUnit fu;
 } R_UOp;
 
+
 typedef struct packed
 {
     logic[31:0] imm;

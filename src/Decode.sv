@@ -18,8 +18,8 @@ wire comValid;
 
 wire DEC_enable;
 
-// (DE ->) IF -> RN -> LD -> RS -> EX -> ROB -> WB
-reg[6:0] stateValid;
+// (IF ->) DE -> RN -> (RS -> LD -> EX -> ROB -> WB)
+reg[1:0] stateValid;
 
 wire PC_enable = !pcWrite;
 
@@ -45,9 +45,9 @@ always_ff@(posedge clk) begin
     if (rst)
         stateValid <= 0;
     else if (pcWrite)
-        stateValid <= 7'b1100000;
+        stateValid <= 2'b00;
     else
-        stateValid <= {stateValid[5:1], stateValid[0] && DEC_enable, 1'b1};
+        stateValid <= {DEC_enable, 1'b1};
 
     DE_pc <= IF_pc;
 end
@@ -72,7 +72,7 @@ reg RN_uopValid[0:0];
 Rename rn 
 (
     .clk(clk),
-    .en(stateValid[0] && DEC_enable && !pcWrite),
+    .en(stateValid[0] && !pcWrite),
     .rst(rst),
 
     .IN_uop('{DE_uop}),
@@ -106,7 +106,7 @@ BranchQueue bq
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid(stateValid[0] && DEC_enable && !pcWrite),
+    .IN_valid(RN_uopValid[0]),
     .IN_isBranch(isBranch),
     .IN_tag(RN_uop.sqN),
     
@@ -118,6 +118,36 @@ BranchQueue bq
     .OUT_commitLimitValid(BQ_maxCommitSqNValid),
     .OUT_commitLimitTag(BQ_maxCommitSqN)
 );
+
+// Later fuse the RV here with the actual integer alu, and only have integer FU
+// instantiated here.
+wire INT_full;
+
+wire[31:0] INT_result;
+wire[5:0] INT_resTag;
+wire[4:0] INT_resName;
+
+wire RV_uopValid;
+R_UOp RV_uop;
+
+ReservationStation rv
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_uopValid(RN_uopValid[0]),
+    .IN_uop(RN_uop),
+    .IN_resultValid('{INTALU_valid}),
+    .IN_resultTag('{INT_resTag}),
+
+    .IN_invalidate(pcWrite),
+    .IN_invalidateSqN(branchSqN),
+
+    .OUT_valid(RV_uopValid),
+    .OUT_uop(RV_uop),
+    .OUT_full(INT_full)
+);
+
 
 wire RF_readEnable[1:0];
 wire[5:0] RF_readAddress[1:0];
@@ -145,8 +175,8 @@ Load ld
 (
     .clk(clk),
     .rst(rst),
-    .IN_uopValid(RN_uopValid),
-    .IN_uop('{RN_uop}),
+    .IN_uopValid('{RV_uopValid}),
+    .IN_uop('{RV_uop}),
     
     .IN_wbValid('{wbValid}),
     .IN_wbTag('{wbRegTag}),
@@ -159,41 +189,6 @@ Load ld
     .OUT_uop('{LD_uop})
 );
 
-// Later fuse the RV here with the actual integer alu, and only have integer FU
-// instantiated here.
-wire[31:0] INT_operands[2:0];
-wire[5:0] INT_tagDst;
-wire[4:0] INT_nmDst;
-wire[5:0] INT_sqN;
-wire[5:0] INT_opcode;
-wire INT_valid;
-wire INT_full;
-
-wire[31:0] INT_result;
-wire[5:0] INT_resTag;
-wire[4:0] INT_resName;
-
-ReservationStation rv
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_uop(LD_uop),
-    .IN_resultValid('{INTALU_valid}),
-    .IN_resultBus('{INT_result}),
-    .IN_resultTag('{INT_resTag}),
-
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
-
-    .OUT_valid(INT_valid),
-    .OUT_operands(INT_operands),
-    .OUT_opcode(INT_opcode),
-    .OUT_tagDst(INT_tagDst),
-    .OUT_nmDst(INT_nmDst),
-    .OUT_sqN(INT_sqN),
-    .OUT_full(INT_full)
-);
 
 wire INTALU_valid;
 wire INTALU_isBranch;
@@ -204,12 +199,12 @@ IntALU ialu
     .en(1),
     .rst(rst),
     
-    .IN_valid(INT_valid),
-    .IN_operands(INT_operands),
-    .IN_opcode(INT_opcode),
-    .IN_tagDst(INT_tagDst),
-    .IN_nmDst(INT_nmDst),
-    .IN_sqN(INT_sqN),    
+    .IN_valid(LD_uop.valid),
+    .IN_operands('{LD_uop.imm, LD_uop.srcB, LD_uop.srcA}),
+    .IN_opcode(LD_uop.opcode),
+    .IN_tagDst(LD_uop.tagDst),
+    .IN_nmDst(LD_uop.nmDst),
+    .IN_sqN(LD_uop.sqN),    
 
     .OUT_isBranch(INTALU_isBranch),
     .OUT_valid(INTALU_valid),
@@ -223,7 +218,7 @@ IntALU ialu
     .OUT_sqN(INTALU_sqN)
     
 );
-assign RF_writeEnable[0] = INTALU_valid;
+assign RF_writeEnable[0] = INTALU_valid && (INT_resName != 0);
 assign RF_writeAddress[0] = INT_resTag;
 assign RF_writeData[0] = INT_result;
 assign wbValid = INTALU_valid;
@@ -255,6 +250,6 @@ ROB rob
     .OUT_comValid('{comValid})
 );
 
-assign DEC_enable = !INT_full && ($signed(RN_uop.sqN - ROB_maxSqN) <= 0);
+assign DEC_enable = stateValid[0] && !INT_full && ($signed(RN_uop.sqN - ROB_maxSqN) <= 0) && !pcWrite;
 
 endmodule
