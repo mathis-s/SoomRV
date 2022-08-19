@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Fri Aug 19 11:10:15 2022
+[*] Fri Aug 19 15:28:24 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Aug 19 11:08:18 2022"
-[dumpfile_size] 51548
+[dumpfile_mtime] "Fri Aug 19 15:27:56 2022"
+[dumpfile_size] 304817
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 0
+[timestart] 36
 [size] 3840 2132
 [pos] -1 -1
-*-5.120295 157 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.299974 630 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Decode.
 [treeopen] TOP.Decode.ld.
-[treeopen] TOP.Decode.rn.
+[treeopen] TOP.Decode.lsu.
 [treeopen] TOP.Decode.RN_uop.
 [treeopen] TOP.Decode.rob.
 [treeopen] TOP.Decode.rob.entries[0].
@@ -64,24 +64,19 @@ TOP.Decode.rv.OUT_valid
 TOP.Decode.rv.IN_uop.tagDst[5:0]
 @200
 -rv.queue[0]
+@22
+TOP.Decode.rv.queue[0].tagA[5:0]
 @28
 TOP.Decode.rv.queue[0].availA
 TOP.Decode.rv.queue[0].availB
 @22
-TOP.Decode.rv.queue[0].tagA[5:0]
-TOP.Decode.rv.queue[0].tagB[5:0]
-TOP.Decode.rv.queue[0].tagDst[5:0]
 TOP.Decode.rv.queue[0].sqN[5:0]
 @200
 -rv.queue[1]
-@22
-TOP.Decode.rv.queue[1].sqN[5:0]
-TOP.Decode.rv.queue[1].tagA[5:0]
 @28
 TOP.Decode.rv.queue[1].availA
 TOP.Decode.rv.queue[1].availB
 @22
-TOP.Decode.rv.queue[1].tagDst[5:0]
 TOP.Decode.rv.queue[1].sqN[5:0]
 @200
 -rv.OUT_uop
@@ -110,17 +105,22 @@ TOP.Decode.ld.OUT_uop[0].srcA[31:0]
 TOP.Decode.ld.OUT_uop[0].srcB[31:0]
 @200
 -lsu
+@22
+TOP.Decode.lsu.iOpcode[5:0]
+TOP.Decode.lsu.IN_MEM_readData[31:0]
+TOP.Decode.lsu.IN_uop.sqN[5:0]
 @28
 TOP.Decode.lsu.IN_valid
-@29
 TOP.Decode.lsu.OUT_valid
+@22
+TOP.Decode.lsu.OUT_uop.sqN[5:0]
+TOP.Decode.lsu.OUT_uop.result[31:0]
 @200
 -ialu
 @28
 TOP.Decode.ialu.IN_valid
 @22
 TOP.Decode.ialu.IN_tagDst[5:0]
-@24
 TOP.Decode.ialu.IN_operands[0][31:0]
 @420
 TOP.Decode.ialu.IN_operands[1][31:0]
@@ -153,8 +153,18 @@ TOP.Decode.rob.entries[0].valid
 @200
 -
 -
+@29
+TOP.Decode.isBranch
+@28
+TOP.Decode.INTALU_isBranch
+@22
+TOP.Decode.branchSqN[5:0]
 @24
 TOP.Decode.rn.freeTagInsertIndex[4:0]
 TOP.Decode.rn.freeTagOutputIndex[4:0]
+@28
+TOP.Decode.rv.IN_resultValid[0]
+@22
+TOP.Decode.rv.IN_resultTag[0][5:0]
 [pattern_trace] 1
 [pattern_trace] 0

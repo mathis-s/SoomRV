@@ -171,6 +171,9 @@ ReservationStation rv
 
     .IN_invalidate(pcWrite),
     .IN_invalidateSqN(branchSqN),
+    
+    .IN_maxCommitSqNValid(BQ_maxCommitSqNValid),
+    .IN_maxCommitSqN(BQ_maxCommitSqN),
 
     .OUT_valid(RV_uopValid),
     .OUT_uop(RV_uop),
