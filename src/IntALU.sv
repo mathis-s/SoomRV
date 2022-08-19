@@ -92,7 +92,6 @@ end
 always_ff@(posedge clk) begin
     OUT_valid <= IN_valid && !IN_wbStall;
     if (IN_valid && !IN_wbStall) begin
-
         if (OUT_isBranch)
             OUT_branchSqN <= IN_sqN;
         else
@@ -101,7 +100,10 @@ always_ff@(posedge clk) begin
         if (branchTaken) begin
             OUT_branchTaken <= 1;
             // TODO: jalr has different addr here
-            OUT_branchAddress <= IN_operands[2];
+            //if (IN_opcode == INT_JALR)
+                //OUT_branchAddress <= IN_operands[1] + IN_operands[2];
+            //else
+                OUT_branchAddress <= IN_operands[2];
         end
         else begin
             OUT_branchTaken <= 0;

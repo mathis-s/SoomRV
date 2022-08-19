@@ -166,8 +166,8 @@ ReservationStation rv
     .IN_wbStall(wbStall),
     .IN_uopValid(RN_uopValid[0]),
     .IN_uop(RN_uop),
-    .IN_resultValid('{INTALU_valid}),
-    .IN_resultTag('{INT_resTag}),
+    .IN_resultValid('{wbValid}),
+    .IN_resultTag('{wbRegTag}),
 
     .IN_invalidate(pcWrite),
     .IN_invalidateSqN(branchSqN),

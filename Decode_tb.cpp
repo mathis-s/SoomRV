@@ -1,16 +1,18 @@
 #include "VDecode.h"
+#include <cstdio>
 #include <iostream>    // Need std::cout
+#include <unistd.h>
 #include <verilated.h> // Defines common routines
 #include "verilated_vcd_c.h"
+#include <array>
 
 VDecode* top; // Instantiation of model
 
 uint64_t main_time = 0;
 
 double sc_time_stamp()
-{                     // Called by $time in Verilog
-    return main_time; // converts to double, to match
-                      // what SystemC does
+{                   
+    return main_time;
 }
 
 uint32_t ram[1024];
@@ -25,73 +27,28 @@ int main(int argc, char** argv)
     // variable, as the "C++ static initialization order fiasco"
     // may cause a crash
     top->clk = 0;
-
-    size_t i = 0;
-    const uint32_t instrs[] = 
+    
+    if (argc == 1)
     {
-        /*0xFF010113,
-        0x40B787B3,
-        0x00f62023,
-        0xfeb7fce3,
-        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
-        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
-        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>
-        0xfb5ff0ef, //jal	ra,100b8 <dbg_printnum>*/
-        
-        /*0x00a50513,//                addi    a0,a0,10
-        0x00510113,//                addi    sp,sp,5
-        0xfff10593,//                addi    a1,sp,-1
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00250533,//                add     a0,a0,sp
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00510113,//                addi    sp,sp,5
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop*/
-
-        /*0x00a50513,                //addi    a0,a0,10
-        0x00a585b3,                //add     a1,a1,a0
-        0x00b60633,                //add     a2,a2,a1
-        0x00a10113,                //addi    sp,sp,10
-        0x00a68693,                //addi    a3,a3,10
-        0x40c10133,                //sub     sp,sp,a2
-        0x00d10133,                //add     sp,sp,a3
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop
-        0x00000013,                //nop*/
-
-        0x08000593,//                li      a1,128
-        0x00150513,//                addi    a0,a0,1
-        0x3ea02fa3,//                sw      a0,1023(zero) # 3ff <.main-0xfc79>
-        0xfeb54ce3,//                blt     a0,a1,1007c <.loop>
-        0x00160613,//                addi    a2,a2,1
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-        0x00000013,//                nop
-    };
+        printf("Invalid argument\n");
+        return 0;
+    }
+    
+    size_t i = 0;
+    std::vector<uint32_t> instrs;
+    system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
+    system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
+    FILE* f = fopen("text.bin", "rb");
+    
+    while (!feof(f))
+    {
+        uint32_t data;
+        fread(&data, sizeof(uint32_t), 1, f);
+        instrs.push_back(data);
+    }
+    
+    printf("Read %zu instructions\n", instrs.size());
+    
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
@@ -112,9 +69,9 @@ int main(int argc, char** argv)
     {
         if (top->clk == 0)
         {
-            if (i >= sizeof(instrs) / sizeof(instrs[0])) break;
+            if (i >= instrs.size()) break;
             size_t index = top->OUT_pc / 4;
-            if (index > (sizeof(instrs) / sizeof(instrs[0])))
+            if (index >= (instrs.size()))
                 break;
             top->IN_instr = instrs[index];
             

@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Thu Aug 18 15:09:46 2022
+[*] Fri Aug 19 11:10:15 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Thu Aug 18 13:52:03 2022"
-[dumpfile_size] 1536754
+[dumpfile_mtime] "Fri Aug 19 11:08:18 2022"
+[dumpfile_size] 51548
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 16698
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-6.120295 28220 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.120295 157 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Decode.
 [treeopen] TOP.Decode.ld.
@@ -108,9 +108,12 @@ TOP.Decode.ld.IN_uop[0].immB
 @22
 TOP.Decode.ld.OUT_uop[0].srcA[31:0]
 TOP.Decode.ld.OUT_uop[0].srcB[31:0]
+@200
+-lsu
 @28
-TOP.Decode.ld.OUT_uop[0].availA
-TOP.Decode.ld.OUT_uop[0].availB
+TOP.Decode.lsu.IN_valid
+@29
+TOP.Decode.lsu.OUT_valid
 @200
 -ialu
 @28
@@ -132,7 +135,7 @@ TOP.Decode.ialu.OUT_nmDst[4:0]
 TOP.Decode.ialu.OUT_tagDst[5:0]
 @200
 -rob
-@23
+@22
 TOP.Decode.rob.baseIndex[5:0]
 @200
 -
