@@ -76,9 +76,9 @@ always_comb begin
     endcase
 end
 
+
 reg branchTaken;
-always_ff@(posedge clk) begin
-    OUT_isBranch <= 
+wire isBranch =
         IN_opcode == INT_BEQ || 
         IN_opcode == INT_BNE || 
         IN_opcode == INT_BLT || 
@@ -87,12 +87,15 @@ always_ff@(posedge clk) begin
         IN_opcode == INT_BGEU || 
         IN_opcode == INT_JAL || 
         IN_opcode == INT_JALR;
-end
+
 
 always_ff@(posedge clk) begin
     OUT_valid <= IN_valid && !IN_wbStall;
     if (IN_valid && !IN_wbStall) begin
-        if (OUT_isBranch)
+        
+        OUT_isBranch <= isBranch;
+        
+        if (isBranch)
             OUT_branchSqN <= IN_sqN;
         else
             OUT_branchSqN <= 6'bx;
@@ -100,9 +103,9 @@ always_ff@(posedge clk) begin
         if (branchTaken) begin
             OUT_branchTaken <= 1;
             // TODO: jalr has different addr here
-            //if (IN_opcode == INT_JALR)
-                //OUT_branchAddress <= IN_operands[1] + IN_operands[2];
-            //else
+            if (IN_opcode == INT_JALR)
+                OUT_branchAddress <= IN_operands[1] + IN_operands[2];
+            else
                 OUT_branchAddress <= IN_operands[2];
         end
         else begin

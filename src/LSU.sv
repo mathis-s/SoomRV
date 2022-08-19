@@ -120,10 +120,10 @@ always@(posedge clk) begin
             LSU_LB: begin
                 reg[7:0] temp;
                 case (iByteIndex)
-                    0: temp <= IN_MEM_readData[7:0];
-                    1: temp <= IN_MEM_readData[15:8];
-                    2: temp <= IN_MEM_readData[23:16];
-                    3: temp <= IN_MEM_readData[31:24];
+                    0: temp = IN_MEM_readData[7:0];
+                    1: temp = IN_MEM_readData[15:8];
+                    2: temp = IN_MEM_readData[23:16];
+                    3: temp = IN_MEM_readData[31:24];
                 endcase
                 OUT_uop.result <= (iOpcode == LSU_LBU) ? {24'b0, temp} : {{24{temp[7]}}, temp};
             end
@@ -132,8 +132,8 @@ always@(posedge clk) begin
             LSU_LH: begin
                 reg[15:0] temp;
                 case (iByteIndex[1])
-                    0: temp <= IN_MEM_readData[15:0];
-                    1: temp <= IN_MEM_readData[31:16];
+                    0: temp = IN_MEM_readData[15:0];
+                    1: temp = IN_MEM_readData[31:16];
                 endcase
                 OUT_uop.result <= (iOpcode == LSU_LBU) ? {16'b0, temp} : {{16{temp[15]}}, temp};
             end

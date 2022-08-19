@@ -36,8 +36,13 @@ int main(int argc, char** argv)
     
     size_t i = 0;
     std::vector<uint32_t> instrs;
+    
+    ram[1] = 8;
+    strcpy((char*)&ram[2], "test string strlen");
+    
     system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
     system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
+    //system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
     FILE* f = fopen("text.bin", "rb");
     
     while (!feof(f))
@@ -79,13 +84,16 @@ int main(int argc, char** argv)
             if (index > (sizeof(ram) / sizeof(ram[0]))) break;
 
             if (top->OUT_MEM_readEnable)
+            {
+                printf("read at %zu: %.8x\n", index, ram[index]);
                 top->IN_MEM_readData = ram[index];
+            }
             else if (top->OUT_MEM_writeEnable)
             {
                 if (index == 255)
                     printf("%u\n", top->OUT_MEM_writeData);
 
-                if (top->OUT_MEM_writeMask == 0b1111) 
+                if (top->OUT_MEM_writeMask == 0b1111)
                     ram[index] = top->OUT_MEM_writeData;
                 else
                 {
