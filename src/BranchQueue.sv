@@ -5,15 +5,16 @@ typedef struct packed
 
 module BranchQueue
 #(
+    parameter NUM_IN = 1,
     parameter NUM_ENTRIES = 8
 )
 (
     input wire clk,
     input wire rst,
 
-    input wire IN_valid,
-    input wire IN_isBranch,
-    input wire[5:0] IN_tag,
+    input wire IN_valid[NUM_IN-1:0],
+    input wire IN_isBranch[NUM_IN-1:0],
+    input wire[5:0] IN_tag[NUM_IN-1:0],
 
     input wire IN_checkedValid,
     input wire[5:0] IN_checkedTag,
@@ -33,6 +34,7 @@ assign OUT_full = (index == (NUM_ENTRIES[2:0] - 1));
 
 reg checkedIndexFound;
 reg[2:0] checkedIndex;
+
 always_comb begin
     checkedIndexFound = 0;
     checkedIndex = NUM_ENTRIES[2:0] - 1;
@@ -64,9 +66,11 @@ always_ff@(posedge clk) begin
             end
         end
         
-        if (IN_valid && IN_isBranch) begin
-            entries[index] = IN_tag;
-            index = index + 1;
+        for (i = 0; i < NUM_IN; i=i+1) begin
+            if (IN_valid[i] && IN_isBranch[i]) begin
+                entries[index] = IN_tag[i];
+                index = index + 1;
+            end
         end
     end
 end

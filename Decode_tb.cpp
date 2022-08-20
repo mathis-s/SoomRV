@@ -1,4 +1,4 @@
-#include "VDecode.h"
+#include "VCore.h"
 #include <cstdio>
 #include <iostream>    // Need std::cout
 #include <unistd.h>
@@ -6,7 +6,7 @@
 #include "verilated_vcd_c.h"
 #include <array>
 
-VDecode* top; // Instantiation of model
+VCore* top; // Instantiation of model
 
 uint64_t main_time = 0;
 
@@ -22,7 +22,7 @@ int main(int argc, char** argv)
     Verilated::commandArgs(argc, argv); // Remember args
     Verilated::traceEverOn(true);
 
-    top = new VDecode; // Create model
+    top = new VCore; // Create model
     // Do not instead make Vtop as a file-scope static
     // variable, as the "C++ static initialization order fiasco"
     // may cause a crash
@@ -38,11 +38,11 @@ int main(int argc, char** argv)
     std::vector<uint32_t> instrs;
     
     ram[1] = 8;
-    strcpy((char*)&ram[2], "test string strlen");
+    strcpy((char*)&ram[2], "strlen test string with length 33");
     
     system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
     system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
-    //system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
+
     FILE* f = fopen("text.bin", "rb");
     
     while (!feof(f))

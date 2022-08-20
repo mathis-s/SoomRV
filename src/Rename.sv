@@ -50,6 +50,8 @@ integer i;
 bit[5:0] counterSqN;
 assign OUT_nextSqN = counterSqN;
 
+reg temp;
+
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
 always_ff@(posedge clk) begin
@@ -127,31 +129,34 @@ always_ff@(posedge clk) begin
             OUT_uop[i].pcA <= IN_uop[i].pcA;
 
             OUT_uopValid[i] <= 1;
-
-            OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
-            OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
-
-            OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
-            OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
         end
 
         // Set seqnum/tags for next instruction(s)
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+            
             OUT_uop[i].sqN <= (counterSqN + i[5:0]);
-
+            // These are affected by previous instrs
+            OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
+            OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
+            OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
+            OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
+            
             if (IN_uop[i].rd != 0) begin
                 OUT_uop[i].tagDst <= freeTags[freeTagOutputIndex];
 
                 // Mark regs written to by newly issued instructions as unavailable/pending.
-                rat[IN_uop[i].rd].avail <= 0;
-                rat[IN_uop[i].rd].specTag <= freeTags[freeTagOutputIndex];
-                rat[IN_uop[i].rd].newSqN <= counterSqN + i[5:0];
+                // These are blocking to make sure they are forwarded to the next iters of this for-loop.
+                rat[IN_uop[i].rd].avail = 0;
+                rat[IN_uop[i].rd].specTag = freeTags[freeTagOutputIndex];
+                rat[IN_uop[i].rd].newSqN = counterSqN + i[5:0];
 
                 freeTagOutputIndex = freeTagOutputIndex + 1;
             end
         end
         counterSqN <= counterSqN + WIDTH_WR[5:0];
     end
+    
+    
     else begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)
             OUT_uopValid[i] <= 0;

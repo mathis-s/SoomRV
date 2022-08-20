@@ -4,6 +4,7 @@ typedef struct packed
     bit valid;
     bit flags;
     bit[5:0] tag;
+    // for debugging
     bit[5:0] sqN;
     bit[4:0] name;
 } ROBEntry;
@@ -53,7 +54,7 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[i].valid || (IN_maxCommitSqNValid && $signed(entries[i].sqN - IN_maxCommitSqN) > 0))
+        if (!entries[i].valid || (IN_maxCommitSqNValid && $signed((baseIndex + i[5:0]) - IN_maxCommitSqN) > 0))
             headValid = 0;
     end
 end
@@ -72,7 +73,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
-            if ($signed((i[5:0] + baseIndex) - IN_invalidateSqN) > 0) begin
+            if ($signed((baseIndex + i[5:0]) - IN_invalidateSqN) > 0) begin
                 entries[i].valid <= 0;
             end
         end
