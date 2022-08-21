@@ -1,101 +1,133 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Mon Aug 15 16:19:57 2022
+[*] Sat Aug 20 14:54:14 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Mon Aug 15 16:19:04 2022"
-[dumpfile_size] 884100
+[dumpfile_mtime] "Sat Aug 20 14:41:12 2022"
+[dumpfile_size] 121532634
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view2.gtkw"
 [timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-4.899530 270 306 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.299974 188 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
-[treeopen] TOP.Decode.
-[treeopen] TOP.Decode.rat.
-[treeopen] TOP.Decode.rob.
-[treeopen] TOP.Decode.rob.entries[0].
-[treeopen] TOP.Decode.rv.
-[treeopen] TOP.OUT_uop.
+[treeopen] TOP.Core.
+[treeopen] TOP.Core.ialu.
+[treeopen] TOP.Core.ialu1.
+[treeopen] TOP.Core.lsu.
+[treeopen] TOP.Core.rob.
+[treeopen] TOP.Core.rv.
 [sst_width] 319
 [signals_width] 428
 [sst_expanded] 1
-[sst_vpaned_height] 1426
+[sst_vpaned_height] 1322
 @28
 TOP.clk
 TOP.rst
-TOP.Decode.progCnt.IN_write
-TOP.Decode.stateValid[4:0]
 @22
-TOP.Decode.DE_pc[31:0]
+TOP.Core.DE_pc[0][31:0]
+TOP.Core.DE_pc[1][31:0]
 @200
--Decoded UOp
-@28
-TOP.Decode.uop.valid
-TOP.Decode.uop.availA
-TOP.Decode.uop.availB
+-RN_uop[0]
 @22
-TOP.Decode.uop.srcA[31:0]
-TOP.Decode.uop.srcB[31:0]
-TOP.Decode.uop.tagDst[5:0]
+TOP.Core.RN_uop[0].sqN[5:0]
+@28
+TOP.Core.RN_uop[0].availA
+TOP.Core.RN_uop[0].availB
+@22
+TOP.Core.RN_uop[0].tagDst[5:0]
 @200
--rv.IN_uop
-@28
-TOP.Decode.rv.IN_uop.valid
+-RN_uop[1]
 @22
-TOP.Decode.rv.IN_uop.tagDst[5:0]
+TOP.Core.RN_uop[1].sqN[5:0]
+@28
+TOP.Core.RN_uop[1].availA
+TOP.Core.RN_uop[1].availB
+@22
+TOP.Core.RN_uop[1].tagDst[5:0]
 @200
--rv.queue[0]
+-RV[0]
+@c00028
+#{TOP.Core.rv.valid[0:3]} TOP.Core.rv.valid[0] TOP.Core.rv.valid[1] TOP.Core.rv.valid[2] TOP.Core.rv.valid[3]
 @28
-TOP.Decode.rv.queue[0].valid
-TOP.Decode.rv.queue[0].availA
-TOP.Decode.rv.queue[0].availB
+TOP.Core.rv.valid[0]
+TOP.Core.rv.valid[1]
+TOP.Core.rv.valid[2]
+@1401208
+-group_end
+@28
+TOP.Core.rv.queue[0].availA
+TOP.Core.rv.queue[0].availB
 @22
-TOP.Decode.rv.queue[0].srcA[31:0]
-TOP.Decode.rv.queue[0].srcB[31:0]
-TOP.Decode.rv.queue[0].tagDst[5:0]
+TOP.Core.rv.queue[0].sqN[5:0]
 @200
--rv.queue[1]
+-RV[1]
 @28
-TOP.Decode.rv.queue[1].valid
-TOP.Decode.rv.queue[1].availA
-TOP.Decode.rv.queue[1].availB
+TOP.Core.rv.queue[1].availA
+TOP.Core.rv.queue[1].availB
 @22
-TOP.Decode.rv.queue[1].srcA[31:0]
-TOP.Decode.rv.queue[1].srcB[31:0]
-TOP.Decode.rv.queue[1].tagDst[5:0]
+TOP.Core.rv.queue[1].sqN[5:0]
 @200
--ialu
+-RV[2]
 @28
-TOP.Decode.ialu.IN_valid
+TOP.Core.rv.queue[2].availA
+TOP.Core.rv.queue[2].availB
 @22
-TOP.Decode.ialu.IN_tagDst[5:0]
-TOP.Decode.ialu.IN_operands[0][31:0]
-TOP.Decode.ialu.IN_operands[1][31:0]
-TOP.Decode.ialu.OUT_result[31:0]
-@28
-TOP.Decode.ialu.OUT_valid
-@22
-TOP.Decode.ialu.OUT_tagDst[5:0]
+TOP.Core.rv.queue[2].sqN[5:0]
 @200
--rob
+-RV[3]
+@28
+TOP.Core.rv.queue[3].availA
+TOP.Core.rv.queue[3].availB
 @22
-TOP.Decode.rob.entries[0].tag[5:0]
-TOP.Decode.rob.entries[1].tag[5:0]
-TOP.Decode.rob.entries[2].tag[5:0]
-TOP.Decode.rob.entries[3].tag[5:0]
-TOP.Decode.rob.entries[4].tag[5:0]
-TOP.Decode.rob.entries[5].tag[5:0]
-TOP.Decode.rob.entries[6].tag[5:0]
-TOP.Decode.rob.entries[7].tag[5:0]
+TOP.Core.rv.queue[3].sqN[5:0]
+@200
+-LD_uop[0]
+@28
+TOP.Core.LD_uop[0].valid
+@22
+TOP.Core.LD_uop[0].sqN[5:0]
+@200
+-LD_uop[1]
+@28
+TOP.Core.LD_uop[1].valid
+@22
+TOP.Core.LD_uop[1].sqN[5:0]
+@200
+-IALU0
+@28
+TOP.Core.ialu.OUT_valid
+@22
+TOP.Core.ialu.OUT_result[31:0]
+TOP.Core.ialu.OUT_sqN[5:0]
+@200
+-LSU
+@28
+TOP.Core.lsu.OUT_valid
+@22
+TOP.Core.lsu.OUT_uop.result[31:0]
+TOP.Core.lsu.OUT_uop.sqN[5:0]
+@200
+-IALU1
+@28
+TOP.Core.ialu1.OUT_valid
+@22
+TOP.Core.ialu1.OUT_result[31:0]
+TOP.Core.ialu1.OUT_sqN[5:0]
+@200
+-ROB
+@22
+TOP.Core.rob.entries[0].sqN[5:0]
+TOP.Core.rob.entries[1].sqN[5:0]
+TOP.Core.rob.entries[2].sqN[5:0]
+TOP.Core.rob.entries[3].sqN[5:0]
+TOP.Core.rob.entries[4].sqN[5:0]
+TOP.Core.rob.entries[5].sqN[5:0]
+TOP.Core.rob.entries[6].sqN[5:0]
+TOP.Core.rob.entries[7].sqN[5:0]
 @200
 -
 @22
-TOP.Decode.rob.baseIndex[5:0]
-@28
-TOP.Decode.rob.OUT_wbValid[0]
-@22
-TOP.Decode.rob.OUT_tags[0][5:0]
-TOP.Decode.rob.OUT_results[0][31:0]
+TOP.Core.rob.baseIndex[5:0]
 [pattern_trace] 1
 [pattern_trace] 0

@@ -5,7 +5,7 @@ typedef struct packed
 
 module BranchQueue
 #(
-    parameter NUM_IN = 1,
+    parameter NUM_IN = 2,
     parameter NUM_ENTRIES = 8
 )
 (

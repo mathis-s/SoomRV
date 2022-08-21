@@ -34,7 +34,6 @@ int main(int argc, char** argv)
         return 0;
     }
     
-    size_t i = 0;
     std::vector<uint32_t> instrs;
     
     ram[1] = 8;
@@ -74,11 +73,15 @@ int main(int argc, char** argv)
     {
         if (top->clk == 0)
         {
-            if (i >= instrs.size()) break;
-            size_t index = top->OUT_pc / 4;
-            if (index >= (instrs.size()))
-                break;
-            top->IN_instr = instrs[index];
+            size_t index;
+            for (int j = 0; j < 2; j++)
+            {
+                index = top->OUT_pc[j] / 4;
+                if (index >= (instrs.size()))
+                    goto break_main;
+                top->IN_instr[j] = instrs[index];
+            }
+            
             
             index = top->OUT_MEM_addr;
             if (index > (sizeof(ram) / sizeof(ram[0]))) break;
@@ -116,6 +119,7 @@ int main(int argc, char** argv)
         tfp->dump(main_time);
         main_time++;              // Time passes...
     }
+    break_main:
 
     top->final(); // Done simulating
     tfp->close();

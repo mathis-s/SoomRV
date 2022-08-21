@@ -121,6 +121,9 @@ always_ff@(posedge clk) begin
             OUT_sqN <= IN_sqN;
         end
     end
+    else begin
+        OUT_branchTaken <= 0;
+    end
 end
 
 //always_ff@(posedge clk) begin

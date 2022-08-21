@@ -8,8 +8,8 @@ typedef struct packed
 
 module Rename
 #(
-    parameter WIDTH_UOPS = 1,
-    parameter WIDTH_WR = 1,
+    parameter WIDTH_UOPS = 2,
+    parameter WIDTH_WR = 2,
     parameter FREE_TAG_FIFO_SIZE=32
 )
 (
@@ -99,11 +99,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branchTaken) begin
         
-        counterSqN <= IN_branchSqN + WIDTH_UOPS;
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].sqN <= (IN_branchSqN + i[5:0]);
-            OUT_uopValid[i] <= 0;
-        end
+        counterSqN <= IN_branchSqN + 1;
 
         for (i = 0; i < 32; i=i+1) begin
             if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin

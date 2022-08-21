@@ -13,9 +13,9 @@ module ROB
 #(
     // how many entries, ie how many instructions can we
     // speculatively execute?
-    parameter LENGTH = 8,
+    parameter LENGTH = 16,
     // how many ops are en/dequeued per cycle?
-    parameter WIDTH = 1
+    parameter WIDTH = 2
 )
 (
     input wire clk,
@@ -59,6 +59,18 @@ always_comb begin
     end
 end
 
+reg allowSingleDequeue;
+always_comb begin
+    allowSingleDequeue = 1;
+    
+    for (i = 1; i < LENGTH; i=i+1)
+        if (entries[i].valid)
+            allowSingleDequeue = 0;
+            
+    if (!entries[0].valid || (IN_maxCommitSqNValid && $signed((baseIndex + i[5:0]) - IN_maxCommitSqN) > 0))
+        allowSingleDequeue = 0;
+end
+
 wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
 
@@ -79,13 +91,11 @@ always_ff@(posedge clk) begin
         end
         if ($signed(baseIndex - IN_invalidateSqN) > 0)
             baseIndex = IN_invalidateSqN;
-        for (i = 0; i < WIDTH; i=i+1) begin
-            OUT_comValid[i] <= 0;
-        end
     end
-    else begin
+    
+    if (!rst) begin
         // Dequeue and push forward fifo entries
-        if (doDequeue) begin
+        if (doDequeue && !IN_invalidate) begin
             // Push forward fifo
             for (i = 0; i < LENGTH - WIDTH; i=i+1) begin
                 entries[i] <= entries[i + WIDTH];
@@ -98,11 +108,23 @@ always_ff@(posedge clk) begin
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_comNames[i] <= entries[i].name;
                 OUT_comTags[i] <= entries[i].tag;
-                OUT_comValid[i] <= entries[i].valid;
+                OUT_comValid[i] <= 1;
                 // TODO: handle exceptions here.
             end
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
+        end
+        else if (allowSingleDequeue && !IN_invalidate) begin
+            OUT_comNames[0] <= entries[0].name;
+            OUT_comTags[0] <= entries[0].tag;
+            OUT_comValid[0] <= 1;
+            
+            entries[0].valid <= 0;
+            
+            for (i = 1; i < WIDTH; i=i+1)
+                OUT_comValid[i] <= 0;
+                
+            baseIndex = baseIndex + 1;
         end
         else begin
             for (i = 0; i < WIDTH; i=i+1)
@@ -111,12 +133,12 @@ always_ff@(posedge clk) begin
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH; i=i+1) begin
-            if (IN_valid[i]) begin
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[2:0]].valid <= 1;
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[2:0]].flags <= 0;
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[2:0]].tag <= IN_tags[i];
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[2:0]].name <= IN_names[i];
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[2:0]].sqN <= IN_sqNs[i];
+            if (IN_valid[i] && (!IN_invalidate || (IN_invalidateSqN - IN_sqNs[i]) <= 0)) begin
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].valid <= 1;
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].flags <= 0;
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].tag <= IN_tags[i];
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].name <= IN_names[i];
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].sqN <= IN_sqNs[i];
             end
         end
     end

@@ -1,7 +1,7 @@
 module RF
 #(
-    parameter NUM_READ = 2,
-    parameter NUM_WRITE = 1,
+    parameter NUM_READ = 4,
+    parameter NUM_WRITE = 2,
     parameter SIZE=64
 )
 (

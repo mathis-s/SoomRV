@@ -1,23 +1,28 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Fri Aug 19 15:28:24 2022
+[*] Sat Aug 20 22:34:59 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Aug 19 15:27:56 2022"
-[dumpfile_size] 304817
+[dumpfile_mtime] "Sat Aug 20 22:34:10 2022"
+[dumpfile_size] 3342568
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 36
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-6.299974 630 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-10.299974 5626 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
-[treeopen] TOP.Decode.
-[treeopen] TOP.Decode.ld.
-[treeopen] TOP.Decode.lsu.
-[treeopen] TOP.Decode.RN_uop.
-[treeopen] TOP.Decode.rob.
-[treeopen] TOP.Decode.rob.entries[0].
-[treeopen] TOP.Decode.rv.
+[treeopen] TOP.Core.
+[treeopen] TOP.Core.ialu.
+[treeopen] TOP.Core.ialu1.
+[treeopen] TOP.Core.idec.
+[treeopen] TOP.Core.ld.
+[treeopen] TOP.Core.LD_uop[0].
+[treeopen] TOP.Core.lsu.
+[treeopen] TOP.Core.rn.
+[treeopen] TOP.Core.rn.OUT_uop[0].
+[treeopen] TOP.Core.rn.rat[5].
+[treeopen] TOP.Core.rob.
+[treeopen] TOP.Core.rv.
 [sst_width] 319
 [signals_width] 428
 [sst_expanded] 1
@@ -25,146 +30,134 @@
 @28
 TOP.clk
 TOP.rst
-TOP.Decode.progCnt.IN_write
 @22
-TOP.IN_instr[31:0]
-TOP.Decode.DE_pc[31:0]
+TOP.Core.DE_pc[0][31:0]
+TOP.Core.DE_pc[1][31:0]
 @28
-TOP.Decode.DEC_enable
-TOP.Decode.stateValid[1:0]
+TOP.Core.stateValid[2:0]
+TOP.Core.mispredFlush
+TOP.Core.pcWrite
+TOP.Core.IF_enable
 @200
--Decoded UOp
+-RN_uop[0]
 @28
-TOP.Decode.RN_uopValid[0]
-TOP.Decode.RN_uop.availA
-TOP.Decode.RN_uop.availB
+#{TOP.Core.rn.OUT_uopValid[0:1]} TOP.Core.rn.OUT_uopValid[0] TOP.Core.rn.OUT_uopValid[1]
 @22
-TOP.Decode.RN_uop.nmDst[4:0]
-TOP.Decode.RN_uop.opcode[5:0]
-TOP.Decode.RN_uop.sqN[5:0]
-TOP.Decode.RN_uop.tagA[5:0]
-TOP.Decode.RN_uop.tagB[5:0]
-TOP.Decode.RN_uop.tagDst[5:0]
+TOP.Core.RN_uop[0].sqN[5:0]
 @28
-TOP.Decode.rn.en
+TOP.Core.RN_uop[0].availA
+TOP.Core.RN_uop[0].availB
+@22
+TOP.Core.RN_uop[0].tagDst[5:0]
+TOP.Core.rn.OUT_uop[0].nmDst[4:0]
 @200
--rv.IN_uop
-@800028
-#{TOP.Decode.rv.valid[0:3]} TOP.Decode.rv.valid[0] TOP.Decode.rv.valid[1] TOP.Decode.rv.valid[2] TOP.Decode.rv.valid[3]
+-RN_uop[1]
+@22
+TOP.Core.RN_uop[1].sqN[5:0]
 @28
-TOP.Decode.rv.valid[0]
-TOP.Decode.rv.valid[1]
-TOP.Decode.rv.valid[2]
-TOP.Decode.rv.valid[3]
-@1001200
--group_end
-@28
-TOP.Decode.rv.OUT_valid
-@24
-TOP.Decode.rv.IN_uop.tagDst[5:0]
+TOP.Core.RN_uop[1].availA
+TOP.Core.RN_uop[1].availB
+@22
+TOP.Core.RN_uop[1].tagDst[5:0]
+TOP.Core.rn.OUT_uop[1].nmDst[4:0]
 @200
--rv.queue[0]
-@22
-TOP.Decode.rv.queue[0].tagA[5:0]
+-RV
+-RV[0]
 @28
-TOP.Decode.rv.queue[0].availA
-TOP.Decode.rv.queue[0].availB
+TOP.Core.rv.valid[0]
+TOP.Core.rv.queue[0].availA
+TOP.Core.rv.queue[0].availB
 @22
-TOP.Decode.rv.queue[0].sqN[5:0]
+TOP.Core.rv.queue[0].sqN[5:0]
 @200
--rv.queue[1]
+-RV[1]
 @28
-TOP.Decode.rv.queue[1].availA
-TOP.Decode.rv.queue[1].availB
+TOP.Core.rv.valid[1]
+TOP.Core.rv.queue[1].availA
+TOP.Core.rv.queue[1].availB
 @22
-TOP.Decode.rv.queue[1].sqN[5:0]
+TOP.Core.rv.queue[1].sqN[5:0]
 @200
--rv.OUT_uop
-@22
-TOP.Decode.rv.OUT_uop.sqN[5:0]
-@c00022
-TOP.Decode.rv.OUT_uop.tagDst[5:0]
+-RV[2]
 @28
-(0)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-(1)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-(2)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-(3)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-(4)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-(5)TOP.Decode.rv.OUT_uop.tagDst[5:0]
-@1401200
--group_end
-@200
--load
+TOP.Core.rv.valid[2]
+TOP.Core.rv.queue[2].availA
+TOP.Core.rv.queue[2].availB
 @22
-TOP.Decode.ld.IN_uop[0].imm[31:0]
+TOP.Core.rv.queue[2].sqN[5:0]
+@200
+-RV[3]
 @28
-TOP.Decode.ld.IN_uop[0].pcA
-TOP.Decode.ld.IN_uop[0].immB
+TOP.Core.rv.valid[3]
+TOP.Core.rv.queue[3].availA
+TOP.Core.rv.queue[3].availB
 @22
-TOP.Decode.ld.OUT_uop[0].srcA[31:0]
-TOP.Decode.ld.OUT_uop[0].srcB[31:0]
+TOP.Core.rv.queue[3].sqN[5:0]
 @200
--lsu
-@22
-TOP.Decode.lsu.iOpcode[5:0]
-TOP.Decode.lsu.IN_MEM_readData[31:0]
-TOP.Decode.lsu.IN_uop.sqN[5:0]
+-LD_uop[0]
 @28
-TOP.Decode.lsu.IN_valid
-TOP.Decode.lsu.OUT_valid
+TOP.Core.LD_uop[0].valid
 @22
-TOP.Decode.lsu.OUT_uop.sqN[5:0]
-TOP.Decode.lsu.OUT_uop.result[31:0]
+TOP.Core.LD_uop[0].sqN[5:0]
+TOP.Core.ld.OUT_uop[0].srcA[31:0]
+TOP.Core.ld.OUT_uop[0].srcB[31:0]
 @200
--ialu
+-LD_uop[1]
 @28
-TOP.Decode.ialu.IN_valid
+TOP.Core.LD_uop[1].valid
 @22
-TOP.Decode.ialu.IN_tagDst[5:0]
-TOP.Decode.ialu.IN_operands[0][31:0]
-@420
-TOP.Decode.ialu.IN_operands[1][31:0]
-@24
-TOP.Decode.ialu.OUT_result[31:0]
-@22
-TOP.Decode.ialu.OUT_sqN[5:0]
-@28
-TOP.Decode.ialu.OUT_valid
-@22
-TOP.Decode.ialu.OUT_nmDst[4:0]
-TOP.Decode.ialu.OUT_tagDst[5:0]
+TOP.Core.LD_uop[1].sqN[5:0]
+TOP.Core.ld.OUT_uop[1].srcA[31:0]
+TOP.Core.ld.OUT_uop[1].srcB[31:0]
 @200
--rob
+-IALU0
 @22
-TOP.Decode.rob.baseIndex[5:0]
-@200
--
-@22
-TOP.Decode.rob.entries[0].sqN[5:0]
-TOP.Decode.rob.entries[1].sqN[5:0]
-TOP.Decode.rob.entries[2].sqN[5:0]
-TOP.Decode.rob.entries[3].sqN[5:0]
-TOP.Decode.rob.entries[4].sqN[5:0]
-TOP.Decode.rob.entries[5].sqN[5:0]
-TOP.Decode.rob.entries[6].sqN[5:0]
-TOP.Decode.rob.entries[7].sqN[5:0]
-@28
-TOP.Decode.rob.entries[0].valid
-@200
--
--
+TOP.Core.ialu.OUT_result[31:0]
 @29
-TOP.Decode.isBranch
-@28
-TOP.Decode.INTALU_isBranch
+TOP.Core.ialu.OUT_valid
 @22
-TOP.Decode.branchSqN[5:0]
+TOP.Core.ialu.OUT_result[31:0]
+TOP.Core.ialu.OUT_sqN[5:0]
+@200
+-LSU
+@22
+TOP.Core.lsu.OUT_uop.result[31:0]
+@28
+TOP.Core.lsu.OUT_valid
+@22
+TOP.Core.lsu.OUT_uop.result[31:0]
+TOP.Core.lsu.OUT_uop.sqN[5:0]
+@200
+-IALU1
+@29
+TOP.Core.ialu1.OUT_valid
+@22
+TOP.Core.ialu1.OUT_result[31:0]
+TOP.Core.ialu1.OUT_sqN[5:0]
+@200
+-ROB
+@22
+TOP.Core.rob.entries[0].sqN[5:0]
+TOP.Core.rob.entries[1].sqN[5:0]
+TOP.Core.rob.entries[2].sqN[5:0]
+TOP.Core.rob.entries[3].sqN[5:0]
+TOP.Core.rob.entries[4].sqN[5:0]
+TOP.Core.rob.entries[5].sqN[5:0]
+TOP.Core.rob.entries[6].sqN[5:0]
+TOP.Core.rob.entries[7].sqN[5:0]
+@200
+-
+@22
+TOP.Core.rob.baseIndex[5:0]
+TOP.Core.branchSqN[5:0]
+@200
+-Sandbox
+@28
+TOP.Core.rv.IN_maxCommitSqNValid
+@22
+TOP.Core.rv.IN_maxCommitSqN[5:0]
 @24
-TOP.Decode.rn.freeTagInsertIndex[4:0]
-TOP.Decode.rn.freeTagOutputIndex[4:0]
-@28
-TOP.Decode.rv.IN_resultValid[0]
-@22
-TOP.Decode.rv.IN_resultTag[0][5:0]
+TOP.Core.rv.storeQueueIn[2:0]
+TOP.Core.rv.storeQueueOut[2:0]
 [pattern_trace] 1
 [pattern_trace] 0

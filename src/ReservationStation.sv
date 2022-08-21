@@ -1,8 +1,8 @@
 module ReservationStation
 #(
-    parameter NUM_UOPS=1,
-    parameter QUEUE_SIZE = 4,
-    parameter RESULT_BUS_COUNT = 1,
+    parameter NUM_UOPS=2,
+    parameter QUEUE_SIZE = 16,
+    parameter RESULT_BUS_COUNT = 2,
     parameter STORE_QUEUE_SIZE=8
 )
 (
@@ -43,7 +43,7 @@ reg valid[QUEUE_SIZE-1:0];
 
 reg enqValid;
 
-reg[1:0] deqIndex[NUM_UOPS-1:0];
+reg[3:0] deqIndex[NUM_UOPS-1:0];
 reg deqValid[NUM_UOPS-1:0];
 
 always_comb begin
@@ -56,18 +56,20 @@ end
 
 reg isLoad;
 reg isStore;
+reg isJumpBranch;
 always_comb begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         
         deqValid[i] = 0;
         deqIndex[i] = 0;
-        isLoad = 0;
         isStore = 0;
+        isLoad = 0;
+        isJumpBranch = 0;
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-            if (valid[j]) begin
-                
+            
+            if (valid[j] && (!deqValid[0] || deqIndex[0] != j[3:0])) begin
                 // maybe just store these as a bit in the uop?
                 isLoad = (queue[j].fu == FU_LSU) && (queue[j].opcode == LSU_LB || queue[j].opcode == LSU_LH ||
                     queue[j].opcode == LSU_LW || queue[j].opcode == LSU_LBU || queue[j].opcode == LSU_LHU);
@@ -75,17 +77,29 @@ always_comb begin
                 isStore = (queue[j].fu == FU_LSU) && 
                     (queue[j].opcode == LSU_SB || queue[j].opcode == LSU_SH || queue[j].opcode == LSU_SW);
                     
+                isJumpBranch = (queue[j].fu == FU_INT) &&
+                    (queue[j].opcode == INT_BEQ || 
+                    queue[j].opcode == INT_BNE || 
+                    queue[j].opcode == INT_BLT || 
+                    queue[j].opcode == INT_BGE || 
+                    queue[j].opcode == INT_BLTU || 
+                    queue[j].opcode == INT_BGEU || 
+                    queue[j].opcode == INT_JAL || 
+                    queue[j].opcode == INT_JALR);
+                    
                 
                 if (queue[j].availA && queue[j].availB && 
+                    // Second FU only gets simple int ops
+                    (i == 0 || (!isLoad && !isStore && !isJumpBranch)) &&
                     // Loads are only issued when all stores before them are handled.
                     (!isLoad || storeQueueEmpty || $signed(storeQueue[storeQueueOut] - queue[j].sqN) > 0) &&
                     // Stores are issued in-order and non-speculatively
                     (!isStore || (storeQueue[storeQueueOut] == queue[j].sqN && 
-                        (!IN_maxCommitSqNValid || $signed(IN_maxCommitSqN - queue[j].sqN) > 0))) &&
+                        (!IN_maxCommitSqNValid || $signed(IN_maxCommitSqN - queue[j].sqN) >= 0))) &&
                     
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
-                    deqIndex[i] = j[1:0];
+                    deqIndex[i] = j[3:0];
                 end
             end
         end
@@ -106,6 +120,10 @@ always_ff@(posedge clk) begin
             if ($signed(queue[i].sqN - IN_invalidateSqN) > 0)
                 valid[i] <= 0;
         end
+        
+        // TODO: incorrect!
+        storeQueueOut = storeQueueIn;
+        
     end
     else begin
         // Get relevant results from common data buses
@@ -127,8 +145,11 @@ always_ff@(posedge clk) begin
             if (!IN_wbStall[i]) begin
                 if (deqValid[i]) begin
                     OUT_uop[i] <= queue[deqIndex[i]];
-                    if (isStore)
+                    if ((queue[deqIndex[i]].fu == FU_LSU) && 
+                        (queue[deqIndex[i]].opcode == LSU_SB || 
+                            queue[deqIndex[i]].opcode == LSU_SH || queue[deqIndex[i]].opcode == LSU_SW)) begin
                         storeQueueOut = storeQueueOut + 1;
+                    end
                         
                     valid[deqIndex[i]] = 0;
                 end
@@ -155,7 +176,7 @@ always_ff@(posedge clk) begin
                         end
                         
                         queue[j] <= temp;
-                        valid[j] <= 1;
+                        valid[j] = 1;
                         enqValid = 1;
                     end
                 end

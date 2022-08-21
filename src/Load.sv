@@ -1,7 +1,7 @@
 module Load
 #(
-    parameter NUM_UOPS=1,
-    parameter NUM_WBS=1,
+    parameter NUM_UOPS=2,
+    parameter NUM_WBS=2,
     parameter NUM_XUS=4
 )
 (
