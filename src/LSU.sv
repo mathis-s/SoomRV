@@ -5,9 +5,12 @@ module LSU
 
     input wire IN_valid,
     input EX_UOp IN_uop,
+    
+    input wire IN_invalidate,
+    input wire[5:0] IN_invalidateSqN,
+
 
     input wire[31:0] IN_MEM_readData,
-
     output reg[31:0] OUT_MEM_addr,
     output reg[31:0] OUT_MEM_writeData,
     output reg OUT_MEM_writeEnable,
@@ -35,7 +38,7 @@ always@(posedge clk) begin
     if (rst) begin
         iValid <= 0;
     end
-    else if (IN_valid) begin
+    else if (IN_valid && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
 
         iValid <= 1;
         iOpcode <= IN_uop.opcode;
@@ -109,7 +112,7 @@ always@(posedge clk) begin
         OUT_MEM_writeEnable <= 0;
     end
 
-    if (iValid) begin
+    if (iValid && (!IN_invalidate || $signed(iSqN - IN_invalidateSqN) <= 0)) begin
         OUT_uop.tagDst <= iTagDst;
         OUT_uop.nmDst <= iNmDst;
         OUT_uop.sqN <= iSqN;

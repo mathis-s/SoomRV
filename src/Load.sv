@@ -18,6 +18,9 @@ module Load
     input wire IN_wbValid[NUM_WBS-1:0],
     input wire[5:0] IN_wbTag[NUM_WBS-1:0],
     input wire[31:0] IN_wbResult[NUM_WBS-1:0],
+    
+    input wire IN_invalidate,
+    input wire[5:0] IN_invalidateSqN,
 
     // Register File read
     output reg OUT_rfReadValid[2*NUM_UOPS-1:0],
@@ -52,7 +55,8 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
-                OUT_uop[i].valid <= 1;
+                
+                OUT_uop[i].valid <= !IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0);
 
                 // Some instructions just use the pc as an operand.             
                 if (IN_uop[i].pcA) begin
