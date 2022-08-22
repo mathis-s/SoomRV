@@ -67,7 +67,7 @@ always_comb begin
         if (entries[i].valid)
             allowSingleDequeue = 0;
             
-    if (!entries[0].valid || (IN_maxCommitSqNValid && $signed((baseIndex + i[5:0]) - IN_maxCommitSqN) > 0))
+    if (!entries[0].valid || (IN_maxCommitSqNValid && $signed((baseIndex) - IN_maxCommitSqN) > 0))
         allowSingleDequeue = 0;
 end
 
@@ -95,6 +95,7 @@ always_ff@(posedge clk) begin
     
     if (!rst) begin
         // Dequeue and push forward fifo entries
+        
         if (doDequeue && !IN_invalidate) begin
             // Push forward fifo
             for (i = 0; i < LENGTH - WIDTH; i=i+1) begin

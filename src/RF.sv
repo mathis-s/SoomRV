@@ -20,6 +20,8 @@ module RF
 integer i;
 reg[31:0] mem[SIZE-1:0];
 
+wire[31:0] tt = mem[22];
+
 always_comb begin
     for (i = 0; i < NUM_READ; i=i+1) begin
         if (IN_readEnable[i]) begin

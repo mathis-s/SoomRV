@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Sun Aug 21 11:00:34 2022
+[*] Sun Aug 21 23:06:23 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Sun Aug 21 10:59:38 2022"
-[dumpfile_size] 1006680
+[dumpfile_mtime] "Sun Aug 21 23:05:04 2022"
+[dumpfile_size] 1598229
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 0
+[timestart] 6390
 [size] 3840 2132
 [pos] -1 -1
-*-8.299974 543 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.140254 6685 4680 6755 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.ialu.
@@ -19,11 +19,30 @@
 [treeopen] TOP.Core.ld.OUT_uop[0].
 [treeopen] TOP.Core.LD_uop[0].
 [treeopen] TOP.Core.lsu.
+[treeopen] TOP.Core.rn.
 [treeopen] TOP.Core.rn.OUT_uop[0].
+[treeopen] TOP.Core.rn.rat[2].
 [treeopen] TOP.Core.rn.rat[5].
 [treeopen] TOP.Core.rob.
+[treeopen] TOP.Core.rob.entries[0].
+[treeopen] TOP.Core.rob.entries[10].
+[treeopen] TOP.Core.rob.entries[11].
+[treeopen] TOP.Core.rob.entries[12].
+[treeopen] TOP.Core.rob.entries[13].
+[treeopen] TOP.Core.rob.entries[14].
+[treeopen] TOP.Core.rob.entries[15].
+[treeopen] TOP.Core.rob.entries[1].
+[treeopen] TOP.Core.rob.entries[2].
+[treeopen] TOP.Core.rob.entries[3].
+[treeopen] TOP.Core.rob.entries[4].
+[treeopen] TOP.Core.rob.entries[5].
+[treeopen] TOP.Core.rob.entries[6].
+[treeopen] TOP.Core.rob.entries[7].
+[treeopen] TOP.Core.rob.entries[8].
+[treeopen] TOP.Core.rob.entries[9].
 [treeopen] TOP.Core.rv.
-[sst_width] 319
+[treeopen] TOP.Core.rv.queue[0].
+[sst_width] 220
 [signals_width] 428
 [sst_expanded] 1
 [sst_vpaned_height] 1426
@@ -38,6 +57,8 @@ TOP.Core.stateValid[2:0]
 TOP.Core.mispredFlush
 TOP.Core.pcWrite
 TOP.Core.IF_enable
+@820
+TOP.Core.OUT_MEM_writeData[31:0]
 @200
 -RN_uop[0]
 @28
@@ -48,7 +69,9 @@ TOP.Core.RN_uop[0].sqN[5:0]
 TOP.Core.RN_uop[0].availA
 TOP.Core.RN_uop[0].availB
 @22
+TOP.Core.rn.freeTagOutputIndex[4:0]
 TOP.Core.RN_uop[0].tagDst[5:0]
+TOP.Core.RN_uop[0].tagB[5:0]
 TOP.Core.rn.OUT_uop[0].nmDst[4:0]
 @200
 -RN_uop[1]
@@ -60,15 +83,22 @@ TOP.Core.RN_uop[1].availB
 @22
 TOP.Core.RN_uop[1].tagDst[5:0]
 TOP.Core.rn.OUT_uop[1].nmDst[4:0]
+@24
+TOP.Core.rv.storeQueueIn[2:0]
+TOP.Core.rv.storeQueueOut[2:0]
 @200
 -RV
 -RV[0]
+@22
+TOP.Core.rv.queue[0].tagA[5:0]
+TOP.Core.rv.queue[0].tagB[5:0]
+TOP.Core.rv.queue[0].sqN[5:0]
 @28
 TOP.Core.rv.valid[0]
 TOP.Core.rv.queue[0].availA
 TOP.Core.rv.queue[0].availB
 @22
-TOP.Core.rv.queue[0].sqN[5:0]
+TOP.Core.rv.queue[0].tagDst[5:0]
 @200
 -RV[1]
 @28
@@ -94,33 +124,33 @@ TOP.Core.rv.queue[3].availB
 @22
 TOP.Core.rv.queue[3].sqN[5:0]
 @200
--LD_uop[0]
+-free tags
 @28
-TOP.Core.LD_uop[0].valid
+TOP.Core.rn.rat[10].avail
 @22
-TOP.Core.LD_uop[0].sqN[5:0]
-TOP.Core.ld.OUT_uop[0].srcA[31:0]
-TOP.Core.ld.OUT_uop[0].srcB[31:0]
-@200
--LD_uop[1]
-@28
-TOP.Core.LD_uop[1].valid
-@22
-TOP.Core.LD_uop[1].sqN[5:0]
-TOP.Core.ld.OUT_uop[1].srcA[31:0]
-TOP.Core.ld.OUT_uop[1].srcB[31:0]
+TOP.Core.rn.rat[10].comTag[5:0]
+TOP.Core.rn.rat[10].specTag[5:0]
+TOP.Core.rn.rat[10].newSqN[5:0]
 @200
 -IALU0
 @22
 TOP.Core.ialu.IN_operands[0][31:0]
 TOP.Core.ialu.IN_operands[1][31:0]
-@29
+TOP.Core.ialu.IN_operands[2][31:0]
+@28
 TOP.Core.ialu.OUT_valid
 @22
 TOP.Core.ialu.OUT_result[31:0]
+@23
 TOP.Core.ialu.OUT_sqN[5:0]
+@22
+TOP.Core.ialu.OUT_tagDst[5:0]
+TOP.Core.ialu.OUT_nmDst[4:0]
 @200
 -LSU
+@22
+TOP.Core.lsu.OUT_MEM_addr[31:0]
+TOP.Core.lsu.IN_MEM_readData[31:0]
 @28
 TOP.Core.lsu.OUT_valid
 @c00022
@@ -162,13 +192,17 @@ TOP.Core.lsu.OUT_uop.result[31:0]
 -group_end
 @22
 TOP.Core.lsu.OUT_uop.sqN[5:0]
+TOP.Core.lsu.OUT_uop.tagDst[5:0]
+TOP.Core.lsu.OUT_uop.nmDst[4:0]
 @200
 -IALU1
-@29
+@28
 TOP.Core.ialu1.OUT_valid
 @22
 TOP.Core.ialu1.OUT_result[31:0]
 TOP.Core.ialu1.OUT_sqN[5:0]
+TOP.Core.ialu1.OUT_tagDst[5:0]
+TOP.Core.ialu1.OUT_nmDst[4:0]
 @200
 -ROB
 @22
@@ -176,10 +210,6 @@ TOP.Core.rob.entries[0].sqN[5:0]
 TOP.Core.rob.entries[1].sqN[5:0]
 TOP.Core.rob.entries[2].sqN[5:0]
 TOP.Core.rob.entries[3].sqN[5:0]
-TOP.Core.rob.entries[4].sqN[5:0]
-TOP.Core.rob.entries[5].sqN[5:0]
-TOP.Core.rob.entries[6].sqN[5:0]
-TOP.Core.rob.entries[7].sqN[5:0]
 @200
 -
 @22
@@ -187,20 +217,45 @@ TOP.Core.rob.baseIndex[5:0]
 TOP.Core.branchSqN[5:0]
 @200
 -Sandbox
-@28
-TOP.Core.rob.entries[0].valid
-TOP.Core.rob.entries[1].valid
-TOP.Core.rob.entries[2].valid
-TOP.Core.rob.entries[3].valid
-TOP.Core.rob.entries[4].valid
-TOP.Core.rob.entries[5].valid
-TOP.Core.rob.entries[6].valid
-TOP.Core.rob.entries[7].valid
-TOP.Core.rob.entries[8].valid
-TOP.Core.rob.entries[9].valid
-TOP.Core.rob.entries[10].valid
 @22
-TOP.Core.RN_nextSqN[5:0]
-TOP.Core.ROB_curSqN[5:0]
+TOP.Core.rn.comRegTag[0][5:0]
+TOP.Core.rn.comRegTag[1][5:0]
+TOP.Core.rn.comRegNm[0][4:0]
+TOP.Core.rn.comRegNm[1][4:0]
+@28
+#{TOP.Core.rn.comValid[0:1]} TOP.Core.rn.comValid[0] TOP.Core.rn.comValid[1]
+@22
+TOP.Core.rn.freeTags[0][5:0]
+TOP.Core.rn.freeTags[1][5:0]
+TOP.Core.rn.freeTags[2][5:0]
+TOP.Core.rn.freeTags[3][5:0]
+TOP.Core.rn.freeTags[4][5:0]
+TOP.Core.rn.freeTags[5][5:0]
+TOP.Core.rn.freeTags[6][5:0]
+TOP.Core.rn.freeTags[7][5:0]
+TOP.Core.rn.freeTags[8][5:0]
+TOP.Core.rn.freeTags[9][5:0]
+TOP.Core.rn.freeTags[10][5:0]
+TOP.Core.rn.freeTags[11][5:0]
+TOP.Core.rn.freeTags[12][5:0]
+TOP.Core.rn.freeTags[13][5:0]
+TOP.Core.rn.freeTags[14][5:0]
+TOP.Core.rn.freeTags[15][5:0]
+TOP.Core.rn.freeTags[16][5:0]
+TOP.Core.rn.freeTags[17][5:0]
+TOP.Core.rn.freeTags[18][5:0]
+TOP.Core.rn.freeTags[19][5:0]
+TOP.Core.rn.freeTags[20][5:0]
+TOP.Core.rn.freeTags[21][5:0]
+TOP.Core.rn.freeTags[22][5:0]
+TOP.Core.rn.freeTags[23][5:0]
+TOP.Core.rn.freeTags[24][5:0]
+TOP.Core.rn.freeTags[25][5:0]
+TOP.Core.rn.freeTags[26][5:0]
+TOP.Core.rn.freeTags[27][5:0]
+TOP.Core.rn.freeTags[28][5:0]
+TOP.Core.rn.freeTags[29][5:0]
+TOP.Core.rn.freeTags[30][5:0]
+TOP.Core.rn.freeTags[31][5:0]
 [pattern_trace] 1
 [pattern_trace] 0

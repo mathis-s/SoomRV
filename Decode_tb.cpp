@@ -36,10 +36,13 @@ int main(int argc, char** argv)
     
     std::vector<uint32_t> instrs;
     
-    ram[1] = 8;
-    strcpy((char*)&ram[2], "strlen test string with length 33");
+    //ram[1] = 8;
+    //strcpy((char*)&ram[2], "strlen test string with length 33");
     
-    system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
+    strcpy((char*)&ram[232/4], "Hello, World!\n");
+    //strcpy((char*)&ram[232/4], "Hello\n");
+    
+    //system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
     system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
 
     FILE* f = fopen("text.bin", "rb");
@@ -50,6 +53,8 @@ int main(int argc, char** argv)
         fread(&data, sizeof(uint32_t), 1, f);
         instrs.push_back(data);
     }
+    
+    fclose(f);
     
     printf("Read %zu instructions\n", instrs.size());
     
@@ -78,23 +83,35 @@ int main(int argc, char** argv)
             {
                 index = top->OUT_pc[j] / 4;
                 if (index >= (instrs.size()))
+                {
+                    printf("tried to read instr at %zu, terminating\n", index);
                     goto break_main;
+                }
                 top->IN_instr[j] = instrs[index];
             }
             
             
             index = top->OUT_MEM_addr;
-            if (index > (sizeof(ram) / sizeof(ram[0]))) break;
+            if (index > (sizeof(ram) / sizeof(ram[0])))
+            {
+                printf("tried to access ram at %zx, terminating\n", index);
+                break;
+            }
 
             if (top->OUT_MEM_readEnable)
             {
-                printf("read at %zu: %.8x\n", index, ram[index]);
+                //printf("read at %zu: %.8x\n", index, ram[index]);
                 top->IN_MEM_readData = ram[index];
             }
             else if (top->OUT_MEM_writeEnable)
             {
+                //printf("write at %zu: %.8x\n", index, top->OUT_MEM_writeData);
                 if (index == 255)
-                    printf("%u\n", top->OUT_MEM_writeData);
+                {
+                    printf("%c", ((uint32_t)top->OUT_MEM_writeData) >> 24);
+                    fflush(stdout);
+                }
+                    //printf("%u\n", top->OUT_MEM_writeData);
 
                 if (top->OUT_MEM_writeMask == 0b1111)
                     ram[index] = top->OUT_MEM_writeData;
@@ -120,7 +137,6 @@ int main(int argc, char** argv)
         main_time++;              // Time passes...
     }
     break_main:
-
     top->final(); // Done simulating
     tfp->close();
     delete top;

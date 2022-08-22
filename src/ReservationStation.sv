@@ -1,7 +1,7 @@
 module ReservationStation
 #(
     parameter NUM_UOPS=2,
-    parameter QUEUE_SIZE = 16,
+    parameter QUEUE_SIZE = 8,
     parameter RESULT_BUS_COUNT = 2,
     parameter STORE_QUEUE_SIZE=8
 )
@@ -24,7 +24,7 @@ module ReservationStation
 
     output reg OUT_valid[NUM_UOPS-1:0],
     output R_UOp OUT_uop[NUM_UOPS-1:0],
-    output reg OUT_full
+    output reg[4:0] OUT_free
 );
 
 integer i;
@@ -37,22 +37,16 @@ reg[2:0] storeQueueOut;
 wire storeQueueEmpty = (storeQueueIn == storeQueueOut);
 reg[5:0] storeQueue[STORE_QUEUE_SIZE-1:0];
 
+reg[4:0] freeEntries;
+
 
 R_UOp queue[QUEUE_SIZE-1:0];
 reg valid[QUEUE_SIZE-1:0];
 
 reg enqValid;
 
-reg[3:0] deqIndex[NUM_UOPS-1:0];
+reg[2:0] deqIndex[NUM_UOPS-1:0];
 reg deqValid[NUM_UOPS-1:0];
-
-always_comb begin
-    OUT_full = 1;
-    for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-        if (!valid[i])
-            OUT_full = 0;
-    end
-end
 
 reg isLoad;
 reg isStore;
@@ -69,7 +63,7 @@ always_comb begin
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
             
-            if (valid[j] && (!deqValid[0] || deqIndex[0] != j[3:0])) begin
+            if (valid[j] && (!deqValid[0] || deqIndex[0] != j[2:0])) begin
                 // maybe just store these as a bit in the uop?
                 isLoad = (queue[j].fu == FU_LSU) && (queue[j].opcode == LSU_LB || queue[j].opcode == LSU_LH ||
                     queue[j].opcode == LSU_LW || queue[j].opcode == LSU_LBU || queue[j].opcode == LSU_LHU);
@@ -94,12 +88,12 @@ always_comb begin
                     // Loads are only issued when all stores before them are handled.
                     (!isLoad || storeQueueEmpty || $signed(storeQueue[storeQueueOut] - queue[j].sqN) > 0) &&
                     // Stores are issued in-order and non-speculatively
-                    (!isStore || (storeQueue[storeQueueOut] == queue[j].sqN && 
+                    (!isStore || (storeQueue[storeQueueOut] == queue[j].sqN &&
                         (!IN_maxCommitSqNValid || $signed(IN_maxCommitSqN - queue[j].sqN) >= 0))) &&
                     
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
-                    deqIndex[i] = j[3:0];
+                    deqIndex[i] = j[2:0];
                 end
             end
         end
@@ -114,16 +108,23 @@ always_ff@(posedge clk) begin
         end
         storeQueueIn = 0;
         storeQueueOut = 0;
+        freeEntries = 16;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-            if ($signed(queue[i].sqN - IN_invalidateSqN) > 0)
+            if ($signed(queue[i].sqN - IN_invalidateSqN) > 0) begin
                 valid[i] <= 0;
+                if (valid[i])
+                    freeEntries = freeEntries + 1;
+            end
         end
         
-        // TODO: incorrect!
-        storeQueueOut = storeQueueIn;
+        for (i = 0; i < QUEUE_SIZE; i=i+1)
+            OUT_valid[i] <= 0;
         
+        // TODO
+        while (storeQueueIn != storeQueueOut && $signed(storeQueue[storeQueueIn - 1] - IN_invalidateSqN) > 0)
+            storeQueueIn = storeQueueIn - 1;
     end
     else begin
         // Get relevant results from common data buses
@@ -152,6 +153,7 @@ always_ff@(posedge clk) begin
                     end
                         
                     valid[deqIndex[i]] = 0;
+                    freeEntries = freeEntries + 1;
                 end
                 OUT_valid[i] <= deqValid[i];
             end
@@ -166,12 +168,14 @@ always_ff@(posedge clk) begin
                         R_UOp temp = IN_uop[i];
 
                         for (k = 0; k < RESULT_BUS_COUNT; k=k+1) begin
-                            if (!temp.availA && temp.tagA == IN_resultTag[k]) begin
-                                temp.availA = 1;
-                            end
+                            if (IN_resultValid[k]) begin
+                                if (!temp.availA && temp.tagA == IN_resultTag[k]) begin
+                                    temp.availA = 1;
+                                end
 
-                            if (!temp.availB && temp.tagB == IN_resultTag[k]) begin
-                                temp.availB = 1;
+                                if (!temp.availB && temp.tagB == IN_resultTag[k]) begin
+                                    temp.availB = 1;
+                                end
                             end
                         end
                         
@@ -187,10 +191,13 @@ always_ff@(posedge clk) begin
                     storeQueue[storeQueueIn] <= IN_uop[i].sqN;
                     storeQueueIn = storeQueueIn + 1;
                     end
+                    freeEntries = freeEntries - 1;
                 end
             end
         end
     end
+    
+    OUT_free <= freeEntries;
 end
 
 endmodule

@@ -147,6 +147,7 @@ always@(posedge clk) begin
     end
     else
         OUT_valid <= 0;
+    
 
 end
 

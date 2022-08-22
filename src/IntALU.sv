@@ -90,8 +90,8 @@ wire isBranch =
 
 
 always_ff@(posedge clk) begin
-    OUT_valid <= IN_valid && !IN_wbStall;
-    if (IN_valid && !IN_wbStall) begin
+
+    if (IN_valid && !IN_wbStall && (!OUT_branchTaken || $signed(IN_sqN - OUT_branchSqN) <= 0)) begin
         
         OUT_isBranch <= isBranch;
         
@@ -114,15 +114,16 @@ always_ff@(posedge clk) begin
             OUT_branchSqN <= 6'bx;
         end
 
-        if (!OUT_branchTaken) begin
-            OUT_tagDst <= IN_tagDst;
-            OUT_nmDst <= IN_nmDst;
-            OUT_result <= resC;
-            OUT_sqN <= IN_sqN;
-        end
+        
+        OUT_tagDst <= IN_tagDst;
+        OUT_nmDst <= IN_nmDst;
+        OUT_result <= resC;
+        OUT_sqN <= IN_sqN;
+        OUT_valid <= 1;
     end
     else begin
         OUT_branchTaken <= 0;
+        OUT_valid <= 0;
     end
 end
 

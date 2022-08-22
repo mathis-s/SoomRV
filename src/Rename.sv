@@ -46,36 +46,30 @@ reg[5:0] freeTags[FREE_TAG_FIFO_SIZE-1:0];
 
 RATEntry rat[31:0];
 integer i;
+integer j;
 
 bit[5:0] counterSqN;
 assign OUT_nextSqN = counterSqN;
 
 reg temp;
 
+// Could also check this ROB-side and simply not commit older ops with same DstRegNm.
+reg isNewestCommit[WIDTH_UOPS-1:0];
+always_comb begin
+    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        
+        isNewestCommit[i] = comValid[i];
+        if (comValid[i])
+            for (j = i + 1; j < WIDTH_UOPS; j=j+1)
+                if (comValid[j] && (comRegNm[j] == comRegNm[i]))
+                    isNewestCommit[i] = 0;
+    end
+end
+
+
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
 always_ff@(posedge clk) begin
-    if (!rst && !IN_branchTaken) begin
-        // Commit results from ROB.
-        for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (comValid[i] && (comRegNm[i] != 0)) begin
-                freeTags[freeTagInsertIndex] <= rat[comRegNm[i]].comTag;
-                freeTagInsertIndex = freeTagInsertIndex + 1;
-                
-                rat[comRegNm[i]].comTag <= comRegTag[i];
-
-                if (IN_mispredFlush) 
-                    rat[comRegNm[i]].specTag <= comRegTag[i];
-            end
-        end
-
-        // Written back values are speculatively available
-        for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_wbValid[i] && rat[IN_wbNm[i]].specTag == IN_wbTag[i]) begin
-                rat[IN_wbNm[i]].avail = 1;
-            end
-        end
-    end
 
     if (rst) begin
         // Free comTag FIFO initialized with tags 32..
@@ -100,7 +94,8 @@ always_ff@(posedge clk) begin
     else if (IN_branchTaken) begin
         
         counterSqN <= IN_branchSqN + 1;
-
+        
+        // TODO this does not free regs of instructions that are squashed in-execute for mispredict.
         for (i = 0; i < 32; i=i+1) begin
             if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
                 rat[i].avail <= 1;
@@ -111,6 +106,8 @@ always_ff@(posedge clk) begin
                 rat[i].specTag <= rat[i].comTag;
             end
         end
+        for (i = 0; i < WIDTH_UOPS; i=i+1)
+            OUT_uopValid[i] <= 0;
     end
 
     else if (en) begin
@@ -151,12 +148,35 @@ always_ff@(posedge clk) begin
         end
         counterSqN <= counterSqN + WIDTH_WR[5:0];
     end
-    
-    
     else begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)
             OUT_uopValid[i] <= 0;
     end
+    
+    if (!rst) begin
+        // Commit results from ROB.
+        for (i = 0; i < WIDTH_WR; i=i+1) begin
+            // commit at higher index is newer op, takes precedence in case of collision
+            if (comValid[i] && (comRegNm[i] != 0) && isNewestCommit[i]) begin
+            
+                freeTags[freeTagInsertIndex] <= rat[comRegNm[i]].comTag;
+                freeTagInsertIndex = freeTagInsertIndex + 1;
+                
+                rat[comRegNm[i]].comTag <= comRegTag[i];
+
+                if (IN_mispredFlush) 
+                    rat[comRegNm[i]].specTag <= comRegTag[i];
+            end
+        end
+
+        // Written back values are speculatively available
+        for (i = 0; i < WIDTH_WR; i=i+1) begin
+            if (IN_wbValid[i] && rat[IN_wbNm[i]].specTag == IN_wbTag[i]) begin
+                rat[IN_wbNm[i]].avail = 1;
+            end
+        end
+    end
+
     
 end
 endmodule
