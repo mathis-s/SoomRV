@@ -39,7 +39,7 @@ int main(int argc, char** argv)
     //ram[1] = 8;
     //strcpy((char*)&ram[2], "strlen test string with length 33");
     
-    strcpy((char*)&ram[232/4], "Hello, World!\n");
+    strcpy((char*)&ram[232/4], "Hello, Worldeeeeeeeeeeeeeeeeeeeeeeeeeeeeedddddddddddddddddddddddddddddddddddddddddddddddffffffffffffffffffffffffffffffffffffffffffffffffffffffffff!\n");
     //strcpy((char*)&ram[232/4], "Hello\n");
     
     //system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
@@ -109,9 +109,9 @@ int main(int argc, char** argv)
                 if (index == 255)
                 {
                     printf("%c", ((uint32_t)top->OUT_MEM_writeData) >> 24);
+                    //printf("%u\n", top->OUT_MEM_writeData);
                     fflush(stdout);
                 }
-                    //printf("%u\n", top->OUT_MEM_writeData);
 
                 if (top->OUT_MEM_writeMask == 0b1111)
                     ram[index] = top->OUT_MEM_writeData;
