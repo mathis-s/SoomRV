@@ -22,10 +22,7 @@ int main(int argc, char** argv)
     Verilated::commandArgs(argc, argv); // Remember args
     Verilated::traceEverOn(true);
 
-    top = new VCore; // Create model
-    // Do not instead make Vtop as a file-scope static
-    // variable, as the "C++ static initialization order fiasco"
-    // may cause a crash
+    top = new VCore;
     top->clk = 0;
     
     if (argc == 1)
@@ -33,30 +30,39 @@ int main(int argc, char** argv)
         printf("Invalid argument\n");
         return 0;
     }
-    
-    std::vector<uint32_t> instrs;
-    
-    //ram[1] = 8;
-    //strcpy((char*)&ram[2], "strlen test string with length 33");
-    
-    strcpy((char*)&ram[232/4], "Hello, Worldeeeeeeeeeeeeeeeeeeeeeeeeeeeeedddddddddddddddddddddddddddddddddddddddddddddddffffffffffffffffffffffffffffffffffffffffffffffffffffffffff!\n");
-    //strcpy((char*)&ram[232/4], "Hello\n");
-    
-    //system((std::string("riscv32-elf-as ") + std::string(argv[1])).c_str());
-    system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
 
-    FILE* f = fopen("text.bin", "rb");
+    system((std::string("riscv32-unknown-elf-as -o temp.o ") + std::string(argv[1])).c_str());
+    system("riscv32-unknown-elf-ld -Tlinker.ld temp.o");
+    system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
+    system("riscv32-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
     
-    while (!feof(f))
+    size_t numInstrs = 0;
     {
-        uint32_t data;
-        fread(&data, sizeof(uint32_t), 1, f);
-        instrs.push_back(data);
+        FILE* f = fopen("text.bin", "rb");
+        while (numInstrs < 1024)
+        {
+            uint32_t data;
+            if (fread(&data, sizeof(uint32_t), 1, f) <= 0)
+                break;
+            ram[numInstrs] = data;
+            numInstrs++;
+        }
+        fclose(f);
+        printf("Read %zu instructions\n", numInstrs);
+        
+        
+        size_t dataIndex = numInstrs;
+        f = fopen("data.bin", "rb");
+        while (dataIndex < 1024)
+        {
+            uint32_t data;
+            if (fread(&data, 1, sizeof(uint32_t), f) == 0)
+                break;
+            ram[dataIndex] = data;
+            dataIndex++;
+        }
+        fclose(f);
     }
-    
-    fclose(f);
-    
-    printf("Read %zu instructions\n", instrs.size());
     
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
@@ -82,17 +88,17 @@ int main(int argc, char** argv)
             for (int j = 0; j < 2; j++)
             {
                 index = top->OUT_pc[j] / 4;
-                if (index >= (instrs.size()))
+                if (index >= (numInstrs))
                 {
                     printf("tried to read instr at %zu, terminating\n", index);
                     goto break_main;
                 }
-                top->IN_instr[j] = instrs[index];
+                top->IN_instr[j] = ram[index];
             }
             
             
             index = top->OUT_MEM_addr;
-            if (index > (sizeof(ram) / sizeof(ram[0])))
+            if (index >= 1024)
             {
                 printf("tried to access ram at %zx, terminating\n", index);
                 break;

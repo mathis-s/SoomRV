@@ -4,3 +4,5 @@ sv2v
 obj_dir
 compile_flags.txt
 text.bin
+*.o
+*.bin

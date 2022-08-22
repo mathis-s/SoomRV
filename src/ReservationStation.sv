@@ -19,8 +19,7 @@ module ReservationStation
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
     
-    input wire IN_maxCommitSqNValid,
-    input wire[5:0] IN_maxCommitSqN,
+    input wire[5:0] IN_nextCommitSqN,
 
     output reg OUT_valid[NUM_UOPS-1:0],
     output R_UOp OUT_uop[NUM_UOPS-1:0],
@@ -51,8 +50,8 @@ reg deqValid[NUM_UOPS-1:0];
 reg isLoad;
 reg isStore;
 reg isJumpBranch;
-always_comb begin
-    
+
+always_comb begin    
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         
         deqValid[i] = 0;
@@ -88,8 +87,8 @@ always_comb begin
                     // Loads are only issued when all stores before them are handled.
                     (!isLoad || storeQueueEmpty || $signed(storeQueue[storeQueueOut] - queue[j].sqN) > 0) &&
                     // Stores are issued in-order and non-speculatively
-                    (!isStore || (storeQueue[storeQueueOut] == queue[j].sqN &&
-                        (!IN_maxCommitSqNValid || $signed(IN_maxCommitSqN - queue[j].sqN) >= 0))) &&
+                    (!isStore || (storeQueue[storeQueueOut] == queue[j].sqN && 
+                        (IN_nextCommitSqN == queue[j].sqN))) &&
                     
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;

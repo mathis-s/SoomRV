@@ -30,14 +30,12 @@ module ROB
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
 
-    input wire IN_maxCommitSqNValid,
-    input wire[5:0] IN_maxCommitSqN,
-
     output wire[5:0] OUT_maxSqN,
     output wire[5:0] OUT_curSqN,
 
     output reg[4:0] OUT_comNames[WIDTH-1:0],
     output reg[5:0] OUT_comTags[WIDTH-1:0],
+    output reg[5:0] OUT_comSqNs[WIDTH-1:0],
     output reg OUT_comValid[WIDTH-1:0]
 );
 
@@ -54,7 +52,7 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[i].valid || (IN_maxCommitSqNValid && $signed((baseIndex + i[5:0]) - IN_maxCommitSqN) > 0))
+        if (!entries[i].valid)
             headValid = 0;
     end
 end
@@ -67,7 +65,7 @@ always_comb begin
         if (entries[i].valid)
             allowSingleDequeue = 0;
             
-    if (!entries[0].valid || (IN_maxCommitSqNValid && $signed((baseIndex) - IN_maxCommitSqN) > 0))
+    if (!entries[0].valid)
         allowSingleDequeue = 0;
 end
 
@@ -109,6 +107,7 @@ always_ff@(posedge clk) begin
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_comNames[i] <= entries[i].name;
                 OUT_comTags[i] <= entries[i].tag;
+                OUT_comSqNs[i] <= baseIndex + i[5:0];
                 OUT_comValid[i] <= 1;
                 // TODO: handle exceptions here.
             end
@@ -118,6 +117,7 @@ always_ff@(posedge clk) begin
         else if (allowSingleDequeue && !IN_invalidate) begin
             OUT_comNames[0] <= entries[0].name;
             OUT_comTags[0] <= entries[0].tag;
+            OUT_comSqNs[0] <= baseIndex;
             OUT_comValid[0] <= 1;
             
             entries[0].valid <= 0;

@@ -30,6 +30,7 @@ module Rename
     input wire comValid[WIDTH_WR-1:0],
     input wire[4:0] comRegNm[WIDTH_WR-1:0],
     input wire[5:0] comRegTag[WIDTH_WR-1:0],
+    input wire[5:0] comSqN[WIDTH_WR-1:0],
 
     // WB for uncommitted but speculatively available values
     input wire IN_wbValid[WIDTH_WR-1:0],
@@ -191,7 +192,8 @@ always_ff@(posedge clk) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             // commit at higher index is newer op, takes precedence in case of collision
-            if (comValid[i] && (comRegNm[i] != 0) && isNewestCommit[i]) begin
+            if (comValid[i] && (comRegNm[i] != 0) && isNewestCommit[i]
+                && (!IN_branchTaken || $signed(comSqN[i] - IN_branchSqN) <= 0)) begin
             
                 tags[rat[comRegNm[i]].comTag].committed <= 0;
                 tags[rat[comRegNm[i]].comTag].used <= 0;
@@ -204,7 +206,7 @@ always_ff@(posedge clk) begin
                 tags[comRegTag[i]].used <= 1;
                 
 
-                if (IN_mispredFlush) 
+                if (IN_mispredFlush || IN_branchTaken) 
                     rat[comRegNm[i]].specTag <= comRegTag[i];
             end
         end

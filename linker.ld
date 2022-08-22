@@ -6,4 +6,5 @@ MEMORY
 SECTIONS
 {
     .text : { *(.text*) } > ram
+    .rodata : { *(.rodata*) } > ram
 } 

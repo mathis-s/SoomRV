@@ -32,6 +32,7 @@ assign wbHasResult[1] = wbValid[1] && wbRegNm[1] != 0;
 
 wire[4:0] comRegNm[NUM_UOPS-1:0];
 wire[5:0] comRegTag[NUM_UOPS-1:0];
+wire[5:0] comSqN[NUM_UOPS-1:0];
 wire comValid[NUM_UOPS-1:0];
 
 wire IF_enable;
@@ -93,6 +94,7 @@ always_ff@(posedge clk) begin
     end
 end
 
+
 D_UOp DE_uop[NUM_UOPS-1:0];
 wire invalidInstr[NUM_UOPS-1:0];
 
@@ -104,9 +106,6 @@ InstrDecoder idec
     .OUT_uop(DE_uop),
     .OUT_invalid(invalidInstr)
 );
-
-wire[5:0] BQ_maxCommitSqN;
-wire BQ_maxCommitSqNValid;
 
 R_UOp RN_uop[NUM_UOPS-1:0];
 reg RN_uopValid[NUM_UOPS-1:0];
@@ -121,6 +120,7 @@ Rename rn
     .comValid(comValid),
     .comRegNm(comRegNm),
     .comRegTag(comRegTag),
+    .comSqN(comSqN),
 
     .IN_wbValid(wbValid),
     .IN_wbTag(wbRegTag),
@@ -133,42 +133,6 @@ Rename rn
     .OUT_uopValid(RN_uopValid),
     .OUT_uop(RN_uop),
     .OUT_nextSqN(RN_nextSqN)
-);
-
-// jumps also in here for now
-reg isBranch[NUM_UOPS-1:0];
-always_comb begin
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
-        isBranch[i] = 
-            RN_uop[i].opcode == INT_BEQ || 
-            RN_uop[i].opcode == INT_BNE || 
-            RN_uop[i].opcode == INT_BLT || 
-            RN_uop[i].opcode == INT_BGE || 
-            RN_uop[i].opcode == INT_BLTU || 
-            RN_uop[i].opcode == INT_BGEU || 
-            RN_uop[i].opcode == INT_JAL || 
-            RN_uop[i].opcode == INT_JALR;
-    end
-end
-
-BranchQueue bq
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_valid(RN_uopValid),
-    .IN_isBranch(isBranch),
-    .IN_tag('{RN_uop[1].sqN, RN_uop[0].sqN}),
-    
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
-    
-    .IN_checkedValid(INTALU_valid && INTALU_isBranch),
-    .IN_checkedTag(branchSqN),
-    .IN_checkedCorrect(!pcWrite),
-    
-    .OUT_full(),
-    .OUT_commitLimitValid(BQ_maxCommitSqNValid),
-    .OUT_commitLimitTag(BQ_maxCommitSqN)
 );
 
 wire[31:0] INT_result;
@@ -195,8 +159,7 @@ ReservationStation rv
     .IN_invalidate(pcWrite),
     .IN_invalidateSqN(branchSqN),
     
-    .IN_maxCommitSqNValid(BQ_maxCommitSqNValid),
-    .IN_maxCommitSqN(BQ_maxCommitSqN),
+    .IN_nextCommitSqN(ROB_curSqN),
 
     .OUT_valid(RV_uopValid),
     .OUT_uop(RV_uop),
@@ -358,16 +321,14 @@ ROB rob
 
     .IN_invalidate(pcWrite),
     .IN_invalidateSqN(branchSqN),
-
-    .IN_maxCommitSqNValid(BQ_maxCommitSqNValid),
-    .IN_maxCommitSqN(BQ_maxCommitSqN),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
 
     .OUT_comNames(comRegNm),
     .OUT_comTags(comRegTag),
-    .OUT_comValid(comValid)
+    .OUT_comValid(comValid),
+    .OUT_comSqNs(comSqN)
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF

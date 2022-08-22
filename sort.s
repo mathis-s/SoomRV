@@ -18,7 +18,7 @@ _start:
 	.section	.rodata.str1.4,"aMS",@progbits,1
 	.align	2
 .LC0:
-	.string	"Hello, World!\n"
+	.string	"Hello, World\n"
 	.text
 	.align	2
 	.globl	main

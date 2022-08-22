@@ -34,6 +34,8 @@ wire[31:0] addr = IN_uop.srcA + IN_uop.imm;
 
 assign OUT_wbReq = iValid;
 
+
+// TODO: Forward stored values from intermediate cycle
 always@(posedge clk) begin
     if (rst) begin
         iValid <= 0;

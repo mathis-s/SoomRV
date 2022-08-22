@@ -1,8 +1,11 @@
+.section .rodata
+.LC0:
+    .string "Hello World abcjdedw!"
+
 .text
-
-
 strlen:
-    lw t0, 4(x0)
+    lui t0, %hi(.LC0)
+    addi t0, t0, %lo(.LC0)
     addi t2, t0, 1
     .loop:
         lb t1, 0(t0)
