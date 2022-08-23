@@ -13,7 +13,7 @@ _start:
 	sw	ra,12(sp)
 	call	main
 .L2:
-	j	end
+	ebreak
 	.size	_start, .-_start
 	.section	.rodata.str1.4,"aMS",@progbits,1
 	.align	2
@@ -46,43 +46,5 @@ print:
 	bne	a5,zero,.L8
 .L6:
 	ret
-end:
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
 	.size	print, .-print
 	.ident	"GCC: (g5964b5cd727) 11.1.0"

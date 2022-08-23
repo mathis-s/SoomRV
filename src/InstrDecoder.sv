@@ -9,6 +9,7 @@
 `define OPC_BRANCH 7'b1100011
 `define OPC_REG_IMM 7'b0010011
 `define OPC_REG_REG 7'b0110011
+`define OPC_ENV 7'b1110011
 
 typedef struct packed
 {
@@ -28,8 +29,7 @@ module InstrDecoder
     input wire[31:0] IN_instr[NUM_UOPS-1:0],
     input wire[31:0] IN_pc[NUM_UOPS-1:0],
 
-    output D_UOp OUT_uop[NUM_UOPS-1:0],
-    output wire OUT_invalid[NUM_UOPS-1:0]
+    output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
 
 integer i;
@@ -48,6 +48,7 @@ always_comb begin
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
             `OPC_JAL:        uop.imm = IN_pc[i] + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0}); // TODO: pc is only 31 bits, fix this later
+            `OPC_ENV,
             `OPC_JALR,          
             `OPC_LOAD,
             `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
@@ -58,6 +59,16 @@ always_comb begin
         endcase
 
         case (instr.opcode)
+            `OPC_ENV: begin
+                uop.fu = FU_INT;
+                uop.rs0 = 0;
+                uop.rs1 = 0;
+                uop.rd = 0;
+                uop.opcode = INT_SYS;
+                uop.immB = 1;
+                uop.pcA = 1;
+                invalidEnc = 0;
+            end
             `OPC_LUI: begin
                 uop.fu = FU_INT;
                 uop.rs0 = 0;
@@ -227,8 +238,11 @@ always_comb begin
             end
             default: invalidEnc = 1;
         endcase
+        if (invalidEnc) begin
+            uop.opcode = INT_UNDEFINED;
+            uop.fu = FU_INT;
+        end
         OUT_uop[i] = uop;
-        OUT_invalid[i] = invalidEnc;
     end
 end
 

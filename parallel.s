@@ -43,33 +43,6 @@
         addi a5, a5, 5
         addi a6, a6, 6
         blt a0, t0, loop
-        
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    
     
 
         

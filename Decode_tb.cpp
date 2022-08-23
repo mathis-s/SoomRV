@@ -82,16 +82,17 @@ int main(int argc, char** argv)
     // Run
     while (!Verilated::gotFinish())
     {
+        if (top->OUT_halt)
+            break;
         if (top->clk == 0)
         {
             size_t index;
             for (int j = 0; j < 2; j++)
             {
                 index = top->OUT_pc[j] / 4;
-                if (index >= (numInstrs))
+                if (index >= 1024)
                 {
-                    printf("tried to read instr at %zu, terminating\n", index);
-                    goto break_main;
+                    index = 0;
                 }
                 top->IN_instr[j] = ram[index];
             }

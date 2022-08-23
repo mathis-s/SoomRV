@@ -47,10 +47,6 @@ module Rename
     output wire[5:0] OUT_nextSqN
 );
 
-//reg[4:0] freeTagInsertIndex;
-//reg[4:0] freeTagOutputIndex;
-//reg[5:0] freeTags[FREE_TAG_FIFO_SIZE-1:0];
-
 TagBufEntry tags[63:0];
 
 RATEntry rat[31:0];

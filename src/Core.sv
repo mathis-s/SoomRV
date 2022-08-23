@@ -15,7 +15,8 @@ module Core
     output wire OUT_MEM_readEnable,
     output wire[3:0] OUT_MEM_writeMask,
     
-    output wire[31:0] OUT_pc[NUM_UOPS-1:0]
+    output wire[31:0] OUT_pc[NUM_UOPS-1:0],
+    output wire OUT_halt
 );
 
 integer i;
@@ -26,6 +27,8 @@ wire[4:0] wbRegNm[NUM_UOPS-1:0];
 wire[5:0] wbRegSqN[NUM_UOPS-1:0];
 wire[5:0] wbRegTag[NUM_UOPS-1:0];
 wire[31:0] wbResult[NUM_UOPS-1:0];
+Flags wbFlags[NUM_UOPS-1:0];
+
 wire wbHasResult[NUM_UOPS-1:0];
 assign wbHasResult[0] = wbValid[0] && wbRegNm[0] != 0;
 assign wbHasResult[1] = wbValid[1] && wbRegNm[1] != 0;
@@ -96,15 +99,13 @@ end
 
 
 D_UOp DE_uop[NUM_UOPS-1:0];
-wire invalidInstr[NUM_UOPS-1:0];
 
 InstrDecoder idec
 (
     .IN_instr(IN_instr),
     .IN_pc(DE_pc),
 
-    .OUT_uop(DE_uop),
-    .OUT_invalid(invalidInstr)
+    .OUT_uop(DE_uop)
 );
 
 R_UOp RN_uop[NUM_UOPS-1:0];
@@ -214,6 +215,7 @@ wire INTALU_valid;
 wire INTALU_isBranch;
 wire[5:0] INTALU_sqN;
 wire INTALU_wbReq;
+Flags INTALU_flags;
 IntALU ialu
 (
     .clk(clk),
@@ -239,7 +241,8 @@ IntALU ialu
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag),
     .OUT_nmDst(INT_resName),
-    .OUT_sqN(INTALU_sqN)
+    .OUT_sqN(INTALU_sqN),
+    .OUT_flags(INTALU_flags)
     
 );
 
@@ -282,8 +285,13 @@ assign wbRegSqN[0] = !LSU_uopValid ?
     INTALU_sqN :
     LSU_uop.sqN;
     
-assign wbValid[0] = (INTALU_valid || LSU_uopValid);
+assign wbFlags[0] = !LSU_uopValid ?
+    INTALU_flags :
+    FLAGS_NONE;
     
+assign wbValid[0] = (INTALU_valid || LSU_uopValid);
+
+
 IntALULight ialu1
 (
     .clk(clk),
@@ -307,6 +315,7 @@ IntALULight ialu1
     .OUT_nmDst(wbRegNm[1]),
     .OUT_sqN(wbRegSqN[1])
 );
+assign wbFlags[1] = FLAGS_NONE; // placeholder
 
 wire[5:0] ROB_maxSqN;
 ROB rob
@@ -317,7 +326,7 @@ ROB rob
     .IN_tags(wbRegTag),
     .IN_names(wbRegNm),
     .IN_sqNs(wbRegSqN),
-    .IN_flags('{0, 0}), // placeholder
+    .IN_flags('{wbFlags[1], wbFlags[0]}), // placeholder
 
     .IN_invalidate(pcWrite),
     .IN_invalidateSqN(branchSqN),
@@ -328,7 +337,9 @@ ROB rob
     .OUT_comNames(comRegNm),
     .OUT_comTags(comRegTag),
     .OUT_comValid(comValid),
-    .OUT_comSqNs(comSqN)
+    .OUT_comSqNs(comSqN),
+    
+    .OUT_halt(OUT_halt)
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF

@@ -20,7 +20,9 @@ typedef enum logic[5:0]
     INT_LUI,
     INT_AUIPC,
     INT_JAL,
-    INT_JALR
+    INT_JALR,
+    INT_SYS,
+    INT_UNDEFINED
 } OPCode_INT;
 
 typedef enum logic[5:0]
@@ -52,6 +54,7 @@ typedef enum logic[5:0]
 } OPCode_LSU;
 
 typedef enum logic[1:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV} FuncUnit;
+typedef enum logic[0:0] {FLAGS_NONE, FLAGS_BRK} Flags;
 
 typedef struct packed
 {
@@ -71,6 +74,7 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[31:0] pc;
+    // TODO: Keep some tags always reserved, use as special values for pc, imm, ...
     logic availA;
     logic[5:0] tagA;
     logic availB;

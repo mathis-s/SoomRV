@@ -36,7 +36,9 @@ module ROB
     output reg[4:0] OUT_comNames[WIDTH-1:0],
     output reg[5:0] OUT_comTags[WIDTH-1:0],
     output reg[5:0] OUT_comSqNs[WIDTH-1:0],
-    output reg OUT_comValid[WIDTH-1:0]
+    output reg OUT_comValid[WIDTH-1:0],
+    
+    output reg OUT_halt
 );
 
 ROBEntry entries[LENGTH-1:0];
@@ -52,7 +54,7 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[i].valid)
+        if (!entries[i].valid || entries[i].flags != 0)
             headValid = 0;
     end
 end
@@ -61,9 +63,9 @@ reg allowSingleDequeue;
 always_comb begin
     allowSingleDequeue = 1;
     
-    for (i = 1; i < LENGTH; i=i+1)
-        if (entries[i].valid)
-            allowSingleDequeue = 0;
+    //for (i = 1; i < LENGTH; i=i+1)
+    //    if (entries[i].valid)
+    //        allowSingleDequeue = 0;
             
     if (!entries[0].valid)
         allowSingleDequeue = 0;
@@ -73,6 +75,7 @@ wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
 
     if (rst) begin
+        OUT_halt <= 0;
         baseIndex = 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
@@ -94,6 +97,7 @@ always_ff@(posedge clk) begin
     if (!rst) begin
         // Dequeue and push forward fifo entries
         
+        // Two Entries
         if (doDequeue && !IN_invalidate) begin
             // Push forward fifo
             for (i = 0; i < LENGTH - WIDTH; i=i+1) begin
@@ -114,8 +118,34 @@ always_ff@(posedge clk) begin
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
         end
+        
+        // One entry
         else if (allowSingleDequeue && !IN_invalidate) begin
-            OUT_comNames[0] <= entries[0].name;
+            
+            // Push forward fifo
+            for (i = 0; i < LENGTH - 1; i=i+1) begin
+                entries[i] <= entries[i + 1];
+            end
+
+            for (i = LENGTH - 1; i < LENGTH; i=i+1) begin
+                entries[i].valid <= 0;
+            end
+
+            for (i = 0; i < 1; i=i+1) begin
+                OUT_comNames[i] <= entries[i].name;
+                OUT_comTags[i] <= entries[i].tag;
+                OUT_comSqNs[i] <= baseIndex + i[5:0];
+                OUT_comValid[i] <= 1;
+                if (entries[i].flags != 0)
+                    OUT_halt <= 1;
+            end
+            for (i = 1; i < WIDTH; i=i+1) begin
+                OUT_comValid[i] <= 0;
+            end
+            // Blocking for proper insertion
+            baseIndex = baseIndex + 1;
+            
+            /*OUT_comNames[0] <= entries[0].name;
             OUT_comTags[0] <= entries[0].tag;
             OUT_comSqNs[0] <= baseIndex;
             OUT_comValid[0] <= 1;
@@ -125,7 +155,7 @@ always_ff@(posedge clk) begin
             for (i = 1; i < WIDTH; i=i+1)
                 OUT_comValid[i] <= 0;
                 
-            baseIndex = baseIndex + 1;
+            baseIndex = baseIndex + 1;*/
         end
         else begin
             for (i = 0; i < WIDTH; i=i+1)
@@ -136,7 +166,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH; i=i+1) begin
             if (IN_valid[i] && (!IN_invalidate || (IN_invalidateSqN - IN_sqNs[i]) <= 0)) begin
                 entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].valid <= 1;
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].flags <= 0;
+                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].flags <= IN_flags[i];
                 entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].tag <= IN_tags[i];
                 entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].name <= IN_names[i];
                 entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].sqN <= IN_sqNs[i];

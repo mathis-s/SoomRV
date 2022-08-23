@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Mon Aug 22 19:08:23 2022
+[*] Mon Aug 22 20:35:23 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Mon Aug 22 18:48:09 2022"
-[dumpfile_size] 1627082
+[dumpfile_mtime] "Mon Aug 22 20:34:28 2022"
+[dumpfile_size] 18432631
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 3390
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-7.140254 4600 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-10.140254 6819 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.ialu.
@@ -90,12 +90,6 @@ TOP.Core.rv.storeQueueIn[2:0]
 TOP.Core.rv.storeQueueOut[2:0]
 @200
 -RV
-@28
-TOP.Core.rn.rat[1].avail
-@22
-TOP.Core.rn.rat[1].comTag[5:0]
-TOP.Core.rn.rat[1].specTag[5:0]
-@200
 -RV[0]
 @22
 TOP.Core.rv.queue[0].tagA[5:0]
@@ -132,14 +126,6 @@ TOP.Core.rv.queue[3].availB
 @22
 TOP.Core.rv.queue[3].sqN[5:0]
 @200
--free tags
-@28
-TOP.Core.rn.rat[10].avail
-@22
-TOP.Core.rn.rat[10].comTag[5:0]
-TOP.Core.rn.rat[10].specTag[5:0]
-TOP.Core.rn.rat[10].newSqN[5:0]
-@200
 -IALU0
 @22
 TOP.Core.ialu.IN_operands[0][31:0]
@@ -154,9 +140,8 @@ TOP.Core.ialu.OUT_tagDst[5:0]
 TOP.Core.ialu.OUT_nmDst[4:0]
 @200
 -LSU
-@23
-TOP.Core.lsu.OUT_MEM_addr[31:0]
 @22
+TOP.Core.lsu.OUT_MEM_addr[31:0]
 TOP.Core.lsu.IN_MEM_readData[31:0]
 @28
 TOP.Core.lsu.OUT_valid

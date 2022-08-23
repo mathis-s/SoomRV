@@ -23,12 +23,15 @@ module IntALU
     output reg[31:0] OUT_result,
     output reg[5:0] OUT_tagDst,
     output reg[4:0] OUT_nmDst,
-    output reg[5:0] OUT_sqN
+    output reg[5:0] OUT_sqN,
+    output Flags OUT_flags
 );
 
 assign OUT_wbReq = IN_valid;
 
 reg[31:0] resC;
+Flags flags;
+
 always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_opcode)
@@ -43,22 +46,18 @@ always_comb begin
         INT_SLTU: resC = {31'b0, IN_operands[0] < IN_operands[1]};
         INT_SUB: resC = IN_operands[0] - IN_operands[1];
         INT_SRA: resC = IN_operands[0] >>> IN_operands[1][4:0];
-
-        //INT_BEQ: resC = {31'b0, IN_operands[0] == IN_operands[1]};
-        //INT_BNE: resC = {31'b0, IN_operands[0] == IN_operands[1]};
-        //INT_BLT: resC = {31'b0, $signed(IN_operands[0]) < $signed(IN_operands[1])};
-        //INT_BGE: resC = {31'b0, $signed(IN_operands[0]) >= $signed(IN_operands[1])};
-        //INT_BLTU: resC = {31'b0, IN_operands[0] < IN_operands[1]};
-        //INT_BGEU: resC = {31'b0, IN_operands[0] >= IN_operands[1]};
         INT_LUI: resC = IN_operands[1];
         INT_JALR,
         INT_JAL: resC = IN_operands[0] + 4;
+        INT_SYS: resC = 0;
         default: resC = 'bx;
     endcase
-
-    //OUT_tagDst = IN_valid ? IN_tagDst : 0;
-    //OUT_nmDst = IN_nmDst;
-    //OUT_result = resC;
+    
+    case (IN_opcode)
+        INT_UNDEFINED,
+        INT_SYS: flags = FLAGS_BRK;
+        default: flags = FLAGS_NONE;
+    endcase
 end 
 
 
@@ -90,40 +89,46 @@ wire isBranch =
 
 
 always_ff@(posedge clk) begin
-
-    if (IN_valid && !IN_wbStall && (!OUT_branchTaken || $signed(IN_sqN - OUT_branchSqN) <= 0)) begin
-        
-        OUT_isBranch <= isBranch;
-        
-        if (isBranch)
-            OUT_branchSqN <= IN_sqN;
-        else
-            OUT_branchSqN <= 6'bx;
-
-        if (branchTaken) begin
-            OUT_branchTaken <= 1;
-            // TODO: jalr has different addr here
-            if (IN_opcode == INT_JALR)
-                OUT_branchAddress <= IN_operands[1] + IN_operands[2];
+    
+    if (rst) begin
+        OUT_valid <= 0;
+    end
+    else begin
+        if (IN_valid && !IN_wbStall && (!OUT_branchTaken || $signed(IN_sqN - OUT_branchSqN) <= 0)) begin
+            
+            OUT_isBranch <= isBranch;
+            
+            if (isBranch)
+                OUT_branchSqN <= IN_sqN;
             else
-                OUT_branchAddress <= IN_operands[2];
+                OUT_branchSqN <= 6'bx;
+
+            if (branchTaken) begin
+                OUT_branchTaken <= 1;
+                // TODO: jalr has different addr here
+                if (IN_opcode == INT_JALR)
+                    OUT_branchAddress <= IN_operands[1] + IN_operands[2];
+                else
+                    OUT_branchAddress <= IN_operands[2];
+            end
+            else begin
+                OUT_branchTaken <= 0;
+                OUT_branchAddress <= 32'bx;
+                OUT_branchSqN <= 6'bx;
+            end
+
+            
+            OUT_tagDst <= IN_tagDst;
+            OUT_nmDst <= IN_nmDst;
+            OUT_result <= resC;
+            OUT_sqN <= IN_sqN;
+            OUT_flags <= flags;
+            OUT_valid <= 1;
         end
         else begin
             OUT_branchTaken <= 0;
-            OUT_branchAddress <= 32'bx;
-            OUT_branchSqN <= 6'bx;
+            OUT_valid <= 0;
         end
-
-        
-        OUT_tagDst <= IN_tagDst;
-        OUT_nmDst <= IN_nmDst;
-        OUT_result <= resC;
-        OUT_sqN <= IN_sqN;
-        OUT_valid <= 1;
-    end
-    else begin
-        OUT_branchTaken <= 0;
-        OUT_valid <= 0;
     end
 end
 
