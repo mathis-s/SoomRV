@@ -28,6 +28,7 @@ module Load
     input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
 
     output reg[NUM_XUS-1:0] OUT_enableXU[NUM_UOPS-1:0],
+    output FuncUnit OUT_funcUnit[NUM_UOPS-1:0],
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
 integer i;
@@ -55,6 +56,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
+                OUT_funcUnit[i] <= IN_uop[i].fu;
                 
                 OUT_uop[i].valid <= !IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0);
 
@@ -63,41 +65,44 @@ always_ff@(posedge clk) begin
                     OUT_uop[i].srcA <= IN_uop[i].pc;
                 end
                 // Try to get from register file
-                else if (IN_uop[i].availA) begin
-                    OUT_uop[i].srcA <= IN_rfReadData[i];
+                else begin 
+                    reg found = 0;
+                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                        // TODO: ignore contention here instead of handling it.
+                        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
+                            OUT_uop[i].srcA <= IN_wbResult[j];
+                            found = 1;
+                        end
+                    end
+                
+                    if (!found) begin
+                        OUT_uop[i].srcA <= IN_rfReadData[i];
+                    end
+                
                 end
                 // Try to get from current WB
-                //else begin
-                //    reg found = 0;
-                //    for (j = 0; j < NUM_WBS; j=j+1) begin
-                //        // TODO: ignore contention here instead of handling it.
-                //        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
-                //            OUT_uop[i].srcA <= IN_wbResult[j];
-                //            OUT_uop[i].availA <= 1;
-                //            found = 1;
-                //        end
-                //    end
-                //end
 
                 if (IN_uop[i].immB) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
                 // Try to get from register file
-                else if (IN_uop[i].availB) begin
-                    OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                else begin
+                    reg found = 0;
+                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                        // TODO: ignore contention here instead of handling it.
+                        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
+                            OUT_uop[i].srcB <= IN_wbResult[j];
+                            found = 1;
+                        end
+                    end
+                    
+                    if (!found) begin
+                        OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                    end
+                
                 end
                 // Try to get from current WB
-                //else begin
-                //    reg found = 0;
-                //    for (j = 0; j < NUM_WBS; j=j+1) begin
-                //        // TODO: ignore contention here instead of handling it.
-                //        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
-                //            OUT_uop[i].srcB <= IN_wbResult[j];
-                //            OUT_uop[i].availB <= 1;
-                //            found = 1;
-                //        end
-                //    end
-                //end
+
 
                 case (IN_uop[i].fu)
                     FU_INT: OUT_enableXU[i] <= 4'b0001;

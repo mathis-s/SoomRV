@@ -19,7 +19,11 @@ module ReservationStation
     input wire IN_wbStall[NUM_UOPS-1:0],
     input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
-
+    
+    input FuncUnit IN_LD_fu[NUM_UOPS-1:0],
+    input EX_UOp IN_LD_uop[NUM_UOPS-1:0],
+    input wire IN_LD_wbStall[NUM_UOPS-1:0],
+    
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
 
@@ -94,7 +98,7 @@ always_ff@(posedge clk) begin
         end
         storeQueueIn = 0;
         storeQueueOut = 0;
-        freeEntries = 16;
+        freeEntries = 8;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
@@ -126,6 +130,23 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
+        
+        // Get ops that are executed in this cycle for forwarding
+        for (i = 0; i < NUM_UOPS; i=i+1) begin
+            if (IN_LD_uop[i].valid && IN_LD_fu[i] == FU_INT && !IN_LD_wbStall[i]) begin
+                for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+                    
+                    if (queue[j].tagA == IN_LD_uop[i].tagDst) begin
+                        queue[j].availA <= 1;
+                    end
+
+                    if (queue[j].tagB == IN_LD_uop[i].tagDst) begin
+                        queue[j].availB <= 1;
+                    end
+                    
+                end
+            end
+        end
         
         // issue uops
         for (i = 0; i < NUM_UOPS; i=i+1) begin

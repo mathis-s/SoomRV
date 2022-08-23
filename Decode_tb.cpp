@@ -32,7 +32,7 @@ int main(int argc, char** argv)
     }
 
     system((std::string("riscv32-unknown-elf-as -o temp.o ") + std::string(argv[1])).c_str());
-    system("riscv32-unknown-elf-ld -Tlinker.ld temp.o");
+    system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
     system("riscv32-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
     
@@ -116,7 +116,6 @@ int main(int argc, char** argv)
                 if (index == 255)
                 {
                     printf("%c", ((uint32_t)top->OUT_MEM_writeData) >> 24);
-                    //printf("%u\n", top->OUT_MEM_writeData);
                     fflush(stdout);
                 }
 
@@ -143,7 +142,9 @@ int main(int argc, char** argv)
         tfp->dump(main_time);
         main_time++;              // Time passes...
     }
-    break_main:
+    
+    printf("%lu cycles\n", main_time / 2);
+
     top->final(); // Done simulating
     tfp->close();
     delete top;

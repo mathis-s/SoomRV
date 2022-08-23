@@ -154,6 +154,11 @@ ReservationStation rv
     .IN_wbStall('{0, wbStall}),
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
+    
+    .IN_LD_fu(LD_fu),
+    .IN_LD_uop(LD_uop),
+    .IN_LD_wbStall('{0, wbStall}),
+    
     .IN_resultValid(wbHasResult),
     .IN_resultTag(wbRegTag),
 
@@ -187,6 +192,7 @@ RF rf
 
 EX_UOp LD_uop[NUM_UOPS-1:0];
 wire[3:0] enabledXUs[NUM_UOPS-1:0];
+FuncUnit LD_fu[NUM_UOPS-1:0];
 Load ld
 (
     .clk(clk),
@@ -204,8 +210,9 @@ Load ld
     .OUT_rfReadValid(RF_readEnable),
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
-
+    
     .OUT_enableXU(enabledXUs),
+    .OUT_funcUnit(LD_fu),
     .OUT_uop(LD_uop)
 );
 wire LSU_wbReq;
@@ -343,6 +350,6 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign IF_enable = (RV_freeEntries > 2 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !pcWrite;
+assign IF_enable = (RV_freeEntries > 3 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !pcWrite;
 
 endmodule

@@ -48,6 +48,7 @@ module Rename
 );
 
 TagBufEntry tags[63:0];
+TagBufEntry tag0Dbg = tags[0];
 
 RATEntry rat[31:0];
 integer i;
@@ -86,6 +87,15 @@ always_comb begin
             end
         end
     end
+end
+
+int usedTags;
+always_comb begin
+    usedTags = 0;
+    for (i = 0; i < 64; i=i+1)
+        if(tags[i].used)
+            usedTags = usedTags + 1;
+
 end
 
 // note: ROB has to consider order when multiple instructions
@@ -159,9 +169,22 @@ always_ff@(posedge clk) begin
             OUT_uop[i].sqN <= (counterSqN + i[5:0]);
             // These are affected by previous instrs
             OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
-            OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
             OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
-            OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
+            
+            // TODO: Do this parametric
+            // Forward from WB
+            if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs0].specTag) ||
+                (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs0].specTag))
+                OUT_uop[i].availA <= 1;
+            else
+                OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
+                
+            if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs1].specTag) ||
+                (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs1].specTag))
+                OUT_uop[i].availB <= 1;
+            else
+                OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
+            
             
             if (IN_uop[i].rd != 0) begin
                 OUT_uop[i].tagDst <= newTags[i];
@@ -175,6 +198,7 @@ always_ff@(posedge clk) begin
                 rat[IN_uop[i].rd].newSqN = counterSqN + i[5:0];
 
                 tags[newTags[i]].used <= 1;
+                tags[newTags[i]].sqN <= counterSqN + i[5:0];
             end
         end
         counterSqN <= counterSqN + WIDTH_WR[5:0];
@@ -188,22 +212,30 @@ always_ff@(posedge clk) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             // commit at higher index is newer op, takes precedence in case of collision
-            if (comValid[i] && (comRegNm[i] != 0) && isNewestCommit[i]
+            if (comValid[i] && (comRegNm[i] != 0)
                 && (!IN_branchTaken || $signed(comSqN[i] - IN_branchSqN) <= 0)) begin
-            
-                tags[rat[comRegNm[i]].comTag].committed <= 0;
-                tags[rat[comRegNm[i]].comTag].used <= 0;
                 
-                
-                rat[comRegNm[i]].comTag <= comRegTag[i];
-                
-                
-                tags[comRegTag[i]].committed <= 1;
-                tags[comRegTag[i]].used <= 1;
-                
+                if (isNewestCommit[i]) begin
+                    tags[rat[comRegNm[i]].comTag].committed <= 0;
+                    tags[rat[comRegNm[i]].comTag].used <= 0;
+                    
+                    
+                    rat[comRegNm[i]].comTag <= comRegTag[i];
+                    
+                    
+                    tags[comRegTag[i]].committed <= 1;
+                    tags[comRegTag[i]].used <= 1;
+                    
 
-                if (IN_mispredFlush || IN_branchTaken) 
-                    rat[comRegNm[i]].specTag <= comRegTag[i];
+                    if (IN_mispredFlush || IN_branchTaken) begin 
+                        rat[comRegNm[i]].specTag <= comRegTag[i];
+                        rat[comRegNm[i]].avail <= 1;
+                    end
+                end
+                else begin
+                    tags[comRegTag[i]].committed <= 0;
+                    tags[comRegTag[i]].used <= 0;
+                end
             end
         end
 
