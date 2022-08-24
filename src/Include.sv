@@ -1,7 +1,7 @@
 
 typedef enum logic[5:0]
 {
-    INT_ADD = 0,
+    INT_ADD,
     INT_XOR,
     INT_OR,
     INT_AND,
@@ -109,6 +109,8 @@ typedef struct packed
 {
     logic[31:0] srcA;
     logic[31:0] srcB;
+    logic zcFwdSrcA;
+    logic zcFwdSrcB;
     logic[31:0] imm;
     logic[5:0] opcode;
     logic[5:0] tagDst;
@@ -124,3 +126,12 @@ typedef struct packed
     bit[4:0] nmDst;
     bit[5:0] sqN;
 } RES_UOp;
+
+
+typedef struct packed
+{
+    bit taken;
+    bit[31:0] dstPC;
+    bit[5:0] sqN;
+    
+} BranchProv;

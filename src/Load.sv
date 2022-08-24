@@ -36,10 +36,10 @@ integer j;
 
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
-        OUT_rfReadValid[i] = IN_uop[i].availA;
+        OUT_rfReadValid[i] = 1;
         OUT_rfReadAddr[i] = IN_uop[i].tagA;
 
-        OUT_rfReadValid[i+NUM_UOPS] = IN_uop[i].availB;
+        OUT_rfReadValid[i+NUM_UOPS] = 1;
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB;
     end
 end
@@ -50,23 +50,33 @@ always_ff@(posedge clk) begin
     end
     else begin  
         for (i = 0; i < NUM_UOPS; i=i+1) begin     
-            if (!IN_wbStall[i] && IN_uopValid[i]) begin       
+            if (!IN_wbStall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 OUT_uop[i].imm <= IN_uop[i].imm;
                 OUT_uop[i].sqN <= IN_uop[i].sqN;
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
+                
+                OUT_uop[i].zcFwdSrcB <= 0;
+                
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 
-                OUT_uop[i].valid <= !IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0);
+                OUT_uop[i].valid <= 1;
 
                 // Some instructions just use the pc as an operand.             
                 if (IN_uop[i].pcA) begin
+                    OUT_uop[i].zcFwdSrcA <= 0;
                     OUT_uop[i].srcA <= IN_uop[i].pc;
+                    
                 end
-                // Try to get from register file
+                // Zero-Cycle forward for INT fu's
+                else if (OUT_uop[i].valid && OUT_uop[i].nmDst != 0 && IN_uop[i].tagA == OUT_uop[i].tagDst && OUT_funcUnit[i] == FU_INT && IN_uop[i].fu == FU_INT) begin
+                    OUT_uop[i].zcFwdSrcA <= 1;
+                    OUT_uop[i].srcA = 32'bx;
+                end                
                 else begin 
                     reg found = 0;
+                    OUT_uop[i].zcFwdSrcA <= 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: ignore contention here instead of handling it.
                         if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
@@ -78,16 +88,20 @@ always_ff@(posedge clk) begin
                     if (!found) begin
                         OUT_uop[i].srcA <= IN_rfReadData[i];
                     end
-                
                 end
-                // Try to get from current WB
-
+                
                 if (IN_uop[i].immB) begin
+                    OUT_uop[i].zcFwdSrcB <= 0;
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
-                // Try to get from register file
+                // Zero-Cycle forward for INT fu's
+                else if (OUT_uop[i].valid && OUT_uop[i].nmDst != 0 && IN_uop[i].tagB == OUT_uop[i].tagDst && OUT_funcUnit[i] == FU_INT && IN_uop[i].fu == FU_INT) begin
+                    OUT_uop[i].zcFwdSrcB <= 1;
+                    OUT_uop[i].srcB = 32'bx;
+                end
                 else begin
                     reg found = 0;
+                    OUT_uop[i].zcFwdSrcB <= 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: ignore contention here instead of handling it.
                         if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
@@ -99,11 +113,8 @@ always_ff@(posedge clk) begin
                     if (!found) begin
                         OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                     end
-                
                 end
                 // Try to get from current WB
-
-
                 case (IN_uop[i].fu)
                     FU_INT: OUT_enableXU[i] <= 4'b0001;
                     FU_LSU: OUT_enableXU[i] <= 4'b0010;
@@ -111,7 +122,7 @@ always_ff@(posedge clk) begin
                     FU_DIV: OUT_enableXU[i] <= 4'b1000;
                 endcase
             end
-            else if (!IN_wbStall[i]) begin
+            else if (!IN_wbStall[i] || (IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
                 OUT_uop[i].valid <= 0;
                 OUT_enableXU[i] <= 0;
             end

@@ -18,7 +18,7 @@ reg[30:0] pc;
 
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1)
-        OUT_pc[i] = {{pc + 2 * i}[30:0], 1'b0};
+        OUT_pc[i] = {({pc + 2 * i}[30:0]), 1'b0};
 end
 
 always_ff@(posedge clk) begin

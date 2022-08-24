@@ -21,7 +21,6 @@ module Core
 
 integer i;
 
-
 wire wbValid[NUM_UOPS-1:0];
 wire[4:0] wbRegNm[NUM_UOPS-1:0];
 wire[5:0] wbRegSqN[NUM_UOPS-1:0];
@@ -43,9 +42,19 @@ wire IF_enable;
 // IF -> DE -> RN
 reg[2:0] stateValid;
 
-wire[31:0] pcIn;
-wire pcWrite;
-wire[5:0] branchSqN;
+BranchProv branchProvs[1:0];
+BranchProv branch;
+always_comb begin
+    branch.taken = 0;
+    branch.sqN = 0;
+    for (i = 0; i < 2; i=i+1) begin
+        if (branchProvs[i].taken && (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0)) begin
+            branch.taken = 1;
+            branch.dstPC = branchProvs[i].dstPC;
+            branch.sqN = branchProvs[i].sqN;
+        end
+    end
+end
 
 reg disableMispredFlush;
 reg mispredFlush;
@@ -59,8 +68,8 @@ ProgramCounter progCnt
     .clk(clk),
     .en(stateValid[0]),
     .rst(rst),
-    .IN_pc(pcIn),
-    .IN_write(pcWrite),
+    .IN_pc(branch.dstPC),
+    .IN_write(branch.taken),
     .OUT_pc(IF_pc)
 );
 
@@ -73,7 +82,7 @@ always_ff@(posedge clk) begin
         mispredFlush <= 0;
         disableMispredFlush <= 0;
     end
-    else if (pcWrite) begin
+    else if (branch.taken) begin
         stateValid <= 3'b000;
         mispredFlush <= (ROB_curSqN != RN_nextSqN);
         disableMispredFlush <= 0;
@@ -113,7 +122,7 @@ reg RN_uopValid[NUM_UOPS-1:0];
 Rename rn 
 (
     .clk(clk),
-    .en(stateValid[1] && !pcWrite),
+    .en(stateValid[1] && !branch.taken),
     .rst(rst),
 
     .IN_uop(DE_uop),
@@ -123,12 +132,12 @@ Rename rn
     .comRegTag(comRegTag),
     .comSqN(comSqN),
 
-    .IN_wbValid(wbValid),
+    .IN_wbValid(wbHasResult),
     .IN_wbTag(wbRegTag),
     .IN_wbNm(wbRegNm),
 
-    .IN_branchTaken(pcWrite),
-    .IN_branchSqN(branchSqN), 
+    .IN_branchTaken(branch.taken),
+    .IN_branchSqN(branch.sqN), 
     .IN_mispredFlush(mispredFlush),   
 
     .OUT_uopValid(RN_uopValid),
@@ -158,12 +167,13 @@ ReservationStation rv
     .IN_LD_fu(LD_fu),
     .IN_LD_uop(LD_uop),
     .IN_LD_wbStall('{0, wbStall}),
+    .IN_LD_wbStallNext('{0, wbStallNext}),
     
     .IN_resultValid(wbHasResult),
     .IN_resultTag(wbRegTag),
 
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
     
     .IN_nextCommitSqN(ROB_curSqN),
 
@@ -201,11 +211,11 @@ Load ld
     .IN_uopValid(RV_uopValid),
     .IN_uop(RV_uop),
     
-    .IN_wbValid(wbValid),
+    .IN_wbValid(wbHasResult),
     .IN_wbTag(wbRegTag),
     .IN_wbResult(wbResult),
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
 
     .OUT_rfReadValid(RF_readEnable),
     .OUT_rfReadAddr(RF_readAddress),
@@ -219,38 +229,32 @@ wire LSU_wbReq;
 
 
 wire INTALU_valid;
-wire INTALU_isBranch;
 wire[5:0] INTALU_sqN;
 wire INTALU_wbReq;
 Flags INTALU_flags;
 IntALU ialu
 (
     .clk(clk),
-    .en(1),
+    .en(enabledXUs[0][0]),
     .rst(rst),
     
-    .IN_valid(LD_uop[0].valid && enabledXUs[0][0]),
     .IN_wbStall(LSU_wbReq),
-    .IN_operands('{LD_uop[0].imm, LD_uop[0].srcB, LD_uop[0].srcA}),
-    .IN_opcode(LD_uop[0].opcode),
-    .IN_tagDst(LD_uop[0].tagDst),
-    .IN_nmDst(LD_uop[0].nmDst),
-    .IN_sqN(LD_uop[0].sqN),    
+    .IN_uop(LD_uop[0]),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
 
     .OUT_wbReq(INTALU_wbReq),
     .OUT_valid(INTALU_valid),
-
-    .OUT_isBranch(INTALU_isBranch),
-    .OUT_branchTaken(pcWrite),
-    .OUT_branchAddress(pcIn),
-    .OUT_branchSqN(branchSqN),
+    
+    .OUT_branchTaken(branchProvs[0].taken),
+    .OUT_branchAddress(branchProvs[0].dstPC),
+    .OUT_branchSqN(branchProvs[0].sqN),
     
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag),
     .OUT_nmDst(INT_resName),
     .OUT_sqN(INTALU_sqN),
     .OUT_flags(INTALU_flags)
-    
 );
 
 wire LSU_uopValid;
@@ -263,8 +267,8 @@ LSU lsu
     .IN_valid(LD_uop[0].valid && enabledXUs[0][1]),
     .IN_uop(LD_uop[0]),
     
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
     
     .IN_MEM_readData(IN_MEM_readData),
     .OUT_MEM_addr(OUT_MEM_addr),
@@ -298,31 +302,32 @@ assign wbFlags[0] = !LSU_uopValid ?
     
 assign wbValid[0] = (INTALU_valid || LSU_uopValid);
 
+wire wbStallNext = LD_uop[0].valid && enabledXUs[0][1] && !wbStall && RV_uopValid[0] && RV_uop[0].fu == FU_INT;
 
-IntALULight ialu1
+IntALU ialu1
 (
     .clk(clk),
-    .en(1),
+    .en(enabledXUs[1][0]),
     .rst(rst),
-    .IN_valid(LD_uop[1].valid && enabledXUs[1][0]),
+    
     .IN_wbStall(0),
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
-    
-    .IN_operands('{LD_uop[1].imm, LD_uop[1].srcB, LD_uop[1].srcA}),
-    .IN_opcode(LD_uop[1].opcode),
-    .IN_tagDst(LD_uop[1].tagDst),
-    .IN_nmDst(LD_uop[1].nmDst),
-    .IN_sqN(LD_uop[1].sqN),
-    
+    .IN_uop(LD_uop[1]),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
+
     .OUT_wbReq(),
     .OUT_valid(wbValid[1]),
+    
+    .OUT_branchTaken(branchProvs[1].taken),
+    .OUT_branchAddress(branchProvs[1].dstPC),
+    .OUT_branchSqN(branchProvs[1].sqN),
+    
     .OUT_result(wbResult[1]),
     .OUT_tagDst(wbRegTag[1]),
     .OUT_nmDst(wbRegNm[1]),
-    .OUT_sqN(wbRegSqN[1])
+    .OUT_sqN(wbRegSqN[1]),
+    .OUT_flags(wbFlags[1])
 );
-assign wbFlags[1] = FLAGS_NONE; // placeholder
 
 wire[5:0] ROB_maxSqN;
 ROB rob
@@ -333,10 +338,10 @@ ROB rob
     .IN_tags(wbRegTag),
     .IN_names(wbRegNm),
     .IN_sqNs(wbRegSqN),
-    .IN_flags('{wbFlags[1], wbFlags[0]}), // placeholder
+    .IN_flags(wbFlags), // placeholder
 
-    .IN_invalidate(pcWrite),
-    .IN_invalidateSqN(branchSqN),
+    .IN_invalidate(branch.taken),
+    .IN_invalidateSqN(branch.sqN),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
@@ -350,6 +355,6 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign IF_enable = (RV_freeEntries > 3 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !pcWrite;
+assign IF_enable = (RV_freeEntries > 3 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
 
 endmodule

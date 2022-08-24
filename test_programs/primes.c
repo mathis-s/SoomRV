@@ -69,6 +69,7 @@ int main ()
         }
         
         found_prime:;
+        //printf("%.8x\n", prime);
         printhex(prime);
     }
 }

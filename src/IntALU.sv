@@ -4,18 +4,14 @@ module IntALU
     input wire en,
     input wire rst,
 
-    input wire IN_valid,
     input wire IN_wbStall,
-    input wire[31:0] IN_operands[2:0],
-    input OPCode_INT IN_opcode,
-    input wire[5:0] IN_tagDst,
-    input wire[4:0] IN_nmDst,
-    input reg[5:0] IN_sqN,
-
+    input EX_UOp IN_uop,
+    input IN_invalidate,
+    input[5:0] IN_invalidateSqN,
+    
     output wire OUT_wbReq,
     output reg OUT_valid,
 
-    output reg OUT_isBranch,
     output reg OUT_branchTaken,
     output reg[31:0] OUT_branchAddress,
     output reg[5:0] OUT_branchSqN,
@@ -27,33 +23,37 @@ module IntALU
     output Flags OUT_flags
 );
 
-assign OUT_wbReq = IN_valid;
+wire[31:0] srcA =  IN_uop.zcFwdSrcA ? OUT_result : IN_uop.srcA;
+wire[31:0] srcB =  IN_uop.zcFwdSrcB ? OUT_result : IN_uop.srcB;
+wire[31:0] imm =  IN_uop.imm;
+
+assign OUT_wbReq = IN_uop.valid && en;
 
 reg[31:0] resC;
 Flags flags;
 
 always_comb begin
     // optimize this depending on how good of a job synthesis does
-    case (IN_opcode)
+    case (IN_uop.opcode)
         INT_AUIPC,
-        INT_ADD: resC = IN_operands[0] + IN_operands[1];
-        INT_XOR: resC = IN_operands[0] ^ IN_operands[1];
-        INT_OR: resC = IN_operands[0] | IN_operands[1];
-        INT_AND: resC = IN_operands[0] & IN_operands[1];
-        INT_SLL: resC = IN_operands[0] << IN_operands[1][4:0];
-        INT_SRL: resC = IN_operands[0] >> IN_operands[1][4:0];
-        INT_SLT: resC = {31'b0, ($signed(IN_operands[0]) < $signed(IN_operands[1]))};
-        INT_SLTU: resC = {31'b0, IN_operands[0] < IN_operands[1]};
-        INT_SUB: resC = IN_operands[0] - IN_operands[1];
-        INT_SRA: resC = IN_operands[0] >>> IN_operands[1][4:0];
-        INT_LUI: resC = IN_operands[1];
+        INT_ADD: resC = srcA + srcB;
+        INT_XOR: resC = srcA ^ srcB;
+        INT_OR: resC = srcA | srcB;
+        INT_AND: resC = srcA & srcB;
+        INT_SLL: resC = srcA << srcB[4:0];
+        INT_SRL: resC = srcA >> srcB[4:0];
+        INT_SLT: resC = {31'b0, ($signed(srcA) < $signed(srcB))};
+        INT_SLTU: resC = {31'b0, srcA < srcB};
+        INT_SUB: resC = srcA - srcB;
+        INT_SRA: resC = srcA >>> srcB[4:0];
+        INT_LUI: resC = srcB;
         INT_JALR,
-        INT_JAL: resC = IN_operands[0] + 4;
+        INT_JAL: resC = srcA + 4;
         INT_SYS: resC = 0;
         default: resC = 'bx;
     endcase
     
-    case (IN_opcode)
+    case (IN_uop.opcode)
         INT_UNDEFINED,
         INT_SYS: flags = FLAGS_BRK;
         default: flags = FLAGS_NONE;
@@ -62,31 +62,21 @@ end
 
 
 always_comb begin
-    case (IN_opcode)
+    case (IN_uop.opcode)
         INT_JAL,
         INT_JALR: branchTaken = 1;
-        INT_BEQ: branchTaken = (IN_operands[0] == IN_operands[1]);
-        INT_BNE: branchTaken = (IN_operands[0] != IN_operands[1]);
-        INT_BLT: branchTaken = ($signed(IN_operands[0]) < $signed(IN_operands[1]));
-        INT_BGE: branchTaken = !($signed(IN_operands[0]) < $signed(IN_operands[1]));
-        INT_BLTU: branchTaken = (IN_operands[0] < IN_operands[1]);
-        INT_BGEU: branchTaken = !(IN_operands[0] < IN_operands[1]);
+        INT_BEQ: branchTaken = (srcA == srcB);
+        INT_BNE: branchTaken = (srcA != srcB);
+        INT_BLT: branchTaken = ($signed(srcA) < $signed(srcB));
+        INT_BGE: branchTaken = !($signed(srcA) < $signed(srcB));
+        INT_BLTU: branchTaken = (srcA < srcB);
+        INT_BGEU: branchTaken = !(srcA < srcB);
         default: branchTaken = 0;
     endcase
 end
 
 
 reg branchTaken;
-wire isBranch =
-        IN_opcode == INT_BEQ || 
-        IN_opcode == INT_BNE || 
-        IN_opcode == INT_BLT || 
-        IN_opcode == INT_BGE || 
-        IN_opcode == INT_BLTU || 
-        IN_opcode == INT_BGEU || 
-        IN_opcode == INT_JAL || 
-        IN_opcode == INT_JALR;
-
 
 always_ff@(posedge clk) begin
     
@@ -94,22 +84,17 @@ always_ff@(posedge clk) begin
         OUT_valid <= 0;
     end
     else begin
-        if (IN_valid && !IN_wbStall && (!OUT_branchTaken || $signed(IN_sqN - OUT_branchSqN) <= 0)) begin
-            
-            OUT_isBranch <= isBranch;
-            
-            if (isBranch)
-                OUT_branchSqN <= IN_sqN;
-            else
-                OUT_branchSqN <= 6'bx;
+        if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+        
+            OUT_branchSqN <= IN_uop.sqN;
 
             if (branchTaken) begin
                 OUT_branchTaken <= 1;
                 // TODO: jalr has different addr here
-                if (IN_opcode == INT_JALR)
-                    OUT_branchAddress <= IN_operands[1] + IN_operands[2];
+                if (IN_uop.opcode == INT_JALR)
+                    OUT_branchAddress <= srcB + imm;
                 else
-                    OUT_branchAddress <= IN_operands[2];
+                    OUT_branchAddress <= imm;
             end
             else begin
                 OUT_branchTaken <= 0;
@@ -118,10 +103,10 @@ always_ff@(posedge clk) begin
             end
 
             
-            OUT_tagDst <= IN_tagDst;
-            OUT_nmDst <= IN_nmDst;
+            OUT_tagDst <= IN_uop.tagDst;
+            OUT_nmDst <= IN_uop.nmDst;
             OUT_result <= resC;
-            OUT_sqN <= IN_sqN;
+            OUT_sqN <= IN_uop.sqN;
             OUT_flags <= flags;
             OUT_valid <= 1;
         end
@@ -131,11 +116,4 @@ always_ff@(posedge clk) begin
         end
     end
 end
-
-//always_ff@(posedge clk) begin
-//    OUT_tagDst <= IN_valid ? IN_tagDst : 0;
-//    OUT_nmDst <= IN_nmDst;
-//    OUT_result <= resC;
-//    
-//end
 endmodule
