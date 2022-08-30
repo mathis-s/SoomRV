@@ -68,6 +68,7 @@ typedef struct packed
     logic[4:0] rd;
     logic[5:0] opcode;
     FuncUnit fu;
+    logic valid;
 } D_UOp;
 
 typedef struct packed

@@ -27,6 +27,8 @@ module InstrDecoder
 )
 (
     input wire[31:0] IN_instr[NUM_UOPS-1:0],
+    input wire IN_instrValid[NUM_UOPS-1:0],
+
     input wire[31:0] IN_pc[NUM_UOPS-1:0],
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
@@ -44,6 +46,7 @@ always_comb begin
         instr = IN_instr[i];
         // TODO write x to uop here?
         uop.pc = IN_pc[i];
+        uop.valid = IN_instrValid[i];
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};

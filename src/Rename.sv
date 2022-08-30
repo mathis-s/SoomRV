@@ -116,7 +116,7 @@ always_ff@(posedge clk) begin
             tags[i].sqN <= 6'bxxxxxx;
         end
         
-        counterSqN <= 0;
+        counterSqN = 0;
         
         // Registers initialized with tags 0..31
         for (i = 0; i < 32; i=i+1) begin
@@ -131,7 +131,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branchTaken) begin
         
-        counterSqN <= IN_branchSqN + 1;
+        counterSqN = IN_branchSqN + 1;
         for (i = 0; i < 32; i=i+1) begin
             if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
                 rat[i].avail <= 1;
@@ -166,43 +166,47 @@ always_ff@(posedge clk) begin
 
         // Set seqnum/tags for next instruction(s)
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            
-            OUT_uop[i].sqN <= (counterSqN + i[5:0]);
-            // These are affected by previous instrs
-            OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
-            OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
-            
-            // TODO: Do this parametric
-            // Forward from WB
-            if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs0].specTag) ||
-                (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs0].specTag))
-                OUT_uop[i].availA <= 1;
-            else
-                OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
-                
-            if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs1].specTag) ||
-                (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs1].specTag))
-                OUT_uop[i].availB <= 1;
-            else
-                OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
-            
-            
-            if (IN_uop[i].rd != 0) begin
-                OUT_uop[i].tagDst <= newTags[i];
-                
-                assert(newTagsAvail[i]);
+            if (IN_uop[i].valid) begin
+                OUT_uop[i].sqN <= counterSqN;
+                // These are affected by previous instrs
+                OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
+                OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
 
-                // Mark regs written to by newly issued instructions as unavailable/pending.
-                // These are blocking to make sure they are forwarded to the next iters of this for-loop.
-                rat[IN_uop[i].rd].avail = 0;
-                rat[IN_uop[i].rd].specTag = newTags[i];
-                rat[IN_uop[i].rd].newSqN = counterSqN + i[5:0];
+                // TODO: Do this parametric
+                // Forward from WB
+                if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs0].specTag) ||
+                    (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs0].specTag))
+                    OUT_uop[i].availA <= 1;
+                else
+                    OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
 
-                tags[newTags[i]].used <= 1;
-                tags[newTags[i]].sqN <= counterSqN + i[5:0];
+                if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs1].specTag) ||
+                    (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs1].specTag))
+                    OUT_uop[i].availB <= 1;
+                else
+                    OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
+
+
+                if (IN_uop[i].rd != 0) begin
+                    OUT_uop[i].tagDst <= newTags[i];
+
+                    assert(newTagsAvail[i]);
+
+                    // Mark regs written to by newly issued instructions as unavailable/pending.
+                    // These are blocking to make sure they are forwarded to the next iters of this for-loop.
+                    rat[IN_uop[i].rd].avail = 0;
+                    rat[IN_uop[i].rd].specTag = newTags[i];
+                    rat[IN_uop[i].rd].newSqN = counterSqN;
+
+                    tags[newTags[i]].used <= 1;
+                    tags[newTags[i]].sqN <= counterSqN;
+                end
+                counterSqN = counterSqN + 1;
             end
+            else
+                OUT_uopValid[i] <= 0;
         end
-        counterSqN <= counterSqN + WIDTH_WR[5:0];
+
     end
     else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)

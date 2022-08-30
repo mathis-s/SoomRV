@@ -80,24 +80,26 @@ int main(int argc, char** argv)
     }
 
     // Run
+
+    // Instr addr is registered
+    uint32_t instrAddrReg = 0;
     while (!Verilated::gotFinish())
     {
         if (top->OUT_halt)
             break;
+        // zero right now, going to be one, so rising edge
         if (top->clk == 0)
         {
             size_t index;
             if (top->OUT_instrReadEnable)
-                for (int j = 0; j < 2; j++)
-                {
-                    index = top->OUT_pc[j] / 4;
-                    if (index >= 1024)
-                    {
-                        index = 0;
-                    }
-                    top->IN_instr[j] = ram[index];
-                }
-            
+            {
+                index = instrAddrReg * 2;
+                if (index >= 1023)
+                    index = 0;
+                top->IN_instrRaw = ((uint64_t)ram[index] | (((uint64_t)ram[index + 1]) << 32));
+                instrAddrReg = top->OUT_instrAddr;
+            }
+
             
             index = top->OUT_MEM_addr;
             if (index >= 1024)
@@ -136,6 +138,8 @@ int main(int argc, char** argv)
                     ram[index] = word;
                 }
             }
+
+
         }
 
         top->clk = !top->clk;

@@ -5,7 +5,7 @@ module Core
 (
     input wire clk,
     input wire rst,
-    input wire[31:0] IN_instr[1:0],
+    input wire[63:0] IN_instrRaw,
 
     input wire[31:0] IN_MEM_readData,
     
@@ -15,7 +15,7 @@ module Core
     output wire OUT_MEM_readEnable,
     output wire[3:0] OUT_MEM_writeMask,
     
-    output wire[31:0] OUT_pc[NUM_UOPS-1:0],
+    output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     output wire OUT_halt
 );
@@ -41,8 +41,8 @@ wire comValid[NUM_UOPS-1:0];
 wire frontendEn;
 
 // IF -> DE -> RN
-reg[2:0] stateValid;
-assign OUT_instrReadEnable = frontendEn;
+reg[3:0] stateValid;
+assign OUT_instrReadEnable = frontendEn && stateValid[0];
 
 BranchProv branchProvs[1:0];
 BranchProv branch;
@@ -61,18 +61,24 @@ end
 reg disableMispredFlush;
 reg mispredFlush;
 
-wire[31:0] IF_pc[NUM_UOPS-1:0];
-reg [31:0] DE_pc[NUM_UOPS-1:0];
+reg [31:0] IF_pc[NUM_UOPS-1:0];
+wire[31:0] IF_instr[NUM_UOPS-1:0];
+wire IF_instrValid[NUM_UOPS-1:0];
 
-assign OUT_pc = IF_pc;
 ProgramCounter progCnt
 (
     .clk(clk),
-    .en(stateValid[0] && frontendEn),
+    .en0(stateValid[0] && frontendEn),
+    .en1(stateValid[1] && frontendEn),
     .rst(rst),
     .IN_pc(branch.dstPC),
     .IN_write(branch.taken),
-    .OUT_pc(IF_pc)
+
+    .IN_instr(IN_instrRaw),
+    .OUT_instrAddr(OUT_instrAddr),
+    .OUT_pc(IF_pc),
+    .OUT_instr(IF_instr),
+    .OUT_instrValid(IF_instrValid)
 );
 
 wire[5:0] RN_nextSqN;
@@ -80,19 +86,19 @@ wire[5:0] ROB_curSqN;
 
 always_ff@(posedge clk) begin
     if (rst) begin
-        stateValid <= 3'b001;
+        stateValid <= 4'b0000;
         mispredFlush <= 0;
         disableMispredFlush <= 0;
     end
     else if (branch.taken) begin
-        stateValid <= 3'b000;
+        stateValid <= 4'b0000;
         mispredFlush <= (ROB_curSqN != RN_nextSqN);
         disableMispredFlush <= 0;
     end
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
     else if (mispredFlush) begin
-        stateValid <= 3'b000;
+        stateValid <= 4'b0000;
         disableMispredFlush <= (ROB_curSqN == RN_nextSqN);
         if (disableMispredFlush)
             mispredFlush <= 0;
@@ -100,12 +106,7 @@ always_ff@(posedge clk) begin
         //mispredFlush <= (ROB_curSqN != RN_nextSqN);
     end
     else if (frontendEn)
-        stateValid <= {stateValid[1:0], 1'b1};
-    
-    if (!rst && frontendEn && stateValid[0]) begin
-        DE_pc[0] <= IF_pc[0];
-        DE_pc[1] <= IF_pc[1];
-    end
+        stateValid <= {stateValid[2:0], 1'b1};
 end
 
 
@@ -113,8 +114,9 @@ D_UOp DE_uop[NUM_UOPS-1:0];
 
 InstrDecoder idec
 (
-    .IN_instr(IN_instr),
-    .IN_pc(DE_pc),
+    .IN_instr(IF_instr),
+    .IN_instrValid(IF_instrValid),
+    .IN_pc(IF_pc),
 
     .OUT_uop(DE_uop)
 );
@@ -124,7 +126,7 @@ reg RN_uopValid[NUM_UOPS-1:0];
 Rename rn 
 (
     .clk(clk),
-    .en(!branch.taken && stateValid[1]),
+    .en(!branch.taken && stateValid[2]),
     .frontEn(frontendEn),
     .rst(rst),
 
@@ -162,7 +164,7 @@ ReservationStation rv
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(stateValid[2] && frontendEn),
+    .frontEn(stateValid[3] && frontendEn),
 
     .IN_wbStall('{0, wbStall}),
     .IN_uopValid(RN_uopValid),
