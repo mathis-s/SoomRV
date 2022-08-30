@@ -48,7 +48,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
 
     end
-    else begin  
+    else begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin     
             if (!IN_wbStall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 OUT_uop[i].imm <= IN_uop[i].imm;

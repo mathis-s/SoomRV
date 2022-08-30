@@ -5,7 +5,7 @@ module Core
 (
     input wire clk,
     input wire rst,
-    input wire[31:0] IN_instr[NUM_UOPS-1:0],
+    input wire[31:0] IN_instr[1:0],
 
     input wire[31:0] IN_MEM_readData,
     
@@ -16,6 +16,7 @@ module Core
     output wire[3:0] OUT_MEM_writeMask,
     
     output wire[31:0] OUT_pc[NUM_UOPS-1:0],
+    output wire OUT_instrReadEnable,
     output wire OUT_halt
 );
 
@@ -37,10 +38,11 @@ wire[5:0] comRegTag[NUM_UOPS-1:0];
 wire[5:0] comSqN[NUM_UOPS-1:0];
 wire comValid[NUM_UOPS-1:0];
 
-wire IF_enable;
+wire frontendEn;
 
 // IF -> DE -> RN
 reg[2:0] stateValid;
+assign OUT_instrReadEnable = frontendEn;
 
 BranchProv branchProvs[1:0];
 BranchProv branch;
@@ -66,7 +68,7 @@ assign OUT_pc = IF_pc;
 ProgramCounter progCnt
 (
     .clk(clk),
-    .en(stateValid[0]),
+    .en(stateValid[0] && frontendEn),
     .rst(rst),
     .IN_pc(branch.dstPC),
     .IN_write(branch.taken),
@@ -97,10 +99,10 @@ always_ff@(posedge clk) begin
         // TODO: Think about mispredict flush to make sure this is correct and clean it up.
         //mispredFlush <= (ROB_curSqN != RN_nextSqN);
     end
-    else
-        stateValid <= {stateValid[1:0], IF_enable};
+    else if (frontendEn)
+        stateValid <= {stateValid[1:0], 1'b1};
     
-    if (!rst) begin
+    if (!rst && frontendEn && stateValid[0]) begin
         DE_pc[0] <= IF_pc[0];
         DE_pc[1] <= IF_pc[1];
     end
@@ -122,7 +124,8 @@ reg RN_uopValid[NUM_UOPS-1:0];
 Rename rn 
 (
     .clk(clk),
-    .en(stateValid[1] && !branch.taken),
+    .en(!branch.taken && stateValid[1]),
+    .frontEn(frontendEn),
     .rst(rst),
 
     .IN_uop(DE_uop),
@@ -159,6 +162,7 @@ ReservationStation rv
 (
     .clk(clk),
     .rst(rst),
+    .frontEn(stateValid[2] && frontendEn),
 
     .IN_wbStall('{0, wbStall}),
     .IN_uopValid(RN_uopValid),
@@ -355,6 +359,6 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign IF_enable = (RV_freeEntries > 3 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
+assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
 
 endmodule

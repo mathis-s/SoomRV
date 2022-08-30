@@ -21,6 +21,7 @@ module Rename
 (
     input wire clk,
     input wire en,
+    input wire frontEn,
     input wire rst,
 
     // Tag lookup for just decoded instrs
@@ -149,7 +150,7 @@ always_ff@(posedge clk) begin
             OUT_uopValid[i] <= 0;
     end
 
-    else if (en) begin
+    else if (en && frontEn) begin
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             OUT_uop[i].imm <= IN_uop[i].imm;
@@ -203,7 +204,7 @@ always_ff@(posedge clk) begin
         end
         counterSqN <= counterSqN + WIDTH_WR[5:0];
     end
-    else begin
+    else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)
             OUT_uopValid[i] <= 0;
     end
@@ -244,6 +245,21 @@ always_ff@(posedge clk) begin
             if (IN_wbValid[i] && rat[IN_wbNm[i]].specTag == IN_wbTag[i]) begin
                 rat[IN_wbNm[i]].avail = 1;
             end
+            
+            // If frontend is stalled right now we need to make sure 
+            // the op we're stalled on is kept up-to-date, as it will be
+            // read later.
+            if (en && !frontEn && IN_wbValid[i]) begin
+                for (j = 0; j < WIDTH_UOPS; j=j+1) begin
+                    if (OUT_uopValid[j]) begin
+                        if (OUT_uop[j].tagA == IN_wbTag[i])
+                            OUT_uop[j].availA <= 1;
+                        if (OUT_uop[j].tagB == IN_wbTag[i])
+                            OUT_uop[j].availB <= 1;
+                    end
+                end
+            end
+            
         end
     end
 

@@ -15,6 +15,7 @@ module ReservationStation
 (
     input wire clk,
     input wire rst,
+    input wire frontEn,
 
     input wire IN_wbStall[NUM_UOPS-1:0],
     input wire IN_uopValid[NUM_UOPS-1:0],
@@ -42,12 +43,6 @@ integer i;
 integer j;
 integer k;
 
-// Alternatively to storeQueue one could also order the entire queue.
-reg[2:0] storeQueueIn;
-reg[2:0] storeQueueOut;
-wire storeQueueEmpty = (storeQueueIn == storeQueueOut);
-reg[5:0] storeQueue[STORE_QUEUE_SIZE-1:0];
-
 reg[4:0] freeEntries;
 
 
@@ -62,17 +57,16 @@ reg[2:0] deqIndex[NUM_UOPS-1:0];
 reg deqValid[NUM_UOPS-1:0];
 
 always_comb begin    
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
+    for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
         
         deqValid[i] = 0;
         deqIndex[i] = 0;
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
             
-            if (valid[j] && (!deqValid[0] || deqIndex[0] != j[2:0])) begin
-                // maybe just store these as a bit in the uop?
+            if (valid[j] && (!deqValid[1] || deqIndex[1] != j[2:0])) begin
                 
-                if ((queue[j].availA || 
+                if ((queue[j].availA ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagA) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagA) ||
                         (IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
@@ -81,7 +75,7 @@ always_comb begin
                         (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
                         ) && 
                         
-                    (queue[j].availB || 
+                    (queue[j].availB ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagB) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagB) ||
                         (IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
@@ -93,11 +87,9 @@ always_comb begin
                     // Second FU only gets simple int ops
                     (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
                     
-                    // Loads are only issued when all stores before them are handled.
-                    (!queueInfo[j].isLoad || storeQueueEmpty || $signed(storeQueue[storeQueueOut] - queue[j].sqN) > 0) &&
-                    // Stores are issued in-order and non-speculatively
-                    (!queueInfo[j].isStore || (storeQueue[storeQueueOut] == queue[j].sqN && 
-                        (IN_nextCommitSqN == queue[j].sqN))) &&
+                    // Loads and Stores are issued in-order and non-speculatively for now
+                    (!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
+                    (!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
                     
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
@@ -130,8 +122,6 @@ always_ff@(posedge clk) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
             valid[i] <= 0;
         end
-        storeQueueIn = 0;
-        storeQueueOut = 0;
         freeEntries = 8;
     end
     else if (IN_invalidate) begin
@@ -145,29 +135,8 @@ always_ff@(posedge clk) begin
         
         for (i = 0; i < QUEUE_SIZE; i=i+1)
             OUT_valid[i] <= 0;
-        
-        // TODO
-        while (storeQueueIn != storeQueueOut && $signed(storeQueue[storeQueueIn - 1] - IN_invalidateSqN) > 0)
-            storeQueueIn = storeQueueIn - 1;
     end
-    else begin        
-        // Get ops that are executed in this cycle for forwarding
-        /*for (i = 0; i < NUM_UOPS; i=i+1) begin
-            if (IN_LD_uop[i].valid && IN_LD_fu[i] == FU_INT && !IN_LD_wbStall[i]) begin
-                for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                    
-                    if (queue[j].tagA == IN_LD_uop[i].tagDst) begin
-                        queue[j].availA <= 1;
-                    end
-
-                    if (queue[j].tagB == IN_LD_uop[i].tagDst) begin
-                        queue[j].availB <= 1;
-                    end
-                    
-                end
-            end
-        end*/
-        
+    else begin
         // issue uops
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             if (!IN_wbStall[i]) begin
@@ -176,7 +145,6 @@ always_ff@(posedge clk) begin
                     if ((queue[deqIndex[i]].fu == FU_LSU) && 
                         (queue[deqIndex[i]].opcode == LSU_SB || 
                             queue[deqIndex[i]].opcode == LSU_SH || queue[deqIndex[i]].opcode == LSU_SW)) begin
-                        storeQueueOut = storeQueueOut + 1;
                     end
                     freeEntries = freeEntries + 1;
                 end
@@ -189,7 +157,7 @@ always_ff@(posedge clk) begin
 
         // enqueue new uop
         for (i = 0; i < NUM_UOPS; i=i+1) begin
-            if (IN_uopValid[i]) begin
+            if (frontEn && IN_uopValid[i]) begin
                 enqValid = 0;
                 for (j = 0; j < QUEUE_SIZE; j=j+1) begin
                     if (enqValid == 0 && !valid[j]) begin
@@ -233,14 +201,12 @@ always_ff@(posedge clk) begin
                     end
                 end
                 
-                if (enqValid) begin
-                    if (IN_uop[i].fu == FU_LSU && 
-                        (IN_uop[i].opcode == LSU_SB || IN_uop[i].opcode == LSU_SH || IN_uop[i].opcode == LSU_SW)) begin
-                    storeQueue[storeQueueIn] <= IN_uop[i].sqN;
-                    storeQueueIn = storeQueueIn + 1;
-                    end
-                    freeEntries = freeEntries - 1;
+                assert(enqValid);
+
+                if (IN_uop[i].fu == FU_LSU && 
+                    (IN_uop[i].opcode == LSU_SB || IN_uop[i].opcode == LSU_SH || IN_uop[i].opcode == LSU_SW)) begin
                 end
+                freeEntries = freeEntries - 1;
             end
         end
     end

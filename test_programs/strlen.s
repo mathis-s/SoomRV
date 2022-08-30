@@ -3,7 +3,8 @@
     .string "Hello World abcjdedw!"
 
 .text
-strlen:
+.globl main
+main:
     lui t0, %hi(.LC0)
     addi t0, t0, %lo(.LC0)
     addi t2, t0, 1

@@ -34,7 +34,7 @@ int main(int argc, char** argv)
     system((std::string("riscv32-unknown-elf-as -o temp.o ") + std::string(argv[1])).c_str());
     system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
-    system("riscv32-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
+    system("riscv32-unknown-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
     
     size_t numInstrs = 0;
     {
@@ -87,15 +87,16 @@ int main(int argc, char** argv)
         if (top->clk == 0)
         {
             size_t index;
-            for (int j = 0; j < 2; j++)
-            {
-                index = top->OUT_pc[j] / 4;
-                if (index >= 1024)
+            if (top->OUT_instrReadEnable)
+                for (int j = 0; j < 2; j++)
                 {
-                    index = 0;
+                    index = top->OUT_pc[j] / 4;
+                    if (index >= 1024)
+                    {
+                        index = 0;
+                    }
+                    top->IN_instr[j] = ram[index];
                 }
-                top->IN_instr[j] = ram[index];
-            }
             
             
             index = top->OUT_MEM_addr;

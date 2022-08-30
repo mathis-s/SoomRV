@@ -165,11 +165,11 @@ always_ff@(posedge clk) begin
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH; i=i+1) begin
             if (IN_valid[i] && (!IN_invalidate || $signed(IN_sqNs[i] - IN_invalidateSqN) <= 0)) begin
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].valid <= 1;
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].flags <= IN_flags[i];
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].tag <= IN_tags[i];
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].name <= IN_names[i];
-                entries[{IN_sqNs[i][5:0] - baseIndex[5:0]}[3:0]].sqN <= IN_sqNs[i];
+                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].valid <= 1;
+                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].flags <= IN_flags[i];
+                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].tag <= IN_tags[i];
+                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].name <= IN_names[i];
+                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].sqN <= IN_sqNs[i];
             end
         end
     end
