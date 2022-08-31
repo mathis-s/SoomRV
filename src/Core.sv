@@ -65,6 +65,21 @@ reg [31:0] IF_pc[NUM_UOPS-1:0];
 wire[31:0] IF_instr[NUM_UOPS-1:0];
 wire IF_instrValid[NUM_UOPS-1:0];
 
+wire[31:0] PC_pc;
+assign OUT_instrAddr = PC_pc[31:3];
+
+
+wire BP_branchTaken;
+wire BP_isJump;
+wire[31:0] BP_branchSrc;
+wire[31:0] BP_branchDst;
+wire[3:0] BP_branchID;
+wire BP_multipleBranches;
+wire BP_branchFound;
+
+wire[3:0] IF_branchID[NUM_UOPS-1:0];
+wire IF_branchPred[NUM_UOPS-1:0];
+
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -73,13 +88,52 @@ ProgramCounter progCnt
     .rst(rst),
     .IN_pc(branch.dstPC),
     .IN_write(branch.taken),
-
     .IN_instr(IN_instrRaw),
-    .OUT_instrAddr(OUT_instrAddr),
+    
+    .IN_BP_branchTaken(BP_branchTaken),
+    .IN_BP_isJump(BP_isJump),
+    .IN_BP_branchSrc(BP_branchSrc),
+    .IN_BP_branchDst(BP_branchDst),
+    .IN_BP_branchID(BP_branchID),
+    .IN_BP_multipleBranches(BP_multipleBranches),
+    .IN_BP_branchFound(BP_branchFound),
+    
+    .OUT_pcRaw(PC_pc),
     .OUT_pc(IF_pc),
     .OUT_instr(IF_instr),
+    .OUT_branchID(IF_branchID),
+    .OUT_branchPred(IF_branchPred),
     .OUT_instrValid(IF_instrValid)
 );
+
+wire isBranch;
+wire[31:0] branchSource;
+wire branchIsJump;
+wire[3:0] branchID;
+wire branchTaken;
+BranchPredictor bp
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_pcValid(stateValid[0] && frontendEn),
+    .IN_pc(PC_pc),
+    .OUT_branchTaken(BP_branchTaken),
+    .OUT_isJump(BP_isJump),
+    .OUT_branchSrc(BP_branchSrc),
+    .OUT_branchDst(BP_branchDst),
+    .OUT_branchID(BP_branchID),
+    .OUT_multipleBranches(BP_multipleBranches),
+    .OUT_branchFound(BP_branchFound),
+    
+    .IN_branchValid(isBranch),
+    .IN_branchID(branchID),
+    .IN_branchAddr(branchSource),
+    .IN_branchDest(branchProvs[1].dstPC),
+    .IN_branchTaken(branchTaken),
+    .IN_branchIsJump(branchIsJump)
+);
+
 
 wire[5:0] RN_nextSqN;
 wire[5:0] ROB_curSqN;
@@ -115,6 +169,8 @@ D_UOp DE_uop[NUM_UOPS-1:0];
 InstrDecoder idec
 (
     .IN_instr(IF_instr),
+    .IN_branchID(IF_branchID),
+    .IN_branchPred(IF_branchPred),
     .IN_instrValid(IF_instrValid),
     .IN_pc(IF_pc),
 
@@ -252,8 +308,13 @@ IntALU ialu
     .OUT_wbReq(INTALU_wbReq),
     .OUT_valid(INTALU_valid),
     
-    .OUT_branchTaken(branchProvs[0].taken),
+    .OUT_isBranch(),
+    .OUT_branchTaken(),
+    .OUT_branchMispred(branchProvs[0].taken),
+    .OUT_branchSource(),
     .OUT_branchAddress(branchProvs[0].dstPC),
+    .OUT_branchIsJump(),
+    .OUT_branchID(),
     .OUT_branchSqN(branchProvs[0].sqN),
     
     .OUT_result(INT_result),
@@ -310,6 +371,8 @@ assign wbValid[0] = (INTALU_valid || LSU_uopValid);
 
 wire wbStallNext = LD_uop[0].valid && enabledXUs[0][1] && !wbStall && RV_uopValid[0] && RV_uop[0].fu == FU_INT;
 
+
+
 IntALU ialu1
 (
     .clk(clk),
@@ -324,8 +387,13 @@ IntALU ialu1
     .OUT_wbReq(),
     .OUT_valid(wbValid[1]),
     
-    .OUT_branchTaken(branchProvs[1].taken),
+    .OUT_isBranch(isBranch),
+    .OUT_branchTaken(branchTaken),
+    .OUT_branchMispred(branchProvs[1].taken),
+    .OUT_branchSource(branchSource),
     .OUT_branchAddress(branchProvs[1].dstPC),
+    .OUT_branchIsJump(branchIsJump),
+    .OUT_branchID(branchID),
     .OUT_branchSqN(branchProvs[1].sqN),
     
     .OUT_result(wbResult[1]),

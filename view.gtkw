@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Tue Aug 23 18:22:52 2022
+[*] Wed Aug 31 22:39:48 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Tue Aug 23 18:16:45 2022"
-[dumpfile_size] 22413888
+[dumpfile_mtime] "Wed Aug 31 22:39:14 2022"
+[dumpfile_size] 673996136
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 1360
+[timestart] 2970090
 [size] 3840 2132
 [pos] -1 -1
-*-6.140254 1860 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.140254 2972900 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.ialu.
@@ -50,14 +50,8 @@
 @28
 TOP.clk
 TOP.rst
-@22
-TOP.Core.DE_pc[0][31:0]
-TOP.Core.DE_pc[1][31:0]
-@28
-TOP.Core.stateValid[2:0]
+@29
 TOP.Core.mispredFlush
-TOP.Core.pcWrite
-TOP.Core.IF_enable
 @820
 TOP.Core.OUT_MEM_writeData[31:0]
 @200
@@ -97,7 +91,7 @@ TOP.Core.rv.queue[0].sqN[5:0]
 TOP.Core.rv.valid[0]
 TOP.Core.rv.queue[0].availA
 TOP.Core.rv.queue[0].availB
-@23
+@22
 TOP.Core.rv.queue[0].tagDst[5:0]
 @200
 -RV[1]
@@ -197,22 +191,5 @@ TOP.Core.rob.entries[1].sqN[5:0]
 TOP.Core.rob.entries[2].sqN[5:0]
 TOP.Core.rob.entries[3].sqN[5:0]
 TOP.Core.rob.baseIndex[5:0]
-@c00022
-TOP.Core.branchSqN[5:0]
-@28
-(0)TOP.Core.branchSqN[5:0]
-(1)TOP.Core.branchSqN[5:0]
-(2)TOP.Core.branchSqN[5:0]
-(3)TOP.Core.branchSqN[5:0]
-(4)TOP.Core.branchSqN[5:0]
-(5)TOP.Core.branchSqN[5:0]
-@1401200
--group_end
-@200
--Sandbox
-@22
-TOP.Core.RN_nextSqN[5:0]
-TOP.Core.ROB_maxSqN[5:0]
-TOP.Core.rv.OUT_free[4:0]
 [pattern_trace] 1
 [pattern_trace] 0

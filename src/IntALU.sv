@@ -11,9 +11,14 @@ module IntALU
     
     output wire OUT_wbReq,
     output reg OUT_valid,
-
+    
+    output reg OUT_isBranch,
     output reg OUT_branchTaken,
+    output reg OUT_branchMispred,
+    output reg[31:0] OUT_branchSource,
     output reg[31:0] OUT_branchAddress,
+    output reg OUT_branchIsJump,
+    output reg[3:0] OUT_branchID,
     output reg[5:0] OUT_branchSqN,
 
     output reg[31:0] OUT_result,
@@ -61,6 +66,8 @@ always_comb begin
 end 
 
 
+reg isBranch;
+
 always_comb begin
     case (IN_uop.opcode)
         INT_JAL,
@@ -73,6 +80,17 @@ always_comb begin
         INT_BGEU: branchTaken = !(srcA < srcB);
         default: branchTaken = 0;
     endcase
+    
+    isBranch =
+        (IN_uop.opcode == INT_JAL ||
+        //IN_uop.opcode == INT_JALR || (not predicted by bp)
+        IN_uop.opcode == INT_BEQ ||
+        IN_uop.opcode == INT_BNE ||
+        IN_uop.opcode == INT_BLT ||
+        IN_uop.opcode == INT_BGE ||
+        IN_uop.opcode == INT_BLTU ||
+        IN_uop.opcode == INT_BGEU);
+        
 end
 
 
@@ -87,20 +105,31 @@ always_ff@(posedge clk) begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
         
             OUT_branchSqN <= IN_uop.sqN;
-
-            if (branchTaken) begin
-                OUT_branchTaken <= 1;
-                // TODO: jalr has different addr here
-                if (IN_uop.opcode == INT_JALR)
-                    OUT_branchAddress <= srcB + imm;
+            
+            OUT_isBranch <= isBranch;
+            if (isBranch) begin
+                OUT_branchSource <= IN_uop.pc;
+                OUT_branchID <= IN_uop.branchID;
+                OUT_branchIsJump <= (IN_uop.opcode == INT_JAL);
+                OUT_branchTaken <= branchTaken;
+                
+                if (branchTaken != IN_uop.branchPred) begin
+                    OUT_branchMispred <= 1;
+                    if (branchTaken)
+                        OUT_branchAddress <= imm;
+                    else
+                        OUT_branchAddress <= (IN_uop.pc + 4);
+                end
                 else
-                    OUT_branchAddress <= imm;
+                    OUT_branchMispred <= 0;
             end
-            else begin
-                OUT_branchTaken <= 0;
-                OUT_branchAddress <= 32'bx;
-                OUT_branchSqN <= 6'bx;
+            // Register jumps are not predicted currently
+            else if (IN_uop.opcode == INT_JALR) begin
+                OUT_branchAddress <= srcB + imm;
+                OUT_branchMispred <= 1;
             end
+            else
+                OUT_branchMispred <= 0;
 
             
             OUT_tagDst <= IN_uop.tagDst;
@@ -111,8 +140,9 @@ always_ff@(posedge clk) begin
             OUT_valid <= 1;
         end
         else begin
-            OUT_branchTaken <= 0;
+            OUT_branchMispred <= 0;
             OUT_valid <= 0;
+            OUT_isBranch <= 0;
         end
     end
 end

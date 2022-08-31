@@ -91,6 +91,9 @@ always_comb begin
                     (!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
                     (!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
                     
+                    // Branches only to FU 1
+                    (!queueInfo[j].isJumpBranch || i == 1) &&
+                    
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
                     deqIndex[i] = j[2:0];

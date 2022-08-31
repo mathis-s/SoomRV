@@ -68,6 +68,8 @@ typedef struct packed
     logic[4:0] rd;
     logic[5:0] opcode;
     FuncUnit fu;
+    logic[3:0] branchID;
+    logic branchPred;
     logic valid;
 } D_UOp;
 
@@ -86,6 +88,8 @@ typedef struct packed
     logic[5:0] tagDst;
     logic[4:0] nmDst;
     logic[5:0] opcode;
+    logic[3:0] branchID;
+    logic branchPred;
     FuncUnit fu;
 } R_UOp;
 
@@ -112,11 +116,14 @@ typedef struct packed
     logic[31:0] srcB;
     logic zcFwdSrcA;
     logic zcFwdSrcB;
+    logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
     logic[5:0] sqN;
+    logic[3:0] branchID;
+    logic branchPred;
     logic valid;
 } EX_UOp;
 

@@ -56,6 +56,9 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
+                OUT_uop[i].pc <= IN_uop[i].pc;
+                OUT_uop[i].branchID <= IN_uop[i].branchID;
+                OUT_uop[i].branchPred <= IN_uop[i].branchPred;
                 
                 OUT_uop[i].zcFwdSrcB <= 0;
                 
