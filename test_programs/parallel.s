@@ -7,6 +7,7 @@
     li a3, 0
     li a5, 0
     li a6, 0
+    li a7, 0
     li t0, 100
     
     loop:
@@ -16,6 +17,7 @@
         addi a3, a3, 4
         addi a5, a5, 5
         addi a6, a6, 6
+        addi a7, a7, 7
         
         addi a0, a0, 1
         addi a1, a1, 2
@@ -23,6 +25,7 @@
         addi a3, a3, 4
         addi a5, a5, 5
         addi a6, a6, 6
+        addi a7, a7, 7
         
         addi a0, a0, 1
         addi a1, a1, 2
@@ -30,6 +33,7 @@
         addi a3, a3, 4
         addi a5, a5, 5
         addi a6, a6, 6
+        addi a7, a7, 7
         
         addi a0, a0, 1
         addi a1, a1, 2
@@ -37,6 +41,7 @@
         addi a3, a3, 4
         addi a5, a5, 5
         addi a6, a6, 6
+        addi a7, a7, 7
         
         addi a0, a0, 1
         addi a1, a1, 2
@@ -44,6 +49,7 @@
         addi a3, a3, 4
         addi a5, a5, 5
         addi a6, a6, 6
+        addi a7, a7, 7
         blt a0, t0, loop
     
 

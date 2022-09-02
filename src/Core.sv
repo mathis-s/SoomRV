@@ -44,12 +44,12 @@ wire frontendEn;
 reg[3:0] stateValid;
 assign OUT_instrReadEnable = frontendEn && stateValid[0];
 
-BranchProv branchProvs[1:0];
+BranchProv branchProvs[2:0];
 BranchProv branch;
 always_comb begin
     branch.taken = 0;
     branch.sqN = 0;
-    for (i = 0; i < 2; i=i+1) begin
+    for (i = 0; i < 3; i=i+1) begin
         if (branchProvs[i].taken && (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0)) begin
             branch.taken = 1;
             branch.dstPC = branchProvs[i].dstPC;
@@ -324,6 +324,26 @@ IntALU ialu
     .OUT_flags(INTALU_flags)
 );
 
+wire LB_valid[0:0];
+wire LB_isLoad[0:0];
+wire[31:0] LB_addr[0:0];
+wire[5:0] LB_sqN[0:0];
+wire LB_mispred[0:0];
+LoadBuffer lb
+(
+    .clk(clk),
+    .rst(rst),
+    .commitSqN(ROB_curSqN),
+    
+    .valid(LB_valid),
+    .isLoad(LB_isLoad),
+    .addr(LB_addr),
+    .sqN(LB_sqN),
+    
+    .mispredict(LB_mispred),
+    .full()
+);
+
 wire LSU_uopValid;
 RES_UOp LSU_uop;
 assign wbStall = LSU_wbReq && INTALU_wbReq;
@@ -343,7 +363,15 @@ LSU lsu
     .OUT_MEM_writeEnable(OUT_MEM_writeEnable),
     .OUT_MEM_writeMask(OUT_MEM_writeMask),
     .OUT_MEM_readEnable(OUT_MEM_readEnable),
-
+    
+    .OUT_LB_valid(LB_valid[0]),
+    .OUT_LB_isLoad(LB_isLoad[0]),
+    .OUT_LB_addr(LB_addr[0]),
+    .OUT_LB_sqN(LB_sqN[0]),
+    .IN_LB_mispred(LB_mispred[0]),
+    
+    .OUT_branchProv(branchProvs[2]),
+    
     .OUT_wbReq(LSU_wbReq),
 
     .OUT_valid(LSU_uopValid),

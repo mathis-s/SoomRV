@@ -88,7 +88,7 @@ always_comb begin
                     (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
                     
                     // Loads and Stores are issued in-order and non-speculatively for now
-                    (!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
+                    //(!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
                     (!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
                     
                     // Branches only to FU 1

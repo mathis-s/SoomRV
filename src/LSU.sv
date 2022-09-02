@@ -16,6 +16,14 @@ module LSU
     output reg OUT_MEM_writeEnable,
     output reg OUT_MEM_readEnable,
     output reg[3:0] OUT_MEM_writeMask,
+    
+    output reg OUT_LB_valid,
+    output reg OUT_LB_isLoad,
+    output reg[31:0] OUT_LB_addr,
+    output reg[5:0] OUT_LB_sqN,
+    input wire IN_LB_mispred,
+    
+    output BranchProv OUT_branchProv,
 
     output wire OUT_wbReq,
 
@@ -29,6 +37,10 @@ reg[5:0] iTagDst;
 reg[4:0] iNmDst;
 reg[5:0] iSqN;
 reg[1:0] iByteIndex;
+reg[31:0] iPC;
+
+// placeholder
+reg[31:0] OUT_pc;
 
 wire[31:0] addr = IN_uop.srcA + IN_uop.imm;
 
@@ -39,6 +51,7 @@ assign OUT_wbReq = iValid;
 always@(posedge clk) begin
     if (rst) begin
         iValid <= 0;
+        OUT_LB_valid <= 0;
     end
     else if (IN_valid && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
 
@@ -48,7 +61,13 @@ always@(posedge clk) begin
         iNmDst <= IN_uop.nmDst;
         iSqN <= IN_uop.sqN;
         iByteIndex <= addr[1:0];
+        iPC <= IN_uop.pc;
         OUT_MEM_addr <= {2'b00, addr[31:2]};
+        
+        OUT_LB_valid <= 1;
+        OUT_LB_isLoad <= !(IN_uop.opcode == LSU_SB || IN_uop.opcode == LSU_SH || IN_uop.opcode == LSU_SW);
+        OUT_LB_addr <= addr;
+        OUT_LB_sqN <= IN_uop.sqN;
 
         case (IN_uop.opcode)
             LSU_LB,
@@ -109,6 +128,7 @@ always@(posedge clk) begin
         endcase
     end
     else begin
+        OUT_LB_valid <= 0;
         iValid <= 0;
         OUT_MEM_readEnable <= 0;
         OUT_MEM_writeEnable <= 0;
@@ -118,6 +138,7 @@ always@(posedge clk) begin
         OUT_uop.tagDst <= iTagDst;
         OUT_uop.nmDst <= iNmDst;
         OUT_uop.sqN <= iSqN;
+        OUT_pc <= iPC;
         OUT_valid <= 1;
 
         case (iOpcode)
@@ -149,8 +170,20 @@ always@(posedge clk) begin
     end
     else
         OUT_valid <= 0;
-    
-
+        
+    if (OUT_valid && (!IN_invalidate || $signed(OUT_uop.sqN - IN_invalidateSqN) <= 0)) begin
+        // When a load was incorrectly speculated to be at a different address than a store before
+        // it, a mispredict branch fires.
+        if (IN_LB_mispred) begin
+            OUT_branchProv.taken <= 1;
+            OUT_branchProv.dstPC <= (OUT_pc + 4);
+            OUT_branchProv.sqN <= (OUT_uop.sqN);
+        end
+        else
+            OUT_branchProv.taken <= 0;
+    end
+    else
+        OUT_branchProv.taken <= 0;
 end
 
 
