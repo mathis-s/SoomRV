@@ -59,6 +59,8 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].pc <= IN_uop[i].pc;
                 OUT_uop[i].branchID <= IN_uop[i].branchID;
                 OUT_uop[i].branchPred <= IN_uop[i].branchPred;
+                OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
+                OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
                 
                 OUT_uop[i].zcFwdSrcB <= 0;
                 

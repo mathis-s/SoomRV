@@ -18,8 +18,10 @@ module IntALU
     output reg[31:0] OUT_branchSource,
     output reg[31:0] OUT_branchAddress,
     output reg OUT_branchIsJump,
-    output reg[3:0] OUT_branchID,
+    output reg[5:0] OUT_branchID,
     output reg[5:0] OUT_branchSqN,
+    output reg[5:0] OUT_branchLoadSqN,
+    output reg[5:0] OUT_branchStoreSqN,
 
     output reg[31:0] OUT_result,
     output reg[5:0] OUT_tagDst,
@@ -105,6 +107,8 @@ always_ff@(posedge clk) begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
         
             OUT_branchSqN <= IN_uop.sqN;
+            OUT_branchLoadSqN <= IN_uop.loadSqN;
+            OUT_branchStoreSqN <= IN_uop.storeSqN;
             
             OUT_isBranch <= isBranch;
             if (isBranch) begin

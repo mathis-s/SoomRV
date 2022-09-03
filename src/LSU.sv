@@ -21,6 +21,8 @@ module LSU
     output reg OUT_LB_isLoad,
     output reg[31:0] OUT_LB_addr,
     output reg[5:0] OUT_LB_sqN,
+    output reg[5:0] OUT_LB_loadSqN,
+    output reg[5:0] OUT_LB_storeSqN,
     input wire IN_LB_mispred,
     
     output BranchProv OUT_branchProv,
@@ -36,11 +38,15 @@ reg[5:0] iOpcode;
 reg[5:0] iTagDst;
 reg[4:0] iNmDst;
 reg[5:0] iSqN;
+reg[5:0] iLoadSqN;
+reg[5:0] iStoreSqN;
 reg[1:0] iByteIndex;
 reg[31:0] iPC;
 
 // placeholder
 reg[31:0] OUT_pc;
+reg[5:0] OUT_loadSqN;
+reg[5:0] OUT_storeSqN;
 
 wire[31:0] addr = IN_uop.srcA + IN_uop.imm;
 
@@ -60,6 +66,8 @@ always@(posedge clk) begin
         iTagDst <= IN_uop.tagDst;
         iNmDst <= IN_uop.nmDst;
         iSqN <= IN_uop.sqN;
+        iLoadSqN <= IN_uop.loadSqN;
+        iStoreSqN <= IN_uop.storeSqN;
         iByteIndex <= addr[1:0];
         iPC <= IN_uop.pc;
         OUT_MEM_addr <= {2'b00, addr[31:2]};
@@ -68,6 +76,8 @@ always@(posedge clk) begin
         OUT_LB_isLoad <= !(IN_uop.opcode == LSU_SB || IN_uop.opcode == LSU_SH || IN_uop.opcode == LSU_SW);
         OUT_LB_addr <= addr;
         OUT_LB_sqN <= IN_uop.sqN;
+        OUT_LB_loadSqN <= IN_uop.loadSqN;
+        OUT_LB_storeSqN <= IN_uop.storeSqN;
 
         case (IN_uop.opcode)
             LSU_LB,
@@ -138,6 +148,8 @@ always@(posedge clk) begin
         OUT_uop.tagDst <= iTagDst;
         OUT_uop.nmDst <= iNmDst;
         OUT_uop.sqN <= iSqN;
+        OUT_loadSqN <= iLoadSqN;
+        OUT_storeSqN <= iStoreSqN;
         OUT_pc <= iPC;
         OUT_valid <= 1;
 
@@ -178,6 +190,8 @@ always@(posedge clk) begin
             OUT_branchProv.taken <= 1;
             OUT_branchProv.dstPC <= (OUT_pc + 4);
             OUT_branchProv.sqN <= (OUT_uop.sqN);
+            OUT_branchProv.loadSqN <= OUT_loadSqN;
+            OUT_branchProv.storeSqN <= OUT_storeSqN;
         end
         else
             OUT_branchProv.taken <= 0;

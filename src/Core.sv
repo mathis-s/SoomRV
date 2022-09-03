@@ -54,6 +54,8 @@ always_comb begin
             branch.taken = 1;
             branch.dstPC = branchProvs[i].dstPC;
             branch.sqN = branchProvs[i].sqN;
+            branch.loadSqN = branchProvs[i].loadSqN;
+            branch.storeSqN = branchProvs[i].storeSqN;
         end
     end
 end
@@ -73,11 +75,11 @@ wire BP_branchTaken;
 wire BP_isJump;
 wire[31:0] BP_branchSrc;
 wire[31:0] BP_branchDst;
-wire[3:0] BP_branchID;
+wire[5:0] BP_branchID;
 wire BP_multipleBranches;
 wire BP_branchFound;
 
-wire[3:0] IF_branchID[NUM_UOPS-1:0];
+wire[5:0] IF_branchID[NUM_UOPS-1:0];
 wire IF_branchPred[NUM_UOPS-1:0];
 
 ProgramCounter progCnt
@@ -109,7 +111,7 @@ ProgramCounter progCnt
 wire isBranch;
 wire[31:0] branchSource;
 wire branchIsJump;
-wire[3:0] branchID;
+wire[5:0] branchID;
 wire branchTaken;
 BranchPredictor bp
 (
@@ -179,6 +181,9 @@ InstrDecoder idec
 
 R_UOp RN_uop[NUM_UOPS-1:0];
 reg RN_uopValid[NUM_UOPS-1:0];
+wire[5:0] RN_nextLoadSqN;
+wire[5:0] RN_nextStoreSqN;
+
 Rename rn 
 (
     .clk(clk),
@@ -198,12 +203,16 @@ Rename rn
     .IN_wbNm(wbRegNm),
 
     .IN_branchTaken(branch.taken),
-    .IN_branchSqN(branch.sqN), 
+    .IN_branchSqN(branch.sqN),
+    .IN_branchLoadSqN(branch.loadSqN),
+    .IN_branchStoreSqN(branch.storeSqN),
     .IN_mispredFlush(mispredFlush),   
 
     .OUT_uopValid(RN_uopValid),
     .OUT_uop(RN_uop),
-    .OUT_nextSqN(RN_nextSqN)
+    .OUT_nextSqN(RN_nextSqN),
+    .OUT_nextLoadSqN(RN_nextLoadSqN),
+    .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
 wire[31:0] INT_result;
@@ -316,6 +325,8 @@ IntALU ialu
     .OUT_branchIsJump(),
     .OUT_branchID(),
     .OUT_branchSqN(branchProvs[0].sqN),
+    .OUT_branchLoadSqN(branchProvs[0].loadSqN),
+    .OUT_branchStoreSqN(branchProvs[0].storeSqN),
     
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag),
@@ -328,7 +339,9 @@ wire LB_valid[0:0];
 wire LB_isLoad[0:0];
 wire[31:0] LB_addr[0:0];
 wire[5:0] LB_sqN[0:0];
+wire[5:0] LB_loadSqN[0:0];
 wire LB_mispred[0:0];
+wire[5:0] LB_maxLoadSqN;
 LoadBuffer lb
 (
     .clk(clk),
@@ -339,9 +352,12 @@ LoadBuffer lb
     .isLoad(LB_isLoad),
     .addr(LB_addr),
     .sqN(LB_sqN),
+    .loadSqN(LB_loadSqN),
+    
+    .IN_branch(branch),
     
     .mispredict(LB_mispred),
-    .full()
+    .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
 
 wire LSU_uopValid;
@@ -368,6 +384,8 @@ LSU lsu
     .OUT_LB_isLoad(LB_isLoad[0]),
     .OUT_LB_addr(LB_addr[0]),
     .OUT_LB_sqN(LB_sqN[0]),
+    .OUT_LB_loadSqN(LB_loadSqN[0]),
+    .OUT_LB_storeSqN(),
     .IN_LB_mispred(LB_mispred[0]),
     
     .OUT_branchProv(branchProvs[2]),
@@ -423,6 +441,8 @@ IntALU ialu1
     .OUT_branchIsJump(branchIsJump),
     .OUT_branchID(branchID),
     .OUT_branchSqN(branchProvs[1].sqN),
+    .OUT_branchLoadSqN(branchProvs[1].loadSqN),
+    .OUT_branchStoreSqN(branchProvs[1].storeSqN),
     
     .OUT_result(wbResult[1]),
     .OUT_tagDst(wbRegTag[1]),
@@ -457,6 +477,6 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
+assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
 
 endmodule

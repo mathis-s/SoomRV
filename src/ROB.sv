@@ -43,6 +43,7 @@ module ROB
 
 ROBEntry entries[LENGTH-1:0];
 reg[5:0] baseIndex;
+reg[31:0] committedInstrs;
 
 assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
@@ -83,6 +84,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH; i=i+1) begin
             OUT_comValid[i] <= 0;
         end
+        committedInstrs <= 0;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -107,6 +109,8 @@ always_ff@(posedge clk) begin
             for (i = LENGTH - WIDTH; i < LENGTH; i=i+1) begin
                 entries[i].valid <= 0;
             end
+            
+            committedInstrs <= committedInstrs + 2;
 
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_comNames[i] <= entries[i].name;
@@ -142,6 +146,7 @@ always_ff@(posedge clk) begin
             for (i = 1; i < WIDTH; i=i+1) begin
                 OUT_comValid[i] <= 0;
             end
+            committedInstrs <= committedInstrs + 2;
             // Blocking for proper insertion
             baseIndex = baseIndex + 1;
             

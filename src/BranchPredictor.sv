@@ -13,7 +13,7 @@ module BranchPredictor
 #(
     parameter NUM_IN=2,
     parameter NUM_ENTRIES=8,
-    parameter ID_BITS=4
+    parameter ID_BITS=6
 )
 (
     input wire clk,
@@ -53,7 +53,7 @@ always_comb begin
     OUT_isJump = 1'bx;
     OUT_branchSrc = 32'bx;
     OUT_branchDst = 32'bx;
-    OUT_branchID = 4'bx;
+    OUT_branchID = 6'bx;
     
     // TODO: Compare: Could also have the mux 2x (4x for final design) to extract 0,1,2,3 at the same time.
     // that would allow one-hot encoding and much faster readout.

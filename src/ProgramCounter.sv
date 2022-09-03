@@ -18,14 +18,14 @@ module ProgramCounter
     input wire IN_BP_isJump,
     input wire[31:0] IN_BP_branchSrc,
     input wire[31:0] IN_BP_branchDst,
-    input wire[3:0] IN_BP_branchID,
+    input wire[5:0] IN_BP_branchID,
     input wire IN_BP_multipleBranches,
 
     output wire[31:0] OUT_pcRaw,
 
     output reg[31:0] OUT_pc[NUM_UOPS-1:0],
     output reg[31:0] OUT_instr[NUM_UOPS-1:0],
-    output reg[3:0] OUT_branchID[NUM_UOPS-1:0],
+    output reg[5:0] OUT_branchID[NUM_UOPS-1:0],
     output reg OUT_branchPred[NUM_UOPS-1:0],
     output reg OUT_instrValid[NUM_UOPS-1:0]
 );
@@ -35,7 +35,7 @@ integer i;
 reg[30:0] pc;
 reg[30:0] pcLast;
 reg[1:0] bMaskLast;
-reg[3:0] bIndexLast[1:0];
+reg[5:0] bIndexLast[1:0];
 reg bPredLast[1:0];
 
 assign OUT_pcRaw = {pc, 1'b0};
@@ -75,7 +75,7 @@ always_ff@(posedge clk) begin
                     // Jump is second instr in bundle
                     if (IN_BP_branchSrc[2]) begin
                         bMaskLast <= 2'b11;
-                        bIndexLast[0] <= 15;
+                        bIndexLast[0] <= 63;
                         bIndexLast[1] <= IN_BP_branchID;
                         bPredLast[0] <= 0;
                         bPredLast[1] <= 1;
@@ -84,7 +84,7 @@ always_ff@(posedge clk) begin
                     else begin
                         bMaskLast <= 2'b01;
                         bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[1] <= 15;
+                        bIndexLast[1] <= 63;
                         bPredLast[0] <= 1;
                         bPredLast[1] <= 0;
                     end
@@ -113,12 +113,12 @@ always_ff@(posedge clk) begin
                     end
                     
                     if (IN_BP_branchSrc[2]) begin
-                        bIndexLast[0] <= 15;
+                        bIndexLast[0] <= 63;
                         bIndexLast[1] <= IN_BP_branchID;
                     end
                     else begin
                         bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[1] <= 15;
+                        bIndexLast[1] <= 63;
                     end
                     
                 end
@@ -130,8 +130,8 @@ always_ff@(posedge clk) begin
                 endcase
                 pcLast <= pc;
                 bMaskLast <= 2'b11;
-                bIndexLast[0] <= 15;
-                bIndexLast[1] <= 15;
+                bIndexLast[0] <= 63;
+                bIndexLast[1] <= 63;
                 bPredLast[0] <= 0;
                 bPredLast[1] <= 0;
             end

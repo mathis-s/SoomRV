@@ -29,7 +29,7 @@ module InstrDecoder
     input wire[31:0] IN_instr[NUM_UOPS-1:0],
     input wire IN_instrValid[NUM_UOPS-1:0],
     input wire IN_branchPred[NUM_UOPS-1:0],
-    input wire[3:0] IN_branchID[NUM_UOPS-1:0],
+    input wire[5:0] IN_branchID[NUM_UOPS-1:0],
 
     input wire[31:0] IN_pc[NUM_UOPS-1:0],
 

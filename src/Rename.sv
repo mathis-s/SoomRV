@@ -41,11 +41,15 @@ module Rename
     // Taken branch
     input wire IN_branchTaken,
     input wire[5:0] IN_branchSqN,
+    input wire[5:0] IN_branchLoadSqN,
+    input wire[5:0] IN_branchStoreSqN,
     input wire IN_mispredFlush,
     
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
     output R_UOp OUT_uop[WIDTH_UOPS-1:0],
-    output wire[5:0] OUT_nextSqN
+    output wire[5:0] OUT_nextSqN,
+    output wire[5:0] OUT_nextLoadSqN,
+    output wire[5:0] OUT_nextStoreSqN
 );
 
 TagBufEntry tags[63:0];
@@ -56,7 +60,11 @@ integer i;
 integer j;
 
 bit[5:0] counterSqN;
+bit[5:0] counterStoreSqN;
+bit[5:0] counterLoadSqN;
 assign OUT_nextSqN = counterSqN;
+assign OUT_nextLoadSqN = counterLoadSqN;
+assign OUT_nextStoreSqN = counterStoreSqN;
 
 reg temp;
 
@@ -117,6 +125,8 @@ always_ff@(posedge clk) begin
         end
         
         counterSqN = 0;
+        counterStoreSqN = 0;
+        counterLoadSqN = 0;
         
         // Registers initialized with tags 0..31
         for (i = 0; i < 32; i=i+1) begin
@@ -132,6 +142,9 @@ always_ff@(posedge clk) begin
     else if (IN_branchTaken) begin
         
         counterSqN = IN_branchSqN + 1;
+        counterLoadSqN = IN_branchLoadSqN;
+        counterStoreSqN = IN_branchStoreSqN;
+        
         for (i = 0; i < 32; i=i+1) begin
             if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
                 rat[i].avail <= 1;
@@ -170,6 +183,8 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             if (IN_uop[i].valid) begin
                 OUT_uop[i].sqN <= counterSqN;
+                OUT_uop[i].loadSqN <= counterLoadSqN;
+                OUT_uop[i].storeSqN <= counterStoreSqN;
                 // These are affected by previous instrs
                 OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
                 OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
@@ -204,6 +219,19 @@ always_ff@(posedge clk) begin
                     tags[newTags[i]].sqN <= counterSqN;
                 end
                 counterSqN = counterSqN + 1;
+                
+                if (IN_uop[i].fu == FU_LSU) begin
+                    
+                    if (IN_uop[i].opcode == LSU_SB ||
+                        IN_uop[i].opcode == LSU_SH ||
+                        IN_uop[i].opcode == LSU_SW)
+                        counterStoreSqN = counterStoreSqN + 1;
+                    else
+                        counterLoadSqN = counterLoadSqN + 1;
+                
+                end 
+                
+                
             end
             else
                 OUT_uopValid[i] <= 0;
