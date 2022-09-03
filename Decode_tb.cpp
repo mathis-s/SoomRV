@@ -81,8 +81,13 @@ int main(int argc, char** argv)
 
     // Run
 
-    // Instr addr is registered
+    // addresses is registered
     uint32_t instrAddrReg = 0;
+    uint32_t memAddrReg = 0;
+    uint32_t memDataReg = 0;
+    bool memWeReg = true;
+    bool memCeReg = true;
+    uint32_t memWmReg = 0;
     while (!Verilated::gotFinish())
     {
         if (top->OUT_halt)
@@ -101,45 +106,52 @@ int main(int argc, char** argv)
             }
 
             
-            index = top->OUT_MEM_addr;
+            index = memAddrReg;
             if (index >= 1024)
             {
                 printf("tried to access ram at %zx, terminating\n", index);
                 break;
             }
 
-            if (top->OUT_MEM_readEnable)
+            if (!memCeReg && memWeReg)
             {
                 //printf("read at %zu: %.8x\n", index, ram[index]);
                 top->IN_MEM_readData = ram[index];
             }
-            else if (top->OUT_MEM_writeEnable)
+            
+            if (!memCeReg && !memWeReg)
             {
-                //printf("write at %zu: %.8x\n", index, top->OUT_MEM_writeData);
+                //printf("write at %zu: %.8x\n", index, memDataReg);
                 if (index == 255)
                 {
-                    printf("%c", ((uint32_t)top->OUT_MEM_writeData) >> 24);
+                    printf("%c", (memDataReg) >> 24);
                     fflush(stdout);
                 }
 
-                if (top->OUT_MEM_writeMask == 0b1111)
-                    ram[index] = top->OUT_MEM_writeData;
+                if (memWmReg == 0b1111)
+                    ram[index] = memDataReg;
                 else
                 {
                     uint32_t word = ram[index];
                     for (int i = 0; i < 4; i++)
-                        if (top->OUT_MEM_writeMask & (1 << i))
+                        if (memWmReg & (1 << i))
                         {
                             uint32_t mask = (1 << (8 * i)) - 1;
                             if (i != 0)
                                 mask &= ~((1 << (8 * (i - 1))) - 1);
-                            word = (word & mask) | (top->OUT_MEM_writeData & ~mask);
+                            word = (word & mask) | (memDataReg & ~mask);
                         }
                     ram[index] = word;
                 }
             }
-
-
+            
+            
+            memAddrReg = top->OUT_MEM_addr;
+            memDataReg = top->OUT_MEM_writeData;
+            memWeReg = top->OUT_MEM_writeEnable;
+            memCeReg = top->OUT_MEM_readEnable;
+            memWmReg = top->OUT_MEM_writeMask;
+            
         }
 
         top->clk = !top->clk;

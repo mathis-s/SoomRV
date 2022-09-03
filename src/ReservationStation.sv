@@ -69,27 +69,27 @@ always_comb begin
                 if ((queue[j].availA ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagA) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagA) ||
-                        (IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
-                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA) ||
-                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
-                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
+                        //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
+                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA)// ||
+                        //(i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
+                        //(i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
                         ) && 
                         
                     (queue[j].availB ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagB) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagB) ||
-                        (IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
-                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB) ||
-                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
-                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
+                        //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
+                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB)// ||
+                        //(i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
+                        //(i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
                         ) &&
                         
                     // Second FU only gets simple int ops
                     (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
-                    
+                    //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
                     // Loads and Stores are issued in-order and non-speculatively for now
                     //(!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
-                    (!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
+                    //(!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
                     
                     // Branches only to FU 1
                     (!queueInfo[j].isJumpBranch || i == 1) &&

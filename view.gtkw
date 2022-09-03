@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Sat Sep  3 12:28:07 2022
+[*] Sat Sep  3 19:20:16 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Sat Sep  3 12:26:26 2022"
-[dumpfile_size] 702325394
+[dumpfile_mtime] "Sat Sep  3 19:15:01 2022"
+[dumpfile_size] 219519
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 5124102
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-5.140255 5124387 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-8.140255 780 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.bp.
@@ -124,6 +124,7 @@ TOP.Core.rv.queue[2].sqN[5:0]
 @28
 TOP.Core.rv.valid[3]
 TOP.Core.rv.queue[3].availA
+@29
 TOP.Core.rv.queue[3].availB
 @22
 TOP.Core.rv.queue[3].sqN[5:0]

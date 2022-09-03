@@ -9,7 +9,7 @@ module Core
 
     input wire[31:0] IN_MEM_readData,
     
-    output wire[31:0] OUT_MEM_addr,
+    output wire[29:0] OUT_MEM_addr,
     output wire[31:0] OUT_MEM_writeData,
     output wire OUT_MEM_writeEnable,
     output wire OUT_MEM_readEnable,
@@ -373,19 +373,21 @@ LSU lsu
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
     
-    .IN_MEM_readData(IN_MEM_readData),
-    .OUT_MEM_addr(OUT_MEM_addr),
-    .OUT_MEM_writeData(OUT_MEM_writeData),
-    .OUT_MEM_writeEnable(OUT_MEM_writeEnable),
-    .OUT_MEM_writeMask(OUT_MEM_writeMask),
-    .OUT_MEM_readEnable(OUT_MEM_readEnable),
+    .OUT_SQ_valid(SQ_valid[0]),
+    .OUT_SQ_isLoad(SQ_isLoad[0]),
+    .OUT_SQ_addr(SQ_addr[0]),
+    .OUT_SQ_data(SQ_data[0]),
+    .OUT_SQ_wmask(SQ_wmask[0]),
+    .OUT_SQ_sqN(SQ_sqN[0]),
+    .OUT_SQ_storeSqN(SQ_storeSqN[0]),
+        
+    .IN_readData(SQ_readData[0]),
     
     .OUT_LB_valid(LB_valid[0]),
     .OUT_LB_isLoad(LB_isLoad[0]),
     .OUT_LB_addr(LB_addr[0]),
     .OUT_LB_sqN(LB_sqN[0]),
     .OUT_LB_loadSqN(LB_loadSqN[0]),
-    .OUT_LB_storeSqN(),
     .IN_LB_mispred(LB_mispred[0]),
     
     .OUT_branchProv(branchProvs[2]),
@@ -395,6 +397,45 @@ LSU lsu
     .OUT_valid(LSU_uopValid),
     .OUT_uop(LSU_uop)
 );
+
+wire[31:0] SQ_readData[0:0];
+wire SQ_valid[0:0];
+wire SQ_isLoad[0:0];
+wire[29:0] SQ_addr[0:0];
+wire[31:0] SQ_data[0:0];
+wire[3:0] SQ_wmask[0:0];
+wire[5:0] SQ_sqN[0:0];
+wire[5:0] SQ_storeSqN[0:0];
+wire[5:0] SQ_maxStoreSqN;
+
+StoreQueue sq
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_valid(SQ_valid),
+    .IN_isLoad(SQ_isLoad),
+    .IN_addr(SQ_addr),
+    .IN_data(SQ_data),
+    .IN_wmask(SQ_wmask),
+    .IN_sqN(SQ_sqN),
+    .IN_storeSqN(SQ_storeSqN),
+    
+    .IN_curSqN(ROB_curSqN),
+    
+    .IN_branch(branch),
+    .IN_MEM_data('{IN_MEM_readData}),
+    .OUT_MEM_addr('{OUT_MEM_addr}),
+    .OUT_MEM_data('{OUT_MEM_writeData}),
+    .OUT_MEM_we('{OUT_MEM_writeEnable}),
+    .OUT_MEM_ce('{OUT_MEM_readEnable}),
+    .OUT_MEM_wm('{OUT_MEM_writeMask}),
+    
+    .OUT_data(SQ_readData),
+    .OUT_maxStoreSqN(SQ_maxStoreSqN)
+    
+);
+
 assign wbRegNm[0] = !LSU_uopValid ? 
     INT_resName :
     LSU_uop.nmDst;
@@ -477,6 +518,10 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && !branch.taken;
+assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && 
+    ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
+    ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
+    ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && 
+    !branch.taken;
 
 endmodule
