@@ -149,8 +149,8 @@ always_ff@(posedge clk) begin
             end
             
             // TODO: is this even possible?
-            if ($signed(baseIndex - IN_branch.storeSqN) > 0)
-                baseIndex = IN_branch.storeSqN;
+            //if ($signed(baseIndex - IN_branch.storeSqN) > 0)
+            //    baseIndex = IN_branch.storeSqN;
         end
     
         // Enqueue

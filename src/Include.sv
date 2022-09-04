@@ -116,8 +116,6 @@ typedef struct packed
 {
     logic[31:0] srcA;
     logic[31:0] srcB;
-    logic zcFwdSrcA;
-    logic zcFwdSrcB;
     logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;

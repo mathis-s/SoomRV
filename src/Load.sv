@@ -2,7 +2,8 @@ module Load
 #(
     parameter NUM_UOPS=2,
     parameter NUM_WBS=2,
-    parameter NUM_XUS=4
+    parameter NUM_XUS=4,
+    parameter NUM_ZC_FWDS=2
 )
 (
     input wire clk,
@@ -21,7 +22,12 @@ module Load
     
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
-
+    
+    // Zero cycle forward inputs
+    input wire[31:0] IN_zcFwdResult[NUM_ZC_FWDS-1:0],
+    input wire[5:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
+    input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
+    
     // Register File read
     output reg OUT_rfReadValid[2*NUM_UOPS-1:0],
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
@@ -62,30 +68,30 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
                 
-                OUT_uop[i].zcFwdSrcB <= 0;
-                
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 
                 OUT_uop[i].valid <= 1;
 
                 // Some instructions just use the pc as an operand.             
                 if (IN_uop[i].pcA) begin
-                    OUT_uop[i].zcFwdSrcA <= 0;
                     OUT_uop[i].srcA <= IN_uop[i].pc;
-                    
-                end
-                // Zero-Cycle forward for INT fu's
-                else if (OUT_uop[i].valid && OUT_uop[i].nmDst != 0 && IN_uop[i].tagA == OUT_uop[i].tagDst && OUT_funcUnit[i] == FU_INT && IN_uop[i].fu == FU_INT) begin
-                    OUT_uop[i].zcFwdSrcA <= 1;
-                    OUT_uop[i].srcA = 32'bx;
-                end                
+                end              
                 else begin 
                     reg found = 0;
-                    OUT_uop[i].zcFwdSrcA <= 0;
+                    
+                    // Try to forward from wbs
                     for (j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: ignore contention here instead of handling it.
-                        if (!found && IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
+                        // TODO: one-hot
+                        if (IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
                             OUT_uop[i].srcA <= IN_wbResult[j];
+                            found = 1;
+                        end
+                    end
+                    
+                    // Try to forward zero cycle (TODO: one hot too)
+                    for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagA) begin
+                            OUT_uop[i].srcA <= IN_zcFwdResult[j];
                             found = 1;
                         end
                     end
@@ -96,21 +102,22 @@ always_ff@(posedge clk) begin
                 end
                 
                 if (IN_uop[i].immB) begin
-                    OUT_uop[i].zcFwdSrcB <= 0;
                     OUT_uop[i].srcB <= IN_uop[i].imm;
-                end
-                // Zero-Cycle forward for INT fu's
-                else if (OUT_uop[i].valid && OUT_uop[i].nmDst != 0 && IN_uop[i].tagB == OUT_uop[i].tagDst && OUT_funcUnit[i] == FU_INT && IN_uop[i].fu == FU_INT) begin
-                    OUT_uop[i].zcFwdSrcB <= 1;
-                    OUT_uop[i].srcB = 32'bx;
                 end
                 else begin
                     reg found = 0;
-                    OUT_uop[i].zcFwdSrcB <= 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: ignore contention here instead of handling it.
-                        if (!found && IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
+                        // TODO: one-hot
+                        if (IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
                             OUT_uop[i].srcB <= IN_wbResult[j];
+                            found = 1;
+                        end
+                    end
+                    
+                    // Try to forward zero cycle (TODO: one hot too)
+                    for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagB) begin
+                            OUT_uop[i].srcB <= IN_zcFwdResult[j];
                             found = 1;
                         end
                     end

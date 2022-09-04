@@ -242,6 +242,7 @@ ReservationStation rv
     
     .IN_resultValid(wbHasResult),
     .IN_resultTag(wbRegTag),
+    .IN_resultSqN(wbRegSqN),
 
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -274,6 +275,10 @@ RF rf
 EX_UOp LD_uop[NUM_UOPS-1:0];
 wire[3:0] enabledXUs[NUM_UOPS-1:0];
 FuncUnit LD_fu[NUM_UOPS-1:0];
+
+wire[31:0] LD_zcFwdResult[1:0];
+wire[5:0] LD_zcFwdTag[1:0];
+wire LD_zcFwdValid[1:0];
 Load ld
 (
     .clk(clk),
@@ -287,6 +292,10 @@ Load ld
     .IN_wbResult(wbResult),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
+    
+    .IN_zcFwdResult(LD_zcFwdResult),
+    .IN_zcFwdTag(LD_zcFwdTag),
+    .IN_zcFwdValid(LD_zcFwdValid),
 
     .OUT_rfReadValid(RF_readEnable),
     .OUT_rfReadAddr(RF_readAddress),
@@ -327,6 +336,10 @@ IntALU ialu
     .OUT_branchSqN(branchProvs[0].sqN),
     .OUT_branchLoadSqN(branchProvs[0].loadSqN),
     .OUT_branchStoreSqN(branchProvs[0].storeSqN),
+    
+    .OUT_zcFwdResult(LD_zcFwdResult[0]),
+    .OUT_zcFwdTag(LD_zcFwdTag[0]),
+    .OUT_zcFwdValid(LD_zcFwdValid[0]),
     
     .OUT_result(INT_result),
     .OUT_tagDst(INT_resTag),
@@ -484,6 +497,10 @@ IntALU ialu1
     .OUT_branchSqN(branchProvs[1].sqN),
     .OUT_branchLoadSqN(branchProvs[1].loadSqN),
     .OUT_branchStoreSqN(branchProvs[1].storeSqN),
+    
+    .OUT_zcFwdResult(LD_zcFwdResult[1]),
+    .OUT_zcFwdTag(LD_zcFwdTag[1]),
+    .OUT_zcFwdValid(LD_zcFwdValid[1]),
     
     .OUT_result(wbResult[1]),
     .OUT_tagDst(wbRegTag[1]),

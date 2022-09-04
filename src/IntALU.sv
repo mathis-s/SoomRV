@@ -22,6 +22,10 @@ module IntALU
     output reg[5:0] OUT_branchSqN,
     output reg[5:0] OUT_branchLoadSqN,
     output reg[5:0] OUT_branchStoreSqN,
+    
+    output wire[31:0] OUT_zcFwdResult,
+    output wire[5:0] OUT_zcFwdTag,
+    output wire OUT_zcFwdValid,
 
     output reg[31:0] OUT_result,
     output reg[5:0] OUT_tagDst,
@@ -30,14 +34,19 @@ module IntALU
     output Flags OUT_flags
 );
 
-wire[31:0] srcA =  IN_uop.zcFwdSrcA ? OUT_result : IN_uop.srcA;
-wire[31:0] srcB =  IN_uop.zcFwdSrcB ? OUT_result : IN_uop.srcB;
-wire[31:0] imm =  IN_uop.imm;
+wire[31:0] srcA = IN_uop.srcA;
+wire[31:0] srcB = IN_uop.srcB;
+wire[31:0] imm = IN_uop.imm;
 
 assign OUT_wbReq = IN_uop.valid && en;
 
 reg[31:0] resC;
 Flags flags;
+
+assign OUT_zcFwdResult = resC;
+assign OUT_zcFwdTag = IN_uop.tagDst;
+// maybe invalidate?
+assign OUT_zcFwdValid = IN_uop.valid && en && IN_uop.nmDst != 0;//&& !IN_wbStall;
 
 always_comb begin
     // optimize this depending on how good of a job synthesis does

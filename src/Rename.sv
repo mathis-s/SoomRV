@@ -48,8 +48,8 @@ module Rename
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
     output R_UOp OUT_uop[WIDTH_UOPS-1:0],
     output wire[5:0] OUT_nextSqN,
-    output wire[5:0] OUT_nextLoadSqN,
-    output wire[5:0] OUT_nextStoreSqN
+    output reg[5:0] OUT_nextLoadSqN,
+    output reg[5:0] OUT_nextStoreSqN
 );
 
 TagBufEntry tags[63:0];
@@ -63,8 +63,6 @@ bit[5:0] counterSqN;
 bit[5:0] counterStoreSqN;
 bit[5:0] counterLoadSqN;
 assign OUT_nextSqN = counterSqN;
-assign OUT_nextLoadSqN = counterLoadSqN;
-assign OUT_nextStoreSqN = counterStoreSqN;
 
 reg temp;
 
@@ -125,7 +123,7 @@ always_ff@(posedge clk) begin
         end
         
         counterSqN = 0;
-        counterStoreSqN = 0;
+        counterStoreSqN = 63;
         counterLoadSqN = 0;
         
         // Registers initialized with tags 0..31
@@ -182,8 +180,19 @@ always_ff@(posedge clk) begin
         // Set seqnum/tags for next instruction(s)
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             if (IN_uop[i].valid) begin
-                OUT_uop[i].sqN <= counterSqN;
+                
                 OUT_uop[i].loadSqN <= counterLoadSqN;
+                
+                if (IN_uop[i].fu == FU_LSU) begin
+                    if (IN_uop[i].opcode == LSU_SB ||
+                        IN_uop[i].opcode == LSU_SH ||
+                        IN_uop[i].opcode == LSU_SW)
+                        counterStoreSqN = counterStoreSqN + 1;
+                    else
+                        counterLoadSqN = counterLoadSqN + 1;
+                end
+                
+                OUT_uop[i].sqN <= counterSqN;
                 OUT_uop[i].storeSqN <= counterStoreSqN;
                 // These are affected by previous instrs
                 OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
@@ -219,17 +228,6 @@ always_ff@(posedge clk) begin
                     tags[newTags[i]].sqN <= counterSqN;
                 end
                 counterSqN = counterSqN + 1;
-                
-                if (IN_uop[i].fu == FU_LSU) begin
-                    
-                    if (IN_uop[i].opcode == LSU_SB ||
-                        IN_uop[i].opcode == LSU_SH ||
-                        IN_uop[i].opcode == LSU_SW)
-                        counterStoreSqN = counterStoreSqN + 1;
-                    else
-                        counterLoadSqN = counterLoadSqN + 1;
-                
-                end 
                 
                 
             end
@@ -293,9 +291,11 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-            
         end
     end
+    
+    OUT_nextLoadSqN <= counterLoadSqN;
+    OUT_nextStoreSqN <= counterStoreSqN + 1;
 
     
 end

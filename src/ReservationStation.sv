@@ -3,6 +3,8 @@ typedef struct packed
     logic isJumpBranch;
     logic isStore;
     logic isLoad;
+    logic preValid;
+    logic valid;
 } UOpInfo;
 
 module ReservationStation
@@ -28,6 +30,7 @@ module ReservationStation
     
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
+    input wire[5:0] IN_resultSqN[RESULT_BUS_COUNT-1:0],
 
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -49,8 +52,6 @@ reg[4:0] freeEntries;
 R_UOp queue[QUEUE_SIZE-1:0];
 UOpInfo queueInfo[QUEUE_SIZE-1:0];
 
-reg valid[QUEUE_SIZE-1:0];
-
 reg enqValid;
 
 reg[2:0] deqIndex[NUM_UOPS-1:0];
@@ -64,24 +65,24 @@ always_comb begin
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
             
-            if (valid[j] && (!deqValid[1] || deqIndex[1] != j[2:0])) begin
+            if (queueInfo[j].valid && (!deqValid[1] || deqIndex[1] != j[2:0])) begin
                 
                 if ((queue[j].availA ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagA) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagA) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
-                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA)// ||
-                        //(i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
-                        //(i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
+                        //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA) ||
+                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && /*queue[j].fu == FU_INT &&*/ OUT_uop[0].fu == FU_INT) ||
+                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && /*queue[j].fu == FU_INT &&*/ OUT_uop[1].fu == FU_INT)
                         ) && 
                         
                     (queue[j].availB ||
                         (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagB) ||
                         (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagB) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
-                        (IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB)// ||
-                        //(i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[0].fu == FU_INT) ||
-                        //(i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && queue[j].fu == FU_INT && OUT_uop[1].fu == FU_INT)
+                        //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB) ||
+                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && /*queue[j].fu == FU_INT &&*/ OUT_uop[0].fu == FU_INT) ||
+                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && /*queue[j].fu == FU_INT &&*/ OUT_uop[1].fu == FU_INT)
                         ) &&
                         
                     // Second FU only gets simple int ops
@@ -108,7 +109,9 @@ always_ff@(posedge clk) begin
     if (!rst) begin
         // Get relevant results from common data buses
         for (i = 0; i < RESULT_BUS_COUNT; i=i+1) 
-            if (IN_resultValid[i]) begin
+            // NOTE: invalidate not required here. If an op depends on an invalid op, it must come after the invalid op,
+            // and as such will be deleted anyways.
+            if (IN_resultValid[i]/* && (!IN_invalidate || $signed(IN_invalidateSqN - IN_resultSqN[i]) >= 0)*/) begin
                 for (j = 0; j < QUEUE_SIZE; j=j+1) begin
                     if (queue[j].availA == 0 && queue[j].tagA == IN_resultTag[i]) begin
                         queue[j].availA <= 1;
@@ -119,25 +122,44 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
+        
+        // Some results can be forwarded
+        for (i = 0; i < NUM_UOPS; i=i+1) begin
+            if (OUT_valid[i] && OUT_uop[i].nmDst != 0/* &&
+                (!IN_invalidate || $signed(IN_invalidateSqN - OUT_uop[i].sqN) >= 0)*/ &&
+                OUT_uop[i].fu == FU_INT) begin
+                for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+                    if (queue[j].availA == 0 && queue[j].tagA == OUT_uop[i].tagDst) begin
+                        queue[j].availA <= 1;
+                    end
+
+                    if (queue[j].availB == 0 && queue[j].tagB == OUT_uop[i].tagDst) begin
+                        queue[j].availB <= 1;
+                    end
+                end
+            end
+        end
+        
     end
     
     if (rst) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
-            valid[i] <= 0;
+            queueInfo[i].valid <= 0;
         end
         freeEntries = 8;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
             if ($signed(queue[i].sqN - IN_invalidateSqN) > 0) begin
-                valid[i] <= 0;
-                if (valid[i])
+                queueInfo[i].valid <= 0;
+                if (queueInfo[i].valid)
                     freeEntries = freeEntries + 1;
             end
         end
         
-        for (i = 0; i < QUEUE_SIZE; i=i+1)
-            OUT_valid[i] <= 0;
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            if ($signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)
+                OUT_valid[i] <= 0;
     end
     else begin
         // issue uops
@@ -145,25 +167,22 @@ always_ff@(posedge clk) begin
             if (!IN_wbStall[i]) begin
                 if (deqValid[i]) begin
                     OUT_uop[i] <= queue[deqIndex[i]];
-                    if ((queue[deqIndex[i]].fu == FU_LSU) && 
-                        (queue[deqIndex[i]].opcode == LSU_SB || 
-                            queue[deqIndex[i]].opcode == LSU_SH || queue[deqIndex[i]].opcode == LSU_SW)) begin
-                    end
                     freeEntries = freeEntries + 1;
+                    OUT_valid[i] <= 1;
+                    queueInfo[deqIndex[i]].valid = 0;
                 end
-                OUT_valid[i] <= deqValid[i];
+                else 
+                    OUT_valid[i] <= 0;
             end
         end
-        for (i = 0; i < NUM_UOPS; i=i+1)
-            if (!IN_wbStall[i] && deqValid[i])
-                valid[deqIndex[i]] = 0;
+                
 
         // enqueue new uop
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             if (frontEn && IN_uopValid[i]) begin
                 enqValid = 0;
                 for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                    if (enqValid == 0 && !valid[j]) begin
+                    if (enqValid == 0 && !queueInfo[j].valid) begin
                         R_UOp temp = IN_uop[i];
 
                         for (k = 0; k < RESULT_BUS_COUNT; k=k+1) begin
@@ -199,7 +218,7 @@ always_ff@(posedge clk) begin
                         queueInfo[j].isLoad <= (temp.fu == FU_LSU) && (temp.opcode == LSU_LB || temp.opcode == LSU_LH ||
                             temp.opcode == LSU_LW || temp.opcode == LSU_LBU || temp.opcode == LSU_LHU);
                     
-                        valid[j] = 1;
+                        queueInfo[j].valid = 1;
                         enqValid = 1;
                     end
                 end
