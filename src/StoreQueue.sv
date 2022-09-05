@@ -74,6 +74,7 @@ always_comb begin
     
     for (i = 0; i < NUM_PORTS; i=i+1) begin
         if (!rst && IN_valid[i] && IN_isLoad[i] && (!IN_branch.taken || $signed(IN_sqN[i] - IN_branch.sqN) <= 0)) begin
+            OUT_MEM_data[i] = 32'bx;
             OUT_MEM_addr[i] = IN_addr[i];
             OUT_MEM_we[i] = 1;
             OUT_MEM_wm[i] = 4'bx;
@@ -144,7 +145,7 @@ always_ff@(posedge clk) begin
         // Invalidate
         else if (IN_branch.taken) begin
             for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if (entries[i].valid && $signed(entries[i].sqN - IN_branch.sqN) > 0)
+                if ($signed(entries[i].sqN - IN_branch.sqN) > 0)
                     entries[i].valid <= 0;
             end
             

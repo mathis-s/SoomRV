@@ -21,7 +21,7 @@ module ProgramCounter
     input wire[5:0] IN_BP_branchID,
     input wire IN_BP_multipleBranches,
 
-    output wire[31:0] OUT_pcRaw,
+    output reg[31:0] OUT_pcRaw,
 
     output reg[31:0] OUT_pc[NUM_UOPS-1:0],
     output reg[31:0] OUT_instr[NUM_UOPS-1:0],

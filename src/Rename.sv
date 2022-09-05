@@ -52,7 +52,6 @@ module Rename
 );
 
 TagBufEntry tags[63:0];
-TagBufEntry tag0Dbg = tags[0];
 
 RATEntry rat[31:0];
 integer i;

@@ -22,6 +22,8 @@ module Core
 
 integer i;
 
+wire dbgIsPrint = OUT_MEM_addr == 255;
+
 RES_UOp wbUOp[NUM_UOPS-1:0];
 
 wire wbHasResult[NUM_UOPS-1:0];
@@ -37,13 +39,29 @@ wire frontendEn;
 
 // IF -> DE -> RN
 reg[3:0] stateValid;
-assign OUT_instrReadEnable = frontendEn && stateValid[0];
+assign OUT_instrReadEnable = !(frontendEn && stateValid[0]);
+
+// 
+reg[63:0] instrRawBackup;
+reg useInstrRawBackup;
+always_ff@(posedge clk) begin
+    if (rst)
+        useInstrRawBackup <= 0;
+    else if (!(frontendEn && stateValid[0])) begin
+        instrRawBackup <= instrRaw;
+        useInstrRawBackup <= 1;
+    end
+    else
+        useInstrRawBackup <= 0;
+end
+wire[63:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
+
 
 BranchProv branchProvs[2:0];
 BranchProv branch;
 always_comb begin
     branch.taken = 0;
-    branch.sqN = 0;
+    branch = 0;
     for (i = 0; i < 3; i=i+1) begin
         if (branchProvs[i].taken && (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0)) begin
             branch.taken = 1;
@@ -85,7 +103,7 @@ ProgramCounter progCnt
     .rst(rst),
     .IN_pc(branch.dstPC),
     .IN_write(branch.taken),
-    .IN_instr(IN_instrRaw),
+    .IN_instr(instrRaw),
     
     .IN_BP_branchTaken(BP_branchTaken),
     .IN_BP_isJump(BP_isJump),
@@ -221,13 +239,13 @@ ReservationStation rv
     .rst(rst),
     .frontEn(stateValid[3] && frontendEn),
 
-    .IN_wbStall('{0, wbStall}),
+    .IN_wbStall('{1'b0, wbStall}),
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     
     .IN_LD_fu(LD_fu),
     .IN_LD_uop(LD_uop),
-    .IN_LD_wbStall('{0, wbStall}),
+    .IN_LD_wbStall('{1'b0, wbStall}),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
@@ -278,7 +296,7 @@ Load ld
 (
     .clk(clk),
     .rst(rst),
-    .IN_wbStall('{0, wbStall}),
+    .IN_wbStall('{1'b0, wbStall}),
     .IN_uopValid(RV_uopValid),
     .IN_uop(RV_uop),
     

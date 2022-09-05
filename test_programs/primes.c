@@ -35,12 +35,13 @@ static void printhex (uint32_t num)
     
     /*for (int i = 7; i >= 0; i--)
     {
-        uint32_t c = (num >> (i << 2)) & 0xff;
+        uint32_t c = (num >> (i << 2)) & 0xf;
         if (c <= 9)
-            *out = c | '0';
+            *out = c + '0';
         else
-            *out = c | 'a';
-    }*/
+            *out = c + 'a' - 10;
+    }
+    *out = '\n';*/
 }
 
 int main ()

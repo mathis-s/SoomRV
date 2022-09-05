@@ -61,6 +61,15 @@ always_comb begin
         INT_JALR,
         INT_JAL: resC = srcA + 4;
         INT_SYS: resC = 0;
+        INT_SH1ADD: resC = srcB + (srcA << 1);
+        INT_SH2ADD: resC = srcB + (srcA << 2);
+        INT_SH3ADD: resC = srcB + (srcA << 3);
+        INT_ANDN: resC = srcA & (~srcB);
+        INT_ORN: resC = srcA | (~srcB);
+        INT_XNOR: resC = srcA ^ (~srcB);
+        INT_SE_B: resC = {{24{srcA[7]}}, srcA[7:0]};
+        INT_SE_H: resC = {{16{srcA[15]}}, srcA[15:0]};
+        INT_ZE_H: resC = {16'b0, srcA[15:0]};
         default: resC = 'bx;
     endcase
     

@@ -10,6 +10,7 @@
 `define OPC_REG_IMM 7'b0010011
 `define OPC_REG_REG 7'b0110011
 `define OPC_ENV 7'b1110011
+`define OPC_BITM 7'b0110011
 
 typedef struct packed
 {
@@ -46,7 +47,8 @@ always_comb begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         instr = IN_instr[i];
-        // TODO write x to uop here?
+        uop = 97'bx;
+        invalidEnc = 1;
         uop.pc = IN_pc[i];
         uop.valid = IN_instrValid[i];
         uop.branchID = IN_branchID[i];
@@ -195,6 +197,75 @@ always_comb begin
                     6: uop.opcode = INT_OR;
                     7: uop.opcode = INT_AND;
                 endcase
+                
+                if (instr.funct7 == 7'b0110000) begin
+                    if (instr.funct3 == 3'b001) begin
+                        if (instr.rs1 == 5'b00000) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_CLZ;
+                        end
+                        else if (instr.rs1 == 5'b00001) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_CTZ;
+                        end
+                        else if (instr.rs1 == 5'b00010) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_CPOP;
+                        end
+                        else if (instr.rs1 == 5'b00100) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_SE_B;
+                        end
+                        else if (instr.rs1 == 5'b00101) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_SE_H;
+                        end
+                        else if (instr.rs1 == 5'b00101) begin
+                            invalidEnc = 0;
+                            uop.opcode = INT_ZE_H;
+                        end
+                    end
+                    else if (instr.funct3 == 3'b101) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_ROR;
+                        uop.imm = {27'b0, instr.rs1};
+                    end
+                end
+                else if (instr[31:20] == 12'b001010000111 && instr.funct3 == 3'b101) begin
+                    invalidEnc = 0;
+                    uop.opcode = INT_ORC_B;
+                end
+                else if (instr[31:20] == 12'b011010011000 && instr.funct3 == 3'b101) begin
+                    invalidEnc = 0;
+                    uop.opcode = INT_ORC_B;
+                end
+                if (instr.funct7 == 7'b0100100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BCLR;
+                        uop.imm = {27'b0, instr.rs1};
+                    end
+                    else if (instr.funct3 == 3'b101) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BEXT;
+                        uop.imm = {27'b0, instr.rs1};
+                    end
+                end
+                else if (instr.funct7 == 7'b0110100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BINV;
+                        uop.imm = {27'b0, instr.rs1};
+                    end
+                end
+                else if (instr.funct7 == 7'b0010100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BSET;
+                        uop.imm = {27'b0, instr.rs1};
+                    end
+                end
+                
             end
             `OPC_REG_REG: begin
                 uop.rs0 = instr.rs0;
@@ -202,9 +273,10 @@ always_comb begin
                 uop.pcA = 0;
                 uop.immB = 0;
                 uop.rd = instr.rd;
+                uop.fu = FU_INT;
+                
                 if (instr.funct7 == 0) begin
                     invalidEnc = 0;
-                    uop.fu = FU_INT;
                     case (instr.funct3)
                         0: uop.opcode = INT_ADD;
                         1: uop.opcode = INT_SLL;
@@ -241,12 +313,113 @@ always_comb begin
                         5: uop.opcode = INT_SRA;
                     endcase
                 end
-                else
-                    invalidEnc = 1;
+                
+                if (instr.funct7 == 7'b0010000) begin
+                    if (instr.funct3 == 3'b010) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_SH1ADD;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b100) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_SH2ADD;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b110) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_SH3ADD;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0100000) begin
+                    if (instr.funct3 == 3'b111) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_ANDN;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b110) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_ORN;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b100) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_XNOR;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0000101) begin
+                    if (instr.funct3 == 3'b110) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_MAX;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b111) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_MAXU;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b100) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_MIN;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b101) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_MINU;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0000100 && instr.rs1 == 0 && instr.funct3 == 3'b100) begin
+                    // NOTE: differenct encoding in rv64!
+                    invalidEnc = 0;
+                    uop.rs1 = 0;
+                    uop.opcode = INT_ZE_H;
+                end
+                else if (instr.funct7 == 7'b0110000) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_ROL;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b101) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_ROR;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0100100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BCLR;
+                        uop.fu = FU_INT;
+                    end
+                    else if (instr.funct3 == 3'b101) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BEXT;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0110100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BINV;
+                        uop.fu = FU_INT;
+                    end
+                end
+                else if (instr.funct7 == 7'b0010100) begin
+                    if (instr.funct3 == 3'b001) begin
+                        invalidEnc = 0;
+                        uop.opcode = INT_BSET;
+                        uop.fu = FU_INT;
+                    end
+                end
             end
+                
             default: invalidEnc = 1;
         endcase
         if (invalidEnc) begin
+            uop = 97'bx;
             uop.opcode = INT_UNDEFINED;
             uop.fu = FU_INT;
         end

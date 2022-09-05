@@ -22,7 +22,31 @@ typedef enum logic[5:0]
     INT_JAL,
     INT_JALR,
     INT_SYS,
-    INT_UNDEFINED
+    INT_UNDEFINED,
+    INT_SH1ADD,
+    INT_SH2ADD,
+    INT_SH3ADD,
+    INT_XNOR,
+    INT_ANDN,
+    INT_ORN,
+    INT_CLZ,
+    INT_CTZ,
+    INT_CPOP,
+    INT_MAX,
+    INT_MAXU,
+    INT_MIN,
+    INT_MINU,
+    INT_SE_B,
+    INT_SE_H,
+    INT_ZE_H,
+    INT_ROL,
+    INT_ROR,
+    INT_ORC_B,
+    INT_REV8,
+    INT_BCLR,
+    INT_BEXT,
+    INT_BINV,
+    INT_BSET
 } OPCode_INT;
 
 typedef enum logic[5:0]

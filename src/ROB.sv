@@ -89,8 +89,8 @@ always_ff@(posedge clk) begin
                 entries[i].valid <= 0;
             end
         end
-        if ($signed(baseIndex - IN_invalidateSqN) > 0)
-            baseIndex = IN_invalidateSqN;
+        //if ($signed(baseIndex - IN_invalidateSqN) > 0)
+        //    baseIndex = IN_invalidateSqN;
     end
     
     if (!rst) begin

@@ -31,7 +31,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    system((std::string("riscv32-unknown-elf-as -o temp.o ") + std::string(argv[1])).c_str());
+    system((std::string("riscv32-unknown-elf-as -march=rv32idzba_zbb -o temp.o ") + std::string(argv[1])).c_str());
     system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
@@ -85,6 +85,7 @@ int main(int argc, char** argv)
     uint32_t instrAddrReg = 0;
     uint32_t memAddrReg = 0;
     uint32_t memDataReg = 0;
+    bool instrCeReg = true;
     bool memWeReg = true;
     bool memCeReg = true;
     uint32_t memWmReg = 0;
@@ -96,13 +97,12 @@ int main(int argc, char** argv)
         if (top->clk == 0)
         {
             size_t index;
-            if (top->OUT_instrReadEnable)
+            if (!instrCeReg)
             {
                 index = instrAddrReg * 2;
                 if (index >= 1023)
                     index = 0;
                 top->IN_instrRaw = ((uint64_t)ram[index] | (((uint64_t)ram[index + 1]) << 32));
-                instrAddrReg = top->OUT_instrAddr;
             }
 
             
@@ -152,6 +152,8 @@ int main(int argc, char** argv)
             memWeReg = top->OUT_MEM_writeEnable;
             memCeReg = top->OUT_MEM_readEnable;
             memWmReg = top->OUT_MEM_writeMask;
+            instrCeReg = top->OUT_instrReadEnable;
+            instrAddrReg = top->OUT_instrAddr;
             
         }
 
