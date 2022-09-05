@@ -16,9 +16,8 @@ module Load
     input R_UOp IN_uop[NUM_UOPS-1:0],
 
     // Writeback Port (snoop) read
-    input wire IN_wbValid[NUM_WBS-1:0],
-    input wire[5:0] IN_wbTag[NUM_WBS-1:0],
-    input wire[31:0] IN_wbResult[NUM_WBS-1:0],
+    input wire IN_wbHasResult[NUM_WBS-1:0],
+    input RES_UOp IN_wbUOp[NUM_WBS-1:0],
     
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -82,8 +81,8 @@ always_ff@(posedge clk) begin
                     // Try to forward from wbs
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
-                        if (IN_wbValid[j] && IN_uop[i].tagA == IN_wbTag[j]) begin
-                            OUT_uop[i].srcA <= IN_wbResult[j];
+                        if (IN_wbHasResult[j] && IN_uop[i].tagA == IN_wbUOp[j].tagDst) begin
+                            OUT_uop[i].srcA <= IN_wbUOp[j].result;
                             found = 1;
                         end
                     end
@@ -108,8 +107,8 @@ always_ff@(posedge clk) begin
                     reg found = 0;
                     for (j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
-                        if (IN_wbValid[j] && IN_uop[i].tagB == IN_wbTag[j]) begin
-                            OUT_uop[i].srcB <= IN_wbResult[j];
+                        if (IN_wbHasResult[j] && IN_uop[i].tagB == IN_wbUOp[j].tagDst) begin
+                            OUT_uop[i].srcB <= IN_wbUOp[j].result;
                             found = 1;
                         end
                     end

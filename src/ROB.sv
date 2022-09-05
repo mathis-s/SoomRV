@@ -6,6 +6,7 @@ typedef struct packed
     bit[5:0] tag;
     // for debugging
     bit[5:0] sqN;
+    bit[29:0] pc;
     bit[4:0] name;
 } ROBEntry;
 
@@ -13,7 +14,7 @@ module ROB
 #(
     // how many entries, ie how many instructions can we
     // speculatively execute?
-    parameter LENGTH = 16,
+    parameter LENGTH = 30,
     // how many ops are en/dequeued per cycle?
     parameter WIDTH = 2
 )
@@ -21,11 +22,7 @@ module ROB
     input wire clk,
     input wire rst,
 
-    input wire IN_valid[WIDTH-1:0],
-    input wire[5:0] IN_tags[WIDTH-1:0],
-    input wire[4:0] IN_names[WIDTH-1:0],
-    input wire[5:0] IN_sqNs[WIDTH-1:0],
-    input wire IN_flags[WIDTH-1:0],
+    input RES_UOp IN_uop[WIDTH-1:0],
 
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -146,21 +143,9 @@ always_ff@(posedge clk) begin
             for (i = 1; i < WIDTH; i=i+1) begin
                 OUT_comValid[i] <= 0;
             end
-            committedInstrs <= committedInstrs + 2;
+            committedInstrs <= committedInstrs + 1;
             // Blocking for proper insertion
             baseIndex = baseIndex + 1;
-            
-            /*OUT_comNames[0] <= entries[0].name;
-            OUT_comTags[0] <= entries[0].tag;
-            OUT_comSqNs[0] <= baseIndex;
-            OUT_comValid[0] <= 1;
-            
-            entries[0].valid <= 0;
-            
-            for (i = 1; i < WIDTH; i=i+1)
-                OUT_comValid[i] <= 0;
-                
-            baseIndex = baseIndex + 1;*/
         end
         else begin
             for (i = 0; i < WIDTH; i=i+1)
@@ -169,12 +154,13 @@ always_ff@(posedge clk) begin
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH; i=i+1) begin
-            if (IN_valid[i] && (!IN_invalidate || $signed(IN_sqNs[i] - IN_invalidateSqN) <= 0)) begin
-                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].valid <= 1;
-                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].flags <= IN_flags[i];
-                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].tag <= IN_tags[i];
-                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].name <= IN_names[i];
-                entries[IN_sqNs[i][3:0] - baseIndex[3:0]].sqN <= IN_sqNs[i];
+            if (IN_uop[i].valid && (!IN_invalidate || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0)) begin
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].valid <= 1;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].flags <= IN_uop[i].flags;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].tag <= IN_uop[i].tagDst;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].name <= IN_uop[i].nmDst;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].sqN <= IN_uop[i].sqN;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].pc <= IN_uop[i].pc[31:2];
             end
         end
     end

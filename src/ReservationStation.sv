@@ -26,11 +26,9 @@ module ReservationStation
     input FuncUnit IN_LD_fu[NUM_UOPS-1:0],
     input EX_UOp IN_LD_uop[NUM_UOPS-1:0],
     input wire IN_LD_wbStall[NUM_UOPS-1:0],
-    input wire IN_LD_wbStallNext[NUM_UOPS-1:0],
     
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
-    input wire[5:0] IN_resultTag[RESULT_BUS_COUNT-1:0],
-    input wire[5:0] IN_resultSqN[RESULT_BUS_COUNT-1:0],
+    input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
 
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -61,28 +59,28 @@ always_comb begin
     for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
         
         deqValid[i] = 0;
-        deqIndex[i] = 0;
+        deqIndex[i] = 3'bx;
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
             
             if (queueInfo[j].valid && (!deqValid[1] || deqIndex[1] != j[2:0])) begin
                 
                 if ((queue[j].availA ||
-                        (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagA) ||
-                        (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagA) ||
+                        (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagA) ||
+                        (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagA) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
                         //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA) ||
-                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && /*queue[j].fu == FU_INT &&*/ OUT_uop[0].fu == FU_INT) ||
-                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && /*queue[j].fu == FU_INT &&*/ OUT_uop[1].fu == FU_INT)
+                        //(OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && OUT_uop[0].fu == FU_INT) ||
+                        (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && OUT_uop[1].fu == FU_INT)
                         ) && 
                         
                     (queue[j].availB ||
-                        (IN_resultValid[0] && IN_resultTag[0] == queue[j].tagB) ||
-                        (IN_resultValid[1] && IN_resultTag[1] == queue[j].tagB) ||
+                        (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagB) ||
+                        (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagB) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
                         //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB) ||
-                        (i == 0 && OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && /*queue[j].fu == FU_INT &&*/ OUT_uop[0].fu == FU_INT) ||
-                        (i == 1 && OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && /*queue[j].fu == FU_INT &&*/ OUT_uop[1].fu == FU_INT)
+                        //(OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && OUT_uop[0].fu == FU_INT) ||
+                        (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && OUT_uop[1].fu == FU_INT)
                         ) &&
                         
                     // Second FU only gets simple int ops
@@ -104,6 +102,26 @@ always_comb begin
     end
 end
 
+
+reg[2:0] insertIndex[NUM_UOPS-1:0];
+reg insertAvail[NUM_UOPS-1:0];
+always_comb begin
+    for (i = 0; i < NUM_UOPS; i=i+1) begin
+        insertAvail[i] = 0;
+        insertIndex[i] = 3'bx;
+        
+        if (IN_uopValid[i]) begin
+            for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+                if (!queueInfo[j].valid && (i == 0 || !insertAvail[0] || insertIndex[0] != j[2:0])) begin
+                    insertAvail[i] = 1;
+                    insertIndex[i] = j[2:0];
+                end
+            end
+        end
+    end
+end
+
+
 always_ff@(posedge clk) begin
     
     if (!rst) begin
@@ -113,18 +131,18 @@ always_ff@(posedge clk) begin
             // and as such will be deleted anyways.
             if (IN_resultValid[i]/* && (!IN_invalidate || $signed(IN_invalidateSqN - IN_resultSqN[i]) >= 0)*/) begin
                 for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                    if (queue[j].availA == 0 && queue[j].tagA == IN_resultTag[i]) begin
+                    if (queue[j].availA == 0 && queue[j].tagA == IN_resultUOp[i].tagDst) begin
                         queue[j].availA <= 1;
                     end
 
-                    if (queue[j].availB == 0 && queue[j].tagB == IN_resultTag[i]) begin
+                    if (queue[j].availB == 0 && queue[j].tagB == IN_resultUOp[i].tagDst) begin
                         queue[j].availB <= 1;
                     end
                 end
             end
         
         // Some results can be forwarded
-        for (i = 0; i < NUM_UOPS; i=i+1) begin
+        for (i = 1; i < NUM_UOPS; i=i+1) begin
             if (OUT_valid[i] && OUT_uop[i].nmDst != 0/* &&
                 (!IN_invalidate || $signed(IN_invalidateSqN - OUT_uop[i].sqN) >= 0)*/ &&
                 OUT_uop[i].fu == FU_INT) begin
@@ -169,7 +187,7 @@ always_ff@(posedge clk) begin
                     OUT_uop[i] <= queue[deqIndex[i]];
                     freeEntries = freeEntries + 1;
                     OUT_valid[i] <= 1;
-                    queueInfo[deqIndex[i]].valid = 0;
+                    queueInfo[deqIndex[i]].valid <= 0;
                 end
                 else 
                     OUT_valid[i] <= 0;
@@ -180,54 +198,46 @@ always_ff@(posedge clk) begin
         // enqueue new uop
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             if (frontEn && IN_uopValid[i]) begin
-                enqValid = 0;
-                for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                    if (enqValid == 0 && !queueInfo[j].valid) begin
-                        R_UOp temp = IN_uop[i];
 
-                        for (k = 0; k < RESULT_BUS_COUNT; k=k+1) begin
-                            if (IN_resultValid[k]) begin
-                                if (!temp.availA && temp.tagA == IN_resultTag[k]) begin
-                                    temp.availA = 1;
-                                end
+                R_UOp temp = IN_uop[i];
+                
+                assert(insertAvail[i]);
 
-                                if (!temp.availB && temp.tagB == IN_resultTag[k]) begin
-                                    temp.availB = 1;
-                                end
-                            end
+                for (k = 0; k < RESULT_BUS_COUNT; k=k+1) begin
+                    if (IN_resultValid[k]) begin
+                        if (!temp.availA && temp.tagA == IN_resultUOp[k].tagDst) begin
+                            temp.availA = 1;
                         end
-                        
-                        queue[j] <= temp;
-                        
-                        queueInfo[j].isJumpBranch <= (temp.fu == FU_INT) && (
-                            temp.opcode == INT_BEQ || 
-                            temp.opcode == INT_BNE || 
-                            temp.opcode == INT_BLT || 
-                            temp.opcode == INT_BGE || 
-                            temp.opcode == INT_BLTU || 
-                            temp.opcode == INT_BGEU || 
-                            temp.opcode == INT_JAL || 
-                            temp.opcode == INT_JALR ||
-                            temp.opcode == INT_SYS ||
-                            temp.opcode == INT_UNDEFINED
-                        );
-                        
-                        queueInfo[j].isStore <= (temp.fu == FU_LSU) && 
-                            (temp.opcode == LSU_SB || temp.opcode == LSU_SH || temp.opcode == LSU_SW);
-                            
-                        queueInfo[j].isLoad <= (temp.fu == FU_LSU) && (temp.opcode == LSU_LB || temp.opcode == LSU_LH ||
-                            temp.opcode == LSU_LW || temp.opcode == LSU_LBU || temp.opcode == LSU_LHU);
-                    
-                        queueInfo[j].valid = 1;
-                        enqValid = 1;
+
+                        if (!temp.availB && temp.tagB == IN_resultUOp[k].tagDst) begin
+                            temp.availB = 1;
+                        end
                     end
                 end
                 
-                assert(enqValid);
+                queue[insertIndex[i]] <= temp;
+                
+                queueInfo[insertIndex[i]].isJumpBranch <= (temp.fu == FU_INT) && (
+                    temp.opcode == INT_BEQ || 
+                    temp.opcode == INT_BNE || 
+                    temp.opcode == INT_BLT || 
+                    temp.opcode == INT_BGE || 
+                    temp.opcode == INT_BLTU || 
+                    temp.opcode == INT_BGEU || 
+                    temp.opcode == INT_JAL || 
+                    temp.opcode == INT_JALR ||
+                    temp.opcode == INT_SYS ||
+                    temp.opcode == INT_UNDEFINED
+                );
+                
+                queueInfo[insertIndex[i]].isStore <= (temp.fu == FU_LSU) && 
+                    (temp.opcode == LSU_SB || temp.opcode == LSU_SH || temp.opcode == LSU_SW);
+                    
+                queueInfo[insertIndex[i]].isLoad <= (temp.fu == FU_LSU) && (temp.opcode == LSU_LB || temp.opcode == LSU_LH ||
+                    temp.opcode == LSU_LW || temp.opcode == LSU_LBU || temp.opcode == LSU_LHU);
+            
+                queueInfo[insertIndex[i]].valid <= 1;
 
-                if (IN_uop[i].fu == FU_LSU && 
-                    (IN_uop[i].opcode == LSU_SB || IN_uop[i].opcode == LSU_SH || IN_uop[i].opcode == LSU_SW)) begin
-                end
                 freeEntries = freeEntries - 1;
             end
         end

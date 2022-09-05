@@ -54,7 +54,7 @@ typedef enum logic[5:0]
 } OPCode_LSU;
 
 typedef enum logic[1:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV} FuncUnit;
-typedef enum logic[0:0] {FLAGS_NONE, FLAGS_BRK} Flags;
+typedef enum bit[0:0] {FLAGS_NONE, FLAGS_BRK} Flags;
 
 typedef struct packed
 {
@@ -135,6 +135,9 @@ typedef struct packed
     bit[5:0] tagDst;
     bit[4:0] nmDst;
     bit[5:0] sqN;
+    bit[31:0] pc;
+    Flags flags;
+    bit valid;
 } RES_UOp;
 
 

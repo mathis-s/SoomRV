@@ -34,9 +34,8 @@ module Rename
     input wire[5:0] comSqN[WIDTH_WR-1:0],
 
     // WB for uncommitted but speculatively available values
-    input wire IN_wbValid[WIDTH_WR-1:0],
-    input wire[5:0] IN_wbTag[WIDTH_WR-1:0],
-    input wire[4:0] IN_wbNm[WIDTH_WR-1:0],
+    input wire IN_wbHasResult[WIDTH_WR-1:0],
+    input RES_UOp IN_wbUOp[WIDTH_WR-1:0],
 
     // Taken branch
     input wire IN_branchTaken,
@@ -124,6 +123,7 @@ always_ff@(posedge clk) begin
         
         counterSqN = 0;
         counterStoreSqN = 63;
+        // TODO: check if load sqn is correctly handled
         counterLoadSqN = 0;
         
         // Registers initialized with tags 0..31
@@ -200,14 +200,14 @@ always_ff@(posedge clk) begin
 
                 // TODO: Do this parametric
                 // Forward from WB
-                if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs0].specTag) ||
-                    (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs0].specTag))
+                if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs0].specTag) ||
+                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs0].specTag))
                     OUT_uop[i].availA <= 1;
                 else
                     OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
 
-                if ((IN_wbValid[0] && IN_wbTag[0] == rat[IN_uop[i].rs1].specTag) ||
-                    (IN_wbValid[1] && IN_wbTag[1] == rat[IN_uop[i].rs1].specTag))
+                if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs1].specTag) ||
+                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs1].specTag))
                     OUT_uop[i].availB <= 1;
                 else
                     OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
@@ -274,19 +274,19 @@ always_ff@(posedge clk) begin
 
         // Written back values are speculatively available
         for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_wbValid[i] && rat[IN_wbNm[i]].specTag == IN_wbTag[i]) begin
-                rat[IN_wbNm[i]].avail = 1;
+            if (IN_wbHasResult[i] && rat[IN_wbUOp[i].nmDst].specTag == IN_wbUOp[i].tagDst) begin
+                rat[IN_wbUOp[i].nmDst].avail = 1;
             end
             
             // If frontend is stalled right now we need to make sure 
             // the op we're stalled on is kept up-to-date, as it will be
             // read later.
-            if (en && !frontEn && IN_wbValid[i]) begin
+            if (en && !frontEn && IN_wbHasResult[i]) begin
                 for (j = 0; j < WIDTH_UOPS; j=j+1) begin
                     if (OUT_uopValid[j]) begin
-                        if (OUT_uop[j].tagA == IN_wbTag[i])
+                        if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availA <= 1;
-                        if (OUT_uop[j].tagB == IN_wbTag[i])
+                        if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availB <= 1;
                     end
                 end

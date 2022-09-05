@@ -31,7 +31,6 @@ module LSU
 
     output wire OUT_wbReq,
 
-    output reg OUT_valid,
     output RES_UOp OUT_uop
 );
 
@@ -182,7 +181,9 @@ always@(posedge clk) begin
         OUT_uop.tagDst <= i2.tagDst;
         OUT_uop.nmDst <= i2.nmDst;
         OUT_uop.sqN <= i2.sqN;
-        OUT_valid <= 1;
+        OUT_uop.valid <= 1;
+        OUT_uop.flags <= FLAGS_NONE;
+        OUT_uop.pc <= i2.pc;
 
         case (i2.opcode)
             LSU_LBU,
@@ -212,7 +213,7 @@ always@(posedge clk) begin
         endcase
     end
     else
-        OUT_valid <= 0;
+        OUT_uop.valid <= 0;
 end
 
 

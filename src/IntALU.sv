@@ -10,7 +10,6 @@ module IntALU
     input[5:0] IN_invalidateSqN,
     
     output wire OUT_wbReq,
-    output reg OUT_valid,
     
     output reg OUT_isBranch,
     output reg OUT_branchTaken,
@@ -27,11 +26,7 @@ module IntALU
     output wire[5:0] OUT_zcFwdTag,
     output wire OUT_zcFwdValid,
 
-    output reg[31:0] OUT_result,
-    output reg[5:0] OUT_tagDst,
-    output reg[4:0] OUT_nmDst,
-    output reg[5:0] OUT_sqN,
-    output Flags OUT_flags
+    output RES_UOp OUT_uop
 );
 
 wire[31:0] srcA = IN_uop.srcA;
@@ -110,7 +105,8 @@ reg branchTaken;
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        OUT_valid <= 0;
+        OUT_uop.valid <= 0;
+        //OUT_valid <= 0;
     end
     else begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
@@ -144,17 +140,18 @@ always_ff@(posedge clk) begin
             else
                 OUT_branchMispred <= 0;
 
-            
-            OUT_tagDst <= IN_uop.tagDst;
-            OUT_nmDst <= IN_uop.nmDst;
-            OUT_result <= resC;
-            OUT_sqN <= IN_uop.sqN;
-            OUT_flags <= flags;
-            OUT_valid <= 1;
+            OUT_uop.tagDst <= IN_uop.tagDst;
+            OUT_uop.nmDst <= IN_uop.nmDst;
+            OUT_uop.result <= resC;
+            OUT_uop.sqN <= IN_uop.sqN;
+            OUT_uop.flags <= flags;
+            OUT_uop.valid <= 1;
+            OUT_uop.pc <= IN_uop.pc;
         end
         else begin
             OUT_branchMispred <= 0;
-            OUT_valid <= 0;
+            //OUT_valid <= 0;
+            OUT_uop.valid <= 0;
             OUT_isBranch <= 0;
         end
     end

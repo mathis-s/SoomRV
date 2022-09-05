@@ -22,16 +22,11 @@ module Core
 
 integer i;
 
-wire wbValid[NUM_UOPS-1:0];
-wire[4:0] wbRegNm[NUM_UOPS-1:0];
-wire[5:0] wbRegSqN[NUM_UOPS-1:0];
-wire[5:0] wbRegTag[NUM_UOPS-1:0];
-wire[31:0] wbResult[NUM_UOPS-1:0];
-Flags wbFlags[NUM_UOPS-1:0];
+RES_UOp wbUOp[NUM_UOPS-1:0];
 
 wire wbHasResult[NUM_UOPS-1:0];
-assign wbHasResult[0] = wbValid[0] && wbRegNm[0] != 0;
-assign wbHasResult[1] = wbValid[1] && wbRegNm[1] != 0;
+assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
+assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 
 wire[4:0] comRegNm[NUM_UOPS-1:0];
 wire[5:0] comRegTag[NUM_UOPS-1:0];
@@ -198,9 +193,8 @@ Rename rn
     .comRegTag(comRegTag),
     .comSqN(comSqN),
 
-    .IN_wbValid(wbHasResult),
-    .IN_wbTag(wbRegTag),
-    .IN_wbNm(wbRegNm),
+    .IN_wbHasResult(wbHasResult),
+    .IN_wbUOp(wbUOp),
 
     .IN_branchTaken(branch.taken),
     .IN_branchSqN(branch.sqN),
@@ -214,10 +208,6 @@ Rename rn
     .OUT_nextLoadSqN(RN_nextLoadSqN),
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
-
-wire[31:0] INT_result;
-wire[5:0] INT_resTag;
-wire[4:0] INT_resName;
 
 wire RV_uopValid[NUM_UOPS-1:0];
 R_UOp RV_uop[NUM_UOPS-1:0];
@@ -238,11 +228,9 @@ ReservationStation rv
     .IN_LD_fu(LD_fu),
     .IN_LD_uop(LD_uop),
     .IN_LD_wbStall('{0, wbStall}),
-    .IN_LD_wbStallNext('{0, wbStallNext}),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultTag(wbRegTag),
-    .IN_resultSqN(wbRegSqN),
+    .IN_resultUOp(wbUOp),
 
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -259,6 +247,13 @@ wire RF_readEnable[3:0];
 wire[5:0] RF_readAddress[3:0];
 wire[31:0] RF_readData[3:0];
 
+wire[5:0] RF_writeAddress[1:0];
+assign RF_writeAddress[0] = wbUOp[0].tagDst;
+assign RF_writeAddress[1] = wbUOp[1].tagDst;
+wire[31:0] RF_writeData[1:0];
+assign RF_writeData[0] = wbUOp[0].result;
+assign RF_writeData[1] = wbUOp[1].result;
+
 RF rf
 (
     .clk(clk),
@@ -268,8 +263,8 @@ RF rf
     .OUT_readData(RF_readData),
 
     .IN_writeEnable(wbHasResult),
-    .IN_writeAddress(wbRegTag),
-    .IN_writeData(wbResult)
+    .IN_writeAddress(RF_writeAddress),
+    .IN_writeData(RF_writeData)
 );
 
 EX_UOp LD_uop[NUM_UOPS-1:0];
@@ -287,9 +282,9 @@ Load ld
     .IN_uopValid(RV_uopValid),
     .IN_uop(RV_uop),
     
-    .IN_wbValid(wbHasResult),
-    .IN_wbTag(wbRegTag),
-    .IN_wbResult(wbResult),
+    .IN_wbHasResult(wbHasResult),
+    .IN_wbUOp(wbUOp),
+    
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
     
@@ -307,11 +302,8 @@ Load ld
 );
 wire LSU_wbReq;
 
-
-wire INTALU_valid;
-wire[5:0] INTALU_sqN;
 wire INTALU_wbReq;
-Flags INTALU_flags;
+RES_UOp INTALU_uop;
 IntALU ialu
 (
     .clk(clk),
@@ -324,7 +316,6 @@ IntALU ialu
     .IN_invalidateSqN(branch.sqN),
 
     .OUT_wbReq(INTALU_wbReq),
-    .OUT_valid(INTALU_valid),
     
     .OUT_isBranch(),
     .OUT_branchTaken(),
@@ -341,11 +332,7 @@ IntALU ialu
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
     .OUT_zcFwdValid(LD_zcFwdValid[0]),
     
-    .OUT_result(INT_result),
-    .OUT_tagDst(INT_resTag),
-    .OUT_nmDst(INT_resName),
-    .OUT_sqN(INTALU_sqN),
-    .OUT_flags(INTALU_flags)
+    .OUT_uop(INTALU_uop)
 );
 
 wire LB_valid[0:0];
@@ -373,7 +360,6 @@ LoadBuffer lb
     .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
 
-wire LSU_uopValid;
 RES_UOp LSU_uop;
 assign wbStall = LSU_wbReq && INTALU_wbReq;
 LSU lsu
@@ -406,8 +392,7 @@ LSU lsu
     .OUT_branchProv(branchProvs[2]),
     
     .OUT_wbReq(LSU_wbReq),
-
-    .OUT_valid(LSU_uopValid),
+    
     .OUT_uop(LSU_uop)
 );
 
@@ -446,32 +431,9 @@ StoreQueue sq
     
     .OUT_data(SQ_readData),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
-    
 );
 
-assign wbRegNm[0] = !LSU_uopValid ? 
-    INT_resName :
-    LSU_uop.nmDst;
-assign wbRegTag[0] = !LSU_uopValid ? 
-    INT_resTag :
-    LSU_uop.tagDst;
-assign wbResult[0] = !LSU_uopValid ? 
-    INT_result :
-    LSU_uop.result;
-
-assign wbRegSqN[0] = !LSU_uopValid ? 
-    INTALU_sqN :
-    LSU_uop.sqN;
-    
-assign wbFlags[0] = !LSU_uopValid ?
-    INTALU_flags :
-    FLAGS_NONE;
-    
-assign wbValid[0] = (INTALU_valid || LSU_uopValid);
-
-wire wbStallNext = LD_uop[0].valid && enabledXUs[0][1] && !wbStall && RV_uopValid[0] && RV_uop[0].fu == FU_INT;
-
-
+assign wbUOp[0] = !LSU_uop.valid ? INTALU_uop : LSU_uop;
 
 IntALU ialu1
 (
@@ -485,7 +447,6 @@ IntALU ialu1
     .IN_invalidateSqN(branch.sqN),
 
     .OUT_wbReq(),
-    .OUT_valid(wbValid[1]),
     
     .OUT_isBranch(isBranch),
     .OUT_branchTaken(branchTaken),
@@ -502,11 +463,7 @@ IntALU ialu1
     .OUT_zcFwdTag(LD_zcFwdTag[1]),
     .OUT_zcFwdValid(LD_zcFwdValid[1]),
     
-    .OUT_result(wbResult[1]),
-    .OUT_tagDst(wbRegTag[1]),
-    .OUT_nmDst(wbRegNm[1]),
-    .OUT_sqN(wbRegSqN[1]),
-    .OUT_flags(wbFlags[1])
+    .OUT_uop(wbUOp[1])
 );
 
 wire[5:0] ROB_maxSqN;
@@ -514,11 +471,7 @@ ROB rob
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid(wbValid),
-    .IN_tags(wbRegTag),
-    .IN_names(wbRegNm),
-    .IN_sqNs(wbRegSqN),
-    .IN_flags(wbFlags), // placeholder
+    .IN_uop(wbUOp),
 
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -535,10 +488,16 @@ ROB rob
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
-assign frontendEn = (RV_freeEntries > 1 * NUM_UOPS) && 
+assign frontendEn = (RV_freeEntries > NUM_UOPS) && 
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
-    ($signed(RN_nextSqN - ROB_maxSqN) <= -2*NUM_UOPS) && 
+    ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
     !branch.taken;
-
+    
+//TODO: check these limits theoretically
+wire dbgLoad = $signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS;
+wire dbgStore = $signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS;
+wire dbgROB = $signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS;
+wire dbgRV = (RV_freeEntries > 1 * NUM_UOPS);
+    
 endmodule
