@@ -25,14 +25,32 @@ module LSU
     output reg[31:0] OUT_LB_addr,
     output reg[5:0] OUT_LB_sqN,
     output reg[5:0] OUT_LB_loadSqN,
-    input wire IN_LB_mispred,
+    output reg[5:0] OUT_LB_storeSqN,
+    output reg[31:0] OUT_LB_pc,
     
-    output BranchProv OUT_branchProv,
+    //output wire[31:0] OUT_CT_lookupAddr,
+    //input wire[4:0] IN_CT_lookupCacheAddr,
+    //input wire IN_CT_lookupFound,
 
     output wire OUT_wbReq,
 
     output RES_UOp OUT_uop
 );
+
+typedef struct packed
+{
+    bit valid;
+    bit[5:0] opcode;
+    bit[5:0] tagDst;
+    bit[4:0] nmDst;
+    bit[5:0] sqN;
+    bit[5:0] loadSqN;
+    bit[5:0] storeSqN;
+    bit[31:0] addr;
+    bit[31:0] data;
+    bit[3:0] wmask;
+    bit[31:0] pc;
+} LSU_UOp;
 
 typedef struct packed
 {
@@ -51,7 +69,9 @@ IData i0;
 IData i1;
 IData i2;
 
-wire[31:0] addr = IN_uop.srcA + IN_uop.imm;
+wire[31:0] addrRaw = IN_uop.srcA + {20'b0, IN_uop.imm[11:0]};
+wire[31:0] addr = addrRaw;//{19'b0, IN_CT_lookupCacheAddr, addrRaw[7:0]};
+//assign OUT_CT_lookupAddr = addrRaw;
 
 assign OUT_wbReq = i2.valid;
 
@@ -64,6 +84,8 @@ always@(posedge clk) begin
     end
     else if (IN_valid && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
 
+        //assert(IN_CT_lookupFound);
+    
         i0.valid <= 1;
         i0.opcode <= IN_uop.opcode;
         i0.tagDst <= IN_uop.tagDst;
@@ -83,6 +105,8 @@ always@(posedge clk) begin
         OUT_LB_addr <= addr;
         OUT_LB_sqN <= IN_uop.sqN;
         OUT_LB_loadSqN <= IN_uop.loadSqN;
+        OUT_LB_storeSqN <= IN_uop.storeSqN;
+        OUT_LB_pc <= IN_uop.pc;
 
         case (IN_uop.opcode)
             LSU_LB,
@@ -92,7 +116,6 @@ always@(posedge clk) begin
             LSU_LHU: begin
                 OUT_SQ_isLoad <= 1;
                 OUT_SQ_valid <= 1;
-                i0.byteIndex <= addr[1:0];
             end
 
             LSU_SB: begin
@@ -157,23 +180,12 @@ always@(posedge clk) begin
         i1.valid <= 0;
     end
     
+    // Forward or invalidate i1
     if (i1.valid && (!IN_invalidate || $signed(i1.sqN - IN_invalidateSqN) <= 0)) begin
-        
-        if (IN_LB_mispred) begin
-            OUT_branchProv.taken <= 1;
-            OUT_branchProv.dstPC <= (i1.pc + 4);
-            OUT_branchProv.sqN <= (i1.sqN);
-            OUT_branchProv.loadSqN <= i1.loadSqN;
-            OUT_branchProv.storeSqN <= i1.storeSqN;
-        end
-        else
-            OUT_branchProv.taken <= 0;
-            
         i2 <= i1;
     end
     else begin
         i2.valid <= 0;
-        OUT_branchProv.taken <= 0;
     end
     
 

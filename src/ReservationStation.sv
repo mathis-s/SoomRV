@@ -93,6 +93,7 @@ always_comb begin
                     // Branches only to FU 1
                     (!queueInfo[j].isJumpBranch || i == 1) &&
                     
+                    // TODO: do comparisons in tree structure instead of linear
                     (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
                     deqIndex[i] = j[2:0];

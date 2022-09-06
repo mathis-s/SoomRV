@@ -137,11 +137,12 @@ int main(int argc, char** argv)
                     for (int i = 0; i < 4; i++)
                         if (memWmReg & (1 << i))
                         {
-                            uint32_t mask = (1 << (8 * i)) - 1;
-                            if (i != 0)
-                                mask &= ~((1 << (8 * (i - 1))) - 1);
-                            word = (word & mask) | (memDataReg & ~mask);
+                            uint32_t mask = (1 << (8 * (i+1))) - 1;
+                            if (i == 3) mask = 0xff000000;
+                            mask &= ~((1 << (8 * (i))) - 1);
+                            word = (word & ~mask) | (memDataReg & mask);
                         }
+                    //printf("word %.8x\n", word);
                     ram[index] = word;
                 }
             }

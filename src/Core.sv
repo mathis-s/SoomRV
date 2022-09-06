@@ -358,7 +358,8 @@ wire LB_isLoad[0:0];
 wire[31:0] LB_addr[0:0];
 wire[5:0] LB_sqN[0:0];
 wire[5:0] LB_loadSqN[0:0];
-wire LB_mispred[0:0];
+wire[5:0] LB_storeSqN[0:0];
+wire[31:0] LB_pc[0:0];
 wire[5:0] LB_maxLoadSqN;
 LoadBuffer lb
 (
@@ -368,15 +369,39 @@ LoadBuffer lb
     
     .valid(LB_valid),
     .isLoad(LB_isLoad),
+    .pc(LB_pc),
     .addr(LB_addr),
     .sqN(LB_sqN),
     .loadSqN(LB_loadSqN),
+    .storeSqN(LB_storeSqN),
     
     .IN_branch(branch),
+    .OUT_branch(branchProvs[2]),
     
-    .mispredict(LB_mispred),
     .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
+
+
+/*CacheController cc
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_uop(),
+    .OUT_cacheLookupAddr(),
+    .OUT_cacheLookupFound(),
+    
+    .IN_LSU_avail(0),
+    .OUT_uop(),
+    .OUT_MC_startRead(),
+    .OUT_MC_writeBack(),
+    .OUT_MC_sramAddr(),
+    .OUT_MC_extAddr(),
+    .OUT_MC_extWBAddr(),
+    .OUT_MC_size(),
+    
+    .IN_MC_busy()
+);*/
 
 RES_UOp LSU_uop;
 assign wbStall = LSU_wbReq && INTALU_wbReq;
@@ -405,9 +430,8 @@ LSU lsu
     .OUT_LB_addr(LB_addr[0]),
     .OUT_LB_sqN(LB_sqN[0]),
     .OUT_LB_loadSqN(LB_loadSqN[0]),
-    .IN_LB_mispred(LB_mispred[0]),
-    
-    .OUT_branchProv(branchProvs[2]),
+    .OUT_LB_storeSqN(LB_storeSqN[0]),
+    .OUT_LB_pc(LB_pc[0]),
     
     .OUT_wbReq(LSU_wbReq),
     
@@ -511,11 +535,5 @@ assign frontendEn = (RV_freeEntries > NUM_UOPS) &&
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
     !branch.taken;
-    
-//TODO: check these limits theoretically
-wire dbgLoad = $signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS;
-wire dbgStore = $signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS;
-wire dbgROB = $signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS;
-wire dbgRV = (RV_freeEntries > 1 * NUM_UOPS);
     
 endmodule

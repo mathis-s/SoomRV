@@ -174,3 +174,21 @@ typedef struct packed
     bit[5:0] loadSqN;
     
 } BranchProv;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic[31:0] data;
+    logic[4:0] cacheAddr;
+    logic[31:0] pc;
+    logic[5:0] opcode;
+    logic[5:0] tagDst;
+    logic[4:0] nmDst;
+    logic[5:0] sqN;
+    logic[5:0] branchID;
+    logic branchPred;
+    logic[5:0] storeSqN;
+    logic[5:0] loadSqN;
+    logic valid;
+} LSU_UOp;
+

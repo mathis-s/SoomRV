@@ -158,6 +158,8 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_PORTS; i=i+1) begin
             if (IN_valid[i] && !IN_isLoad[i] && (!IN_branch.taken || $signed(IN_sqN[i] - IN_branch.sqN) <= 0)) begin
                 reg[2:0] index = IN_storeSqN[i][2:0] - baseIndex[2:0];
+                assert(IN_storeSqN[i] <= baseIndex + NUM_ENTRIES[5:0] - 1);
+                //assert(!entries[index].valid);
                 entries[index].valid <= 1;
                 entries[index].sqN <= IN_sqN[i];
                 entries[index].addr <= IN_addr[i];
