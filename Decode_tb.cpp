@@ -80,6 +80,7 @@ int main(int argc, char** argv)
     }
 
     // Run
+    top->en = 1;
 
     // addresses is registered
     uint32_t instrAddrReg = 0;

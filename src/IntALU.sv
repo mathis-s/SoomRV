@@ -74,8 +74,8 @@ always_comb begin
     endcase
     
     case (IN_uop.opcode)
-        INT_UNDEFINED,
-        INT_SYS: flags = FLAGS_BRK;
+        INT_UNDEFINED: flags = FLAGS_EXCEPT;
+        INT_SYS: flags = imm[0] ? FLAGS_BRK : FLAGS_TRAP;
         default: flags = FLAGS_NONE;
     endcase
 end 
@@ -148,7 +148,11 @@ always_ff@(posedge clk) begin
             end
             else
                 OUT_branchMispred <= 0;
-
+            
+            OUT_uop.isBranch <= isBranch;
+            OUT_uop.branchTaken <= branchTaken;
+            OUT_uop.branchID <= IN_uop.branchID;
+            
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.result <= resC;

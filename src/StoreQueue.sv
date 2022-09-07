@@ -16,13 +16,15 @@ module StoreQueue
     input wire clk,
     input wire rst,
     
-    input wire IN_valid[NUM_PORTS-1:0],
-    input wire IN_isLoad[NUM_PORTS-1:0],
-    input wire[29:0] IN_addr[NUM_PORTS-1:0],
-    input wire[31:0] IN_data[NUM_PORTS-1:0],
-    input wire[3:0] IN_wmask[NUM_PORTS-1:0],
-    input wire[5:0] IN_sqN[NUM_PORTS-1:0],
-    input wire[5:0] IN_storeSqN[NUM_PORTS-1:0],
+    //input wire IN_valid[NUM_PORTS-1:0],
+    //input wire IN_isLoad[NUM_PORTS-1:0],
+    //input wire[29:0] IN_addr[NUM_PORTS-1:0],
+    //input wire[31:0] IN_data[NUM_PORTS-1:0],
+    //input wire[3:0] IN_wmask[NUM_PORTS-1:0],
+    //input wire[5:0] IN_sqN[NUM_PORTS-1:0],
+    //input wire[5:0] IN_storeSqN[NUM_PORTS-1:0],
+    
+    input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input wire[5:0] IN_curSqN,
     
@@ -35,7 +37,9 @@ module StoreQueue
     output reg OUT_MEM_ce[NUM_PORTS-1:0],
     output reg[3:0] OUT_MEM_wm[NUM_PORTS-1:0],
     
-    output reg[31:0] OUT_data[NUM_PORTS-1:0],
+    //output reg[31:0] OUT_data[NUM_PORTS-1:0],
+    output RES_UOp OUT_uop[NUM_PORTS-1:0],
+    
     output reg[5:0] OUT_maxStoreSqN
 );
 
@@ -54,16 +58,63 @@ reg[5:0] iSqN[NUM_PORTS-1:0];
 reg[3:0] iMask[NUM_PORTS-1:0];
 reg[31:0] iData[NUM_PORTS-1:0];
 
+AGU_UOp i0[NUM_PORTS-1:0];
+AGU_UOp i1[NUM_PORTS-1:0];
 
 reg[31:0] queueLookupData[NUM_PORTS-1:0];
 reg[3:0] queueLookupMask[NUM_PORTS-1:0];
 
+
+
 always_comb begin
     for (i = 0; i < NUM_PORTS; i=i+1) begin
-        OUT_data[i][31:24] = queueLookupMask[i][3] ? queueLookupData[i][31:24] : IN_MEM_data[i][31:24];
-        OUT_data[i][23:16] = queueLookupMask[i][2] ? queueLookupData[i][23:16] : IN_MEM_data[i][23:16];
-        OUT_data[i][15:8] = queueLookupMask[i][1] ? queueLookupData[i][15:8] : IN_MEM_data[i][15:8];
-        OUT_data[i][7:0] = queueLookupMask[i][0] ? queueLookupData[i][7:0] : IN_MEM_data[i][7:0];
+        
+        reg[31:0] result = 32'bx;
+        
+        if (i1[i].isLoad) begin
+            reg[31:0] data;
+            data[31:24] = queueLookupMask[i][3] ? queueLookupData[i][31:24] : IN_MEM_data[i][31:24];
+            data[23:16] = queueLookupMask[i][2] ? queueLookupData[i][23:16] : IN_MEM_data[i][23:16];
+            data[15:8] = queueLookupMask[i][1] ? queueLookupData[i][15:8] : IN_MEM_data[i][15:8];
+            data[7:0] = queueLookupMask[i][0] ? queueLookupData[i][7:0] : IN_MEM_data[i][7:0];
+            
+            case (i1[i].size)
+                
+                0: begin
+                    case (i1[i].shamt)
+                        0: result[7:0] = data[7:0];
+                        1: result[7:0] = data[15:8];
+                        2: result[7:0] = data[23:16];
+                        3: result[7:0] = data[31:24];
+                    endcase
+                    
+                    result[31:8] = {24{i1[i].signExtend ? result[7] : 1'b0}};
+                end
+                
+                1: begin
+                    case (i1[i].shamt)
+                        default: result[15:0] = data[15:0];
+                        2: result[15:0] = data[31:16];
+                    endcase
+                    
+                    result[31:16] = {16{i1[i].signExtend ? result[15] : 1'b0}};
+                end
+                
+                default: result = data;
+            endcase
+        end
+
+        OUT_uop[i].result = result;
+        OUT_uop[i].tagDst = i1[i].tagDst;
+        OUT_uop[i].nmDst = i1[i].nmDst;
+        OUT_uop[i].sqN = i1[i].sqN;
+        OUT_uop[i].pc = i1[i].pc;
+        OUT_uop[i].valid = i1[i].valid;
+        // add flags here
+        OUT_uop[i].flags = FLAGS_NONE;
+        OUT_uop[i].isBranch = 0;
+        OUT_uop[i].branchTaken = 0;
+        OUT_uop[i].branchID = 0;
     end
 end
 
@@ -73,9 +124,9 @@ always_comb begin
     doingDequeue = 0;
     
     for (i = 0; i < NUM_PORTS; i=i+1) begin
-        if (!rst && IN_valid[i] && IN_isLoad[i] && (!IN_branch.taken || $signed(IN_sqN[i] - IN_branch.sqN) <= 0)) begin
+        if (!rst && IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             OUT_MEM_data[i] = 32'bx;
-            OUT_MEM_addr[i] = IN_addr[i];
+            OUT_MEM_addr[i] = IN_uop[i].addr[31:2];
             OUT_MEM_we[i] = 1;
             OUT_MEM_wm[i] = 4'bx;
             OUT_MEM_ce[i] = 0;
@@ -105,7 +156,7 @@ always_comb begin
         iMask[j] = 0;
         iData[j] = 32'bx;
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (entries[i].valid && entries[i].addr == iAddr[j] && $signed(entries[i].sqN - iSqN[j]) < 0) begin
+            if (i0[j].isLoad && entries[i].valid && entries[i].addr == i0[j].addr[31:2] && $signed(entries[i].sqN - i0[j].sqN) < 0) begin
                 // this is pretty neat!
                 if (entries[i].wmask[0])
                     iData[j][7:0] = entries[i].data[7:0];
@@ -128,6 +179,10 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
         end
+        for (i = 0; i < NUM_PORTS; i=i+1) begin
+            i0[i].valid <= 0;
+            i1[i].valid <= 0;
+        end
         baseIndex = 0;
         OUT_maxStoreSqN <= 0;
     end
@@ -149,30 +204,40 @@ always_ff@(posedge clk) begin
                     entries[i].valid <= 0;
             end
             
-            // TODO: is this even possible?
-            //if ($signed(baseIndex - IN_branch.storeSqN) > 0)
-            //    baseIndex = IN_branch.storeSqN;
+            if (IN_branch.flush)
+                baseIndex = IN_branch.storeSqN + 1;
         end
     
         // Enqueue
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (IN_valid[i] && !IN_isLoad[i] && (!IN_branch.taken || $signed(IN_sqN[i] - IN_branch.sqN) <= 0)) begin
-                reg[2:0] index = IN_storeSqN[i][2:0] - baseIndex[2:0];
-                assert(IN_storeSqN[i] <= baseIndex + NUM_ENTRIES[5:0] - 1);
+            if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+                reg[2:0] index = IN_uop[i].storeSqN[2:0] - baseIndex[2:0];
+                assert(IN_uop[i].storeSqN <= baseIndex + NUM_ENTRIES[5:0] - 1);
                 //assert(!entries[index].valid);
                 entries[index].valid <= 1;
-                entries[index].sqN <= IN_sqN[i];
-                entries[index].addr <= IN_addr[i];
-                entries[index].data <= IN_data[i];
-                entries[index].wmask <= IN_wmask[i];
+                entries[index].sqN <= IN_uop[i].sqN;
+                entries[index].addr <= IN_uop[i].addr[31:2];
+                entries[index].data <= IN_uop[i].data;
+                entries[index].wmask <= IN_uop[i].wmask;
             end
         end
         
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            iAddr[i] <= IN_addr[i];
-            iSqN[i] <= IN_sqN[i];
-            queueLookupData[i] <= iData[i];
-            queueLookupMask[i] <= iMask[i];
+            if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+                i0[i] <= IN_uop[i];
+            end
+            else
+                i0[i].valid <= 0;
+                
+            if (i0[i].valid && (!IN_branch.taken || $signed(i0[i].sqN - IN_branch.sqN) <= 0)) begin
+                if (i0[i].isLoad) begin
+                    queueLookupData[i] <= iData[i];
+                    queueLookupMask[i] <= iMask[i];
+                end
+                i1[i] <= i0[i];
+            end
+            else
+                i1[i].valid <= 0;
         end
         
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;

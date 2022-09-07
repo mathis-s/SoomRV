@@ -2,12 +2,15 @@
 typedef struct packed 
 {
     bit valid;
-    bit flags;
+    Flags flags;
     bit[5:0] tag;
     // for debugging
     bit[5:0] sqN;
     bit[29:0] pc;
     bit[4:0] name;
+    bit isBranch;
+    bit branchTaken;
+    bit[5:0] branchID;
 } ROBEntry;
 
 module ROB
@@ -15,14 +18,15 @@ module ROB
     // how many entries, ie how many instructions can we
     // speculatively execute?
     parameter LENGTH = 30,
-    // how many ops are en/dequeued per cycle?
-    parameter WIDTH = 2
+
+    parameter WIDTH = 2,
+    parameter WIDTH_WB = 3
 )
 (
     input wire clk,
     input wire rst,
 
-    input RES_UOp IN_uop[WIDTH-1:0],
+    input RES_UOp IN_uop[WIDTH_WB-1:0],
 
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -33,7 +37,17 @@ module ROB
     output reg[4:0] OUT_comNames[WIDTH-1:0],
     output reg[5:0] OUT_comTags[WIDTH-1:0],
     output reg[5:0] OUT_comSqNs[WIDTH-1:0],
+    output reg OUT_comIsBranch[WIDTH-1:0],
+    output reg OUT_comBranchTaken[WIDTH-1:0],
+    output reg[5:0] OUT_comBranchID[WIDTH-1:0],
+    output reg[29:0] OUT_comPC[WIDTH-1:0],
     output reg OUT_comValid[WIDTH-1:0],
+    
+    input wire[31:0] IN_irqAddr,
+    output Flags OUT_irqFlags,
+    output reg[31:0] OUT_irqSrc,
+    
+    output BranchProv OUT_branch,
     
     output reg OUT_halt
 );
@@ -52,9 +66,12 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[i].valid || entries[i].flags != 0)
+        if (!entries[i].valid || entries[i].flags != FLAGS_NONE)
             headValid = 0;
     end
+    
+    if (entries[1].isBranch)
+        headValid = 0;
 end
 
 reg allowSingleDequeue;
@@ -71,6 +88,8 @@ end
 
 wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
+
+    OUT_branch.taken <= 0;
 
     if (rst) begin
         OUT_halt <= 0;
@@ -113,8 +132,11 @@ always_ff@(posedge clk) begin
                 OUT_comNames[i] <= entries[i].name;
                 OUT_comTags[i] <= entries[i].tag;
                 OUT_comSqNs[i] <= baseIndex + i[5:0];
+                OUT_comIsBranch[i] <= entries[i].isBranch;
+                OUT_comBranchTaken[i] <= entries[i].branchTaken;
+                OUT_comBranchID[i] <= entries[i].branchID;
                 OUT_comValid[i] <= 1;
-                // TODO: handle exceptions here.
+                OUT_comPC[i] <= entries[i].pc;
             end
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
@@ -136,9 +158,28 @@ always_ff@(posedge clk) begin
                 OUT_comNames[i] <= entries[i].name;
                 OUT_comTags[i] <= entries[i].tag;
                 OUT_comSqNs[i] <= baseIndex + i[5:0];
+                OUT_comIsBranch[i] <= entries[i].isBranch;
+                OUT_comBranchTaken[i] <= entries[i].branchTaken;
+                OUT_comBranchID[i] <= entries[i].branchID;
                 OUT_comValid[i] <= 1;
-                if (entries[i].flags != 0)
+                OUT_comPC[i] <= entries[i].pc;
+                
+                
+                if (entries[i].flags == FLAGS_BRK)
                     OUT_halt <= 1;
+                else if (entries[i].flags == FLAGS_TRAP || entries[i].flags == FLAGS_EXCEPT) begin
+                    OUT_branch.taken <= 1;
+                    OUT_branch.dstPC <= IN_irqAddr;
+                    OUT_branch.sqN <= baseIndex + i[5:0];
+                    OUT_branch.flush <= 1;
+                    // These don't matter, the entire pipeline will be flushed
+                    OUT_branch.storeSqN <= 0;
+                    OUT_branch.loadSqN <= 0;
+                    
+                    OUT_irqFlags <= entries[i].flags;
+                    OUT_irqSrc <= {entries[i].pc, 2'b0};
+                end
+                
             end
             for (i = 1; i < WIDTH; i=i+1) begin
                 OUT_comValid[i] <= 0;
@@ -153,7 +194,7 @@ always_ff@(posedge clk) begin
         end
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
-        for (i = 0; i < WIDTH; i=i+1) begin
+        for (i = 0; i < WIDTH_WB; i=i+1) begin
             if (IN_uop[i].valid && (!IN_invalidate || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0)) begin
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].valid <= 1;
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].flags <= IN_uop[i].flags;
@@ -161,6 +202,9 @@ always_ff@(posedge clk) begin
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].name <= IN_uop[i].nmDst;
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].sqN <= IN_uop[i].sqN;
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].pc <= IN_uop[i].pc[31:2];
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].isBranch <= IN_uop[i].isBranch;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].branchTaken <= IN_uop[i].branchTaken;
+                entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].branchID <= IN_uop[i].branchID;
             end
         end
     end

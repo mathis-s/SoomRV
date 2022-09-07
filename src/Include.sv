@@ -78,7 +78,7 @@ typedef enum logic[5:0]
 } OPCode_LSU;
 
 typedef enum logic[1:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV} FuncUnit;
-typedef enum bit[0:0] {FLAGS_NONE, FLAGS_BRK} Flags;
+typedef enum bit[1:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT} Flags;
 
 typedef struct packed
 {
@@ -160,6 +160,9 @@ typedef struct packed
     bit[4:0] nmDst;
     bit[5:0] sqN;
     bit[31:0] pc;
+    bit isBranch;
+    bit branchTaken;
+    bit[5:0] branchID;
     Flags flags;
     bit valid;
 } RES_UOp;
@@ -172,6 +175,7 @@ typedef struct packed
     bit[5:0] sqN;
     bit[5:0] storeSqN;
     bit[5:0] loadSqN;
+    bit flush;
     
 } BranchProv;
 
@@ -179,16 +183,19 @@ typedef struct packed
 {
     logic[31:0] addr;
     logic[31:0] data;
+    // could union some of these fields
+    logic[3:0] wmask;
+    logic signExtend;
+    logic[1:0] shamt;
+    logic[1:0] size;
     logic[4:0] cacheAddr;
+    logic isLoad;
     logic[31:0] pc;
-    logic[5:0] opcode;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
     logic[5:0] sqN;
-    logic[5:0] branchID;
-    logic branchPred;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     logic valid;
-} LSU_UOp;
+} AGU_UOp;
 

@@ -1,10 +1,12 @@
 module Core
 #(
-    parameter NUM_UOPS=2
+    parameter NUM_UOPS=2,
+    parameter NUM_WBS=3
 )
 (
     input wire clk,
     input wire rst,
+    input en,
     input wire[63:0] IN_instrRaw,
 
     input wire[31:0] IN_MEM_readData,
@@ -24,15 +26,20 @@ integer i;
 
 wire dbgIsPrint = OUT_MEM_addr == 255;
 
-RES_UOp wbUOp[NUM_UOPS-1:0];
-
-wire wbHasResult[NUM_UOPS-1:0];
+RES_UOp wbUOp[NUM_WBS-1:0];
+wire wbHasResult[NUM_WBS-1:0];
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
+assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 
 wire[4:0] comRegNm[NUM_UOPS-1:0];
 wire[5:0] comRegTag[NUM_UOPS-1:0];
 wire[5:0] comSqN[NUM_UOPS-1:0];
+wire comIsBranch[NUM_UOPS-1:0];
+wire comBranchTaken[NUM_UOPS-1:0];
+wire[5:0] comBranchID[NUM_UOPS-1:0];
+wire[29:0] comPC[NUM_UOPS-1:0];
+
 wire comValid[NUM_UOPS-1:0];
 
 wire frontendEn;
@@ -57,18 +64,19 @@ end
 wire[63:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
 
 
-BranchProv branchProvs[2:0];
+BranchProv branchProvs[3:0];
 BranchProv branch;
 always_comb begin
     branch.taken = 0;
     branch = 0;
-    for (i = 0; i < 3; i=i+1) begin
+    for (i = 0; i < 4; i=i+1) begin
         if (branchProvs[i].taken && (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0)) begin
             branch.taken = 1;
             branch.dstPC = branchProvs[i].dstPC;
             branch.sqN = branchProvs[i].sqN;
             branch.loadSqN = branchProvs[i].loadSqN;
             branch.storeSqN = branchProvs[i].storeSqN;
+            branch.flush = branchProvs[i].flush;
         end
     end
 end
@@ -146,7 +154,13 @@ BranchPredictor bp
     .IN_branchAddr(branchSource),
     .IN_branchDest(branchProvs[1].dstPC),
     .IN_branchTaken(branchTaken),
-    .IN_branchIsJump(branchIsJump)
+    .IN_branchIsJump(branchIsJump),
+    
+    .IN_ROB_valid(comValid[0]),
+    .IN_ROB_isBranch(comIsBranch[0]),
+    .IN_ROB_branchID(comBranchID[0]),
+    .IN_ROB_branchAddr(comPC[0]),
+    .IN_ROB_branchTaken(comBranchTaken[0])
 );
 
 
@@ -265,12 +279,14 @@ wire RF_readEnable[3:0];
 wire[5:0] RF_readAddress[3:0];
 wire[31:0] RF_readData[3:0];
 
-wire[5:0] RF_writeAddress[1:0];
+wire[5:0] RF_writeAddress[2:0];
 assign RF_writeAddress[0] = wbUOp[0].tagDst;
 assign RF_writeAddress[1] = wbUOp[1].tagDst;
-wire[31:0] RF_writeData[1:0];
+assign RF_writeAddress[2] = wbUOp[2].tagDst;
+wire[31:0] RF_writeData[2:0];
 assign RF_writeData[0] = wbUOp[0].result;
 assign RF_writeData[1] = wbUOp[1].result;
+assign RF_writeData[2] = wbUOp[2].result;
 
 RF rf
 (
@@ -318,10 +334,10 @@ Load ld
     .OUT_funcUnit(LD_fu),
     .OUT_uop(LD_uop)
 );
-wire LSU_wbReq;
+wire LSU_wbReq = 0;
 
 wire INTALU_wbReq;
-RES_UOp INTALU_uop;
+always_comb branchProvs[0].flush = 0;
 IntALU ialu
 (
     .clk(clk),
@@ -350,35 +366,7 @@ IntALU ialu
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
     .OUT_zcFwdValid(LD_zcFwdValid[0]),
     
-    .OUT_uop(INTALU_uop)
-);
-
-wire LB_valid[0:0];
-wire LB_isLoad[0:0];
-wire[31:0] LB_addr[0:0];
-wire[5:0] LB_sqN[0:0];
-wire[5:0] LB_loadSqN[0:0];
-wire[5:0] LB_storeSqN[0:0];
-wire[31:0] LB_pc[0:0];
-wire[5:0] LB_maxLoadSqN;
-LoadBuffer lb
-(
-    .clk(clk),
-    .rst(rst),
-    .commitSqN(ROB_curSqN),
-    
-    .valid(LB_valid),
-    .isLoad(LB_isLoad),
-    .pc(LB_pc),
-    .addr(LB_addr),
-    .sqN(LB_sqN),
-    .loadSqN(LB_loadSqN),
-    .storeSqN(LB_storeSqN),
-    
-    .IN_branch(branch),
-    .OUT_branch(branchProvs[2]),
-    
-    .OUT_maxLoadSqN(LB_maxLoadSqN)
+    .OUT_uop(wbUOp[0])
 );
 
 
@@ -403,49 +391,43 @@ LoadBuffer lb
     .IN_MC_busy()
 );*/
 
-RES_UOp LSU_uop;
-assign wbStall = LSU_wbReq && INTALU_wbReq;
-LSU lsu
+AGU_UOp AGU_uop;
+AGU agu
 (
     .clk(clk),
     .rst(rst),
-    .IN_valid(LD_uop[0].valid && enabledXUs[0][1]),
+    .en(enabledXUs[0][1]),
+    
+    .IN_branch(branch),
+    
     .IN_uop(LD_uop[0]),
-    
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
-    
-    .OUT_SQ_valid(SQ_valid[0]),
-    .OUT_SQ_isLoad(SQ_isLoad[0]),
-    .OUT_SQ_addr(SQ_addr[0]),
-    .OUT_SQ_data(SQ_data[0]),
-    .OUT_SQ_wmask(SQ_wmask[0]),
-    .OUT_SQ_sqN(SQ_sqN[0]),
-    .OUT_SQ_storeSqN(SQ_storeSqN[0]),
-        
-    .IN_readData(SQ_readData[0]),
-    
-    .OUT_LB_valid(LB_valid[0]),
-    .OUT_LB_isLoad(LB_isLoad[0]),
-    .OUT_LB_addr(LB_addr[0]),
-    .OUT_LB_sqN(LB_sqN[0]),
-    .OUT_LB_loadSqN(LB_loadSqN[0]),
-    .OUT_LB_storeSqN(LB_storeSqN[0]),
-    .OUT_LB_pc(LB_pc[0]),
-    
-    .OUT_wbReq(LSU_wbReq),
-    
-    .OUT_uop(LSU_uop)
+    .OUT_uop(AGU_uop)
 );
 
-wire[31:0] SQ_readData[0:0];
-wire SQ_valid[0:0];
-wire SQ_isLoad[0:0];
-wire[29:0] SQ_addr[0:0];
-wire[31:0] SQ_data[0:0];
-wire[3:0] SQ_wmask[0:0];
-wire[5:0] SQ_sqN[0:0];
-wire[5:0] SQ_storeSqN[0:0];
+wire[5:0] LB_maxLoadSqN;
+LoadBuffer lb
+(
+    .clk(clk),
+    .rst(rst),
+    .commitSqN(ROB_curSqN),
+    
+    .valid('{AGU_uop.valid}),
+    .isLoad('{AGU_uop.isLoad}),
+    .pc('{AGU_uop.pc}),
+    .addr('{AGU_uop.addr}),
+    .sqN('{AGU_uop.sqN}),
+    .loadSqN('{AGU_uop.loadSqN}),
+    .storeSqN('{AGU_uop.storeSqN}),
+    
+    .IN_branch(branch),
+    .OUT_branch(branchProvs[2]),
+    
+    .OUT_maxLoadSqN(LB_maxLoadSqN)
+);
+
+
+assign wbStall = 0;//LSU_wbReq && INTALU_wbReq;
+
 wire[5:0] SQ_maxStoreSqN;
 
 StoreQueue sq
@@ -453,17 +435,12 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     
-    .IN_valid(SQ_valid),
-    .IN_isLoad(SQ_isLoad),
-    .IN_addr(SQ_addr),
-    .IN_data(SQ_data),
-    .IN_wmask(SQ_wmask),
-    .IN_sqN(SQ_sqN),
-    .IN_storeSqN(SQ_storeSqN),
+    .IN_uop('{AGU_uop}),
     
     .IN_curSqN(ROB_curSqN),
     
     .IN_branch(branch),
+    
     .IN_MEM_data('{IN_MEM_readData}),
     .OUT_MEM_addr('{OUT_MEM_addr}),
     .OUT_MEM_data('{OUT_MEM_writeData}),
@@ -471,12 +448,11 @@ StoreQueue sq
     .OUT_MEM_ce('{OUT_MEM_readEnable}),
     .OUT_MEM_wm('{OUT_MEM_writeMask}),
     
-    .OUT_data(SQ_readData),
+    .OUT_uop('{wbUOp[2]}),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
 );
 
-assign wbUOp[0] = !LSU_uop.valid ? INTALU_uop : LSU_uop;
-
+always_comb branchProvs[1].flush = 0;
 IntALU ialu1
 (
     .clk(clk),
@@ -523,8 +499,18 @@ ROB rob
 
     .OUT_comNames(comRegNm),
     .OUT_comTags(comRegTag),
+    .OUT_comIsBranch(comIsBranch),
+    .OUT_comBranchTaken(comBranchTaken),
+    .OUT_comBranchID(comBranchID),
+    .OUT_comPC(comPC),
     .OUT_comValid(comValid),
     .OUT_comSqNs(comSqN),
+    
+    .IN_irqAddr(32'hbc),
+    .OUT_irqFlags(),
+    .OUT_irqSrc(),
+    
+    .OUT_branch(branchProvs[3]),
     
     .OUT_halt(OUT_halt)
 );
@@ -534,6 +520,7 @@ assign frontendEn = (RV_freeEntries > NUM_UOPS) &&
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
-    !branch.taken;
+    !branch.taken &&
+    en;
     
 endmodule

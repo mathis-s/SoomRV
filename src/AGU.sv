@@ -1,0 +1,124 @@
+ 
+module AGU
+(
+    input wire clk,
+    input wire rst,
+    input wire en,
+    
+    input BranchProv IN_branch,
+    
+    input EX_UOp IN_uop,
+    output AGU_UOp OUT_uop
+);
+
+wire[31:0] addr = IN_uop.srcA + {20'b0, IN_uop.imm[11:0]};
+
+always_ff@(posedge clk) begin
+    
+    if (rst) begin
+        OUT_uop.valid <= 0;
+    end
+    else begin
+        
+        if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+            OUT_uop.addr <= addr;
+            //OUT_uop.wmask <= IN_uop.wmask;
+            //OUT_uop.signExtend <= IN_uop.signExtend;
+            //OUT_uop.shamt <= IN_uop.shamt;
+            OUT_uop.cacheAddr <= 5'bx;
+            OUT_uop.pc <= IN_uop.pc;
+            OUT_uop.tagDst <= IN_uop.tagDst;
+            OUT_uop.nmDst <= IN_uop.nmDst;
+            OUT_uop.sqN <= IN_uop.sqN;
+            OUT_uop.storeSqN <= IN_uop.storeSqN;
+            OUT_uop.loadSqN <= IN_uop.loadSqN;
+            OUT_uop.valid <= 1;
+            
+            
+            case (IN_uop.opcode)
+                LSU_LB: begin
+                    OUT_uop.isLoad <= 1;
+                    OUT_uop.shamt <= addr[1:0];
+                    OUT_uop.size <= 0;
+                    OUT_uop.signExtend <= 1;
+                end
+                LSU_LH: begin
+                    OUT_uop.isLoad <= 1;
+                    OUT_uop.shamt <= {addr[1], 1'b0};
+                    OUT_uop.size <= 1;
+                    OUT_uop.signExtend <= 1;
+                end
+                LSU_LW: begin
+                    OUT_uop.isLoad <= 1;
+                    OUT_uop.shamt <= 2'b0;
+                    OUT_uop.size <= 2;
+                    OUT_uop.signExtend <= 0;
+                end
+                LSU_LBU: begin
+                    OUT_uop.isLoad <= 1;
+                    OUT_uop.shamt <= addr[1:0];
+                    OUT_uop.size <= 0;
+                    OUT_uop.signExtend <= 0;
+                end
+                LSU_LHU: begin
+                    OUT_uop.isLoad <= 1;
+                    OUT_uop.shamt <= {addr[1], 1'b0};
+                    OUT_uop.size <= 1;
+                    OUT_uop.signExtend <= 0;
+                end
+
+                LSU_SB: begin
+                    OUT_uop.isLoad <= 0;
+                    case (addr[1:0]) 
+                        0: begin
+                            OUT_uop.wmask <= 4'b0001;
+                            OUT_uop.data <= IN_uop.srcB;
+                        end
+                        1: begin 
+                            OUT_uop.wmask <= 4'b0010;
+                            OUT_uop.data <= IN_uop.srcB << 8;
+                        end
+                        2: begin
+                            OUT_uop.wmask <= 4'b0100;
+                            OUT_uop.data <= IN_uop.srcB << 16;
+                        end 
+                        3: begin
+                            OUT_uop.wmask <= 4'b1000;
+                            OUT_uop.data <= IN_uop.srcB << 24;
+                        end 
+                    endcase
+                end
+
+                LSU_SH: begin
+                    OUT_uop.isLoad <= 0;
+                    case (addr[1]) 
+                        0: begin
+                            OUT_uop.wmask <= 4'b0011;
+                            OUT_uop.data <= IN_uop.srcB;
+                        end
+                        1: begin 
+                            OUT_uop.wmask <= 4'b1100;
+                            OUT_uop.data <= IN_uop.srcB << 16;
+                        end
+                    endcase
+                end
+
+                LSU_SW: begin
+                    OUT_uop.isLoad <= 0;
+                    OUT_uop.wmask <= 4'b1111;
+                    OUT_uop.data <= IN_uop.srcB;
+                end
+                
+                default: begin end
+            endcase
+            
+        end
+        else
+            OUT_uop.valid <= 0;
+    end
+    
+end
+
+
+
+endmodule

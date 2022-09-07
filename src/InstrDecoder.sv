@@ -419,7 +419,7 @@ always_comb begin
             default: invalidEnc = 1;
         endcase
         if (invalidEnc) begin
-            uop = 97'bx;
+            //uop = 97'bx;
             uop.opcode = INT_UNDEFINED;
             uop.fu = FU_INT;
         end

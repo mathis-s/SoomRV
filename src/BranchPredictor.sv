@@ -6,13 +6,15 @@ typedef struct packed
     bit[31:0] srcAddr;
     bit[31:0] dstAddr;
     bit taken;  // always taken or dynamic bp?
-    bit[1:0] counter; // dynamic bp counter
+    bit[1:0] history;
+    bit[3:0][1:0] counters;
+    //bit[1:0] counter; // dynamic bp counter
 } BTEntry;
 
 module BranchPredictor
 #(
     parameter NUM_IN=2,
-    parameter NUM_ENTRIES=8,
+    parameter NUM_ENTRIES=16,
     parameter ID_BITS=6
 )
 (
@@ -37,7 +39,15 @@ module BranchPredictor
     input wire[31:0] IN_branchAddr,
     input wire[31:0] IN_branchDest,
     input wire IN_branchTaken,
-    input wire IN_branchIsJump
+    input wire IN_branchIsJump,
+    
+    
+    // Branch ROB Interface
+    input wire IN_ROB_valid,
+    input wire IN_ROB_isBranch,
+    input wire[ID_BITS-1:0] IN_ROB_branchID,
+    input wire[29:0] IN_ROB_branchAddr,
+    input wire IN_ROB_branchTaken
 );
 
 integer i;
@@ -66,7 +76,7 @@ always_comb begin
                 if (OUT_branchFound) OUT_multipleBranches = 1;
                     
                 OUT_branchFound = 1;
-                OUT_branchTaken = entries[i].taken || entries[i].counter[1];
+                OUT_branchTaken = entries[i].taken || entries[i].counters[entries[i].history][1];
                 OUT_isJump = entries[i].taken;
                 OUT_branchSrc = entries[i].srcAddr;
                 OUT_branchDst = entries[i].dstAddr;
@@ -89,41 +99,45 @@ always@(posedge clk) begin
         
         // No entry yet, create entry
         if (IN_branchTaken && IN_branchID == ((1 << ID_BITS) - 1)) begin
-            entries[insertIndex[2:0]].valid <= 1;
-            entries[insertIndex[2:0]].used <= 1;
-            entries[insertIndex[2:0]].srcAddr <= IN_branchAddr;
-            entries[insertIndex[2:0]].dstAddr <= IN_branchDest;
+            entries[insertIndex[3:0]].valid <= 1;
+            entries[insertIndex[3:0]].used <= 1;
+            entries[insertIndex[3:0]].srcAddr <= IN_branchAddr;
+            entries[insertIndex[3:0]].dstAddr <= IN_branchDest;
             // only jumps always taken
-            entries[insertIndex[2:0]].taken <= IN_branchIsJump;
-            entries[insertIndex[2:0]].counter <= {IN_branchTaken, 1'b0};
+            entries[insertIndex[3:0]].taken <= IN_branchIsJump;
+            entries[insertIndex[3:0]].counters[0] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[3:0]].counters[1] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[3:0]].counters[2] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[3:0]].counters[3] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[3:0]].history <= {IN_branchTaken, IN_branchTaken};
             insertIndex <= insertIndex + 1;
         end
-        
-        // Entry exists (and was not replaced)
-        else if (IN_branchAddr == entries[IN_branchID[2:0]].srcAddr) begin
-        
-            //entries[IN_branchID].used <= 1;
-            
-            // Update saturating counter
-            if (IN_branchTaken) begin
-                if (entries[IN_branchID[2:0]].counter != 2'b11)
-                    entries[IN_branchID[2:0]].counter <= entries[IN_branchID[2:0]].counter + 1;
-            end
-            else if (entries[IN_branchID[2:0]].counter != 2'b00)
-                entries[IN_branchID[2:0]].counter <= entries[IN_branchID[2:0]].counter - 1;
-        end
-        
     end
     else begin
         // If not valid or not used recently, keep this entry as first to replace
-        if (entries[insertIndex[2:0]].valid && entries[insertIndex[2:0]].used) begin
-            insertIndex[2:0] <= insertIndex[2:0] + 1;
-            entries[insertIndex[2:0]].used <= 0;
+        if (entries[insertIndex[3:0]].valid && entries[insertIndex[3:0]].used) begin
+            insertIndex[3:0] <= insertIndex[3:0] + 1;
+            entries[insertIndex[3:0]].used <= 0;
         end
     end
     
+    if (IN_ROB_valid && IN_ROB_isBranch && IN_ROB_branchID != ((1 << ID_BITS) - 1) && {IN_ROB_branchAddr, 2'b00} == entries[IN_ROB_branchID[3:0]].srcAddr) begin
+        
+        reg[1:0] hist = entries[IN_ROB_branchID[3:0]].history;
+        
+        entries[IN_ROB_branchID[3:0]].history <= {hist[0], IN_ROB_branchTaken};
+        
+        if (IN_ROB_branchTaken) begin
+            if (entries[IN_ROB_branchID[3:0]].counters[hist] != 2'b11)
+                entries[IN_ROB_branchID[3:0]].counters[hist] <= entries[IN_ROB_branchID[3:0]].counters[hist] + 1;
+        end
+        else if (entries[IN_ROB_branchID[3:0]].counters[hist] != 2'b00)
+            entries[IN_ROB_branchID[3:0]].counters[hist] <= entries[IN_ROB_branchID[3:0]].counters[hist] - 1;
+            
+    end
+    
     if (!rst && IN_pcValid && OUT_branchTaken) begin
-        entries[OUT_branchID[2:0]].used <= 1;
+        entries[OUT_branchID[3:0]].used <= 1;
     end
 end
 

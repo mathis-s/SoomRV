@@ -1,16 +1,8 @@
 	.file	"primes.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_f2p0_d2p0"
+	.attribute arch, "rv32i2p0_f2p0_d2p0_zba_zbb"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
-	.text
-	.globl	sieve
-	.bss
-	.align	2
-	.type	sieve, @object
-	.size	sieve, 512
-sieve:
-	.zero	512
 	.text
 	.align	2
 	.globl	mark
@@ -21,133 +13,135 @@ mark:
 	srli	a5,a4,5
 	li	a3,127
 	bgtu	a5,a3,.L1
-	lui	a1,%hi(sieve)
-	addi	a1,a1,%lo(sieve)
+	lui	a1,%hi(.LANCHOR0)
+	addi	a1,a1,%lo(.LANCHOR0)
 	li	a7,1
 	li	a6,127
 .L3:
 	slli	a5,a5,2
 	add	a5,a1,a5
-	sll	a3,a7,a4
 	lw	a2,0(a5)
+	sll	a3,a7,a4
+	add	a4,a4,a0
 	or	a3,a3,a2
 	sw	a3,0(a5)
-	add	a4,a4,a0
 	srli	a5,a4,5
 	bleu	a5,a6,.L3
 .L1:
 	ret
 	.size	mark, .-mark
-	.section	.rodata
-	.align	2
-	.type	hexLut, @object
-	.size	hexLut, 16
-hexLut:
-	.ascii	"0123456789abcdef"
-	.text
-	.align	2
-	.type	printhex, @function
-printhex:
-	lui	a5,%hi(hexLut)
-	addi	a5,a5,%lo(hexLut)
-	srli	a4,a0,28
-	add	a4,a5,a4
-	lbu	a3,0(a4)
-	li	a4,1023
-	sb	a3,0(a4)
-	srli	a3,a0,24
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	srli	a3,a0,20
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	srli	a3,a0,16
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	srli	a3,a0,12
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	srli	a3,a0,8
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	srli	a3,a0,4
-	andi	a3,a3,15
-	add	a3,a5,a3
-	lbu	a3,0(a3)
-	sb	a3,0(a4)
-	andi	a0,a0,15
-	add	a5,a5,a0
-	lbu	a5,0(a5)
-	sb	a5,0(a4)
-	li	a5,10
-	sb	a5,0(a4)
-	ret
-	.size	printhex, .-printhex
+	.section	.text.startup,"ax",@progbits
 	.align	2
 	.globl	main
 	.type	main, @function
 main:
-	addi	sp,sp,-32
-	sw	ra,28(sp)
-	sw	s0,24(sp)
-	sw	s1,20(sp)
-	sw	s2,16(sp)
-	sw	s3,12(sp)
-	sw	s4,8(sp)
-	sw	s5,4(sp)
-	sw	s6,0(sp)
-	li	s0,1
-	li	s1,0
-	li	s2,3
-	li	s3,30
-	li	s5,128
-	lui	s4,%hi(sieve)
-	addi	s4,s4,%lo(sieve)
-	li	s6,1
-.L9:
-	mv	a0,s2
-	call	mark
-	j	.L7
-.L10:
-	addi	s2,s2,2
-	addi	s0,s0,1
-	slli	a4,s1,2
-	add	a4,s4,a4
-	sll	a5,s6,s0
-	lw	a4,0(a4)
-	and	a5,a5,a4
-	beq	a5,zero,.L13
-.L7:
-	ble	s0,s3,.L10
-	addi	s1,s1,1
-	beq	s1,s5,.L14
-	li	s0,-1
-	j	.L7
-.L13:
-	mv	a0,s2
-	call	printhex
-	j	.L9
-.L14:
+	addi	sp,sp,-16
+	lui	a6,%hi(.LANCHOR0)
+	lui	t6,%hi(.LANCHOR1)
+	sw	s0,12(sp)
+	li	a1,1
 	li	a0,0
-	lw	ra,28(sp)
-	lw	s0,24(sp)
-	lw	s1,20(sp)
-	lw	s2,16(sp)
-	lw	s3,12(sp)
-	lw	s4,8(sp)
-	lw	s5,4(sp)
-	lw	s6,0(sp)
-	addi	sp,sp,32
+	li	a3,3
+	li	t4,127
+	addi	a6,a6,%lo(.LANCHOR0)
+	li	t1,1
+	li	t3,31
+	li	t5,128
+	addi	t6,t6,%lo(.LANCHOR1)
+	li	t0,10
+.L10:
+	srli	a4,a3,1
+	add	a4,a4,a3
+	srli	a5,a4,5
+	bgtu	a5,t4,.L9
+.L8:
+	slli	a5,a5,2
+	add	a5,a6,a5
+	lw	a7,0(a5)
+	sll	a2,t1,a4
+	add	a4,a4,a3
+	or	a2,a2,a7
+	sw	a2,0(a5)
+	srli	a5,a4,5
+	nop
+	nop
+	bleu	a5,t4,.L8
+.L9:
+	bne	a1,t3,.L11
+	addi	a0,a0,1
+	beq	a0,t5,.L16
+	li	a4,1
+	li	a1,0
+.L12:
+	slli	a5,a0,2
+	add	a5,a6,a5
+	lw	a5,0(a5)
+	addi	a3,a3,2
+	and	a5,a4,a5
+	bne	a5,zero,.L9
+	srli	a5,a3,28
+	srli	a2,a3,24
+	add	a5,t6,a5
+	andi	a2,a2,15
+	srli	a4,a3,20
+	lbu	s0,0(a5)
+	add	a2,t6,a2
+	andi	a4,a4,15
+	srli	a5,a3,16
+	lbu	t2,0(a2)
+	add	a4,t6,a4
+	andi	a5,a5,15
+	srli	a2,a3,12
+	lbu	a7,0(a4)
+	add	a5,t6,a5
+	andi	a2,a2,15
+	srli	a4,a3,8
+	sb	s0,1023(zero)
+	add	a2,t6,a2
+	lbu	s0,0(a5)
+	andi	a4,a4,15
+	srli	a5,a3,4
+	sb	t2,1023(zero)
+	add	a4,t6,a4
+	lbu	t2,0(a2)
+	andi	a5,a5,15
+	sb	a7,1023(zero)
+	add	a5,t6,a5
+	lbu	a7,0(a4)
+	andi	a4,a3,15
+	sb	s0,1023(zero)
+	lbu	a2,0(a5)
+	add	a5,t6,a4
+	sb	t2,1023(zero)
+	lbu	a5,0(a5)
+	sb	a7,1023(zero)
+	sb	a2,1023(zero)
+	sb	a5,1023(zero)
+	sb	t0,1023(zero)
+	j	.L10
+.L11:
+	addi	a1,a1,1
+	sll	a4,t1,a1
+	j	.L12
+.L16:
+	lw	s0,12(sp)
+	li	a0,0
+	addi	sp,sp,16
 	jr	ra
 	.size	main, .-main
+	.globl	sieve
+	.section	.rodata
+	.align	2
+	.set	.LANCHOR1,. + 0
+	.type	hexLut, @object
+	.size	hexLut, 16
+hexLut:
+	.ascii	"0123456789abcdef"
+	.bss
+	.align	2
+	.set	.LANCHOR0,. + 0
+	.type	sieve, @object
+	.size	sieve, 512
+sieve:
+	.zero	512
 	.ident	"GCC: (g5964b5cd727) 11.1.0"

@@ -16,7 +16,7 @@ typedef struct packed
 module Rename
 #(
     parameter WIDTH_UOPS = 2,
-    parameter WIDTH_WR = 2
+    parameter WIDTH_WR = 3
 )
 (
     input wire clk,
@@ -28,10 +28,10 @@ module Rename
     input D_UOp IN_uop[WIDTH_UOPS-1:0],
 
     // Committed changes from ROB
-    input wire comValid[WIDTH_WR-1:0],
-    input wire[4:0] comRegNm[WIDTH_WR-1:0],
-    input wire[5:0] comRegTag[WIDTH_WR-1:0],
-    input wire[5:0] comSqN[WIDTH_WR-1:0],
+    input wire comValid[WIDTH_UOPS-1:0],
+    input wire[4:0] comRegNm[WIDTH_UOPS-1:0],
+    input wire[5:0] comRegTag[WIDTH_UOPS-1:0],
+    input wire[5:0] comSqN[WIDTH_UOPS-1:0],
 
     // WB for uncommitted but speculatively available values
     input wire IN_wbHasResult[WIDTH_WR-1:0],
@@ -139,6 +139,7 @@ always_ff@(posedge clk) begin
     else if (IN_branchTaken) begin
         
         counterSqN = IN_branchSqN + 1;
+        
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
         
@@ -200,13 +201,15 @@ always_ff@(posedge clk) begin
                 // TODO: Do this parametric
                 // Forward from WB
                 if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs0].specTag) ||
-                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs0].specTag))
+                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs0].specTag) ||
+                    (IN_wbHasResult[2] && IN_wbUOp[2].tagDst == rat[IN_uop[i].rs0].specTag))
                     OUT_uop[i].availA <= 1;
                 else
                     OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
 
                 if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs1].specTag) ||
-                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs1].specTag))
+                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs1].specTag) ||
+                    (IN_wbHasResult[2] && IN_wbUOp[2].tagDst == rat[IN_uop[i].rs1].specTag))
                     OUT_uop[i].availB <= 1;
                 else
                     OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
@@ -242,7 +245,7 @@ always_ff@(posedge clk) begin
     
     if (!rst) begin
         // Commit results from ROB.
-        for (i = 0; i < WIDTH_WR; i=i+1) begin
+        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             // commit at higher index is newer op, takes precedence in case of collision
             if (comValid[i] && (comRegNm[i] != 0)
                 && (!IN_branchTaken || $signed(comSqN[i] - IN_branchSqN) <= 0)) begin

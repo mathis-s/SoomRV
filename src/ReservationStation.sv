@@ -11,7 +11,7 @@ module ReservationStation
 #(
     parameter NUM_UOPS=2,
     parameter QUEUE_SIZE = 8,
-    parameter RESULT_BUS_COUNT = 2,
+    parameter RESULT_BUS_COUNT = 3,
     parameter STORE_QUEUE_SIZE=8
 )
 (
@@ -68,33 +68,32 @@ always_comb begin
                 if ((queue[j].availA ||
                         (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagA) ||
                         (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagA) ||
+                        (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagA) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
                         //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA) ||
-                        //(OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && OUT_uop[0].fu == FU_INT) ||
+                        (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && OUT_uop[0].fu == FU_INT) ||
                         (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && OUT_uop[1].fu == FU_INT)
                         ) && 
                         
                     (queue[j].availB ||
                         (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagB) ||
                         (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagB) ||
+                        (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagB) ||
                         //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
                         //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB) ||
-                        //(OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && OUT_uop[0].fu == FU_INT) ||
+                        (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && OUT_uop[0].fu == FU_INT) ||
                         (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && OUT_uop[1].fu == FU_INT)
                         ) &&
                         
                     // Second FU only gets simple int ops
                     (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
                     //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
-                    // Loads and Stores are issued in-order and non-speculatively for now
-                    //(!queueInfo[j].isLoad || IN_nextCommitSqN == queue[j].sqN) &&
-                    //(!queueInfo[j].isStore || IN_nextCommitSqN == queue[j].sqN) &&
                     
                     // Branches only to FU 1
-                    (!queueInfo[j].isJumpBranch || i == 1) &&
+                    (!queueInfo[j].isJumpBranch || i == 1)// &&
                     
                     // TODO: do comparisons in tree structure instead of linear
-                    (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
+                    /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
                     deqValid[i] = 1;
                     deqIndex[i] = j[2:0];
                 end
@@ -143,7 +142,7 @@ always_ff@(posedge clk) begin
             end
         
         // Some results can be forwarded
-        for (i = 1; i < NUM_UOPS; i=i+1) begin
+        for (i = 0; i < NUM_UOPS; i=i+1) begin
             if (OUT_valid[i] && OUT_uop[i].nmDst != 0/* &&
                 (!IN_invalidate || $signed(IN_invalidateSqN - OUT_uop[i].sqN) >= 0)*/ &&
                 OUT_uop[i].fu == FU_INT) begin

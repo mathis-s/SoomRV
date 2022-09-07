@@ -55,7 +55,9 @@ always_ff@(posedge clk) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) > 0)
                     entries[i].valid <= 0;
             end
-            if ($signed(baseIndex - IN_branch.loadSqN) > 0)
+            //if ($signed(baseIndex - IN_branch.loadSqN) > 0)
+            //    baseIndex = IN_branch.loadSqN;
+            if (IN_branch.flush)
                 baseIndex = IN_branch.loadSqN;
         end
         else begin
@@ -98,6 +100,7 @@ always_ff@(posedge clk) begin
                         OUT_branch.sqN <= sqN[i];
                         OUT_branch.loadSqN <= loadSqN[i];
                         OUT_branch.storeSqN <= storeSqN[i];
+                        OUT_branch.flush <= 0;
                     end
                     else 
                         OUT_branch.taken <= 0;
