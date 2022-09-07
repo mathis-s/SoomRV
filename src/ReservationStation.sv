@@ -19,13 +19,9 @@ module ReservationStation
     input wire rst,
     input wire frontEn,
 
-    input wire IN_wbStall[NUM_UOPS-1:0],
+    input wire IN_stall[NUM_UOPS-1:0],
     input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
-    
-    input FuncUnit IN_LD_fu[NUM_UOPS-1:0],
-    input EX_UOp IN_LD_uop[NUM_UOPS-1:0],
-    input wire IN_LD_wbStall[NUM_UOPS-1:0],
     
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
@@ -69,8 +65,6 @@ always_comb begin
                         (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagA) ||
                         (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagA) ||
                         (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagA) ||
-                        //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagA) ||
-                        //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagA) ||
                         (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && OUT_uop[0].fu == FU_INT) ||
                         (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && OUT_uop[1].fu == FU_INT)
                         ) && 
@@ -79,8 +73,6 @@ always_comb begin
                         (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagB) ||
                         (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagB) ||
                         (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagB) ||
-                        //(IN_LD_fu[0] == FU_INT && IN_LD_uop[0].valid && !IN_LD_wbStall[0] && IN_LD_uop[0].nmDst != 0 && IN_LD_uop[0].tagDst == queue[j].tagB) ||
-                        //(IN_LD_fu[1] == FU_INT && IN_LD_uop[1].valid && !IN_LD_wbStall[1] && IN_LD_uop[1].nmDst != 0 && IN_LD_uop[1].tagDst == queue[j].tagB) ||
                         (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && OUT_uop[0].fu == FU_INT) ||
                         (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && OUT_uop[1].fu == FU_INT)
                         ) &&
@@ -90,10 +82,10 @@ always_comb begin
                     //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
                     
                     // Branches only to FU 1
-                    (!queueInfo[j].isJumpBranch || i == 1)// &&
+                    (!queueInfo[j].isJumpBranch || i == 1) &&
                     
                     // TODO: do comparisons in tree structure instead of linear
-                    /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
+                    (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
                     deqValid[i] = 1;
                     deqIndex[i] = j[2:0];
                 end
@@ -101,6 +93,82 @@ always_comb begin
         end
     end
 end
+
+/*always_comb begin
+
+    for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
+        integer pow;
+        reg ready[QUEUE_SIZE-1:0];
+        reg[5:0] sqN[QUEUE_SIZE-1:0];
+        reg[2:0] index[QUEUE_SIZE-1:0];
+    
+        for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+            
+            ready[j] = (
+                queueInfo[j].valid && 
+                (!deqValid[1] || deqIndex[1] != j[2:0]) &&
+                
+                (queue[j].availA ||
+                    (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagA) ||
+                    (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagA) ||
+                    (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagA) ||
+                    (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagA && OUT_uop[0].fu == FU_INT) ||
+                    (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagA && OUT_uop[1].fu == FU_INT)) && 
+                    
+                (queue[j].availB ||
+                    (IN_resultValid[0] && IN_resultUOp[0].tagDst == queue[j].tagB) ||
+                    (IN_resultValid[1] && IN_resultUOp[1].tagDst == queue[j].tagB) ||
+                    (IN_resultValid[2] && IN_resultUOp[2].tagDst == queue[j].tagB) ||
+                    (OUT_valid[0] && OUT_uop[0].nmDst != 0 && OUT_uop[0].tagDst == queue[j].tagB && OUT_uop[0].fu == FU_INT) ||
+                    (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && OUT_uop[1].fu == FU_INT)) &&
+                    
+                // Second FU only gets simple int ops
+                (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
+
+                // Branches only to FU 1
+                (!queueInfo[j].isJumpBranch || i == 1));
+            
+            sqN[j] = queue[j].sqN;
+            index[j] = j[2:0];
+        end
+        
+        // Reduce
+        for (pow = 2; pow <= QUEUE_SIZE; pow=pow*2) begin
+            for (j = 0; j < QUEUE_SIZE / pow; j=j+1) begin
+                if (ready[2*j] && ready[2*j + 1]) begin
+                    ready[j] = 1;
+                    
+                    if ($signed(sqN[2*j] - sqN[2*j+1]) < 0) begin
+                        sqN[j] = sqN[2*j];
+                        index[j] = index[2*j];
+                    end
+                    else begin
+                        sqN[j] = sqN[2*j + 1];
+                        index[j] = index[2*j + 1];
+                    end
+                end
+                else if (ready[2*j]) begin
+                    ready[j] = 1;
+                    sqN[j] = sqN[2*j];
+                    index[j] = index[2*j];
+                end
+                else if (ready[2*j+1]) begin
+                    ready[j] = 1;
+                    sqN[j] = sqN[2*j+1];
+                    index[j] = index[2*j+1];
+                end
+                else begin
+                    ready[j] = 0;
+                    sqN[j] <= 5'bx;
+                    index[j] = 3'bx;
+                end
+            end
+        end
+        
+        deqIndex[i] = index[0];
+        deqValid[i] = ready[0];
+    end
+end*/
 
 
 reg[2:0] insertIndex[NUM_UOPS-1:0];
@@ -182,7 +250,7 @@ always_ff@(posedge clk) begin
     else begin
         // issue uops
         for (i = 0; i < NUM_UOPS; i=i+1) begin
-            if (!IN_wbStall[i]) begin
+            if (!IN_stall[i]) begin
                 if (deqValid[i]) begin
                     OUT_uop[i] <= queue[deqIndex[i]];
                     freeEntries = freeEntries + 1;

@@ -244,7 +244,9 @@ Rename rn
 wire RV_uopValid[NUM_UOPS-1:0];
 R_UOp RV_uop[NUM_UOPS-1:0];
 
-wire wbStall;
+wire stall[1:0];
+wire wbStall[1:0];
+assign wbStall[0] = 1'b0;
 
 wire[4:0] RV_freeEntries;
 ReservationStation rv
@@ -253,13 +255,9 @@ ReservationStation rv
     .rst(rst),
     .frontEn(stateValid[3] && frontendEn),
 
-    .IN_wbStall('{1'b0, wbStall}),
+    .IN_stall(stall),
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
-    
-    .IN_LD_fu(LD_fu),
-    .IN_LD_uop(LD_uop),
-    .IN_LD_wbStall('{1'b0, wbStall}),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
@@ -312,7 +310,10 @@ Load ld
 (
     .clk(clk),
     .rst(rst),
-    .IN_wbStall('{1'b0, wbStall}),
+    .IN_wbStall(wbStall),
+    .IN_wbStallSrc({FU_MUL, FU_MUL}),
+    .OUT_stall(stall),
+    
     .IN_uopValid(RV_uopValid),
     .IN_uop(RV_uop),
     
@@ -425,9 +426,6 @@ LoadBuffer lb
     .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
 
-
-assign wbStall = 0;//LSU_wbReq && INTALU_wbReq;
-
 wire[5:0] SQ_maxStoreSqN;
 
 StoreQueue sq
@@ -453,6 +451,7 @@ StoreQueue sq
 );
 
 always_comb branchProvs[1].flush = 0;
+RES_UOp INT1_uop;
 IntALU ialu1
 (
     .clk(clk),
@@ -481,8 +480,27 @@ IntALU ialu1
     .OUT_zcFwdTag(LD_zcFwdTag[1]),
     .OUT_zcFwdValid(LD_zcFwdValid[1]),
     
-    .OUT_uop(wbUOp[1])
+    .OUT_uop(INT1_uop)
 );
+
+RES_UOp MUL_uop;
+wire MUL_wbReq;
+Multiply mul
+(
+    .clk(clk),
+    .rst(rst),
+    .en(enabledXUs[1][2]),
+    
+    .IN_wbStall(wbStall[1]),
+    .OUT_wbReq(MUL_wbReq),
+    
+    .IN_branch(branch),
+    .IN_uop(LD_uop[1]),
+    .OUT_uop(MUL_uop)
+);
+
+assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
+assign wbStall[1] = enabledXUs[1][0] && MUL_wbReq && LD_uop[1].valid;
 
 wire[5:0] ROB_maxSqN;
 ROB rob

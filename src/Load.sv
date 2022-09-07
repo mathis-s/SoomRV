@@ -12,6 +12,10 @@ module Load
     // stall for wb contention, on stall simply do nothing and
     // keep the previous output
     input wire IN_wbStall[NUM_UOPS-1:0],
+    input FuncUnit IN_wbStallSrc[NUM_UOPS-1:0],
+    
+    output OUT_stall[NUM_UOPS-1:0],
+    
     input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
 
@@ -46,16 +50,22 @@ always_comb begin
 
         OUT_rfReadValid[i+NUM_UOPS] = 1;
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB;
+        
+        OUT_stall[i] = (IN_wbStall[i] && OUT_uop[i].valid && IN_wbStallSrc[i] == outFU[i]);
     end
 end
+
+FuncUnit outFU[NUM_UOPS-1:0];
 
 always_ff@(posedge clk) begin
     if (rst) begin
 
     end
     else begin
-        for (i = 0; i < NUM_UOPS; i=i+1) begin     
-            if (!IN_wbStall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
+        for (i = 0; i < NUM_UOPS; i=i+1) begin
+            
+            if (!OUT_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
+                
                 OUT_uop[i].imm <= IN_uop[i].imm;
                 OUT_uop[i].sqN <= IN_uop[i].sqN;
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
@@ -132,8 +142,9 @@ always_ff@(posedge clk) begin
                     FU_MUL: OUT_enableXU[i] <= 4'b0100;
                     FU_DIV: OUT_enableXU[i] <= 4'b1000;
                 endcase
+                outFU[i] <= IN_uop[i].fu;
             end
-            else if (!IN_wbStall[i] || (IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
+            else if (!(OUT_stall[i] && (!IN_invalidate || $signed(OUT_uop[i].sqN - IN_invalidateSqN) <= 0))) begin
                 OUT_uop[i].valid <= 0;
                 OUT_enableXU[i] <= 0;
             end
