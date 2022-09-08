@@ -37,6 +37,10 @@ module StoreQueue
     output reg OUT_MEM_ce[NUM_PORTS-1:0],
     output reg[3:0] OUT_MEM_wm[NUM_PORTS-1:0],
     
+    // CSRs can share most ports with regular memory except these
+    input wire[31:0] IN_CSR_data[NUM_PORTS-1:0],
+    output reg OUT_CSR_ce[NUM_PORTS-1:0],
+    
     //output reg[31:0] OUT_data[NUM_PORTS-1:0],
     output RES_UOp OUT_uop[NUM_PORTS-1:0],
     
@@ -51,6 +55,8 @@ SQEntry entries[NUM_ENTRIES-1:0];
 reg[5:0] baseIndex;
 
 reg doingDequeue;
+reg isCsrRead[NUM_PORTS-1:0];
+
 
 // intermediate 
 reg[29:0] iAddr[NUM_PORTS-1:0];
@@ -60,6 +66,9 @@ reg[31:0] iData[NUM_PORTS-1:0];
 
 AGU_UOp i0[NUM_PORTS-1:0];
 AGU_UOp i1[NUM_PORTS-1:0];
+
+reg i0_isCsrRead[NUM_PORTS-1:0];
+reg i1_isCsrRead[NUM_PORTS-1:0];
 
 reg[31:0] queueLookupData[NUM_PORTS-1:0];
 reg[3:0] queueLookupMask[NUM_PORTS-1:0];
@@ -73,10 +82,14 @@ always_comb begin
         
         if (i1[i].isLoad) begin
             reg[31:0] data;
-            data[31:24] = queueLookupMask[i][3] ? queueLookupData[i][31:24] : IN_MEM_data[i][31:24];
-            data[23:16] = queueLookupMask[i][2] ? queueLookupData[i][23:16] : IN_MEM_data[i][23:16];
-            data[15:8] = queueLookupMask[i][1] ? queueLookupData[i][15:8] : IN_MEM_data[i][15:8];
-            data[7:0] = queueLookupMask[i][0] ? queueLookupData[i][7:0] : IN_MEM_data[i][7:0];
+            data[31:24] = queueLookupMask[i][3] ? queueLookupData[i][31:24] : 
+                (i1_isCsrRead[i] ?  IN_CSR_data[i][31:24] : IN_MEM_data[i][31:24]);
+            data[23:16] = queueLookupMask[i][2] ? queueLookupData[i][23:16] : 
+                (i1_isCsrRead[i] ? IN_CSR_data[i][23:16] : IN_MEM_data[i][23:16]);
+            data[15:8] = queueLookupMask[i][1] ? queueLookupData[i][15:8] : 
+                (i1_isCsrRead[i] ? IN_CSR_data[i][15:8] : IN_MEM_data[i][15:8]);
+            data[7:0] = queueLookupMask[i][0] ? queueLookupData[i][7:0] : 
+                (i1_isCsrRead[i] ? IN_CSR_data[i][7:0] : IN_MEM_data[i][7:0]);
             
             case (i1[i].size)
                 
@@ -118,18 +131,27 @@ always_comb begin
     end
 end
 
-
 // Handle Loads combinatorially (SRAM input is registered)
 always_comb begin
     doingDequeue = 0;
     
     for (i = 0; i < NUM_PORTS; i=i+1) begin
+        
+        isCsrRead[i] = 0;
         if (!rst && IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             OUT_MEM_data[i] = 32'bx;
             OUT_MEM_addr[i] = IN_uop[i].addr[31:2];
             OUT_MEM_we[i] = 1;
             OUT_MEM_wm[i] = 4'bx;
-            OUT_MEM_ce[i] = 0;
+            if (IN_uop[i].addr[31:24] == 8'hff) begin
+                OUT_MEM_ce[i] = 1;
+                OUT_CSR_ce[i] = 0;
+                isCsrRead[i] = 1;
+            end
+            else begin
+                OUT_MEM_ce[i] = 0;
+                OUT_CSR_ce[i] = 1;
+            end
         end
         
         // Port 0 handles stores as well
@@ -137,9 +159,17 @@ always_comb begin
             doingDequeue = 1;
             OUT_MEM_data[i] = entries[0].data;
             OUT_MEM_addr[i] = entries[0].addr;
-            OUT_MEM_ce[i] = 0;
             OUT_MEM_we[i] = 0;
             OUT_MEM_wm[i] = entries[0].wmask;
+            
+            if (entries[0].addr[29:22] == 8'hff) begin
+                OUT_MEM_ce[i] = 1;
+                OUT_CSR_ce[i] = 0;
+            end
+            else begin
+                OUT_MEM_ce[i] = 0;
+                OUT_CSR_ce[i] = 1;
+            end
         end
         
         else begin
@@ -148,6 +178,7 @@ always_comb begin
             OUT_MEM_we[i] = 1'b1;
             OUT_MEM_ce[i] = 1'b1;
             OUT_MEM_wm[i] = 4'bx;
+            OUT_CSR_ce[i] = 1'b1;
         end
     end
     
@@ -225,6 +256,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_PORTS; i=i+1) begin
             if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 i0[i] <= IN_uop[i];
+                i0_isCsrRead[i] <= isCsrRead[i];
             end
             else
                 i0[i].valid <= 0;
@@ -235,6 +267,7 @@ always_ff@(posedge clk) begin
                     queueLookupMask[i] <= iMask[i];
                 end
                 i1[i] <= i0[i];
+                i1_isCsrRead[i] <= i0_isCsrRead[i];
             end
             else
                 i1[i].valid <= 0;

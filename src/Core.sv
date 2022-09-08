@@ -19,7 +19,11 @@ module Core
     
     output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
-    output wire OUT_halt
+    output wire OUT_halt,
+    
+    output wire[15:0] OUT_GPIO_oe,
+    output wire[15:0] OUT_GPIO,
+    input wire[15:0] IN_GPIO
 );
 
 integer i;
@@ -246,7 +250,6 @@ R_UOp RV_uop[NUM_UOPS-1:0];
 
 wire stall[1:0];
 wire wbStall[1:0];
-assign wbStall[0] = 1'b0;
 
 wire[4:0] RV_freeEntries;
 ReservationStation rv
@@ -254,6 +257,8 @@ ReservationStation rv
     .clk(clk),
     .rst(rst),
     .frontEn(stateValid[3] && frontendEn),
+    
+    .IN_DIV_doNotIssue(DIV_doNotIssue),
 
     .IN_stall(stall),
     .IN_uopValid(RN_uopValid),
@@ -311,7 +316,7 @@ Load ld
     .clk(clk),
     .rst(rst),
     .IN_wbStall(wbStall),
-    .IN_wbStallSrc({FU_MUL, FU_MUL}),
+    .IN_wbStallSrc({FU_MUL, FU_DIV}),
     .OUT_stall(stall),
     
     .IN_uopValid(RV_uopValid),
@@ -335,17 +340,18 @@ Load ld
     .OUT_funcUnit(LD_fu),
     .OUT_uop(LD_uop)
 );
-wire LSU_wbReq = 0;
+
 
 wire INTALU_wbReq;
 always_comb branchProvs[0].flush = 0;
+RES_UOp INT0_uop;
 IntALU ialu
 (
     .clk(clk),
     .en(enabledXUs[0][0]),
     .rst(rst),
     
-    .IN_wbStall(LSU_wbReq),
+    .IN_wbStall(0),
     .IN_uop(LD_uop[0]),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -367,8 +373,32 @@ IntALU ialu
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
     .OUT_zcFwdValid(LD_zcFwdValid[0]),
     
-    .OUT_uop(wbUOp[0])
+    .OUT_uop(INT0_uop)
 );
+
+
+wire DIV_wbReq;
+wire DIV_busy;
+RES_UOp DIV_uop;
+wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && enabledXUs[0][3]) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
+Divide div
+(
+    .clk(clk),
+    .rst(rst),
+    .en(enabledXUs[0][3]),
+    
+    .IN_wbStall(enabledXUs[0][0] && wbStall[0]),
+    .OUT_wbReq(DIV_wbReq),
+    .OUT_busy(DIV_busy),
+    
+    .IN_branch(branch),
+    .IN_uop(LD_uop[0]),
+    .OUT_uop(DIV_uop)
+
+);
+
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
+assign wbStall[0] = DIV_busy;
 
 
 /*CacheController cc
@@ -427,6 +457,8 @@ LoadBuffer lb
 );
 
 wire[5:0] SQ_maxStoreSqN;
+wire CSR_ce[0:0];
+wire[31:0] CSR_dataOut[0:0];
 
 StoreQueue sq
 (
@@ -445,6 +477,9 @@ StoreQueue sq
     .OUT_MEM_we('{OUT_MEM_writeEnable}),
     .OUT_MEM_ce('{OUT_MEM_readEnable}),
     .OUT_MEM_wm('{OUT_MEM_writeMask}),
+    
+    .IN_CSR_data(CSR_dataOut),
+    .OUT_CSR_ce(CSR_ce),
     
     .OUT_uop('{wbUOp[2]}),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
@@ -503,6 +538,10 @@ assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
 assign wbStall[1] = enabledXUs[1][0] && MUL_wbReq && LD_uop[1].valid;
 
 wire[5:0] ROB_maxSqN;
+
+wire[31:0] CR_irqAddr;
+Flags ROB_irqFlags;
+wire[31:0] ROB_irqSrc;
 ROB rob
 (
     .clk(clk),
@@ -524,13 +563,40 @@ ROB rob
     .OUT_comValid(comValid),
     .OUT_comSqNs(comSqN),
     
-    .IN_irqAddr(32'hbc),
-    .OUT_irqFlags(),
-    .OUT_irqSrc(),
+    .IN_irqAddr(CR_irqAddr),
+    .OUT_irqFlags(ROB_irqFlags),
+    .OUT_irqSrc(ROB_irqSrc),
     
     .OUT_branch(branchProvs[3]),
     
     .OUT_halt(OUT_halt)
+);
+
+ControlRegs cr
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_ce(CSR_ce[0]),
+    .IN_we(OUT_MEM_writeEnable),
+    .IN_wm(OUT_MEM_writeMask),
+    .IN_addr(OUT_MEM_addr[5:0]),
+    .IN_data(OUT_MEM_writeData),
+    .OUT_data(CSR_dataOut[0]),
+
+    .IN_comValid(comValid),
+    .IN_branch(branch),
+    .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
+    .IN_ifValid(IF_instrValid),
+    .IN_comBranch(comIsBranch[0]), // TODO: update to only include branches not jumps
+    
+    .OUT_irqAddr(CR_irqAddr),
+    .IN_irqTaken(branchProvs[3].taken),
+    .IN_irqSrc(ROB_irqSrc),
+    .IN_irqFlags(ROB_irqFlags),
+    
+    .OUT_GPIO_oe(OUT_GPIO_oe),
+    .OUT_GPIO(OUT_GPIO),
+    .IN_GPIO(IN_GPIO)
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF

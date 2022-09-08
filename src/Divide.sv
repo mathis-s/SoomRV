@@ -5,7 +5,6 @@ module Divide
     input wire en,
     
     input wire IN_wbStall,
-    input wire IN_stall,
     output wire OUT_wbReq,
     output reg OUT_busy,
     
@@ -34,7 +33,7 @@ always_ff@(posedge clk) begin
         OUT_busy <= 0;
     end
     else begin
-        if (en && IN_uop.valid && !IN_stall && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+        if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             OUT_busy <= 1;
             uop <= IN_uop;
             cnt <= 31;
@@ -78,7 +77,7 @@ always_ff@(posedge clk) begin
             end
             else if (!IN_wbStall)  begin
                 reg[31:0] qRestored = (q - (~q)) - (r[63] ? 1 : 0);
-                reg[31:0] remainder = {(r[63] ? (r + {d, 32'b0}) : r)}[63:32];
+                reg[31:0] remainder = (r[63] ? (r[63:32] + d) : r[63:32]);
                 
                 OUT_busy <= 0;
                 

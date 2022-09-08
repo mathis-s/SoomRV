@@ -5,6 +5,13 @@ main:
     li a0, 1111111111
     li a1, -1111111111
     mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
+    mulh a0, a0, a1
     nop
     nop
     nop

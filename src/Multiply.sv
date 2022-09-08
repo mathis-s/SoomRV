@@ -2,7 +2,7 @@
 module Multiply
 #
 (
-    parameter NUM_STAGES=4,
+    parameter NUM_STAGES=8,
     
     parameter BITS=(32/NUM_STAGES)
 )
@@ -41,7 +41,9 @@ integer i;
 MulPS pl[NUM_STAGES:0];
 assign OUT_wbReq = pl[NUM_STAGES].valid;
 
-always@(posedge clk) begin
+reg[63:0] result;
+
+always_ff@(posedge clk) begin
     
     if (rst) begin
         for (i = 0; i < NUM_STAGES; i=i+1) begin
@@ -95,7 +97,7 @@ always@(posedge clk) begin
                     pl[i+1].valid <= 0;
             end
             
-            if (pl[NUM_STAGES].valid && (!branch.taken || $signed(pl[NUM_STAGES].sqN - IN_branch.sqN) <= 0)) begin
+            if (pl[NUM_STAGES].valid && (!IN_branch.taken || $signed(pl[NUM_STAGES].sqN - IN_branch.sqN) <= 0)) begin
                 
                 OUT_uop.valid <= 1;
                 OUT_uop.tagDst <= pl[NUM_STAGES].tagDst;
@@ -107,10 +109,12 @@ always@(posedge clk) begin
                 OUT_uop.branchID <= 0;
                 OUT_uop.flags <= FLAGS_NONE;
                 
+                result = (pl[NUM_STAGES].invert ? (-pl[NUM_STAGES].res) : pl[NUM_STAGES].res);
+                
                 if (pl[NUM_STAGES].high)
-                    OUT_uop.result <= {(pl[NUM_STAGES].invert ? (-pl[NUM_STAGES].res) : pl[NUM_STAGES].res)}[63:32];
+                    OUT_uop.result <= result[63:32];
                 else
-                    OUT_uop.result <= {(pl[NUM_STAGES].invert ? (-pl[NUM_STAGES].res) : pl[NUM_STAGES].res)}[31:0];
+                    OUT_uop.result <= result[31:0];
             end
             else
                 OUT_uop.valid <= 0;

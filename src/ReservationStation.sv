@@ -18,6 +18,8 @@ module ReservationStation
     input wire clk,
     input wire rst,
     input wire frontEn,
+    
+    input wire IN_DIV_doNotIssue,
 
     input wire IN_stall[NUM_UOPS-1:0],
     input wire IN_uopValid[NUM_UOPS-1:0],
@@ -78,14 +80,15 @@ always_comb begin
                         ) &&
                         
                     // Second FU only gets simple int ops
-                    (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore)) &&
+                    (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore && queue[j].fu != FU_DIV)) &&
+                    (!IN_DIV_doNotIssue || queue[j].fu != FU_DIV) &&
                     //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
                     
                     // Branches only to FU 1
-                    (!queueInfo[j].isJumpBranch || i == 1) &&
+                    (!queueInfo[j].isJumpBranch || i == 1)// &&
                     
                     // TODO: do comparisons in tree structure instead of linear
-                    (!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)) begin
+                    /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
                     deqValid[i] = 1;
                     deqIndex[i] = j[2:0];
                 end
