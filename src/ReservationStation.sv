@@ -20,6 +20,7 @@ module ReservationStation
     input wire frontEn,
     
     input wire IN_DIV_doNotIssue,
+    input wire IN_MUL_doNotIssue,
 
     input wire IN_stall[NUM_UOPS-1:0],
     input wire IN_uopValid[NUM_UOPS-1:0],
@@ -53,6 +54,9 @@ reg enqValid;
 reg[2:0] deqIndex[NUM_UOPS-1:0];
 reg deqValid[NUM_UOPS-1:0];
 
+// 10 9 8 7 6 5 4 3 2
+reg[32:0] reservedWBs[NUM_UOPS-1:0];
+
 always_comb begin    
     for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
         
@@ -81,11 +85,14 @@ always_comb begin
                         
                     // Second FU only gets simple int ops
                     (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore && queue[j].fu != FU_DIV)) &&
+                    (i == 1 || (queue[j].fu != FU_MUL)) &&
                     (!IN_DIV_doNotIssue || queue[j].fu != FU_DIV) &&
+                    (!IN_MUL_doNotIssue || queue[j].fu != FU_MUL) &&
                     //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
                     
                     // Branches only to FU 1
-                    (!queueInfo[j].isJumpBranch || i == 1)// &&
+                    (!queueInfo[j].isJumpBranch || i == 1) &&
+                    (queue[j].fu != FU_INT || !reservedWBs[i][0])
                     
                     // TODO: do comparisons in tree structure instead of linear
                     /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
@@ -195,6 +202,11 @@ end
 
 always_ff@(posedge clk) begin
     
+    for (i = 0; i < NUM_UOPS; i=i+1) begin
+        reservedWBs[i] <= {1'b0, reservedWBs[i][32:1]};
+        OUT_valid[i] <= 0;
+    end
+    
     if (!rst) begin
         // Get relevant results from common data buses
         for (i = 0; i < RESULT_BUS_COUNT; i=i+1) 
@@ -236,6 +248,9 @@ always_ff@(posedge clk) begin
             queueInfo[i].valid <= 0;
         end
         freeEntries = 8;
+        OUT_free <= 8;
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            reservedWBs[i] <= 0;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
@@ -246,9 +261,9 @@ always_ff@(posedge clk) begin
             end
         end
         
-        for (i = 0; i < NUM_UOPS; i=i+1)
-            if ($signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)
-                OUT_valid[i] <= 0;
+        //for (i = 0; i < NUM_UOPS; i=i+1)
+        //    if ($signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)
+        //        OUT_valid[i] <= 0;
     end
     else begin
         // issue uops
@@ -259,6 +274,14 @@ always_ff@(posedge clk) begin
                     freeEntries = freeEntries + 1;
                     OUT_valid[i] <= 1;
                     queueInfo[deqIndex[i]].valid <= 0;
+                    
+                    //if (queue[deqIndex[i]].fu == FU_MUL)
+                    reservedWBs[i] <= {
+                        (queue[deqIndex[i]].fu == FU_DIV), 
+                        reservedWBs[i][32:10], 
+                        (queue[deqIndex[i]].fu == FU_MUL) | reservedWBs[i][9], 
+                        reservedWBs[i][8:1]
+                    };
                 end
                 else 
                     OUT_valid[i] <= 0;

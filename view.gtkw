@@ -1,22 +1,25 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Thu Sep  8 16:17:02 2022
+[*] Sat Sep 10 14:48:04 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Thu Sep  8 15:34:32 2022"
-[dumpfile_size] 998618
+[dumpfile_mtime] "Sat Sep 10 14:47:01 2022"
+[dumpfile_size] 60953316
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 1667
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-7.140255 2540 912780 13460 1840 2640 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.140255 41131 912780 13460 1840 2640 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.agu.
+[treeopen] TOP.Core.agu.OUT_uop.
 [treeopen] TOP.Core.bp.
 [treeopen] TOP.Core.bp.entries[1].
 [treeopen] TOP.Core.bp.entries[2].
+[treeopen] TOP.Core.branch.
 [treeopen] TOP.Core.branchProvs[2].
+[treeopen] TOP.Core.cr.
 [treeopen] TOP.Core.div.
 [treeopen] TOP.Core.div.IN_uop.
 [treeopen] TOP.Core.ialu.
@@ -29,10 +32,13 @@
 [treeopen] TOP.Core.ld.IN_uop[1].
 [treeopen] TOP.Core.ld.OUT_uop[0].
 [treeopen] TOP.Core.LD_uop[0].
+[treeopen] TOP.Core.mul.
+[treeopen] TOP.Core.mul.OUT_uop.
 [treeopen] TOP.Core.rn.
 [treeopen] TOP.Core.rn.OUT_uop[0].
 [treeopen] TOP.Core.rn.rat[2].
 [treeopen] TOP.Core.rn.rat[5].
+[treeopen] TOP.Core.RN_uop[0].
 [treeopen] TOP.Core.RN_uop[1].
 [treeopen] TOP.Core.rob.
 [treeopen] TOP.Core.rob.entries[0].
@@ -53,32 +59,58 @@
 [treeopen] TOP.Core.rob.entries[9].
 [treeopen] TOP.Core.rv.
 [treeopen] TOP.Core.rv.queue[0].
+[treeopen] TOP.Core.rv.queue[5].
 [treeopen] TOP.Core.sq.
 [sst_width] 314
 [signals_width] 428
 [sst_expanded] 1
-[sst_vpaned_height] 1426
+[sst_vpaned_height] 1354
 @28
 TOP.clk
+TOP.en
 TOP.rst
 TOP.Core.mispredFlush
+@22
+>-832000
+TOP.Core.mispredFlushSqN[5:0]
+@28
+>0
 TOP.Core.branch.taken
+TOP.Core.branch.flush
 @22
 TOP.Core.branch.sqN[5:0]
+TOP.Core.branch.dstPC[31:0]
 @28
+TOP.Core.OUT_halt
+TOP.Core.OUT_instrMappingMiss
+@22
+>24
+TOP.Core.IN_instrMappingBase[18:0]
+@28
+>0
 TOP.Core.frontendEn
 @820
 TOP.Core.OUT_MEM_writeData[31:0]
 @24
 TOP.Core.OUT_MEM_addr[29:0]
+@22
+TOP.Core.IN_instrRaw[63:0]
+TOP.Core.DE_uop[0].imm[31:0]
+TOP.Core.DE_uop[1].imm[31:0]
 @28
 TOP.Core.dbgIsPrint
+TOP.Core.cr.OUT_SPI_clk
+TOP.Core.cr.OUT_IO_busy
+TOP.Core.cr.OUT_SPI_mosi
+TOP.Core.cr.IN_SPI_miso
+TOP.Core.cr.OUT_IO_busy
 @200
 -RN_uop[0]
 @28
 #{TOP.Core.rn.OUT_uopValid[0:1]} TOP.Core.rn.OUT_uopValid[0] TOP.Core.rn.OUT_uopValid[1]
 @22
 TOP.Core.RN_uop[0].pc[31:0]
+TOP.Core.RN_uop[0].imm[31:0]
 TOP.Core.RN_uop[0].sqN[5:0]
 @28
 TOP.Core.RN_uop[0].availA
@@ -92,6 +124,7 @@ TOP.Core.rn.OUT_uop[0].nmDst[4:0]
 -RN_uop[1]
 @22
 TOP.Core.RN_uop[1].pc[31:0]
+TOP.Core.RN_uop[1].imm[31:0]
 @28
 #{TOP.Core.rn.newTagsAvail[0:1]} TOP.Core.rn.newTagsAvail[0] TOP.Core.rn.newTagsAvail[1]
 @22
@@ -117,47 +150,31 @@ TOP.Core.rn.OUT_uop[1].nmDst[4:0]
 @200
 -RV[0]
 @22
-TOP.Core.rv.queue[0].tagA[5:0]
-TOP.Core.rv.queue[0].tagB[5:0]
 TOP.Core.rv.queue[0].sqN[5:0]
-@28
-TOP.Core.rv.queue[0].availA
-TOP.Core.rv.queue[0].availB
-@22
-TOP.Core.rv.queue[0].tagDst[5:0]
-@200
--RV[1]
-@28
-TOP.Core.rv.queueInfo[1].valid
-@22
-TOP.Core.rv.queue[1].tagA[5:0]
-TOP.Core.rv.queue[1].tagB[5:0]
-@28
-TOP.Core.rv.queue[1].availA
-TOP.Core.rv.queue[1].availB
-@22
 TOP.Core.rv.queue[1].sqN[5:0]
-@200
--RV[2]
-@28
-TOP.Core.rv.queueInfo[2].valid
-TOP.Core.rv.queue[2].availA
-TOP.Core.rv.queue[2].availB
-@22
 TOP.Core.rv.queue[2].sqN[5:0]
-@200
--RV[3]
-@28
-TOP.Core.rv.queue[3].availA
-TOP.Core.rv.queue[3].availB
-@22
 TOP.Core.rv.queue[3].sqN[5:0]
+TOP.Core.rv.queue[4].sqN[5:0]
+TOP.Core.rv.queue[5].sqN[5:0]
+@28
+TOP.Core.rv.queueInfo[5].valid
+@22
+TOP.Core.rv.queue[6].sqN[5:0]
+@200
+-LD
+@22
+TOP.Core.ld.IN_uop[1].sqN[5:0]
+TOP.Core.ld.IN_uop[0].sqN[5:0]
+TOP.Core.ld.OUT_uop[1].sqN[5:0]
+@28
+TOP.Core.ld.OUT_uop[1].valid
+TOP.Core.ld.outFU[1][1:0]
 @200
 -IALU0
 @22
 TOP.Core.ialu.IN_uop.srcA[31:0]
 TOP.Core.ialu.IN_uop.srcB[31:0]
-@29
+@28
 TOP.Core.ialu.IN_uop.valid
 @22
 TOP.Core.ialu.OUT_uop.sqN[5:0]
@@ -170,6 +187,7 @@ TOP.Core.ialu.OUT_uop.result[31:0]
 @22
 TOP.Core.agu.OUT_uop.sqN[5:0]
 TOP.Core.agu.OUT_uop.addr[31:0]
+TOP.Core.agu.OUT_uop.pc[31:0]
 @28
 TOP.Core.agu.OUT_uop.valid
 @22
@@ -190,11 +208,10 @@ TOP.Core.ialu1.OUT_uop.pc[31:0]
 @28
 #{TOP.Core.stall[0:1]} TOP.Core.stall[0] TOP.Core.stall[1]
 #{TOP.Core.wbStall[0:1]} TOP.Core.wbStall[0] TOP.Core.wbStall[1]
-TOP.Core.div.IN_wbStall
-TOP.Core.div.IN_stall
 TOP.Core.div.IN_uop.valid
 TOP.Core.div.en
 TOP.Core.div.OUT_busy
+TOP.Core.div.OUT_uop.valid
 @c00024
 TOP.Core.div.IN_uop.srcA[31:0]
 @28
@@ -235,8 +252,18 @@ TOP.Core.div.IN_uop.srcA[31:0]
 @24
 TOP.Core.div.IN_uop.srcB[31:0]
 TOP.Core.div.OUT_uop.result[31:0]
+@200
+-Mul
+@22
+TOP.Core.mul.IN_uop.sqN[5:0]
 @28
-TOP.Core.div.OUT_uop.valid
+TOP.Core.mul.en
+TOP.Core.mul.OUT_uop.valid
+@22
+TOP.Core.mul.OUT_uop.pc[31:0]
+TOP.Core.mul.OUT_uop.tagDst[5:0]
+TOP.Core.mul.OUT_uop.sqN[5:0]
+TOP.Core.mul.OUT_uop.result[31:0]
 @200
 -ROB
 @22
@@ -247,12 +274,13 @@ TOP.Core.rob.entries[2].sqN[5:0]
 @24
 TOP.Core.rob.committedInstrs[31:0]
 @200
--SQ
+-
 @22
-TOP.Core.sq.entries[0].addr[29:0]
-@820
-TOP.Core.sq.entries[0].data[31:0]
-@28
-TOP.Core.sq.entries[0].valid
+TOP.Core.LB_maxLoadSqN[5:0]
+TOP.Core.RN_nextLoadSqN[5:0]
+TOP.Core.RN_nextSqN[5:0]
+TOP.Core.ROB_maxSqN[5:0]
+TOP.Core.SQ_maxStoreSqN[5:0]
+TOP.Core.RN_nextStoreSqN[5:0]
 [pattern_trace] 1
 [pattern_trace] 0

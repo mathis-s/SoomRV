@@ -1,6 +1,7 @@
 typedef struct packed
 {
     bit valid;
+    bit ready;
     bit[5:0] sqN;
     bit[29:0] addr;
     bit[31:0] data;
@@ -44,7 +45,8 @@ module StoreQueue
     //output reg[31:0] OUT_data[NUM_PORTS-1:0],
     output RES_UOp OUT_uop[NUM_PORTS-1:0],
     
-    output reg[5:0] OUT_maxStoreSqN
+    output reg[5:0] OUT_maxStoreSqN,
+    input wire IN_IO_busy
 );
 
 integer i;
@@ -56,6 +58,7 @@ reg[5:0] baseIndex;
 
 reg doingDequeue;
 reg isCsrRead[NUM_PORTS-1:0];
+reg isCsrWrite[NUM_PORTS-1:0];
 
 
 // intermediate 
@@ -73,7 +76,7 @@ reg i1_isCsrRead[NUM_PORTS-1:0];
 reg[31:0] queueLookupData[NUM_PORTS-1:0];
 reg[3:0] queueLookupMask[NUM_PORTS-1:0];
 
-
+reg didCSRwrite;
 
 always_comb begin
     for (i = 0; i < NUM_PORTS; i=i+1) begin
@@ -123,8 +126,7 @@ always_comb begin
         OUT_uop[i].sqN = i1[i].sqN;
         OUT_uop[i].pc = i1[i].pc;
         OUT_uop[i].valid = i1[i].valid;
-        // add flags here
-        OUT_uop[i].flags = FLAGS_NONE;
+        OUT_uop[i].flags = i1[i].exception ? FLAGS_EXCEPT : FLAGS_NONE;
         OUT_uop[i].isBranch = 0;
         OUT_uop[i].branchTaken = 0;
         OUT_uop[i].branchID = 0;
@@ -138,6 +140,7 @@ always_comb begin
     for (i = 0; i < NUM_PORTS; i=i+1) begin
         
         isCsrRead[i] = 0;
+        isCsrWrite[i] = 0;
         if (!rst && IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             OUT_MEM_data[i] = 32'bx;
             OUT_MEM_addr[i] = IN_uop[i].addr[31:2];
@@ -155,7 +158,9 @@ always_comb begin
         end
         
         // Port 0 handles stores as well
-        else if (!rst && i == 0 && entries[0].valid && !IN_branch.taken && $signed(IN_curSqN - entries[0].sqN) > 0) begin
+        else if (!rst && i == 0 && entries[0].valid && !IN_branch.taken && entries[0].ready &&
+            // Don't issue Memory Mapped IO ops while IO is not ready
+            (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff)) begin
             doingDequeue = 1;
             OUT_MEM_data[i] = entries[0].data;
             OUT_MEM_addr[i] = entries[0].addr;
@@ -165,6 +170,7 @@ always_comb begin
             if (entries[0].addr[29:22] == 8'hff) begin
                 OUT_MEM_ce[i] = 1;
                 OUT_CSR_ce[i] = 0;
+                isCsrWrite[i] = 1;
             end
             else begin
                 OUT_MEM_ce[i] = 0;
@@ -206,6 +212,9 @@ end
 
 
 always_ff@(posedge clk) begin
+    
+    didCSRwrite <= 0;
+
     if (rst) begin
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
@@ -215,7 +224,7 @@ always_ff@(posedge clk) begin
             i1[i].valid <= 0;
         end
         baseIndex = 0;
-        OUT_maxStoreSqN <= 0;
+        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
     end
     
     else begin
@@ -225,6 +234,7 @@ always_ff@(posedge clk) begin
                 entries[i] <= entries[i+1];
                 
             entries[NUM_ENTRIES-1].valid <= 0;
+            didCSRwrite <= isCsrWrite[0]; 
             baseIndex = baseIndex + 1;
         end
         
@@ -238,14 +248,20 @@ always_ff@(posedge clk) begin
             if (IN_branch.flush)
                 baseIndex = IN_branch.storeSqN + 1;
         end
+        
+        // Set entries of commited instructions to ready
+        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+            if ($signed(IN_curSqN - entries[i].sqN) > 0)
+                entries[i].ready <= 1;
+        end
     
         // Enqueue
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+            if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) && !IN_uop[i].exception) begin
                 reg[2:0] index = IN_uop[i].storeSqN[2:0] - baseIndex[2:0];
                 assert(IN_uop[i].storeSqN <= baseIndex + NUM_ENTRIES[5:0] - 1);
-                //assert(!entries[index].valid);
                 entries[index].valid <= 1;
+                entries[index].ready <= 0;
                 entries[index].sqN <= IN_uop[i].sqN;
                 entries[index].addr <= IN_uop[i].addr[31:2];
                 entries[index].data <= IN_uop[i].data;

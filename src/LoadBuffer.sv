@@ -47,6 +47,8 @@ always_ff@(posedge clk) begin
             entries[i].valid <= 0;
         end
         baseIndex = 0;
+        OUT_branch.taken <= 0;
+        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
     end
     else begin
         

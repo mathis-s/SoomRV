@@ -15,7 +15,10 @@ double sc_time_stamp()
     return main_time;
 }
 
-uint32_t ram[1024];
+uint32_t ram[2048];
+uint32_t pram[2048];
+
+uint32_t extram[65536];
 
 int main(int argc, char** argv)
 {
@@ -39,12 +42,12 @@ int main(int argc, char** argv)
     size_t numInstrs = 0;
     {
         FILE* f = fopen("text.bin", "rb");
-        while (numInstrs < 1024)
+        while (numInstrs < 65536)
         {
             uint32_t data;
             if (fread(&data, sizeof(uint32_t), 1, f) <= 0)
                 break;
-            ram[numInstrs] = data;
+            extram[numInstrs] = data;
             numInstrs++;
         }
         fclose(f);
@@ -64,6 +67,8 @@ int main(int argc, char** argv)
         fclose(f);
     }
     
+    memcpy(pram, extram, sizeof(pram));
+    
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
@@ -81,6 +86,8 @@ int main(int argc, char** argv)
 
     // Run
     top->en = 1;
+    top->IN_instrMappingBase = 0;
+    top->IN_instrMappingHalfSize = 0;
 
     // addresses is registered
     uint32_t instrAddrReg = 0;
@@ -90,20 +97,29 @@ int main(int argc, char** argv)
     bool memWeReg = true;
     bool memCeReg = true;
     uint32_t memWmReg = 0;
+    
+    uint32_t waitCnt = 8;
+
+    
     while (!Verilated::gotFinish())
     {
         if (top->OUT_halt)
             break;
+    
         // zero right now, going to be one, so rising edge
         if (top->clk == 0)
         {
             size_t index;
-            if (!instrCeReg)
+
             {
-                index = instrAddrReg * 2;
-                if (index >= 1023)
-                    index = 0;
-                top->IN_instrRaw = ((uint64_t)ram[index] | (((uint64_t)ram[index + 1]) << 32));
+                top->en = 1;
+                if (!instrCeReg)
+                {
+                    index = (instrAddrReg * 2) & 2047;
+                    //if (index >= 8192)
+                    //    index = 0;
+                    top->IN_instrRaw = ((uint64_t)pram[index] | (((uint64_t)pram[index + 1]) << 32));
+                }
             }
 
             
@@ -146,6 +162,20 @@ int main(int argc, char** argv)
                     //printf("word %.8x\n", word);
                     ram[index] = word;
                 }
+            }
+            
+            
+            if (top->OUT_instrMappingMiss)
+            {
+                printf("miss %zx\n", (size_t)top->OUT_instrAddr);
+                
+                if (waitCnt == 0)
+                {
+                    memcpy(pram, &extram[((size_t)(top->OUT_instrAddr) & 0x03c00) << 1], sizeof(pram));
+                    top->IN_instrMappingBase = (((size_t)top->OUT_instrAddr) & 0x3c00) << 3;
+                    waitCnt = 8;
+                }
+                else waitCnt--;
             }
             
             

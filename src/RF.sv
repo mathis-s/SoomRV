@@ -35,7 +35,7 @@ end
 always_ff@(posedge clk) begin
 
     if (rst) begin
-
+        
     end
     else begin
         for (i = 0; i < NUM_WRITE; i=i+1) begin
@@ -44,6 +44,8 @@ always_ff@(posedge clk) begin
             end
         end
     end
+    
+    mem[0] <= 0;
 end
 
 endmodule

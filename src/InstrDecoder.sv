@@ -47,7 +47,7 @@ always_comb begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         instr = IN_instr[i];
-        uop = 97'bx;
+        uop = 97'b0;
         invalidEnc = 1;
         uop.pc = IN_pc[i];
         uop.valid = IN_instrValid[i];
@@ -201,15 +201,15 @@ always_comb begin
                 if (instr.funct7 == 7'b0110000) begin
                     if (instr.funct3 == 3'b001) begin
                         if (instr.rs1 == 5'b00000) begin
-                            invalidEnc = 0;
+                            //invalidEnc = 0;
                             uop.opcode = INT_CLZ;
                         end
                         else if (instr.rs1 == 5'b00001) begin
-                            invalidEnc = 0;
+                            //invalidEnc = 0;
                             uop.opcode = INT_CTZ;
                         end
                         else if (instr.rs1 == 5'b00010) begin
-                            invalidEnc = 0;
+                            //invalidEnc = 0;
                             uop.opcode = INT_CPOP;
                         end
                         else if (instr.rs1 == 5'b00100) begin
@@ -232,35 +232,36 @@ always_comb begin
                     end
                 end
                 else if (instr[31:20] == 12'b001010000111 && instr.funct3 == 3'b101) begin
-                    invalidEnc = 0;
+                    //invalidEnc = 0;
                     uop.opcode = INT_ORC_B;
                 end
                 else if (instr[31:20] == 12'b011010011000 && instr.funct3 == 3'b101) begin
-                    invalidEnc = 0;
+                    //invalidEnc = 0;
+                    // TODO
                     uop.opcode = INT_ORC_B;
                 end
                 if (instr.funct7 == 7'b0100100) begin
                     if (instr.funct3 == 3'b001) begin
                         invalidEnc = 0;
-                        uop.opcode = INT_BCLR;
+                        //uop.opcode = INT_BCLR;
                         uop.imm = {27'b0, instr.rs1};
                     end
                     else if (instr.funct3 == 3'b101) begin
                         invalidEnc = 0;
-                        uop.opcode = INT_BEXT;
+                        //uop.opcode = INT_BEXT;
                         uop.imm = {27'b0, instr.rs1};
                     end
                 end
                 else if (instr.funct7 == 7'b0110100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BINV;
                         uop.imm = {27'b0, instr.rs1};
                     end
                 end
                 else if (instr.funct7 == 7'b0010100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BSET;
                         uop.imm = {27'b0, instr.rs1};
                     end
@@ -350,22 +351,22 @@ always_comb begin
                 end
                 else if (instr.funct7 == 7'b0000101) begin
                     if (instr.funct3 == 3'b110) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_MAX;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b111) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_MAXU;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b100) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_MIN;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b101) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_MINU;
                         uop.fu = FU_INT;
                     end
@@ -378,38 +379,38 @@ always_comb begin
                 end
                 else if (instr.funct7 == 7'b0110000) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_ROL;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b101) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_ROR;
                         uop.fu = FU_INT;
                     end
                 end
                 else if (instr.funct7 == 7'b0100100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BCLR;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b101) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BEXT;
                         uop.fu = FU_INT;
                     end
                 end
                 else if (instr.funct7 == 7'b0110100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BINV;
                         uop.fu = FU_INT;
                     end
                 end
                 else if (instr.funct7 == 7'b0010100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
+                        //invalidEnc = 0;
                         uop.opcode = INT_BSET;
                         uop.fu = FU_INT;
                     end

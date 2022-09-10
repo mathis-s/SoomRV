@@ -80,15 +80,17 @@ end
 
 reg[5:0] newTags[WIDTH_UOPS-1:0];
 reg newTagsAvail[WIDTH_UOPS-1:0];
+wire[5:0] newTagsDbg0 = newTags[0];
+wire[5:0] newTagsDbg1 = newTags[1];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        newTagsAvail[i] = 0;
+        newTagsAvail[i] = 1'b0;
         newTags[i] = 6'bx;
         for (j = 0; j < 64; j=j+1) begin
             // TODO kind of hacky...
             if (!tags[j].used && (i == 0 || newTags[0] != j[5:0])) begin
                 newTags[i] = j[5:0];
-                newTagsAvail[i] = 1;
+                newTagsAvail[i] = 1'b1;
             end
         end
     end
@@ -110,13 +112,13 @@ always_ff@(posedge clk) begin
     if (rst) begin
         
         for (i = 0; i < 32; i=i+1) begin
-            tags[i].used <= 1;
-            tags[i].committed <= 1;
+            tags[i].used <= 1'b1;
+            tags[i].committed <= 1'b1;
             tags[i].sqN <= 6'bxxxxxx;
         end
         for (i = 32; i < 64; i=i+1) begin
-            tags[i].used <= 0;
-            tags[i].committed <= 1'bx;
+            tags[i].used <= 1'b0;
+            tags[i].committed <= 1'b0;
             tags[i].sqN <= 6'bxxxxxx;
         end
         
@@ -124,6 +126,8 @@ always_ff@(posedge clk) begin
         counterStoreSqN = 63;
         // TODO: check if load sqn is correctly handled
         counterLoadSqN = 0;
+        OUT_nextLoadSqN <= counterLoadSqN;
+        OUT_nextStoreSqN <= counterStoreSqN + 1;
         
         // Registers initialized with tags 0..31
         for (i = 0; i < 32; i=i+1) begin
@@ -173,13 +177,13 @@ always_ff@(posedge clk) begin
             OUT_uop[i].pcA <= IN_uop[i].pcA;
             OUT_uop[i].branchID <= IN_uop[i].branchID;
             OUT_uop[i].branchPred <= IN_uop[i].branchPred;
-
-            OUT_uopValid[i] <= 1;
         end
-
+        
         // Set seqnum/tags for next instruction(s)
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             if (IN_uop[i].valid) begin
+                
+                OUT_uopValid[i] <= 1;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 

@@ -6,12 +6,34 @@ module AGU
     input wire en,
     
     input BranchProv IN_branch,
+    input wire[20:0] IN_mapping[3:0],
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_uop
 );
 
+integer i;
+
 wire[31:0] addr = IN_uop.srcA + {20'b0, IN_uop.imm[11:0]};
+reg[1:0] mapping;
+reg mappingValid;
+reg mappingExcept;
+
+always_comb begin
+    
+    mappingValid = 0;
+    mapping = 0;
+    
+    for (i = 0; i < 4; i=i+1) begin
+        
+        if (addr[31:11] == IN_mapping[i]) begin
+            mappingValid = 1;
+            mapping = i[1:0];
+        end
+    end
+    
+    
+end
 
 always_ff@(posedge clk) begin
     
@@ -21,11 +43,19 @@ always_ff@(posedge clk) begin
     else begin
         
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-            OUT_uop.addr <= addr;
+            
+            mappingExcept = 0;
+            
+            if (addr[31:24] == 8'hff)
+                OUT_uop.addr <= addr;
+            else begin
+                OUT_uop.addr <= {19'b0, mapping, addr[10:0]};
+                mappingExcept = !mappingValid;
+            end
+            
             //OUT_uop.wmask <= IN_uop.wmask;
             //OUT_uop.signExtend <= IN_uop.signExtend;
             //OUT_uop.shamt <= IN_uop.shamt;
-            OUT_uop.cacheAddr <= 5'bx;
             OUT_uop.pc <= IN_uop.pc;
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;
@@ -33,6 +63,23 @@ always_ff@(posedge clk) begin
             OUT_uop.storeSqN <= IN_uop.storeSqN;
             OUT_uop.loadSqN <= IN_uop.loadSqN;
             OUT_uop.valid <= 1;
+            
+            // Exception fires on Null pointer or unaligned access
+            // (Unaligned is handled in software)
+            case (IN_uop.opcode)
+                LSU_LB,
+                LSU_LBU,
+                LSU_SB: OUT_uop.exception <= mappingExcept || (addr == 0);
+                
+                LSU_LH,
+                LSU_LHU,
+                LSU_SH: OUT_uop.exception <= mappingExcept || (addr == 0) || (addr[0]);
+                
+                LSU_LW,
+                LSU_SW: OUT_uop.exception <= mappingExcept || (addr == 0) || (addr[0] || addr[1]);
+                
+                default: begin end
+            endcase
             
             
             case (IN_uop.opcode)

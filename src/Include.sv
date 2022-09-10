@@ -145,12 +145,12 @@ typedef struct packed
     logic[5:0] opcode;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
-    logic[5:0] sqN;
-    logic[5:0] branchID;
-    logic branchPred;
-    logic[5:0] storeSqN;
-    logic[5:0] loadSqN;
-    logic valid;
+    logic[5:0] sqN; // 20
+    logic[5:0] branchID; // 14
+    logic branchPred; // 13
+    logic[5:0] storeSqN; // 7
+    logic[5:0] loadSqN; // 1
+    logic valid; //0
 } EX_UOp;
 
 typedef struct packed
@@ -158,13 +158,13 @@ typedef struct packed
     bit[31:0] result;
     bit[5:0] tagDst;
     bit[4:0] nmDst;
-    bit[5:0] sqN;
-    bit[31:0] pc;
-    bit isBranch;
-    bit branchTaken;
-    bit[5:0] branchID;
-    Flags flags;
-    bit valid;
+    bit[5:0] sqN; // 43
+    bit[31:0] pc; // 11
+    bit isBranch; // 10
+    bit branchTaken; // 9
+    bit[5:0] branchID; // 3
+    Flags flags; //1
+    bit valid; //0
 } RES_UOp;
 
 
@@ -188,7 +188,6 @@ typedef struct packed
     logic signExtend;
     logic[1:0] shamt;
     logic[1:0] size;
-    logic[4:0] cacheAddr;
     logic isLoad;
     logic[31:0] pc;
     logic[5:0] tagDst;
@@ -196,6 +195,7 @@ typedef struct packed
     logic[5:0] sqN;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
+    logic exception;
     logic valid;
 } AGU_UOp;
 

@@ -2,31 +2,33 @@
 .globl main
 
 main:
-    li a0, 1111111111
-    li a1, -1111111111
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    mulh a0, a0, a1
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
+    li a0, 111
+    li a1, 111
+    div a0, a0, a1
+    mul a1, a1, a1
+	div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    div a0, a0, a1
+    mul a1, a1, a1
+    
     call printhex
     ebreak
 

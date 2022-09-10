@@ -78,6 +78,12 @@ main:
     # not implemented, fires exception
     fadd.d f1, f1, f1
     
+	# null pointer read
+    lw a0, 0(zero)
+    
+    # unaligned write
+    sw a0, 2(zero)
+    
     li a0, 2
     call printhex
     

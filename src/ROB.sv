@@ -90,9 +90,9 @@ wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
-
+    OUT_halt <= 0;
+    
     if (rst) begin
-        OUT_halt <= 0;
         baseIndex = 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
@@ -101,6 +101,7 @@ always_ff@(posedge clk) begin
             OUT_comValid[i] <= 0;
         end
         committedInstrs <= 0;
+        OUT_branch.taken <= 0;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -165,8 +166,17 @@ always_ff@(posedge clk) begin
                 OUT_comPC[i] <= entries[i].pc;
                 
                 
-                if (entries[i].flags == FLAGS_BRK)
+                if (entries[i].flags == FLAGS_BRK) begin
+                    // ebreak does a jump to the instruction after itself,
+                    // this way the debugger can see the state right after ebreak exec'd.
                     OUT_halt <= 1;
+                    OUT_branch.taken <= 1;
+                    OUT_branch.dstPC <= {entries[i].pc + 1'b1, 2'b0};
+                    OUT_branch.sqN <= baseIndex + i[5:0];
+                    OUT_branch.flush <= 1;
+                    OUT_branch.storeSqN <= 0;
+                    OUT_branch.loadSqN <= 0;
+                end
                 else if (entries[i].flags == FLAGS_TRAP || entries[i].flags == FLAGS_EXCEPT) begin
                     OUT_branch.taken <= 1;
                     OUT_branch.dstPC <= IN_irqAddr;
@@ -196,6 +206,10 @@ always_ff@(posedge clk) begin
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
         for (i = 0; i < WIDTH_WB; i=i+1) begin
             if (IN_uop[i].valid && (!IN_invalidate || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0)) begin
+                
+                //assert(!IN_invalidate || !entries[IN_uop[i].sqN[4:0]].valid);
+                //$display("insert %d", IN_uop[i].sqN);
+                
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].valid <= 1;
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].flags <= IN_uop[i].flags;
                 entries[IN_uop[i].sqN[4:0] - baseIndex[4:0]].tag <= IN_uop[i].tagDst;

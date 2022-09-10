@@ -4,9 +4,7 @@ module Divide
     input wire rst,
     input wire en,
     
-    input wire IN_wbStall,
-    output wire OUT_wbReq,
-    output reg OUT_busy,
+    output wire OUT_busy,
     
     input BranchProv IN_branch,
     
@@ -23,18 +21,19 @@ reg[31:0] q;
 reg[31:0] d;
 reg invert;
 
-assign OUT_wbReq = OUT_busy && (cnt == 0);
+reg running;
 
+assign OUT_busy = running && (cnt != 0 && cnt != 63);
 
 always_ff@(posedge clk) begin
 
     if (rst) begin
         OUT_uop.valid <= 0;
-        OUT_busy <= 0;
+        running <= 0;
     end
     else begin
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-            OUT_busy <= 1;
+            running <= 1;
             uop <= IN_uop;
             cnt <= 31;
             
@@ -56,10 +55,10 @@ always_ff@(posedge clk) begin
             OUT_uop.valid <= 0;
             
         end
-        else if (OUT_busy) begin
+        else if (running) begin
             
             if (IN_branch.taken && $signed(IN_branch.sqN - uop.sqN) < 0) begin
-                OUT_busy <= 0;
+                running <= 0;
                 uop.valid <= 0;
                 OUT_uop.valid <= 0;
             end
@@ -75,11 +74,11 @@ always_ff@(posedge clk) begin
                 cnt <= cnt - 1;
                 OUT_uop.valid <= 0;
             end
-            else if (!IN_wbStall)  begin
+            else begin
                 reg[31:0] qRestored = (q - (~q)) - (r[63] ? 1 : 0);
                 reg[31:0] remainder = (r[63] ? (r[63:32] + d) : r[63:32]);
                 
-                OUT_busy <= 0;
+                running <= 0;
                 
                 OUT_uop.sqN <= uop.sqN;
                 OUT_uop.tagDst <= uop.tagDst;
@@ -96,12 +95,10 @@ always_ff@(posedge clk) begin
                 else
                     OUT_uop.result <= invert ? (-qRestored) : qRestored;
             end
-            else
-                OUT_uop.valid <= 0;
         end
         else begin
             OUT_uop.valid <= 0;
-            OUT_busy <= 0;
+            running <= 0;
         end
     end
 end

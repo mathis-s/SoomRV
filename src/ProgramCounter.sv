@@ -27,7 +27,11 @@ module ProgramCounter
     output reg[31:0] OUT_instr[NUM_UOPS-1:0],
     output reg[5:0] OUT_branchID[NUM_UOPS-1:0],
     output reg OUT_branchPred[NUM_UOPS-1:0],
-    output reg OUT_instrValid[NUM_UOPS-1:0]
+    output reg OUT_instrValid[NUM_UOPS-1:0],
+    
+    input wire[31:0] IN_instrMappingBase,
+    input wire IN_instrMappingHalfSize,
+    output wire OUT_instrMappingMiss
 );
 
 integer i;
@@ -45,6 +49,8 @@ always_comb begin
     OUT_instr[1] = IN_instr[63:32];
 end
 
+assign OUT_instrMappingMiss = (pc[30:12] != IN_instrMappingBase[31:13]) ||
+    (IN_instrMappingHalfSize && pc[11] != IN_instrMappingBase[12]);
 
 always_ff@(posedge clk) begin
     if (rst) begin
@@ -125,8 +131,12 @@ always_ff@(posedge clk) begin
             end
             else begin
                 case (pc[1])
-                    1'b1: pc <= pc + 2;
-                    1'b0: pc <= pc + 4;
+                    1'b1: begin
+                        pc <= pc + 2;
+                    end
+                    1'b0: begin
+                        pc <= pc + 4;
+                    end
                 endcase
                 pcLast <= pc;
                 bMaskLast <= 2'b11;

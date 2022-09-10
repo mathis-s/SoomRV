@@ -115,6 +115,9 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         OUT_uop.valid <= 0;
+        OUT_branchTaken <= 0;
+        OUT_isBranch <= 0;
+        OUT_branchMispred <= 0;
         //OUT_valid <= 0;
     end
     else begin

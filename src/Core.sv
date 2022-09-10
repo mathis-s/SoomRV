@@ -23,7 +23,15 @@ module Core
     
     output wire[15:0] OUT_GPIO_oe,
     output wire[15:0] OUT_GPIO,
-    input wire[15:0] IN_GPIO
+    input wire[15:0] IN_GPIO,
+    
+    output wire OUT_SPI_clk,
+    output wire OUT_SPI_mosi,
+    input wire IN_SPI_miso,
+    
+    output wire OUT_instrMappingMiss,
+    input wire[31:0] IN_instrMappingBase,
+    input wire IN_instrMappingHalfSize
 );
 
 integer i;
@@ -74,7 +82,9 @@ always_comb begin
     branch.taken = 0;
     branch = 0;
     for (i = 0; i < 4; i=i+1) begin
-        if (branchProvs[i].taken && (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0)) begin
+        if (branchProvs[i].taken && 
+            (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0) &&
+            (!mispredFlush || $signed(branchProvs[i].sqN - mispredFlushSqN) < 0)) begin
             branch.taken = 1;
             branch.dstPC = branchProvs[i].dstPC;
             branch.sqN = branchProvs[i].sqN;
@@ -87,6 +97,7 @@ end
 
 reg disableMispredFlush;
 reg mispredFlush;
+reg[5:0] mispredFlushSqN;
 
 reg [31:0] IF_pc[NUM_UOPS-1:0];
 wire[31:0] IF_instr[NUM_UOPS-1:0];
@@ -130,7 +141,11 @@ ProgramCounter progCnt
     .OUT_instr(IF_instr),
     .OUT_branchID(IF_branchID),
     .OUT_branchPred(IF_branchPred),
-    .OUT_instrValid(IF_instrValid)
+    .OUT_instrValid(IF_instrValid),
+    
+    .IN_instrMappingBase(IN_instrMappingBase),
+    .IN_instrMappingHalfSize(IN_instrMappingHalfSize),
+    .OUT_instrMappingMiss(OUT_instrMappingMiss)
 );
 
 wire isBranch;
@@ -176,11 +191,13 @@ always_ff@(posedge clk) begin
         stateValid <= 4'b0000;
         mispredFlush <= 0;
         disableMispredFlush <= 0;
+        mispredFlushSqN <= 0;
     end
     else if (branch.taken) begin
         stateValid <= 4'b0000;
         mispredFlush <= (ROB_curSqN != RN_nextSqN);
         disableMispredFlush <= 0;
+        mispredFlushSqN <= branch.sqN;
     end
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
@@ -209,6 +226,18 @@ InstrDecoder idec
 
     .OUT_uop(DE_uop)
 );
+
+wire[31:0] dbg_DUOp_pc0 = DE_uop[0].pc;
+wire[31:0] dbg_DUOp_pc1 = DE_uop[1].pc;
+
+wire[4:0] dbg_DUOp_nmDst = DE_uop[0].rd;
+wire[4:0] dbg_DUOp_nmDst = DE_uop[1].rd;
+
+wire[4:0] dbg_DUOp_srcA0 = DE_uop[0].rs0;
+wire[4:0] dbg_DUOp_srcA1 = DE_uop[1].rs0;
+
+wire[4:0] dbg_DUOp_srcB0 = DE_uop[0].rs1;
+wire[4:0] dbg_DUOp_srcB1 = DE_uop[1].rs1;
 
 R_UOp RN_uop[NUM_UOPS-1:0];
 reg RN_uopValid[NUM_UOPS-1:0];
@@ -245,11 +274,41 @@ Rename rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
+wire[31:0] dbg_RUOp_pc0 = RN_uop[0].pc;
+wire[31:0] dbg_RUOp_pc1 = RN_uop[1].pc;
+
+wire[5:0] dbg_RUOp_sqN0 = RN_uop[0].sqN;
+wire[5:0] dbg_RUOp_sqN1 = RN_uop[1].sqN;
+
+wire[5:0] dbg_RUOp_tagDst0 = RN_uop[0].tagDst;
+wire[5:0] dbg_RUOp_tagDst1 = RN_uop[1].tagDst;
+
+wire[4:0] dbg_RUOp_nmDst0 = RN_uop[0].nmDst;
+wire[4:0] dbg_RUOp_nmDst1 = RN_uop[1].nmDst;
+
+
+wire[5:0] dbg_RUOp_tagA0 = RN_uop[0].tagA;
+wire[5:0] dbg_RUOp_tagA1 = RN_uop[1].tagA;
+
+wire[5:0] dbg_RUOp_tagB0 = RN_uop[0].tagB;
+wire[5:0] dbg_RUOp_tagB1 = RN_uop[1].tagB;
+
+
+wire dbg_RUOp_availA0 = RN_uop[0].availA;
+wire dbg_RUOp_availA1 = RN_uop[1].availA;
+
+wire dbg_RUOp_availB0 = RN_uop[0].availB;
+wire dbg_RUOp_availB1 = RN_uop[1].availB;
+
 wire RV_uopValid[NUM_UOPS-1:0];
 R_UOp RV_uop[NUM_UOPS-1:0];
 
 wire stall[1:0];
+assign stall[0] = 0;
+assign stall[1] = 0;
 wire wbStall[1:0];
+assign wbStall[0] = 0;
+assign wbStall[1] = 0;
 
 wire[4:0] RV_freeEntries;
 ReservationStation rv
@@ -259,6 +318,7 @@ ReservationStation rv
     .frontEn(stateValid[3] && frontendEn),
     
     .IN_DIV_doNotIssue(DIV_doNotIssue),
+    .IN_MUL_doNotIssue(MUL_doNotIssue),
 
     .IN_stall(stall),
     .IN_uopValid(RN_uopValid),
@@ -315,9 +375,6 @@ Load ld
 (
     .clk(clk),
     .rst(rst),
-    .IN_wbStall(wbStall),
-    .IN_wbStallSrc({FU_MUL, FU_DIV}),
-    .OUT_stall(stall),
     
     .IN_uopValid(RV_uopValid),
     .IN_uop(RV_uop),
@@ -343,7 +400,7 @@ Load ld
 
 
 wire INTALU_wbReq;
-always_comb branchProvs[0].flush = 0;
+initial branchProvs[0].flush = 0;
 RES_UOp INT0_uop;
 IntALU ialu
 (
@@ -351,7 +408,7 @@ IntALU ialu
     .en(enabledXUs[0][0]),
     .rst(rst),
     
-    .IN_wbStall(0),
+    .IN_wbStall(1'b0),
     .IN_uop(LD_uop[0]),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -377,7 +434,6 @@ IntALU ialu
 );
 
 
-wire DIV_wbReq;
 wire DIV_busy;
 RES_UOp DIV_uop;
 wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && enabledXUs[0][3]) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
@@ -387,8 +443,6 @@ Divide div
     .rst(rst),
     .en(enabledXUs[0][3]),
     
-    .IN_wbStall(enabledXUs[0][0] && wbStall[0]),
-    .OUT_wbReq(DIV_wbReq),
     .OUT_busy(DIV_busy),
     
     .IN_branch(branch),
@@ -398,7 +452,7 @@ Divide div
 );
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
-assign wbStall[0] = DIV_busy;
+//assign wbStall[0] = DIV_busy;
 
 
 /*CacheController cc
@@ -423,6 +477,7 @@ assign wbStall[0] = DIV_busy;
 );*/
 
 AGU_UOp AGU_uop;
+wire[20:0] AGU_mapping[3:0];
 AGU agu
 (
     .clk(clk),
@@ -430,6 +485,7 @@ AGU agu
     .en(enabledXUs[0][1]),
     
     .IN_branch(branch),
+    .IN_mapping(AGU_mapping),
     
     .IN_uop(LD_uop[0]),
     .OUT_uop(AGU_uop)
@@ -482,10 +538,12 @@ StoreQueue sq
     .OUT_CSR_ce(CSR_ce),
     
     .OUT_uop('{wbUOp[2]}),
-    .OUT_maxStoreSqN(SQ_maxStoreSqN)
+    .OUT_maxStoreSqN(SQ_maxStoreSqN),
+    
+    .IN_IO_busy(IO_busy)
 );
 
-always_comb branchProvs[1].flush = 0;
+initial branchProvs[1].flush = 0;
 RES_UOp INT1_uop;
 IntALU ialu1
 (
@@ -493,7 +551,7 @@ IntALU ialu1
     .en(enabledXUs[1][0]),
     .rst(rst),
     
-    .IN_wbStall(0),
+    .IN_wbStall(1'b0),
     .IN_uop(LD_uop[1]),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -520,14 +578,15 @@ IntALU ialu1
 
 RES_UOp MUL_uop;
 wire MUL_wbReq;
-Multiply mul
+wire MUL_busy;
+wire MUL_doNotIssue = MUL_busy || (LD_uop[1].valid && enabledXUs[1][2]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
+MultiplySmall mul
 (
     .clk(clk),
     .rst(rst),
     .en(enabledXUs[1][2]),
     
-    .IN_wbStall(wbStall[1]),
-    .OUT_wbReq(MUL_wbReq),
+    .OUT_busy(MUL_busy),
     
     .IN_branch(branch),
     .IN_uop(LD_uop[1]),
@@ -535,7 +594,7 @@ Multiply mul
 );
 
 assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
-assign wbStall[1] = enabledXUs[1][0] && MUL_wbReq && LD_uop[1].valid;
+//assign wbStall[1] = enabledXUs[1][0] && MUL_wbReq && LD_uop[1].valid;
 
 wire[5:0] ROB_maxSqN;
 
@@ -572,6 +631,7 @@ ROB rob
     .OUT_halt(OUT_halt)
 );
 
+wire IO_busy;
 ControlRegs cr
 (
     .clk(clk),
@@ -596,7 +656,15 @@ ControlRegs cr
     
     .OUT_GPIO_oe(OUT_GPIO_oe),
     .OUT_GPIO(OUT_GPIO),
-    .IN_GPIO(IN_GPIO)
+    .IN_GPIO(IN_GPIO),
+    
+    .OUT_SPI_clk(OUT_SPI_clk),
+    .OUT_SPI_mosi(OUT_SPI_mosi),
+    .IN_SPI_miso(IN_SPI_miso),
+    
+    .OUT_AGU_mapping(AGU_mapping),
+    
+    .OUT_IO_busy(IO_busy)
 );
 
 // this should be done properly, ideally effects in rename cycle instead of IF
@@ -605,6 +673,7 @@ assign frontendEn = (RV_freeEntries > NUM_UOPS) &&
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
     !branch.taken &&
-    en;
+    en &&
+    !OUT_instrMappingMiss;
     
 endmodule

@@ -33,7 +33,15 @@ module ControlRegs
     
     output reg[15:0] OUT_GPIO_oe,
     output reg[15:0] OUT_GPIO,
-    input wire[15:0] IN_GPIO
+    input wire[15:0] IN_GPIO,
+    
+    output reg OUT_SPI_clk,
+    output reg OUT_SPI_mosi,
+    input wire IN_SPI_miso,
+    
+    output wire[20:0] OUT_AGU_mapping[3:0],
+    
+    output wire OUT_IO_busy
 );
 
 integer i;
@@ -53,26 +61,40 @@ reg[31:0] dataReg;
 // 3 CR_comInstrs
 // 4 CR_invalids
 // 5 CR_branches
-reg[63:0] cRegs64[6:0];
+reg[63:0] cRegs64[5:0];
 
 
 // 32-bit Control Regs
-// 0 IRQ handler,
-// 1 IRQ src
-// 2 IRQ flags
-// 3
-// 4
-// 5 GPIO oe | out
-// 6 GPIO aen | ade | acnt | ...
-// 7 GPIO in
+//  0 IRQ handler,
+//  1 IRQ src
+//  2 IRQ flags
+//  3 STATUS
+//  4 SPI out/in
+//  5 GPIO oe | out
+//  6 GPIO aen | ade | acnt | ...
+//  7 GPIO in
+//  8 RAM map 0
+//  9 RAM map 1
+// 10 RAM map 2
+// 11 RAM map 3
 
 reg[7:0] gpioCnt;
-reg[31:0] cRegs[7:0];
+reg[31:0] cRegs[11:0];
 always_comb begin
     OUT_GPIO_oe = cRegs[5][15:0];
     OUT_GPIO = cRegs[5][31:16];
 end
 assign OUT_irqAddr = cRegs[0];
+
+assign OUT_AGU_mapping[0] = cRegs[8][31:11];
+assign OUT_AGU_mapping[1] = cRegs[9][31:11];
+assign OUT_AGU_mapping[2] = cRegs[10][31:11];
+assign OUT_AGU_mapping[3] = cRegs[11][31:11];
+
+// Nonzero during SPI transfer
+reg[5:0] spiCnt;
+
+assign OUT_IO_busy = (spiCnt != 0) || (gpioCnt != 0);
 
 always_ff@(posedge clk) begin
     
@@ -81,10 +103,30 @@ always_ff@(posedge clk) begin
         ceReg <= 1;
         for (i = 0; i < 6; i=i+1)
             cRegs64[i] <= 0;
+            
+        for (i = 0; i < 8; i=i+1)
+            cRegs[i] <= 0; 
+            
+        
+        cRegs[8] <= 0 << 11;
+        cRegs[9] <= 1 << 11;
+        cRegs[10] <= 2 << 11;
+        cRegs[11] <= 3 << 11;
+        
+        OUT_SPI_clk <= 0;
+        spiCnt <= 0;
     end
     else begin
         
-        gpioCnt <= gpioCnt - 1;
+        if (OUT_SPI_clk == 1) begin
+            OUT_SPI_clk <= 0;
+            OUT_SPI_mosi <= cRegs[4][31];
+        end
+        else if (spiCnt != 0) begin
+            OUT_SPI_clk <= 1;
+            spiCnt <= spiCnt - 1;
+            cRegs[4] <= {cRegs[4][30:0], IN_SPI_miso};
+        end
         
         if (!ceReg) begin
             if (!weReg) begin
@@ -109,13 +151,23 @@ always_ff@(posedge clk) begin
                     end*/
                 end
                 else begin
-                    if (wmReg[0]) cRegs[addrReg[2:0]][7:0] <= dataReg[7:0];
-                    if (wmReg[1]) cRegs[addrReg[2:0]][15:8] <= dataReg[15:8];
-                    if (wmReg[2]) cRegs[addrReg[2:0]][23:16] <= dataReg[23:16];
-                    if (wmReg[3]) cRegs[addrReg[2:0]][31:24] <= dataReg[31:24];
+                    if (wmReg[0]) cRegs[addrReg[3:0]][7:0] <= dataReg[7:0];
+                    if (wmReg[1]) cRegs[addrReg[3:0]][15:8] <= dataReg[15:8];
+                    if (wmReg[2]) cRegs[addrReg[3:0]][23:16] <= dataReg[23:16];
+                    if (wmReg[3]) cRegs[addrReg[3:0]][31:24] <= dataReg[31:24];
                     
-                    if (addrReg[2:0] == 5)
+                    if (addrReg[2:0] == 3'd5)
                         gpioCnt <= cRegs[6][7:0];
+                        
+                    if (addrReg[2:0] == 3'd4) begin
+                        case (wmReg)
+                            4'b1111: spiCnt <= 32;
+                            4'b1100: spiCnt <= 16;
+                            4'b1000: spiCnt <= 8;
+                            default: begin end
+                        endcase
+                        OUT_SPI_mosi <= dataReg[31];
+                    end
                 end
             end
             else begin
@@ -126,23 +178,20 @@ always_ff@(posedge clk) begin
                         OUT_data <= cRegs64[addrReg[3:1]][31:0];
                 end
                 else begin
-                    if (addrReg[2:0] == 7)
+                    if (addrReg[2:0] == 3'd7)
                         OUT_data <= {16'bx, IN_GPIO};
                     else
-                        OUT_data <= cRegs[addrReg[2:0]];
+                        OUT_data <= cRegs[addrReg[3:0]];
                 end
             end
         end
         
-        ceReg <= IN_ce;
-        weReg <= IN_we;
-        wmReg <= IN_wm;
-        addrReg <= IN_addr;
-        dataReg <= IN_data;
         
         if (gpioCnt == 0) begin
             cRegs[5][31:24] <= (cRegs[5][31:24] | cRegs[6][15:8]) & (~cRegs[6][23:16]);
         end
+        else
+            gpioCnt <= gpioCnt - 1;
         
         
         if (IN_irqTaken) begin
@@ -150,6 +199,11 @@ always_ff@(posedge clk) begin
             cRegs[2] <= {30'b0, IN_irqFlags[1:0]};
         end
         
+        ceReg <= IN_ce;
+        weReg <= IN_we;
+        wmReg <= IN_wm;
+        addrReg <= IN_addr;
+        dataReg <= IN_data;
         
         // Update Perf Counters
         cRegs64[0] <= cRegs64[0] + 1;
