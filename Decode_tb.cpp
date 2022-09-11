@@ -126,9 +126,9 @@ int main(int argc, char** argv)
             index = memAddrReg;
             if (!memCeReg && index >= 1024)
             {
-                //index = 1023;
-                printf("tried to access ram at %zx, terminating\n", index);
-                break;
+                index = 1023;
+                //printf("tried to access ram at %zx, terminating\n", index);
+                //break;
             }
 
             if (!memCeReg && memWeReg)

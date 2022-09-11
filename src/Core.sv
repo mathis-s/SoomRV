@@ -31,7 +31,8 @@ module Core
     
     output wire OUT_instrMappingMiss,
     input wire[31:0] IN_instrMappingBase,
-    input wire IN_instrMappingHalfSize
+    input wire IN_instrMappingHalfSize,
+    output wire[31:0] OUT_LA_robPCsample
 );
 
 integer i;
@@ -51,6 +52,9 @@ wire comIsBranch[NUM_UOPS-1:0];
 wire comBranchTaken[NUM_UOPS-1:0];
 wire[5:0] comBranchID[NUM_UOPS-1:0];
 wire[29:0] comPC[NUM_UOPS-1:0];
+
+assign OUT_LA_robPCsample[15:0] = comPC[0][15:0];
+assign OUT_LA_robPCsample[31:16] = comPC[1][15:0];
 
 wire comValid[NUM_UOPS-1:0];
 
@@ -179,7 +183,9 @@ BranchPredictor bp
     .IN_ROB_isBranch(comIsBranch[0]),
     .IN_ROB_branchID(comBranchID[0]),
     .IN_ROB_branchAddr(comPC[0]),
-    .IN_ROB_branchTaken(comBranchTaken[0])
+    .IN_ROB_branchTaken(comBranchTaken[0]),
+    
+    .OUT_CSR_branchCommitted(CSR_branchCommitted)
 );
 
 
@@ -206,8 +212,6 @@ always_ff@(posedge clk) begin
         disableMispredFlush <= (ROB_curSqN == RN_nextSqN);
         if (disableMispredFlush)
             mispredFlush <= 0;
-        // TODO: Think about mispredict flush to make sure this is correct and clean it up.
-        //mispredFlush <= (ROB_curSqN != RN_nextSqN);
     end
     else if (frontendEn)
         stateValid <= {stateValid[2:0], 1'b1};
@@ -262,6 +266,7 @@ Rename rn
     .IN_wbUOp(wbUOp),
 
     .IN_branchTaken(branch.taken),
+    .IN_branchFlush(branch.flush),
     .IN_branchSqN(branch.sqN),
     .IN_branchLoadSqN(branch.loadSqN),
     .IN_branchStoreSqN(branch.storeSqN),
@@ -601,6 +606,7 @@ wire[5:0] ROB_maxSqN;
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
+wire[11:0] ROB_irqMemAddr;
 ROB rob
 (
     .clk(clk),
@@ -625,6 +631,7 @@ ROB rob
     .IN_irqAddr(CR_irqAddr),
     .OUT_irqFlags(ROB_irqFlags),
     .OUT_irqSrc(ROB_irqSrc),
+    .OUT_irqMemAddr(ROB_irqMemAddr),
     
     .OUT_branch(branchProvs[3]),
     
@@ -632,6 +639,7 @@ ROB rob
 );
 
 wire IO_busy;
+wire CSR_branchCommitted;
 ControlRegs cr
 (
     .clk(clk),
@@ -644,15 +652,16 @@ ControlRegs cr
     .OUT_data(CSR_dataOut[0]),
 
     .IN_comValid(comValid),
-    .IN_branch(branch),
+    .IN_branch(branchProvs[1]),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
     .IN_ifValid(IF_instrValid),
-    .IN_comBranch(comIsBranch[0]), // TODO: update to only include branches not jumps
+    .IN_comBranch(CSR_branchCommitted),
     
     .OUT_irqAddr(CR_irqAddr),
     .IN_irqTaken(branchProvs[3].taken),
     .IN_irqSrc(ROB_irqSrc),
     .IN_irqFlags(ROB_irqFlags),
+    .IN_irqMemAddr(ROB_irqMemAddr),
     
     .OUT_GPIO_oe(OUT_GPIO_oe),
     .OUT_GPIO(OUT_GPIO),

@@ -34,6 +34,19 @@ main:
     sext.h a0, a0
     call printhex
     
+    
+	li a0, 0x00010000
+    clz a0, a0
+    call printhex
+    
+	li a0, 0x00010000
+    ctz a0, a0
+    call printhex
+    
+	li a0, 0xdeadbeef
+    cpop a0, a0
+    call printhex
+    
     ebreak
     
     

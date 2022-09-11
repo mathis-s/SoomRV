@@ -101,7 +101,6 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[31:0] pc;
-    // TODO: Keep some tags always reserved, use as special values for pc, imm, ...
     logic availA;
     logic[5:0] tagA;
     logic availB;

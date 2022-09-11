@@ -46,11 +46,15 @@ always_ff@(posedge clk) begin
             
             mappingExcept = 0;
             
-            if (addr[31:24] == 8'hff)
+            if (addr[31:24] == 8'hff) begin
                 OUT_uop.addr <= addr;
+            end
+            else if (!mappingValid) begin
+                mappingExcept = 1;
+                OUT_uop.addr <= addr;
+            end
             else begin
                 OUT_uop.addr <= {19'b0, mapping, addr[10:0]};
-                mappingExcept = !mappingValid;
             end
             
             //OUT_uop.wmask <= IN_uop.wmask;

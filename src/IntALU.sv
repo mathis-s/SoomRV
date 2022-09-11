@@ -28,6 +28,7 @@ module IntALU
 
     output RES_UOp OUT_uop
 );
+integer i = 0;
 
 wire[31:0] srcA = IN_uop.srcA;
 wire[31:0] srcB = IN_uop.srcB;
@@ -42,6 +43,26 @@ assign OUT_zcFwdResult = resC;
 assign OUT_zcFwdTag = IN_uop.tagDst;
 // maybe invalidate?
 assign OUT_zcFwdValid = IN_uop.valid && en && IN_uop.nmDst != 0;//&& !IN_wbStall;
+
+
+wire[5:0] resLzTz;
+
+reg[31:0] srcAbitRev;
+always_comb begin
+    for (i = 0; i < 32; i=i+1)
+        srcAbitRev[i] = srcA[31-i];
+end
+LZCnt lzc (
+    .in(IN_uop.opcode == INT_CLZ ? srcA : srcAbitRev),
+    .out(resLzTz)
+);
+
+wire[5:0] resPopCnt;
+PopCnt popc
+(
+    .a(IN_uop.srcA),
+    .res(resPopCnt)
+);
 
 always_comb begin
     // optimize this depending on how good of a job synthesis does
@@ -70,6 +91,9 @@ always_comb begin
         INT_SE_B: resC = {{24{srcA[7]}}, srcA[7:0]};
         INT_SE_H: resC = {{16{srcA[15]}}, srcA[15:0]};
         INT_ZE_H: resC = {16'b0, srcA[15:0]};
+        INT_CLZ, 
+        INT_CTZ: resC = {26'b0, resLzTz};
+        INT_CPOP: resC = {26'b0, resPopCnt};
         default: resC = 'bx;
     endcase
     
@@ -122,7 +146,6 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
-        
             OUT_branchSqN <= IN_uop.sqN;
             OUT_branchLoadSqN <= IN_uop.loadSqN;
             OUT_branchStoreSqN <= IN_uop.storeSqN;

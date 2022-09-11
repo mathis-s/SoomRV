@@ -57,7 +57,7 @@ always_comb begin
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
-            `OPC_JAL:        uop.imm = IN_pc[i] + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0}); // TODO: pc is only 31 bits, fix this later
+            `OPC_JAL:        uop.imm = IN_pc[i] + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
             `OPC_ENV,
             `OPC_JALR,          
             `OPC_LOAD,
@@ -201,15 +201,15 @@ always_comb begin
                 if (instr.funct7 == 7'b0110000) begin
                     if (instr.funct3 == 3'b001) begin
                         if (instr.rs1 == 5'b00000) begin
-                            //invalidEnc = 0;
+                            invalidEnc = 0;
                             uop.opcode = INT_CLZ;
                         end
                         else if (instr.rs1 == 5'b00001) begin
-                            //invalidEnc = 0;
+                            invalidEnc = 0;
                             uop.opcode = INT_CTZ;
                         end
                         else if (instr.rs1 == 5'b00010) begin
-                            //invalidEnc = 0;
+                            invalidEnc = 0;
                             uop.opcode = INT_CPOP;
                         end
                         else if (instr.rs1 == 5'b00100) begin
@@ -242,13 +242,13 @@ always_comb begin
                 end
                 if (instr.funct7 == 7'b0100100) begin
                     if (instr.funct3 == 3'b001) begin
-                        invalidEnc = 0;
-                        //uop.opcode = INT_BCLR;
+                        //invalidEnc = 0;
+                        uop.opcode = INT_BCLR;
                         uop.imm = {27'b0, instr.rs1};
                     end
                     else if (instr.funct3 == 3'b101) begin
-                        invalidEnc = 0;
-                        //uop.opcode = INT_BEXT;
+                        //invalidEnc = 0;
+                        uop.opcode = INT_BEXT;
                         uop.imm = {27'b0, instr.rs1};
                     end
                 end

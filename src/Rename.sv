@@ -39,6 +39,7 @@ module Rename
 
     // Taken branch
     input wire IN_branchTaken,
+    input wire IN_branchFlush,
     input wire[5:0] IN_branchSqN,
     input wire[5:0] IN_branchLoadSqN,
     input wire[5:0] IN_branchStoreSqN,
@@ -148,7 +149,7 @@ always_ff@(posedge clk) begin
         counterStoreSqN = IN_branchStoreSqN;
         
         for (i = 0; i < 32; i=i+1) begin
-            if (rat[i].comTag != rat[i].specTag && $signed(rat[i].newSqN - IN_branchSqN) > 0) begin
+            if (rat[i].comTag != rat[i].specTag && ($signed(rat[i].newSqN - IN_branchSqN) > 0 || IN_branchFlush)) begin
                 rat[i].avail <= 1;
                 // This might not be valid, but the pipeline is flushed after branch.
                 // During the flush, the valid tag is committed and written.

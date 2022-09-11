@@ -47,7 +47,9 @@ module BranchPredictor
     input wire IN_ROB_isBranch,
     input wire[ID_BITS-1:0] IN_ROB_branchID,
     input wire[29:0] IN_ROB_branchAddr,
-    input wire IN_ROB_branchTaken
+    input wire IN_ROB_branchTaken,
+    
+    output reg OUT_CSR_branchCommitted
 );
 
 integer i;
@@ -86,7 +88,9 @@ always_comb begin
 end
 
 always@(posedge clk) begin
-
+    
+    OUT_CSR_branchCommitted <= 0;
+    
     if (rst) begin
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
@@ -126,6 +130,8 @@ always@(posedge clk) begin
         reg[1:0] hist = entries[IN_ROB_branchID[3:0]].history;
         
         entries[IN_ROB_branchID[3:0]].history <= {hist[0], IN_ROB_branchTaken};
+        
+        OUT_CSR_branchCommitted <= !entries[IN_ROB_branchID[3:0]].taken;
         
         if (IN_ROB_branchTaken) begin
             if (entries[IN_ROB_branchID[3:0]].counters[hist] != 2'b11)

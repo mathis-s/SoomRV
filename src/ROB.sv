@@ -46,6 +46,7 @@ module ROB
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
+    output reg[11:0] OUT_irqMemAddr,
     
     output BranchProv OUT_branch,
     
@@ -158,13 +159,12 @@ always_ff@(posedge clk) begin
             for (i = 0; i < 1; i=i+1) begin
                 OUT_comNames[i] <= entries[i].name;
                 OUT_comTags[i] <= entries[i].tag;
-                OUT_comSqNs[i] <= baseIndex + i[5:0];
+                OUT_comSqNs[i] <= baseIndex + i[5:0 ];
                 OUT_comIsBranch[i] <= entries[i].isBranch;
                 OUT_comBranchTaken[i] <= entries[i].branchTaken;
                 OUT_comBranchID[i] <= entries[i].branchID;
                 OUT_comValid[i] <= 1;
                 OUT_comPC[i] <= entries[i].pc;
-                
                 
                 if (entries[i].flags == FLAGS_BRK) begin
                     // ebreak does a jump to the instruction after itself,
@@ -176,6 +176,8 @@ always_ff@(posedge clk) begin
                     OUT_branch.flush <= 1;
                     OUT_branch.storeSqN <= 0;
                     OUT_branch.loadSqN <= 0;
+                    // Do not write back result, redirect to x0
+                    OUT_comNames[i] <= 0;
                 end
                 else if (entries[i].flags == FLAGS_TRAP || entries[i].flags == FLAGS_EXCEPT) begin
                     OUT_branch.taken <= 1;
@@ -186,8 +188,14 @@ always_ff@(posedge clk) begin
                     OUT_branch.storeSqN <= 0;
                     OUT_branch.loadSqN <= 0;
                     
+                    // Do not write back result, redirect to x0
+                    if (entries[i].flags == FLAGS_EXCEPT)
+                        OUT_comNames[i] <= 0;
+                    
                     OUT_irqFlags <= entries[i].flags;
                     OUT_irqSrc <= {entries[i].pc, 2'b0};
+                    // For exceptions, some fields are reused to get the segment of the violating address
+                    OUT_irqMemAddr <= {entries[i].name, entries[i].branchTaken, entries[i].branchID};
                 end
                 
             end
