@@ -9,3 +9,6 @@ and also supports speculative execution and precise exceptions.
 - Fully Out-of-Order Load/Store
 - Local Adaptive Branch Predictor
 - Tag-based OoO Execution with 32 speculative registers (in addition to the 32 architectural registers)
+
+## Basic Architecture
+![soomrv](https://user-images.githubusercontent.com/39701487/189920766-0fa0f296-ef00-4983-acc0-1c024d90e1f4.svg)
