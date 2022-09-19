@@ -231,17 +231,7 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 
-wire[31:0] dbg_DUOp_pc0 = DE_uop[0].pc;
-wire[31:0] dbg_DUOp_pc1 = DE_uop[1].pc;
 
-wire[4:0] dbg_DUOp_nmDst = DE_uop[0].rd;
-wire[4:0] dbg_DUOp_nmDst = DE_uop[1].rd;
-
-wire[4:0] dbg_DUOp_srcA0 = DE_uop[0].rs0;
-wire[4:0] dbg_DUOp_srcA1 = DE_uop[1].rs0;
-
-wire[4:0] dbg_DUOp_srcB0 = DE_uop[0].rs1;
-wire[4:0] dbg_DUOp_srcB1 = DE_uop[1].rs1;
 
 R_UOp RN_uop[NUM_UOPS-1:0];
 reg RN_uopValid[NUM_UOPS-1:0];
@@ -278,32 +268,6 @@ Rename rn
     .OUT_nextLoadSqN(RN_nextLoadSqN),
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
-
-wire[31:0] dbg_RUOp_pc0 = RN_uop[0].pc;
-wire[31:0] dbg_RUOp_pc1 = RN_uop[1].pc;
-
-wire[5:0] dbg_RUOp_sqN0 = RN_uop[0].sqN;
-wire[5:0] dbg_RUOp_sqN1 = RN_uop[1].sqN;
-
-wire[5:0] dbg_RUOp_tagDst0 = RN_uop[0].tagDst;
-wire[5:0] dbg_RUOp_tagDst1 = RN_uop[1].tagDst;
-
-wire[4:0] dbg_RUOp_nmDst0 = RN_uop[0].nmDst;
-wire[4:0] dbg_RUOp_nmDst1 = RN_uop[1].nmDst;
-
-
-wire[5:0] dbg_RUOp_tagA0 = RN_uop[0].tagA;
-wire[5:0] dbg_RUOp_tagA1 = RN_uop[1].tagA;
-
-wire[5:0] dbg_RUOp_tagB0 = RN_uop[0].tagB;
-wire[5:0] dbg_RUOp_tagB1 = RN_uop[1].tagB;
-
-
-wire dbg_RUOp_availA0 = RN_uop[0].availA;
-wire dbg_RUOp_availA1 = RN_uop[1].availA;
-
-wire dbg_RUOp_availB0 = RN_uop[0].availB;
-wire dbg_RUOp_availB1 = RN_uop[1].availB;
 
 wire RV_uopValid[NUM_UOPS-1:0];
 R_UOp RV_uop[NUM_UOPS-1:0];
@@ -482,7 +446,7 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
 );*/
 
 AGU_UOp AGU_uop;
-wire[20:0] AGU_mapping[3:0];
+wire[23:0] AGU_mapping[15:0];
 AGU agu
 (
     .clk(clk),
@@ -647,7 +611,7 @@ ControlRegs cr
     .IN_ce(CSR_ce[0]),
     .IN_we(OUT_MEM_writeEnable),
     .IN_wm(OUT_MEM_writeMask),
-    .IN_addr(OUT_MEM_addr[5:0]),
+    .IN_addr(OUT_MEM_addr[6:0]),
     .IN_data(OUT_MEM_writeData),
     .OUT_data(CSR_dataOut[0]),
 
@@ -685,4 +649,77 @@ assign frontendEn = (RV_freeEntries > NUM_UOPS) &&
     en &&
     !OUT_instrMappingMiss;
     
+/*integer spiCnt = 0;
+reg[7:0] spiByte = 0;
+always@(posedge OUT_SPI_clk) begin
+    spiByte = {spiByte[6:0], OUT_SPI_mosi};
+    spiCnt = spiCnt + 1;
+    //$display("cnt %d %x", spiCnt, mprj_io[25]);
+    if (spiCnt == 8) begin
+        $write("%c", spiByte);
+        spiCnt = 0;
+    end
+end*/
+
+`ifdef IVERILOG_DEBUG
+wire[31:0] dbg_DUOp_pc0 = DE_uop[0].pc;
+wire[31:0] dbg_DUOp_pc1 = DE_uop[1].pc;
+
+wire[4:0] dbg_DUOp_nmDst = DE_uop[0].rd;
+wire[4:0] dbg_DUOp_nmDst = DE_uop[1].rd;
+
+wire[4:0] dbg_DUOp_srcA0 = DE_uop[0].rs0;
+wire[4:0] dbg_DUOp_srcA1 = DE_uop[1].rs0;
+
+wire[4:0] dbg_DUOp_srcB0 = DE_uop[0].rs1;
+wire[4:0] dbg_DUOp_srcB1 = DE_uop[1].rs1;
+
+wire[31:0] dbg_RUOp_pc0 = RN_uop[0].pc;
+wire[31:0] dbg_RUOp_pc1 = RN_uop[1].pc;
+
+wire[5:0] dbg_RUOp_sqN0 = RN_uop[0].sqN;
+wire[5:0] dbg_RUOp_sqN1 = RN_uop[1].sqN;
+
+wire[5:0] dbg_RUOp_tagDst0 = RN_uop[0].tagDst;
+wire[5:0] dbg_RUOp_tagDst1 = RN_uop[1].tagDst;
+
+wire[4:0] dbg_RUOp_nmDst0 = RN_uop[0].nmDst;
+wire[4:0] dbg_RUOp_nmDst1 = RN_uop[1].nmDst;
+
+
+wire[5:0] dbg_RUOp_tagA0 = RN_uop[0].tagA;
+wire[5:0] dbg_RUOp_tagA1 = RN_uop[1].tagA;
+
+wire[5:0] dbg_RUOp_tagB0 = RN_uop[0].tagB;
+wire[5:0] dbg_RUOp_tagB1 = RN_uop[1].tagB;
+
+
+wire dbg_RUOp_availA0 = RN_uop[0].availA;
+wire dbg_RUOp_availA1 = RN_uop[1].availA;
+
+wire dbg_RUOp_availB0 = RN_uop[0].availB;
+wire dbg_RUOp_availB1 = RN_uop[1].availB;
+
+wire[31:0] dbg_LdUOp_pc0 = LD_uop[0].pc;
+wire[31:0] dbg_LdUOp_pc1 = LD_uop[1].pc;
+wire[5:0] dbg_LdUOp_sqN0 = LD_uop[0].sqN;
+wire[5:0] dbg_LdUOp_sqN1 = LD_uop[1].sqN;
+wire[5:0] dbg_LdUOp_tagDst0 = LD_uop[0].tagDst;
+wire[5:0] dbg_LdUOp_tagDst1 = LD_uop[1].tagDst;
+wire[4:0] dbg_LdUOp_nmDst0 = LD_uop[0].nmDst;
+wire[4:0] dbg_LdUOp_nmDst1 = LD_uop[1].nmDst;
+
+wire[31:0] dbg_LdUOp_srcA0 = LD_uop[0].srcA;
+wire[31:0] dbg_LdUOp_srcA1 = LD_uop[1].srcA;
+
+wire[31:0] dbg_LdUOp_srcB0 = LD_uop[0].srcB;
+wire[31:0] dbg_LdUOp_srcB1 = LD_uop[1].srcB;
+
+wire[31:0] dbg_LdUOp_imm0 = LD_uop[0].imm;
+wire[31:0] dbg_LdUOp_imm1 = LD_uop[1].imm;
+
+wire dbg_LdUOp_valid = LD_uop[0].valid;
+wire dbg_LdUOp_valid = LD_uop[1].valid;
+`endif
+
 endmodule

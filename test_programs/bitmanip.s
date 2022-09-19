@@ -47,6 +47,14 @@ main:
     cpop a0, a0
     call printhex
     
+	li a0, 0xabcedf0
+    orc.b a0, a0
+    call printhex
+    
+	li a0, 0xabcedf00
+    rev8 a0, a0
+    call printhex
+    
     ebreak
     
     

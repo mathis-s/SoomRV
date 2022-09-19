@@ -2,11 +2,11 @@
 .globl main
 main:
     
-    li a0, -2147483648
-    li a1, -1
     
-    div a0, a0, a1
-    mv s0, a0
+    li a0, 103945
+    li a1, -2
+    
+    min a0, a1, a0
     call printdec_slow
     #mv a0, s0
     #call printhex

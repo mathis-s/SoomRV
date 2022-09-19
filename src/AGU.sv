@@ -6,7 +6,7 @@ module AGU
     input wire en,
     
     input BranchProv IN_branch,
-    input wire[20:0] IN_mapping[3:0],
+    input wire[23:0] IN_mapping[15:0],
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_uop
@@ -15,7 +15,7 @@ module AGU
 integer i;
 
 wire[31:0] addr = IN_uop.srcA + {20'b0, IN_uop.imm[11:0]};
-reg[1:0] mapping;
+reg[3:0] mapping;
 reg mappingValid;
 reg mappingExcept;
 
@@ -24,11 +24,11 @@ always_comb begin
     mappingValid = 0;
     mapping = 0;
     
-    for (i = 0; i < 4; i=i+1) begin
+    for (i = 0; i < 16; i=i+1) begin
         
-        if (addr[31:11] == IN_mapping[i]) begin
+        if (addr[31:8] == IN_mapping[i]) begin
             mappingValid = 1;
-            mapping = i[1:0];
+            mapping = i[3:0];
         end
     end
     
@@ -46,7 +46,7 @@ always_ff@(posedge clk) begin
             
             mappingExcept = 0;
             
-            if (addr[31:24] == 8'hff) begin
+            /*if (addr[31:24] == 8'hff) begin
                 OUT_uop.addr <= addr;
             end
             else if (!mappingValid) begin
@@ -54,8 +54,9 @@ always_ff@(posedge clk) begin
                 OUT_uop.addr <= addr;
             end
             else begin
-                OUT_uop.addr <= {19'b0, mapping, addr[10:0]};
-            end
+                OUT_uop.addr <= {20'b0, mapping, addr[7:0]};
+            end*/
+            OUT_uop.addr <= addr;
             
             //OUT_uop.wmask <= IN_uop.wmask;
             //OUT_uop.signExtend <= IN_uop.signExtend;
@@ -70,7 +71,7 @@ always_ff@(posedge clk) begin
             
             // Exception fires on Null pointer or unaligned access
             // (Unaligned is handled in software)
-            case (IN_uop.opcode)
+            /*case (IN_uop.opcode)
                 LSU_LB,
                 LSU_LBU,
                 LSU_SB: OUT_uop.exception <= mappingExcept || (addr == 0);
@@ -83,7 +84,8 @@ always_ff@(posedge clk) begin
                 LSU_SW: OUT_uop.exception <= mappingExcept || (addr == 0) || (addr[0] || addr[1]);
                 
                 default: begin end
-            endcase
+            endcase*/
+            OUT_uop.exception <= 0;
             
             
             case (IN_uop.opcode)

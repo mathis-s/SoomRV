@@ -59,11 +59,27 @@ reg[32:0] reservedWBs[NUM_UOPS-1:0];
 
 always_comb begin    
     for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
+    
+        reg[2:0] ids0[7:0];
+        reg[5:0] sqns0[7:0];
+        reg valid0[7:0];
         
-        deqValid[i] = 0;
+        reg[2:0] ids1[3:0];
+        reg[5:0] sqns1[3:0];
+        reg valid1[3:0];
+        
+        reg[2:0] ids2[1:0];
+        reg[5:0] sqns2[1:0];
+        reg valid2[1:0];
+        
+        deqValid[i] = 1'b0;
         deqIndex[i] = 3'bx;
         
         for (j = 0; j < QUEUE_SIZE; j=j+1) begin
+            
+            ids0[j] = j[2:0];
+            sqns0[j] = queue[j].sqN;
+            valid0[j] = 0;
             
             if (queueInfo[j].valid && (!deqValid[1] || deqIndex[1] != j[2:0])) begin
                 
@@ -96,11 +112,61 @@ always_comb begin
                     
                     // TODO: do comparisons in tree structure instead of linear
                     /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
-                    deqValid[i] = 1;
-                    deqIndex[i] = j[2:0];
+                    
+                    //deqValid[i] = 1;
+                    //deqIndex[i] = j[2:0];
+                    valid0[j] = 1;
                 end
             end
         end
+        
+        for (j = 0; j < 4; j=j+1) begin
+            if (valid0[2*j] && (!valid0[2*j+1] || $signed(sqns0[2*j] - sqns0[2*j+1]) < 0)) begin            
+                valid1[j] = 1;
+                ids1[j] = ids0[2*j];
+                sqns1[j] = sqns0[2*j];
+            end
+            else if (valid0[2*j+1]) begin
+                valid1[j] = 1;
+                ids1[j] = ids0[2*j+1];
+                sqns1[j] = sqns0[2*j+1];
+            end
+            else begin
+                valid1[j] = 0;
+                ids1[j] = 3'bx;
+                sqns1[j] = 6'bx;
+            end
+        end
+        
+        for (j = 0; j < 2; j=j+1) begin
+            if (valid1[2*j] && (!valid1[2*j+1] || $signed(sqns1[2*j] - sqns1[2*j+1]) < 0)) begin            
+                valid2[j] = 1;
+                ids2[j] = ids1[2*j];
+                sqns2[j] = sqns1[2*j];
+            end
+            else if (valid1[2*j+1]) begin
+                valid2[j] = 1;
+                ids2[j] = ids1[2*j+1];
+                sqns2[j] = sqns1[2*j+1];
+            end
+            else begin
+                valid2[j] = 0;
+                ids2[j] = 3'bx;
+                sqns2[j] = 6'bx;
+            end
+        end
+        
+        for (j = 0; j < 1; j=j+1) begin
+            if (valid2[2*j] && (!valid2[2*j+1] || $signed(sqns2[2*j] - sqns2[2*j+1]) < 0)) begin            
+                deqValid[i] = 1;
+                deqIndex[i] = ids2[2*j];
+            end
+            else if (valid2[2*j+1]) begin
+                deqValid[i] = 1;
+                deqIndex[i] = ids2[2*j+1];
+            end
+        end
+        
     end
 end
 

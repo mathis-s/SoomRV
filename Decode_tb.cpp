@@ -15,7 +15,7 @@ double sc_time_stamp()
     return main_time;
 }
 
-uint32_t ram[2048];
+uint32_t ram[65536];
 uint32_t pram[2048];
 
 uint32_t extram[65536];
@@ -55,15 +55,24 @@ int main(int argc, char** argv)
         
         
         size_t dataIndex = numInstrs;
+        size_t dataStart = dataIndex;
         f = fopen("data.bin", "rb");
-        while (dataIndex < 1024)
+        while (dataIndex < 65536)
         {
             uint32_t data;
             if (fread(&data, 1, sizeof(uint32_t), f) == 0)
                 break;
             ram[dataIndex] = data;
+            printf("%.6zx: %.8x ", dataIndex, data);
+            if (isprint(data & 0xff)) putc(data&0xff, stdout); else putc('.', stdout);
+            if (isprint((data & 0xff00)>>8)) putc((data & 0xff00)>>8, stdout); else putc('.', stdout);
+            if (isprint((data & 0xff0000)>>16)) putc((data & 0xff0000)>>16, stdout); else putc('.', stdout);
+            if (isprint((data & 0xff000000)>>24)) putc((data & 0xff000000)>>24, stdout); else putc('.', stdout);
+            putc(10, stdout);
+            
             dataIndex++;
         }
+        printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex-4);
         fclose(f);
     }
     
@@ -124,27 +133,27 @@ int main(int argc, char** argv)
 
             
             index = memAddrReg;
-            if (!memCeReg && index >= 1024)
+            if (!memCeReg && index >= 65536)
             {
-                index = 1023;
-                //printf("tried to access ram at %zx, terminating\n", index);
-                //break;
+                if (!memWeReg && index == (0xfe000000 / 4))
+                {
+                    printf("%c", (memDataReg));
+                    fflush(stdout);
+                }
+                else
+                {
+                    printf("tried to access ram at %zx, terminating\n", index);
+                    break;
+                }
             }
-
-            if (!memCeReg && memWeReg)
+            else if (!memCeReg && memWeReg)
             {
                 //printf("read at %zu: %.8x\n", index, ram[index]);
                 top->IN_MEM_readData = ram[index];
             }
-            
-            if (!memCeReg && !memWeReg)
+            else if (!memCeReg && !memWeReg)
             {
                 //printf("write at %zu: %.8x\n", index, memDataReg);
-                if (index == 255)
-                {
-                    printf("%c", (memDataReg) >> 24);
-                    fflush(stdout);
-                }
 
                 if (memWmReg == 0b1111)
                     ram[index] = memDataReg;

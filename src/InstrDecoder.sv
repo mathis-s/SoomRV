@@ -232,13 +232,12 @@ always_comb begin
                     end
                 end
                 else if (instr[31:20] == 12'b001010000111 && instr.funct3 == 3'b101) begin
-                    //invalidEnc = 0;
+                    invalidEnc = 0;
                     uop.opcode = INT_ORC_B;
                 end
                 else if (instr[31:20] == 12'b011010011000 && instr.funct3 == 3'b101) begin
-                    //invalidEnc = 0;
-                    // TODO
-                    uop.opcode = INT_ORC_B;
+                    invalidEnc = 0;
+                    uop.opcode = INT_REV8;
                 end
                 if (instr.funct7 == 7'b0100100) begin
                     if (instr.funct3 == 3'b001) begin
@@ -351,22 +350,22 @@ always_comb begin
                 end
                 else if (instr.funct7 == 7'b0000101) begin
                     if (instr.funct3 == 3'b110) begin
-                        //invalidEnc = 0;
+                        invalidEnc = 0;
                         uop.opcode = INT_MAX;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b111) begin
-                        //invalidEnc = 0;
+                        invalidEnc = 0;
                         uop.opcode = INT_MAXU;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b100) begin
-                        //invalidEnc = 0;
+                        invalidEnc = 0;
                         uop.opcode = INT_MIN;
                         uop.fu = FU_INT;
                     end
                     else if (instr.funct3 == 3'b101) begin
-                        //invalidEnc = 0;
+                        invalidEnc = 0;
                         uop.opcode = INT_MINU;
                         uop.fu = FU_INT;
                     end

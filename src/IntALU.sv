@@ -64,6 +64,9 @@ PopCnt popc
     .res(resPopCnt)
 );
 
+wire lessThan = ($signed(srcA) < $signed(srcB));
+wire lessThanU = (srcA < srcB);
+
 always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_uop.opcode)
@@ -74,8 +77,8 @@ always_comb begin
         INT_AND: resC = srcA & srcB;
         INT_SLL: resC = srcA << srcB[4:0];
         INT_SRL: resC = srcA >> srcB[4:0];
-        INT_SLT: resC = {31'b0, ($signed(srcA) < $signed(srcB))};
-        INT_SLTU: resC = {31'b0, srcA < srcB};
+        INT_SLT: resC = {31'b0, lessThan};
+        INT_SLTU: resC = {31'b0, lessThanU};
         INT_SUB: resC = srcA - srcB;
         INT_SRA: resC = srcA >>> srcB[4:0];
         INT_LUI: resC = srcB;
@@ -94,6 +97,12 @@ always_comb begin
         INT_CLZ, 
         INT_CTZ: resC = {26'b0, resLzTz};
         INT_CPOP: resC = {26'b0, resPopCnt};
+        INT_ORC_B: resC = {{{4'd8}{|srcA[31:24]}}, {{4'd8}{|srcA[23:16]}}, {{4'd8}{|srcA[15:8]}}, {{4'd8}{|srcA[7:0]}}};
+        INT_MAX: resC = lessThan ? srcB : srcA;
+        INT_MAXU: resC = lessThanU ? srcB : srcA;
+        INT_MIN: resC = lessThan ? srcA : srcB;
+        INT_MINU: resC = lessThanU ? srcA : srcB;
+        INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
         default: resC = 'bx;
     endcase
     

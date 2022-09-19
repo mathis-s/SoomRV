@@ -14,7 +14,7 @@ typedef struct packed
 module BranchPredictor
 #(
     parameter NUM_IN=2,
-    parameter NUM_ENTRIES=16,
+    parameter NUM_ENTRIES=32,
     parameter ID_BITS=6
 )
 (
@@ -72,8 +72,8 @@ always_comb begin
     if (IN_pcValid)
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             if (entries[i].valid && 
-                entries[i].srcAddr[31:3] == IN_pc[31:3] && entries[i].srcAddr[2:0] >= IN_pc[2:0] &&
-                (!OUT_branchFound || (entries[i].srcAddr[2:0] < OUT_branchSrc[2:0]))) begin
+                entries[i].srcAddr[31:3] == IN_pc[31:3] && entries[i].srcAddr[2:2] >= IN_pc[2:2] &&
+                (!OUT_branchFound || (entries[i].srcAddr[2:2] < OUT_branchSrc[2:2]))) begin
                 
                 if (OUT_branchFound) OUT_multipleBranches = 1;
                     
@@ -103,47 +103,47 @@ always@(posedge clk) begin
         
         // No entry yet, create entry
         if (IN_branchTaken && IN_branchID == ((1 << ID_BITS) - 1)) begin
-            entries[insertIndex[3:0]].valid <= 1;
-            entries[insertIndex[3:0]].used <= 1;
-            entries[insertIndex[3:0]].srcAddr <= IN_branchAddr;
-            entries[insertIndex[3:0]].dstAddr <= IN_branchDest;
+            entries[insertIndex[4:0]].valid <= 1;
+            entries[insertIndex[4:0]].used <= 1;
+            entries[insertIndex[4:0]].srcAddr <= IN_branchAddr;
+            entries[insertIndex[4:0]].dstAddr <= IN_branchDest;
             // only jumps always taken
-            entries[insertIndex[3:0]].taken <= IN_branchIsJump;
-            entries[insertIndex[3:0]].counters[0] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[3:0]].counters[1] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[3:0]].counters[2] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[3:0]].counters[3] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[3:0]].history <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[4:0]].taken <= IN_branchIsJump;
+            entries[insertIndex[4:0]].counters[0] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[4:0]].counters[1] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[4:0]].counters[2] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[4:0]].counters[3] <= {IN_branchTaken, IN_branchTaken};
+            entries[insertIndex[4:0]].history <= {IN_branchTaken, IN_branchTaken};
             insertIndex <= insertIndex + 1;
         end
     end
     else begin
         // If not valid or not used recently, keep this entry as first to replace
-        if (entries[insertIndex[3:0]].valid && entries[insertIndex[3:0]].used) begin
-            insertIndex[3:0] <= insertIndex[3:0] + 1;
-            entries[insertIndex[3:0]].used <= 0;
+        if (entries[insertIndex[4:0]].valid && entries[insertIndex[4:0]].used) begin
+            insertIndex[4:0] <= insertIndex[4:0] + 1;
+            entries[insertIndex[4:0]].used <= 0;
         end
     end
     
-    if (IN_ROB_valid && IN_ROB_isBranch && IN_ROB_branchID != ((1 << ID_BITS) - 1) && {IN_ROB_branchAddr, 2'b00} == entries[IN_ROB_branchID[3:0]].srcAddr) begin
+    if (IN_ROB_valid && IN_ROB_isBranch && IN_ROB_branchID != ((1 << ID_BITS) - 1) && {IN_ROB_branchAddr, 2'b00} == entries[IN_ROB_branchID[4:0]].srcAddr) begin
         
-        reg[1:0] hist = entries[IN_ROB_branchID[3:0]].history;
+        reg[1:0] hist = entries[IN_ROB_branchID[4:0]].history;
         
-        entries[IN_ROB_branchID[3:0]].history <= {hist[0], IN_ROB_branchTaken};
+        entries[IN_ROB_branchID[4:0]].history <= {hist[0], IN_ROB_branchTaken};
         
-        OUT_CSR_branchCommitted <= !entries[IN_ROB_branchID[3:0]].taken;
+        OUT_CSR_branchCommitted <= !entries[IN_ROB_branchID[4:0]].taken;
         
         if (IN_ROB_branchTaken) begin
-            if (entries[IN_ROB_branchID[3:0]].counters[hist] != 2'b11)
-                entries[IN_ROB_branchID[3:0]].counters[hist] <= entries[IN_ROB_branchID[3:0]].counters[hist] + 1;
+            if (entries[IN_ROB_branchID[4:0]].counters[hist] != 2'b11)
+                entries[IN_ROB_branchID[4:0]].counters[hist] <= entries[IN_ROB_branchID[4:0]].counters[hist] + 1;
         end
-        else if (entries[IN_ROB_branchID[3:0]].counters[hist] != 2'b00)
-            entries[IN_ROB_branchID[3:0]].counters[hist] <= entries[IN_ROB_branchID[3:0]].counters[hist] - 1;
+        else if (entries[IN_ROB_branchID[4:0]].counters[hist] != 2'b00)
+            entries[IN_ROB_branchID[4:0]].counters[hist] <= entries[IN_ROB_branchID[4:0]].counters[hist] - 1;
             
     end
     
     if (!rst && IN_pcValid && OUT_branchTaken) begin
-        entries[OUT_branchID[3:0]].used <= 1;
+        entries[OUT_branchID[4:0]].used <= 1;
     end
 end
 

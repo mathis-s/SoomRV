@@ -228,6 +228,13 @@ always_ff@(posedge clk) begin
     end
     
     else begin
+        
+        // Set entries of commited instructions to ready
+        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+            if ($signed(IN_curSqN - entries[i].sqN) > 0)
+                entries[i].ready <= 1;
+        end
+        
         // Dequeue
         if (doingDequeue) begin
             for (i = 0; i < NUM_ENTRIES-1; i=i+1)
@@ -241,18 +248,12 @@ always_ff@(posedge clk) begin
         // Invalidate
         else if (IN_branch.taken) begin
             for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ($signed(entries[i].sqN - IN_branch.sqN) > 0)
+                if ($signed(entries[i].sqN - IN_branch.sqN) > 0 && !entries[i].ready)
                     entries[i].valid <= 0;
             end
             
             if (IN_branch.flush)
                 baseIndex = IN_branch.storeSqN + 1;
-        end
-        
-        // Set entries of commited instructions to ready
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if ($signed(IN_curSqN - entries[i].sqN) > 0)
-                entries[i].ready <= 1;
         end
     
         // Enqueue
