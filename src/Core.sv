@@ -43,23 +43,17 @@ assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 
-wire[4:0] comRegNm[NUM_UOPS-1:0];
-wire[5:0] comRegTag[NUM_UOPS-1:0];
-wire[5:0] comSqN[NUM_UOPS-1:0];
-wire comIsBranch[NUM_UOPS-1:0];
-wire comBranchTaken[NUM_UOPS-1:0];
-wire[5:0] comBranchID[NUM_UOPS-1:0];
-wire[29:0] comPC[NUM_UOPS-1:0];
+CommitUOp comUOps[NUM_UOPS-1:0];
 
-assign OUT_LA_robPCsample[15:0] = comPC[0][15:0];
-assign OUT_LA_robPCsample[31:16] = comPC[1][15:0];
+assign OUT_LA_robPCsample[15:0] = comUOps[0].pc[15:0];
+assign OUT_LA_robPCsample[31:16] = comUOps[1].pc[15:0];
 
 wire comValid[NUM_UOPS-1:0];
 
 wire frontendEn;
 
 // IF -> DE -> RN
-reg[5:0] stateValid;
+reg[2:0] stateValid;
 assign OUT_instrReadEnable = !(frontendEn && stateValid[0]);
 
 // 
@@ -80,26 +74,20 @@ wire[63:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
 
 BranchProv branchProvs[3:0];
 BranchProv branch;
-always_comb begin
-    branch.taken = 0;
-    branch = 0;
-    for (i = 0; i < 4; i=i+1) begin
-        if (branchProvs[i].taken && 
-            (!branch.taken || $signed(branchProvs[i].sqN - branch.sqN) < 0) &&
-            (!mispredFlush || $signed(branchProvs[i].sqN - mispredFlushSqN) < 0)) begin
-            branch.taken = 1;
-            branch.dstPC = branchProvs[i].dstPC;
-            branch.sqN = branchProvs[i].sqN;
-            branch.loadSqN = branchProvs[i].loadSqN;
-            branch.storeSqN = branchProvs[i].storeSqN;
-            branch.flush = branchProvs[i].flush;
-        end
-    end
-end
+wire mispredFlush;
+BranchSelector bsel
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_branches(branchProvs),
+    .OUT_branch(branch),
+    
+    .IN_ROB_curSqN(ROB_curSqN),
+    .IN_RN_nextSqN(RN_nextSqN),
+    .OUT_mispredFlush(mispredFlush)
+);
 
-reg disableMispredFlush;
-reg mispredFlush;
-reg[5:0] mispredFlushSqN;
 
 reg [31:0] IF_pc[NUM_UOPS-1:0];
 wire[31:0] IF_instr[NUM_UOPS-1:0];
@@ -107,7 +95,6 @@ wire IF_instrValid[NUM_UOPS-1:0];
 
 wire[31:0] PC_pc;
 assign OUT_instrAddr = PC_pc[31:3];
-
 
 wire BP_branchTaken;
 wire BP_isJump;
@@ -177,42 +164,23 @@ BranchPredictor bp
     .IN_branchTaken(branchTaken),
     .IN_branchIsJump(branchIsJump),
     
-    .IN_ROB_valid(comValid[0]),
-    .IN_ROB_isBranch(comIsBranch[0]),
-    .IN_ROB_branchID(comBranchID[0]),
-    .IN_ROB_branchAddr(comPC[0]),
-    .IN_ROB_branchTaken(comBranchTaken[0]),
+    .IN_comUOp(comUOps[0]),
     
     .OUT_CSR_branchCommitted(CSR_branchCommitted)
 );
-
 
 wire[5:0] RN_nextSqN;
 wire[5:0] ROB_curSqN;
 
 always_ff@(posedge clk) begin
-    if (rst) begin
-        stateValid <= 6'b000000;
-        mispredFlush <= 0;
-        disableMispredFlush <= 0;
-        mispredFlushSqN <= 0;
-    end
-    else if (branch.taken) begin
-        stateValid <= 6'b000000;
-        mispredFlush <= (ROB_curSqN != RN_nextSqN);
-        disableMispredFlush <= 0;
-        mispredFlushSqN <= branch.sqN;
-    end
+    if (rst)
+        stateValid <= 3'b000;
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
-    else if (mispredFlush) begin
-        stateValid <= 6'b000000;
-        disableMispredFlush <= (ROB_curSqN == RN_nextSqN);
-        if (disableMispredFlush)
-            mispredFlush <= 0;
-    end
+    else if (branch.taken || mispredFlush)
+        stateValid <= 3'b000;
     else if (frontendEn)
-        stateValid <= {stateValid[4:0], 1'b1};
+        stateValid <= {stateValid[1:0], 1'b1};
 end
 
 
@@ -257,10 +225,7 @@ Rename rn
 
     .IN_uop(FUSE_uop),
 
-    .comValid(comValid),
-    .comRegNm(comRegNm),
-    .comRegTag(comRegTag),
-    .comSqN(comSqN),
+    .IN_comUOp(comUOps),
 
     .IN_wbHasResult(wbHasResult),
     .IN_wbUOp(wbUOp),
@@ -592,15 +557,8 @@ ROB rob
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
-
-    .OUT_comNames(comRegNm),
-    .OUT_comTags(comRegTag),
-    .OUT_comIsBranch(comIsBranch),
-    .OUT_comBranchTaken(comBranchTaken),
-    .OUT_comBranchID(comBranchID),
-    .OUT_comPC(comPC),
-    .OUT_comValid(comValid),
-    .OUT_comSqNs(comSqN),
+    
+    .OUT_comUOp(comUOps),
     
     .IN_irqAddr(CR_irqAddr),
     .OUT_irqFlags(ROB_irqFlags),
@@ -625,7 +583,7 @@ ControlRegs cr
     .IN_data(OUT_MEM_writeData),
     .OUT_data(CSR_dataOut[0]),
 
-    .IN_comValid(comValid),
+    .IN_comValid('{comUOps[0].valid, comUOps[1].valid}),
     .IN_branch(branchProvs[1]),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
     .IN_ifValid(IF_instrValid),
@@ -658,78 +616,9 @@ assign frontendEn = (RV_freeEntries > NUM_UOPS) &&
     !branch.taken &&
     en &&
     !OUT_instrMappingMiss;
-    
-/*integer spiCnt = 0;
-reg[7:0] spiByte = 0;
-always@(posedge OUT_SPI_clk) begin
-    spiByte = {spiByte[6:0], OUT_SPI_mosi};
-    spiCnt = spiCnt + 1;
-    //$display("cnt %d %x", spiCnt, mprj_io[25]);
-    if (spiCnt == 8) begin
-        $write("%c", spiByte);
-        spiCnt = 0;
-    end
-end*/
 
 `ifdef IVERILOG_DEBUG
-wire[31:0] dbg_DUOp_pc0 = DE_uop[0].pc;
-wire[31:0] dbg_DUOp_pc1 = DE_uop[1].pc;
-
-wire[4:0] dbg_DUOp_nmDst = DE_uop[0].rd;
-wire[4:0] dbg_DUOp_nmDst = DE_uop[1].rd;
-
-wire[4:0] dbg_DUOp_srcA0 = DE_uop[0].rs0;
-wire[4:0] dbg_DUOp_srcA1 = DE_uop[1].rs0;
-
-wire[4:0] dbg_DUOp_srcB0 = DE_uop[0].rs1;
-wire[4:0] dbg_DUOp_srcB1 = DE_uop[1].rs1;
-
-wire[31:0] dbg_RUOp_pc0 = RN_uop[0].pc;
-wire[31:0] dbg_RUOp_pc1 = RN_uop[1].pc;
-
-wire[5:0] dbg_RUOp_sqN0 = RN_uop[0].sqN;
-wire[5:0] dbg_RUOp_sqN1 = RN_uop[1].sqN;
-
-wire[5:0] dbg_RUOp_tagDst0 = RN_uop[0].tagDst;
-wire[5:0] dbg_RUOp_tagDst1 = RN_uop[1].tagDst;
-
-wire[4:0] dbg_RUOp_nmDst0 = RN_uop[0].nmDst;
-wire[4:0] dbg_RUOp_nmDst1 = RN_uop[1].nmDst;
-
-
-wire[5:0] dbg_RUOp_tagA0 = RN_uop[0].tagA;
-wire[5:0] dbg_RUOp_tagA1 = RN_uop[1].tagA;
-
-wire[5:0] dbg_RUOp_tagB0 = RN_uop[0].tagB;
-wire[5:0] dbg_RUOp_tagB1 = RN_uop[1].tagB;
-
-
-wire dbg_RUOp_availA0 = RN_uop[0].availA;
-wire dbg_RUOp_availA1 = RN_uop[1].availA;
-
-wire dbg_RUOp_availB0 = RN_uop[0].availB;
-wire dbg_RUOp_availB1 = RN_uop[1].availB;
-
-wire[31:0] dbg_LdUOp_pc0 = LD_uop[0].pc;
-wire[31:0] dbg_LdUOp_pc1 = LD_uop[1].pc;
-wire[5:0] dbg_LdUOp_sqN0 = LD_uop[0].sqN;
-wire[5:0] dbg_LdUOp_sqN1 = LD_uop[1].sqN;
-wire[5:0] dbg_LdUOp_tagDst0 = LD_uop[0].tagDst;
-wire[5:0] dbg_LdUOp_tagDst1 = LD_uop[1].tagDst;
-wire[4:0] dbg_LdUOp_nmDst0 = LD_uop[0].nmDst;
-wire[4:0] dbg_LdUOp_nmDst1 = LD_uop[1].nmDst;
-
-wire[31:0] dbg_LdUOp_srcA0 = LD_uop[0].srcA;
-wire[31:0] dbg_LdUOp_srcA1 = LD_uop[1].srcA;
-
-wire[31:0] dbg_LdUOp_srcB0 = LD_uop[0].srcB;
-wire[31:0] dbg_LdUOp_srcB1 = LD_uop[1].srcB;
-
-wire[31:0] dbg_LdUOp_imm0 = LD_uop[0].imm;
-wire[31:0] dbg_LdUOp_imm1 = LD_uop[1].imm;
-
-wire dbg_LdUOp_valid = LD_uop[0].valid;
-wire dbg_LdUOp_valid = LD_uop[1].valid;
+`include "src/Debug.svi"
 `endif
 
 endmodule

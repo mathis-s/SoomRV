@@ -28,10 +28,7 @@ module Rename
     input D_UOp IN_uop[WIDTH_UOPS-1:0],
 
     // Committed changes from ROB
-    input wire comValid[WIDTH_UOPS-1:0],
-    input wire[4:0] comRegNm[WIDTH_UOPS-1:0],
-    input wire[5:0] comRegTag[WIDTH_UOPS-1:0],
-    input wire[5:0] comSqN[WIDTH_UOPS-1:0],
+    input CommitUOp IN_comUOp[WIDTH_UOPS-1:0],
 
     // WB for uncommitted but speculatively available values
     input wire IN_wbHasResult[WIDTH_WR-1:0],
@@ -70,10 +67,10 @@ reg isNewestCommit[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         
-        isNewestCommit[i] = comValid[i];
-        if (comValid[i])
+        isNewestCommit[i] = IN_comUOp[i].valid;
+        if (IN_comUOp[i].valid)
             for (j = i + 1; j < WIDTH_UOPS; j=j+1)
-                if (comValid[j] && (comRegNm[j] == comRegNm[i]))
+                if (IN_comUOp[j].valid && (IN_comUOp[j].nmDst == IN_comUOp[i].nmDst))
                     isNewestCommit[i] = 0;
     end
 end
@@ -251,29 +248,29 @@ always_ff@(posedge clk) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             // commit at higher index is newer op, takes precedence in case of collision
-            if (comValid[i] && (comRegNm[i] != 0)
-                && (!IN_branchTaken || $signed(comSqN[i] - IN_branchSqN) <= 0)) begin
+            if (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0)
+                && (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0)) begin
                 
                 if (isNewestCommit[i]) begin
-                    tags[rat[comRegNm[i]].comTag].committed <= 0;
-                    tags[rat[comRegNm[i]].comTag].used <= 0;
+                    tags[rat[IN_comUOp[i].nmDst].comTag].committed <= 0;
+                    tags[rat[IN_comUOp[i].nmDst].comTag].used <= 0;
                     
                     
-                    rat[comRegNm[i]].comTag <= comRegTag[i];
+                    rat[IN_comUOp[i].nmDst].comTag <= IN_comUOp[i].tagDst;
                     
                     
-                    tags[comRegTag[i]].committed <= 1;
-                    tags[comRegTag[i]].used <= 1;
+                    tags[IN_comUOp[i].tagDst].committed <= 1;
+                    tags[IN_comUOp[i].tagDst].used <= 1;
                     
 
                     if (IN_mispredFlush || IN_branchTaken) begin 
-                        rat[comRegNm[i]].specTag <= comRegTag[i];
-                        rat[comRegNm[i]].avail <= 1;
+                        rat[IN_comUOp[i].nmDst].specTag <= IN_comUOp[i].tagDst;
+                        rat[IN_comUOp[i].nmDst].avail <= 1;
                     end
                 end
                 else begin
-                    tags[comRegTag[i]].committed <= 0;
-                    tags[comRegTag[i]].used <= 0;
+                    tags[IN_comUOp[i].tagDst].committed <= 0;
+                    tags[IN_comUOp[i].tagDst].used <= 0;
                 end
             end
         end

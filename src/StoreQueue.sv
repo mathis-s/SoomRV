@@ -11,7 +11,7 @@ typedef struct packed
 module StoreQueue
 #(
     parameter NUM_PORTS=1,
-    parameter NUM_ENTRIES=8
+    parameter NUM_ENTRIES=16
 )
 (
     input wire clk,
@@ -259,7 +259,7 @@ always_ff@(posedge clk) begin
         // Enqueue
         for (i = 0; i < NUM_PORTS; i=i+1) begin
             if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) && !IN_uop[i].exception) begin
-                reg[2:0] index = IN_uop[i].storeSqN[2:0] - baseIndex[2:0];
+                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
                 assert(IN_uop[i].storeSqN <= baseIndex + NUM_ENTRIES[5:0] - 1);
                 entries[index].valid <= 1;
                 entries[index].ready <= 0;

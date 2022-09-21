@@ -198,3 +198,15 @@ typedef struct packed
     logic valid;
 } AGU_UOp;
 
+
+typedef struct packed
+{
+    logic[4:0] nmDst;
+    logic[5:0] tagDst;
+    logic[5:0] sqN;
+    logic isBranch;
+    logic branchTaken;
+    logic[5:0] branchID;
+    logic[29:0] pc;
+    logic valid;
+} CommitUOp;

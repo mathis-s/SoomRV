@@ -43,11 +43,7 @@ module BranchPredictor
     
     
     // Branch ROB Interface
-    input wire IN_ROB_valid,
-    input wire IN_ROB_isBranch,
-    input wire[ID_BITS-1:0] IN_ROB_branchID,
-    input wire[29:0] IN_ROB_branchAddr,
-    input wire IN_ROB_branchTaken,
+    input CommitUOp IN_comUOp,
     
     output reg OUT_CSR_branchCommitted
 );
@@ -125,20 +121,20 @@ always@(posedge clk) begin
         end
     end
     
-    if (IN_ROB_valid && IN_ROB_isBranch && IN_ROB_branchID != ((1 << ID_BITS) - 1) && {IN_ROB_branchAddr, 2'b00} == entries[IN_ROB_branchID[4:0]].srcAddr) begin
+    if (IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.branchID != ((1 << ID_BITS) - 1) && {IN_comUOp.pc, 2'b00} == entries[IN_comUOp.branchID[4:0]].srcAddr) begin
         
-        reg[1:0] hist = entries[IN_ROB_branchID[4:0]].history;
+        reg[1:0] hist = entries[IN_comUOp.branchID[4:0]].history;
         
-        entries[IN_ROB_branchID[4:0]].history <= {hist[0], IN_ROB_branchTaken};
+        entries[IN_comUOp.branchID[4:0]].history <= {hist[0], IN_comUOp.branchTaken};
         
-        OUT_CSR_branchCommitted <= !entries[IN_ROB_branchID[4:0]].taken;
+        OUT_CSR_branchCommitted <= !entries[IN_comUOp.branchID[4:0]].taken;
         
-        if (IN_ROB_branchTaken) begin
-            if (entries[IN_ROB_branchID[4:0]].counters[hist] != 2'b11)
-                entries[IN_ROB_branchID[4:0]].counters[hist] <= entries[IN_ROB_branchID[4:0]].counters[hist] + 1;
+        if (IN_comUOp.branchTaken) begin
+            if (entries[IN_comUOp.branchID[4:0]].counters[hist] != 2'b11)
+                entries[IN_comUOp.branchID[4:0]].counters[hist] <= entries[IN_comUOp.branchID[4:0]].counters[hist] + 1;
         end
-        else if (entries[IN_ROB_branchID[4:0]].counters[hist] != 2'b00)
-            entries[IN_ROB_branchID[4:0]].counters[hist] <= entries[IN_ROB_branchID[4:0]].counters[hist] - 1;
+        else if (entries[IN_comUOp.branchID[4:0]].counters[hist] != 2'b00)
+            entries[IN_comUOp.branchID[4:0]].counters[hist] <= entries[IN_comUOp.branchID[4:0]].counters[hist] - 1;
             
     end
     

@@ -34,14 +34,7 @@ module ROB
     output wire[5:0] OUT_maxSqN,
     output wire[5:0] OUT_curSqN,
 
-    output reg[4:0] OUT_comNames[WIDTH-1:0],
-    output reg[5:0] OUT_comTags[WIDTH-1:0],
-    output reg[5:0] OUT_comSqNs[WIDTH-1:0],
-    output reg OUT_comIsBranch[WIDTH-1:0],
-    output reg OUT_comBranchTaken[WIDTH-1:0],
-    output reg[5:0] OUT_comBranchID[WIDTH-1:0],
-    output reg[29:0] OUT_comPC[WIDTH-1:0],
-    output reg OUT_comValid[WIDTH-1:0],
+    output CommitUOp OUT_comUOp[WIDTH-1:0],
     
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
@@ -99,7 +92,7 @@ always_ff@(posedge clk) begin
             entries[i].valid <= 0;
         end
         for (i = 0; i < WIDTH; i=i+1) begin
-            OUT_comValid[i] <= 0;
+            OUT_comUOp[i].valid <= 0;
         end
         committedInstrs <= 0;
         OUT_branch.taken <= 0;
@@ -131,14 +124,14 @@ always_ff@(posedge clk) begin
             committedInstrs <= committedInstrs + 2;
 
             for (i = 0; i < WIDTH; i=i+1) begin
-                OUT_comNames[i] <= entries[i].name;
-                OUT_comTags[i] <= entries[i].tag;
-                OUT_comSqNs[i] <= baseIndex + i[5:0];
-                OUT_comIsBranch[i] <= entries[i].isBranch;
-                OUT_comBranchTaken[i] <= entries[i].branchTaken;
-                OUT_comBranchID[i] <= entries[i].branchID;
-                OUT_comValid[i] <= 1;
-                OUT_comPC[i] <= entries[i].pc;
+                OUT_comUOp[i].nmDst <= entries[i].name;
+                OUT_comUOp[i].tagDst <= entries[i].tag;
+                OUT_comUOp[i].sqN <= baseIndex + i[5:0];
+                OUT_comUOp[i].isBranch <= entries[i].isBranch;
+                OUT_comUOp[i].branchTaken <= entries[i].branchTaken;
+                OUT_comUOp[i].branchID <= entries[i].branchID;
+                OUT_comUOp[i].valid <= 1;
+                OUT_comUOp[i].pc <= entries[i].pc;
             end
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
@@ -157,14 +150,14 @@ always_ff@(posedge clk) begin
             end
 
             for (i = 0; i < 1; i=i+1) begin
-                OUT_comNames[i] <= entries[i].name;
-                OUT_comTags[i] <= entries[i].tag;
-                OUT_comSqNs[i] <= baseIndex + i[5:0 ];
-                OUT_comIsBranch[i] <= entries[i].isBranch;
-                OUT_comBranchTaken[i] <= entries[i].branchTaken;
-                OUT_comBranchID[i] <= entries[i].branchID;
-                OUT_comValid[i] <= 1;
-                OUT_comPC[i] <= entries[i].pc;
+                OUT_comUOp[i].nmDst <= entries[i].name;
+                OUT_comUOp[i].tagDst <= entries[i].tag;
+                OUT_comUOp[i].sqN <= baseIndex + i[5:0 ];
+                OUT_comUOp[i].isBranch <= entries[i].isBranch;
+                OUT_comUOp[i].branchTaken <= entries[i].branchTaken;
+                OUT_comUOp[i].branchID <= entries[i].branchID;
+                OUT_comUOp[i].valid <= 1;
+                OUT_comUOp[i].pc <= entries[i].pc;
                 
                 if (entries[i].flags == FLAGS_BRK) begin
                     // ebreak does a jump to the instruction after itself,
@@ -177,7 +170,7 @@ always_ff@(posedge clk) begin
                     OUT_branch.storeSqN <= 0;
                     OUT_branch.loadSqN <= 0;
                     // Do not write back result, redirect to x0
-                    OUT_comNames[i] <= 0;
+                    OUT_comUOp[i].nmDst <= 0;
                 end
                 else if (entries[i].flags == FLAGS_TRAP || entries[i].flags == FLAGS_EXCEPT) begin
                     OUT_branch.taken <= 1;
@@ -190,7 +183,7 @@ always_ff@(posedge clk) begin
                     
                     // Do not write back result, redirect to x0
                     if (entries[i].flags == FLAGS_EXCEPT)
-                        OUT_comNames[i] <= 0;
+                        OUT_comUOp[i].nmDst <= 0;
                     
                     OUT_irqFlags <= entries[i].flags;
                     OUT_irqSrc <= {entries[i].pc, 2'b0};
@@ -200,7 +193,7 @@ always_ff@(posedge clk) begin
                 
             end
             for (i = 1; i < WIDTH; i=i+1) begin
-                OUT_comValid[i] <= 0;
+                OUT_comUOp[i].valid <= 0;
             end
             committedInstrs <= committedInstrs + 1;
             // Blocking for proper insertion
@@ -208,7 +201,7 @@ always_ff@(posedge clk) begin
         end
         else begin
             for (i = 0; i < WIDTH; i=i+1)
-                OUT_comValid[i] <= 0;
+                OUT_comUOp[i].valid <= 0;
         end
 
         // Enqueue if entries are unused (or if we just dequeued, which frees space).
