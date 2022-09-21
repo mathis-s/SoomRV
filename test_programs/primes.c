@@ -21,7 +21,7 @@ void mark (uint32_t prime)
 static const char hexLut[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 static void printhex (uint32_t num)
 {
-    volatile char* out = (char*) 1023;
+    volatile char* out = (char*) 0xfe000000;
     
     *out = hexLut[(num >> 28) & 0xf];
     *out = hexLut[(num >> 24) & 0xf];

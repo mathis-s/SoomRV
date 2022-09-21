@@ -27,6 +27,7 @@ module InstrDecoder
     parameter NUM_UOPS=2
 )
 (
+    input wire en,
     input wire[31:0] IN_instr[NUM_UOPS-1:0],
     input wire IN_instrValid[NUM_UOPS-1:0],
     input wire IN_branchPred[NUM_UOPS-1:0],
@@ -50,7 +51,7 @@ always_comb begin
         uop = 97'b0;
         invalidEnc = 1;
         uop.pc = IN_pc[i];
-        uop.valid = IN_instrValid[i];
+        uop.valid = IN_instrValid[i] && en;
         uop.branchID = IN_branchID[i];
         uop.branchPred = IN_branchPred[i];
         

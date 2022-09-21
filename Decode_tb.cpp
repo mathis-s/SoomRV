@@ -16,9 +16,8 @@ double sc_time_stamp()
 }
 
 uint32_t ram[65536];
-uint32_t pram[2048];
+uint32_t pram[65536];
 
-uint32_t extram[65536];
 
 int main(int argc, char** argv)
 {
@@ -47,7 +46,7 @@ int main(int argc, char** argv)
             uint32_t data;
             if (fread(&data, sizeof(uint32_t), 1, f) <= 0)
                 break;
-            extram[numInstrs] = data;
+            pram[numInstrs] = data;
             numInstrs++;
         }
         fclose(f);
@@ -75,9 +74,7 @@ int main(int argc, char** argv)
         printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex-4);
         fclose(f);
     }
-    
-    memcpy(pram, extram, sizeof(pram));
-    
+
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
@@ -107,8 +104,6 @@ int main(int argc, char** argv)
     bool memCeReg = true;
     uint32_t memWmReg = 0;
     
-    uint32_t waitCnt = 8;
-
     
     while (!Verilated::gotFinish())
     {
@@ -124,7 +119,7 @@ int main(int argc, char** argv)
                 top->en = 1;
                 if (!instrCeReg)
                 {
-                    index = (instrAddrReg * 2) & 2047;
+                    index = (instrAddrReg * 2) & 0xFFFF;
                     //if (index >= 8192)
                     //    index = 0;
                     top->IN_instrRaw = ((uint64_t)pram[index] | (((uint64_t)pram[index + 1]) << 32));
@@ -171,20 +166,6 @@ int main(int argc, char** argv)
                     //printf("word %.8x\n", word);
                     ram[index] = word;
                 }
-            }
-            
-            
-            if (top->OUT_instrMappingMiss)
-            {
-                printf("miss %zx\n", (size_t)top->OUT_instrAddr);
-                
-                if (waitCnt == 0)
-                {
-                    memcpy(pram, &extram[((size_t)(top->OUT_instrAddr) & 0x03c00) << 1], sizeof(pram));
-                    top->IN_instrMappingBase = (((size_t)top->OUT_instrAddr) & 0x3c00) << 3;
-                    waitCnt = 8;
-                }
-                else waitCnt--;
             }
             
             

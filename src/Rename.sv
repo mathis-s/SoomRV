@@ -241,7 +241,6 @@ always_ff@(posedge clk) begin
             else
                 OUT_uopValid[i] <= 0;
         end
-
     end
     else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)

@@ -31,7 +31,7 @@ printhex:
 	srli	a4,a0,28
 	add	a4,a5,a4
 	lbu	a3,0(a4)
-	li	a4,1023
+	li	a4,0xfe000000
 	sb	a3,0(a4)
 	srli	a3,a0,24
 	andi	a3,a3,15

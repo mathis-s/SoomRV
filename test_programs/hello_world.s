@@ -9,9 +9,10 @@
 print:
 	lbu	a5,0(a0)
 	beq	a5,zero,.L1
+	li	a4,-33554432
 .L3:
 	addi	a0,a0,1
-	sb	a5,1023(zero)
+	sb	a5,0(a4)
 	lbu	a5,0(a0)
 	bne	a5,zero,.L3
 .L1:
@@ -32,7 +33,7 @@ printhex:
 	srli	a4,a0,28
 	add	a4,a5,a4
 	lbu	a3,0(a4)
-	li	a4,1023
+	li	a4,-33554432
 	sb	a3,0(a4)
 	srli	a3,a0,24
 	andi	a3,a3,15

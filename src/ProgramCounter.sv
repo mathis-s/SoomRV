@@ -49,8 +49,8 @@ always_comb begin
     OUT_instr[1] = IN_instr[63:32];
 end
 
-assign OUT_instrMappingMiss = (pc[30:13] != IN_instrMappingBase[31:14]) ||
-    (IN_instrMappingHalfSize && pc[12] != IN_instrMappingBase[13]);
+assign OUT_instrMappingMiss = 0;//(pc[30:13] != IN_instrMappingBase[31:14]) ||
+    //(IN_instrMappingHalfSize && pc[12] != IN_instrMappingBase[13]);
 
 always_ff@(posedge clk) begin
     if (rst) begin

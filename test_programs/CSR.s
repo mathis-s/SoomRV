@@ -21,54 +21,56 @@ main:
 	sb	a4,1023(zero)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L2
-	lui	a4,%hi(.LANCHOR0)
-	li	a0,100
-	addi	a4,a4,%lo(.LANCHOR0)
-	li	a7,-16777216
-	li	a6,10
+	lui	a3,%hi(.LANCHOR0)
+	li	a6,100
+	addi	a3,a3,%lo(.LANCHOR0)
+	li	t1,-16777216
+	li	a4,-33554432
+	li	a7,10
 .L3:
-	lw	a5,64(a7)
-	addi	a0,a0,-1
-	srli	a3,a5,28
-	srli	a1,a5,24
-	add	a3,a4,a3
-	srli	a2,a5,20
+	lw	a5,128(t1)
+	addi	a6,a6,-1
+	srli	a2,a5,28
+	srli	a0,a5,24
+	add	a2,a3,a2
+	srli	a1,a5,20
+	andi	a0,a0,15
+	lbu	t3,0(a2)
+	add	a0,a3,a0
+	srli	a2,a5,16
 	andi	a1,a1,15
-	lbu	t1,0(a3)
-	add	a1,a4,a1
-	srli	a3,a5,16
+	lbu	t5,0(a0)
+	add	a1,a3,a1
+	srli	a0,a5,12
 	andi	a2,a2,15
 	lbu	t4,0(a1)
-	add	a2,a4,a2
-	srli	a1,a5,12
-	andi	a3,a3,15
+	add	a2,a3,a2
+	srli	a1,a5,8
+	andi	a0,a0,15
+	sb	t3,0(a4)
+	add	a0,a3,a0
 	lbu	t3,0(a2)
-	add	a3,a4,a3
-	srli	a2,a5,8
 	andi	a1,a1,15
-	sb	t1,1023(zero)
-	add	a1,a4,a1
-	lbu	t1,0(a3)
+	srli	a2,a5,4
+	sb	t5,0(a4)
+	lbu	a0,0(a0)
+	add	a1,a3,a1
 	andi	a2,a2,15
-	srli	a3,a5,4
-	sb	t4,1023(zero)
+	sb	t4,0(a4)
 	lbu	a1,0(a1)
-	add	a2,a4,a2
-	andi	a3,a3,15
-	sb	t3,1023(zero)
-	lbu	a2,0(a2)
-	add	a3,a4,a3
+	add	a2,a3,a2
 	andi	a5,a5,15
-	sb	t1,1023(zero)
-	lbu	a3,0(a3)
-	add	a5,a4,a5
-	sb	a1,1023(zero)
+	sb	t3,0(a4)
+	lbu	a2,0(a2)
+	add	a5,a3,a5
+	sb	a0,0(a4)
 	lbu	a5,0(a5)
-	sb	a2,1023(zero)
-	sb	a3,1023(zero)
-	sb	a5,1023(zero)
-	sb	a6,1023(zero)
-	bne	a0,zero,.L3
+	sb	a1,0(a4)
+	sb	a2,0(a4)
+	sb	a5,0(a4)
+	sb	a7,0(a4)
+	bne	a6,zero,.L3
+	li	a0,0
 	ret
 	.size	main, .-main
 	.section	.rodata

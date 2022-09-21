@@ -37,8 +37,6 @@ module Core
 
 integer i;
 
-wire dbgIsPrint = OUT_MEM_addr == 255;
-
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
@@ -61,7 +59,7 @@ wire comValid[NUM_UOPS-1:0];
 wire frontendEn;
 
 // IF -> DE -> RN
-reg[3:0] stateValid;
+reg[5:0] stateValid;
 assign OUT_instrReadEnable = !(frontendEn && stateValid[0]);
 
 // 
@@ -194,13 +192,13 @@ wire[5:0] ROB_curSqN;
 
 always_ff@(posedge clk) begin
     if (rst) begin
-        stateValid <= 4'b0000;
+        stateValid <= 6'b000000;
         mispredFlush <= 0;
         disableMispredFlush <= 0;
         mispredFlushSqN <= 0;
     end
     else if (branch.taken) begin
-        stateValid <= 4'b0000;
+        stateValid <= 6'b000000;
         mispredFlush <= (ROB_curSqN != RN_nextSqN);
         disableMispredFlush <= 0;
         mispredFlushSqN <= branch.sqN;
@@ -208,13 +206,13 @@ always_ff@(posedge clk) begin
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
     else if (mispredFlush) begin
-        stateValid <= 4'b0000;
+        stateValid <= 6'b000000;
         disableMispredFlush <= (ROB_curSqN == RN_nextSqN);
         if (disableMispredFlush)
             mispredFlush <= 0;
     end
     else if (frontendEn)
-        stateValid <= {stateValid[2:0], 1'b1};
+        stateValid <= {stateValid[4:0], 1'b1};
 end
 
 
@@ -222,6 +220,7 @@ D_UOp DE_uop[NUM_UOPS-1:0];
 
 InstrDecoder idec
 (
+    .en(stateValid[2]),
     .IN_instr(IF_instr),
     .IN_branchID(IF_branchID),
     .IN_branchPred(IF_branchPred),
@@ -231,6 +230,17 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 
+D_UOp FUSE_uop[NUM_UOPS-1:0];
+Fuse fuse
+(
+    .clk(clk),
+    .en(frontendEn),
+    .rst(rst),
+    .mispredict(branch.taken),
+    
+    .IN_uop(DE_uop),
+    .OUT_uop(FUSE_uop)
+);
 
 
 R_UOp RN_uop[NUM_UOPS-1:0];
@@ -241,11 +251,11 @@ wire[5:0] RN_nextStoreSqN;
 Rename rn 
 (
     .clk(clk),
-    .en(!branch.taken && stateValid[2]),
+    .en(!branch.taken && !mispredFlush),
     .frontEn(frontendEn),
     .rst(rst),
 
-    .IN_uop(DE_uop),
+    .IN_uop(FUSE_uop),
 
     .comValid(comValid),
     .comRegNm(comRegNm),
@@ -284,7 +294,7 @@ ReservationStation rv
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(stateValid[3] && frontendEn),
+    .frontEn(frontendEn),
     
     .IN_DIV_doNotIssue(DIV_doNotIssue),
     .IN_MUL_doNotIssue(MUL_doNotIssue),

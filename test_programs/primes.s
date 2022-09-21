@@ -37,8 +37,10 @@ mark:
 main:
 	addi	sp,sp,-16
 	lui	a6,%hi(.LANCHOR0)
-	lui	t6,%hi(.LANCHOR1)
+	lui	t0,%hi(.LANCHOR1)
 	sw	s0,12(sp)
+	sw	s1,8(sp)
+	sw	s2,4(sp)
 	li	a1,1
 	li	a0,0
 	li	a3,3
@@ -47,8 +49,9 @@ main:
 	li	t1,1
 	li	t3,31
 	li	t5,128
-	addi	t6,t6,%lo(.LANCHOR1)
-	li	t0,10
+	addi	t0,t0,%lo(.LANCHOR1)
+	li	t6,-33554432
+	li	t2,10
 .L10:
 	srli	a4,a3,1
 	add	a4,a4,a3
@@ -62,9 +65,10 @@ main:
 	add	a4,a4,a3
 	or	a2,a2,a7
 	sw	a2,0(a5)
+	nop
+	nop
+	nop
 	srli	a5,a4,5
-	nop
-	nop
 	bleu	a5,t4,.L8
 .L9:
 	bne	a1,t3,.L11
@@ -81,43 +85,43 @@ main:
 	bne	a5,zero,.L9
 	srli	a5,a3,28
 	srli	a2,a3,24
-	add	a5,t6,a5
+	add	a5,t0,a5
 	andi	a2,a2,15
 	srli	a4,a3,20
 	lbu	s0,0(a5)
-	add	a2,t6,a2
+	add	a2,t0,a2
 	andi	a4,a4,15
 	srli	a5,a3,16
-	lbu	t2,0(a2)
-	add	a4,t6,a4
+	lbu	a7,0(a2)
+	add	a4,t0,a4
 	andi	a5,a5,15
 	srli	a2,a3,12
-	lbu	a7,0(a4)
-	add	a5,t6,a5
+	lbu	s1,0(a4)
+	add	a5,t0,a5
 	andi	a2,a2,15
 	srli	a4,a3,8
-	sb	s0,1023(zero)
-	add	a2,t6,a2
-	lbu	s0,0(a5)
+	sb	s0,0(t6)
+	lbu	s2,0(a5)
+	add	a2,t0,a2
 	andi	a4,a4,15
 	srli	a5,a3,4
-	sb	t2,1023(zero)
-	add	a4,t6,a4
-	lbu	t2,0(a2)
+	sb	a7,0(t6)
+	lbu	s0,0(a2)
+	add	a4,t0,a4
 	andi	a5,a5,15
-	sb	a7,1023(zero)
-	add	a5,t6,a5
+	sb	s1,0(t6)
 	lbu	a7,0(a4)
+	add	a5,t0,a5
 	andi	a4,a3,15
-	sb	s0,1023(zero)
+	sb	s2,0(t6)
 	lbu	a2,0(a5)
-	add	a5,t6,a4
-	sb	t2,1023(zero)
+	add	a5,t0,a4
+	sb	s0,0(t6)
 	lbu	a5,0(a5)
-	sb	a7,1023(zero)
-	sb	a2,1023(zero)
-	sb	a5,1023(zero)
-	sb	t0,1023(zero)
+	sb	a7,0(t6)
+	sb	a2,0(t6)
+	sb	a5,0(t6)
+	sb	t2,0(t6)
 	j	.L10
 .L11:
 	addi	a1,a1,1
@@ -125,6 +129,8 @@ main:
 	j	.L12
 .L16:
 	lw	s0,12(sp)
+	lw	s1,8(sp)
+	lw	s2,4(sp)
 	li	a0,0
 	addi	sp,sp,16
 	jr	ra
