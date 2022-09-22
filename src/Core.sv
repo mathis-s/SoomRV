@@ -52,9 +52,11 @@ wire comValid[NUM_UOPS-1:0];
 
 wire frontendEn;
 
+wire ifetchEn;
+
 // IF -> DE -> RN
 reg[2:0] stateValid;
-assign OUT_instrReadEnable = !(frontendEn && stateValid[0]);
+assign OUT_instrReadEnable = !(ifetchEn && stateValid[0]);
 
 // 
 reg[63:0] instrRawBackup;
@@ -62,7 +64,7 @@ reg useInstrRawBackup;
 always_ff@(posedge clk) begin
     if (rst)
         useInstrRawBackup <= 0;
-    else if (!(frontendEn && stateValid[0])) begin
+    else if (!(ifetchEn && stateValid[0])) begin
         instrRawBackup <= instrRaw;
         useInstrRawBackup <= 1;
     end
@@ -88,11 +90,6 @@ BranchSelector bsel
     .OUT_mispredFlush(mispredFlush)
 );
 
-
-reg [31:0] IF_pc[NUM_UOPS-1:0];
-wire[31:0] IF_instr[NUM_UOPS-1:0];
-wire IF_instrValid[NUM_UOPS-1:0];
-
 wire[31:0] PC_pc;
 assign OUT_instrAddr = PC_pc[31:3];
 
@@ -103,15 +100,15 @@ wire[31:0] BP_branchDst;
 wire[5:0] BP_branchID;
 wire BP_multipleBranches;
 wire BP_branchFound;
+wire BP_branchCompr;
 
-wire[5:0] IF_branchID[NUM_UOPS-1:0];
-wire IF_branchPred[NUM_UOPS-1:0];
+IF_Instr IF_instrs[3:0];
 
 ProgramCounter progCnt
 (
     .clk(clk),
-    .en0(stateValid[0] && frontendEn),
-    .en1(stateValid[1] && frontendEn),
+    .en0(stateValid[0] && ifetchEn),
+    .en1(stateValid[1] && ifetchEn),
     .rst(rst),
     .IN_pc(branch.dstPC),
     .IN_write(branch.taken),
@@ -124,13 +121,10 @@ ProgramCounter progCnt
     .IN_BP_branchID(BP_branchID),
     .IN_BP_multipleBranches(BP_multipleBranches),
     .IN_BP_branchFound(BP_branchFound),
+    .IN_BP_branchCompr(BP_branchCompr),
     
     .OUT_pcRaw(PC_pc),
-    .OUT_pc(IF_pc),
-    .OUT_instr(IF_instr),
-    .OUT_branchID(IF_branchID),
-    .OUT_branchPred(IF_branchPred),
-    .OUT_instrValid(IF_instrValid),
+    .OUT_instrs(IF_instrs),
     
     .IN_instrMappingBase(IN_instrMappingBase),
     .IN_instrMappingHalfSize(IN_instrMappingHalfSize),
@@ -142,12 +136,13 @@ wire[31:0] branchSource;
 wire branchIsJump;
 wire[5:0] branchID;
 wire branchTaken;
+wire branchCompr;
 BranchPredictor bp
 (
     .clk(clk),
     .rst(rst),
     
-    .IN_pcValid(stateValid[0] && frontendEn),
+    .IN_pcValid(stateValid[0] && ifetchEn),
     .IN_pc(PC_pc),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_isJump(BP_isJump),
@@ -156,6 +151,7 @@ BranchPredictor bp
     .OUT_branchID(BP_branchID),
     .OUT_multipleBranches(BP_multipleBranches),
     .OUT_branchFound(BP_branchFound),
+    .OUT_branchCompr(BP_branchCompr),
     
     .IN_branchValid(isBranch),
     .IN_branchID(branchID),
@@ -163,6 +159,7 @@ BranchPredictor bp
     .IN_branchDest(branchProvs[1].dstPC),
     .IN_branchTaken(branchTaken),
     .IN_branchIsJump(branchIsJump),
+    .IN_branchCompr(branchCompr),
     
     .IN_comUOp(comUOps[0]),
     
@@ -177,34 +174,48 @@ always_ff@(posedge clk) begin
         stateValid <= 3'b000;
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
-    else if (branch.taken || mispredFlush)
+    else if (branch.taken)
         stateValid <= 3'b000;
-    else if (frontendEn)
+    else if (ifetchEn)
         stateValid <= {stateValid[1:0], 1'b1};
 end
 
+wire PD_full;
+PD_Instr PD_instrs[1:0];
+PreDecode preDec
+(
+    .clk(clk),
+    .rst(rst),
+    .ifetchValid(stateValid[2] && ifetchEn),
+    .outEn(!FUSE_full),
+    
+    .OUT_full(PD_full),
+    
+    .mispred(branch.taken),
+    .IN_instrs(IF_instrs),
+    .OUT_instrs(PD_instrs)
+);
+assign ifetchEn = !PD_full;
 
 D_UOp DE_uop[NUM_UOPS-1:0];
 
 InstrDecoder idec
 (
-    .en(stateValid[2]),
-    .IN_instr(IF_instr),
-    .IN_branchID(IF_branchID),
-    .IN_branchPred(IF_branchPred),
-    .IN_instrValid(IF_instrValid),
-    .IN_pc(IF_pc),
-
+    .en(1'b1),
+    .IN_instrs(PD_instrs),
     .OUT_uop(DE_uop)
 );
 
+wire FUSE_full;
 D_UOp FUSE_uop[NUM_UOPS-1:0];
 Fuse fuse
 (
     .clk(clk),
-    .en(frontendEn),
+    .frontEn(frontendEn),
     .rst(rst),
     .mispredict(branch.taken),
+    
+    .OUT_full(FUSE_full),
     
     .IN_uop(DE_uop),
     .OUT_uop(FUSE_uop)
@@ -369,6 +380,7 @@ IntALU ialu
     .OUT_branchSqN(branchProvs[0].sqN),
     .OUT_branchLoadSqN(branchProvs[0].loadSqN),
     .OUT_branchStoreSqN(branchProvs[0].storeSqN),
+    .OUT_branchCompr(),
     
     .OUT_zcFwdResult(LD_zcFwdResult[0]),
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
@@ -512,6 +524,7 @@ IntALU ialu1
     .OUT_branchSqN(branchProvs[1].sqN),
     .OUT_branchLoadSqN(branchProvs[1].loadSqN),
     .OUT_branchStoreSqN(branchProvs[1].storeSqN),
+    .OUT_branchCompr(branchCompr),
     
     .OUT_zcFwdResult(LD_zcFwdResult[1]),
     .OUT_zcFwdTag(LD_zcFwdTag[1]),
@@ -586,7 +599,7 @@ ControlRegs cr
     .IN_comValid('{comUOps[0].valid, comUOps[1].valid}),
     .IN_branch(branchProvs[1]),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
-    .IN_ifValid(IF_instrValid),
+    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid}),
     .IN_comBranch(CSR_branchCommitted),
     
     .OUT_irqAddr(CR_irqAddr),
@@ -608,14 +621,14 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-// this should be done properly, ideally effects in rename cycle instead of IF
 assign frontendEn = (RV_freeEntries > NUM_UOPS) && 
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
     !branch.taken &&
     en &&
-    !OUT_instrMappingMiss;
+    !OUT_instrMappingMiss &&
+    !mispredFlush;
 
 `ifdef IVERILOG_DEBUG
 `include "src/Debug.svi"

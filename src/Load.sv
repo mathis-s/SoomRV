@@ -71,6 +71,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].branchPred <= IN_uop[i].branchPred;
                 OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
+                OUT_uop[i].compressed <= IN_uop[i].compressed;
                 
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 

@@ -110,12 +110,7 @@ module InstrDecoder
 )
 (
     input wire en,
-    input wire[31:0] IN_instr[NUM_UOPS-1:0],
-    input wire IN_instrValid[NUM_UOPS-1:0],
-    input wire IN_branchPred[NUM_UOPS-1:0],
-    input wire[5:0] IN_branchID[NUM_UOPS-1:0],
-
-    input wire[31:0] IN_pc[NUM_UOPS-1:0],
+    input PD_Instr IN_instrs[NUM_UOPS-1:0],
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -129,23 +124,23 @@ Instr32 instr;
 always_comb begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
-        instr = IN_instr[i];
-        uop = 97'b0;
+        instr = IN_instrs[i].instr;
+        uop = 98'b0;
         invalidEnc = 1;
-        uop.pc = IN_pc[i];
-        uop.valid = IN_instrValid[i] && en;
-        uop.branchID = IN_branchID[i];
-        uop.branchPred = IN_branchPred[i];
+        uop.pc = {IN_instrs[i].pc, 1'b0};
+        uop.valid = IN_instrs[i].valid && en;
+        uop.branchID = IN_instrs[i].branchID;
+        uop.branchPred = IN_instrs[i].branchPred;
         
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
-            `OPC_JAL:        uop.imm = IN_pc[i] + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
+            `OPC_JAL:        uop.imm = {IN_instrs[i].pc, 1'b0} + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
             `OPC_ENV,
             `OPC_JALR,          
             `OPC_LOAD,
             `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
-            `OPC_BRANCH:     uop.imm = IN_pc[i] + $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
+            `OPC_BRANCH:     uop.imm = {IN_instrs[i].pc, 1'b0} + $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
             `OPC_STORE:    uop.imm = $signed({{20{instr[31]}}, instr[31:25], instr[11:7]});
             //`OPC_REG_REG,
             default:      uop.imm = 0;
@@ -506,7 +501,7 @@ always_comb begin
         end
         // Compressed Instructions
         else begin
-            
+            uop.compressed = 1;
         end
         
         

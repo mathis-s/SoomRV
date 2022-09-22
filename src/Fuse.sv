@@ -6,9 +6,11 @@ module Fuse
 )
 (
     input wire clk,
-    input wire en,
+    input wire frontEn,
     input wire rst,
     input wire mispredict,
+    
+    output reg OUT_full,
     
     input D_UOp IN_uop[NUM_UOPS_IN-1:0],
     output D_UOp OUT_uop[NUM_UOPS_OUT-1:0]
@@ -28,6 +30,7 @@ D_UOp bufInsertUOps[NUM_UOPS_IN-1:0];
 
 reg[$clog2(BUF_SIZE)-1:0] obufIndexIn;
 reg[$clog2(BUF_SIZE)-1:0] obufIndexOut;
+reg[$clog2(BUF_SIZE):0] freeEntries;
 D_UOp outBuffer[BUF_SIZE-1:0];
 
 always_comb begin
@@ -87,25 +90,32 @@ always_ff@(posedge clk) begin
 
         obufIndexIn = 0;
         obufIndexOut = 0;
+        freeEntries = BUF_SIZE;
     end
-    else if (en && !mispredict) begin
+    else if (!mispredict) begin
         
-        bufInsertUOps <= fusedUOps;
-        uop <= next_uop;
-        
-        for (i = 0; i < NUM_UOPS_OUT; i=i+1) begin
-            if (obufIndexOut != obufIndexIn) begin
-                OUT_uop[i] <= outBuffer[obufIndexOut];
-                OUT_uop[i].valid <= 1'b1;
-                obufIndexOut = obufIndexOut + 1;
+        if (frontEn) begin
+            for (i = 0; i < NUM_UOPS_OUT; i=i+1) begin
+                if (obufIndexOut != obufIndexIn) begin
+                    OUT_uop[i] <= outBuffer[obufIndexOut];
+                    OUT_uop[i].valid <= 1'b1;
+                    obufIndexOut = obufIndexOut + 1;
+                    freeEntries = freeEntries + 1;
+                end
+                else OUT_uop[i].valid <= 0;
             end
-            else OUT_uop[i].valid <= 0;
         end
-        for (i = 0; i < NUM_UOPS_IN; i=i+1) begin
-            if (bufInsertUOps[i].valid) begin
-                outBuffer[obufIndexIn] <= bufInsertUOps[i];
-                obufIndexIn = obufIndexIn + 1;
-                assert(obufIndexIn != obufIndexOut);
+        
+        if (!OUT_full) begin
+            bufInsertUOps <= fusedUOps;
+            uop <= next_uop;
+            for (i = 0; i < NUM_UOPS_IN; i=i+1) begin
+                if (bufInsertUOps[i].valid) begin
+                    outBuffer[obufIndexIn] <= bufInsertUOps[i];
+                    obufIndexIn = obufIndexIn + 1;
+                    assert(obufIndexIn != obufIndexOut);
+                    freeEntries = freeEntries - 1;
+                end
             end
         end
     
@@ -119,7 +129,10 @@ always_ff@(posedge clk) begin
         end
         obufIndexIn = 0;
         obufIndexOut = 0;
+        freeEntries = BUF_SIZE;
     end
+    
+    OUT_full <= (freeEntries < 4);
 
 end
 

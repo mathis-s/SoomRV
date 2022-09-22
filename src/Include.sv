@@ -82,18 +82,36 @@ typedef enum bit[1:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT} Flags;
 
 typedef struct packed
 {
+    logic[15:0] instr;
+    logic[30:0] pc;
+    logic[5:0] branchID;
+    logic branchPred;
+    logic valid;
+} IF_Instr;
+
+typedef struct packed
+{
+    logic[31:0] instr;
+    logic[30:0] pc;
+    logic[5:0] branchID;
+    logic branchPred;
+    logic valid;
+} PD_Instr;
+
+typedef struct packed
+{
     logic[31:0] imm;
     logic[31:0] pc;
     logic[4:0] rs0; 
     logic[4:0] rs1;
     logic pcA;
-    // only useful when we otherwise need a duplicate opcode -> maybe rework some things
     logic immB;
     logic[4:0] rd;
     logic[5:0] opcode;
     FuncUnit fu;
     logic[5:0] branchID;
     logic branchPred;
+    logic compressed;
     logic valid;
 } D_UOp;
 
@@ -116,6 +134,7 @@ typedef struct packed
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     FuncUnit fu;
+    logic compressed;
 } R_UOp;
 
 
@@ -144,12 +163,13 @@ typedef struct packed
     logic[5:0] opcode;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
-    logic[5:0] sqN; // 20
-    logic[5:0] branchID; // 14
-    logic branchPred; // 13
-    logic[5:0] storeSqN; // 7
-    logic[5:0] loadSqN; // 1
-    logic valid; //0
+    logic[5:0] sqN;
+    logic[5:0] branchID;
+    logic branchPred;
+    logic[5:0] storeSqN;
+    logic[5:0] loadSqN;
+    logic compressed;
+    logic valid;
 } EX_UOp;
 
 typedef struct packed
@@ -162,8 +182,8 @@ typedef struct packed
     bit isBranch; // 10
     bit branchTaken; // 9
     bit[5:0] branchID; // 3
-    Flags flags; //1
-    bit valid; //0
+    Flags flags; // 1
+    bit valid; // 0
 } RES_UOp;
 
 

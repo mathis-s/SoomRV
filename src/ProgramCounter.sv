@@ -1,6 +1,7 @@
 module ProgramCounter
 #(
-    parameter NUM_UOPS=2
+    parameter NUM_UOPS=2,
+    parameter NUM_BLOCKS=4
 )
 (
     input wire clk,
@@ -20,14 +21,11 @@ module ProgramCounter
     input wire[31:0] IN_BP_branchDst,
     input wire[5:0] IN_BP_branchID,
     input wire IN_BP_multipleBranches,
+    input wire IN_BP_branchCompr,
 
     output reg[31:0] OUT_pcRaw,
-
-    output reg[31:0] OUT_pc[NUM_UOPS-1:0],
-    output reg[31:0] OUT_instr[NUM_UOPS-1:0],
-    output reg[5:0] OUT_branchID[NUM_UOPS-1:0],
-    output reg OUT_branchPred[NUM_UOPS-1:0],
-    output reg OUT_instrValid[NUM_UOPS-1:0],
+    
+    output IF_Instr OUT_instrs[NUM_BLOCKS-1:0],
     
     input wire[31:0] IN_instrMappingBase,
     input wire IN_instrMappingHalfSize,
@@ -38,15 +36,15 @@ integer i;
 
 reg[30:0] pc;
 reg[30:0] pcLast;
-reg[1:0] bMaskLast;
-reg[5:0] bIndexLast[1:0];
-reg bPredLast[1:0];
+reg[3:0] bMaskLast;
+reg[5:0] bIndexLast[3:0];
+reg bPredLast[3:0];
 
 assign OUT_pcRaw = {pc, 1'b0};
 
 always_comb begin
-    OUT_instr[0] = IN_instr[31:0];
-    OUT_instr[1] = IN_instr[63:32];
+    for (i = 0; i < NUM_BLOCKS; i=i+1)
+        OUT_instrs[i].instr = IN_instr[(16*i)+:16];
 end
 
 assign OUT_instrMappingMiss = 0;//(pc[30:13] != IN_instrMappingBase[31:14]) ||
@@ -61,45 +59,43 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (en1) begin
-            for (i = 0; i < NUM_UOPS; i=i+1) begin
-                OUT_pc[i] <= {{pcLast[30:2], 2'b00} + 31'd2 * i[30:0], 1'b0};
-                OUT_instrValid[i] <= (i[0] >= pcLast[1]) && bMaskLast[i];
-                OUT_branchID[i] <= bIndexLast[i];
-                OUT_branchPred[i] <= bPredLast[i];
+            for (i = 0; i < NUM_BLOCKS; i=i+1) begin
+                OUT_instrs[i].pc <= {{pcLast[30:2], 2'b00} + 31'd1 * i[30:0]};
+                OUT_instrs[i].valid <= (i[1:0] >= pcLast[1:0]) && bMaskLast[i];
+                OUT_instrs[i].branchID <= bIndexLast[i];
+                OUT_instrs[i].branchPred <= bPredLast[i];
             end
         end
 
         if (en0) begin
             if (IN_BP_branchFound) begin
                 if (IN_BP_isJump || IN_BP_branchTaken) begin
-                
-                    assert(IN_BP_branchTaken);
                     
                     pc <= IN_BP_branchDst[31:1];
                     pcLast <= pc;
                     
                     // Jump is second instr in bundle
                     if (IN_BP_branchSrc[2]) begin
-                        bMaskLast <= 2'b11;
+                        bMaskLast <= 4'b1111;
                         bIndexLast[0] <= 63;
-                        bIndexLast[1] <= IN_BP_branchID;
+                        bIndexLast[2] <= IN_BP_branchID;
                         bPredLast[0] <= 0;
-                        bPredLast[1] <= 1;
+                        bPredLast[2] <= 1;
                     end
                     // Jump is first instr in bundle
                     else begin
-                        bMaskLast <= 2'b01;
+                        bMaskLast <= 4'b0011;
                         bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[1] <= 63;
+                        bIndexLast[2] <= 63;
                         bPredLast[0] <= 1;
-                        bPredLast[1] <= 0;
+                        bPredLast[2] <= 0;
                     end
                 end
-                // Is branch
+                // Branch found, not taken
                 else begin
-                    // always predict as not taken for now
+
                     bPredLast[0] <= 0;
-                    bPredLast[1] <= 0;
+                    bPredLast[2] <= 0;
                 
                     pcLast <= pc;
                     
@@ -108,10 +104,10 @@ always_ff@(posedge clk) begin
                     if (IN_BP_multipleBranches) begin
                         pc <= IN_BP_branchSrc[31:1] + 2;
                         // only run first instr
-                        bMaskLast <= 2'b01;
+                        bMaskLast <= 4'b0011;
                     end
                     else begin
-                        bMaskLast <= 2'b11;
+                        bMaskLast <= 4'b1111;
                         case (pc[1])
                             1'b1: pc <= pc + 2;
                             1'b0: pc <= pc + 4;
@@ -120,11 +116,11 @@ always_ff@(posedge clk) begin
                     
                     if (IN_BP_branchSrc[2]) begin
                         bIndexLast[0] <= 63;
-                        bIndexLast[1] <= IN_BP_branchID;
+                        bIndexLast[2] <= IN_BP_branchID;
                     end
                     else begin
                         bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[1] <= 63;
+                        bIndexLast[2] <= 63;
                     end
                     
                 end
@@ -139,11 +135,11 @@ always_ff@(posedge clk) begin
                     end
                 endcase
                 pcLast <= pc;
-                bMaskLast <= 2'b11;
+                bMaskLast <= 4'b1111;
                 bIndexLast[0] <= 63;
-                bIndexLast[1] <= 63;
+                bIndexLast[2] <= 63;
                 bPredLast[0] <= 0;
-                bPredLast[1] <= 0;
+                bPredLast[2] <= 0;
             end
         end
     end

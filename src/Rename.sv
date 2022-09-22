@@ -175,6 +175,7 @@ always_ff@(posedge clk) begin
             OUT_uop[i].pcA <= IN_uop[i].pcA;
             OUT_uop[i].branchID <= IN_uop[i].branchID;
             OUT_uop[i].branchPred <= IN_uop[i].branchPred;
+            OUT_uop[i].compressed <= IN_uop[i].compressed;
         end
         
         // Set seqnum/tags for next instruction(s)

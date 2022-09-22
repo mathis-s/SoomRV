@@ -21,6 +21,7 @@ module IntALU
     output reg[5:0] OUT_branchSqN,
     output reg[5:0] OUT_branchLoadSqN,
     output reg[5:0] OUT_branchStoreSqN,
+    output reg OUT_branchCompr,
     
     output wire[31:0] OUT_zcFwdResult,
     output wire[5:0] OUT_zcFwdTag,
@@ -151,7 +152,6 @@ always_ff@(posedge clk) begin
         OUT_branchTaken <= 0;
         OUT_isBranch <= 0;
         OUT_branchMispred <= 0;
-        //OUT_valid <= 0;
     end
     else begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
@@ -165,11 +165,14 @@ always_ff@(posedge clk) begin
                 OUT_branchID <= IN_uop.branchID;
                 OUT_branchIsJump <= (IN_uop.opcode == INT_JAL);
                 OUT_branchTaken <= branchTaken;
+                OUT_branchCompr <= IN_uop.compressed;
                 
                 if (branchTaken != IN_uop.branchPred) begin
                     OUT_branchMispred <= 1;
                     if (branchTaken)
                         OUT_branchAddress <= imm;
+                    else if (IN_uop.compressed)
+                        OUT_branchAddress <= (IN_uop.pc + 2);
                     else
                         OUT_branchAddress <= (IN_uop.pc + 4);
                 end
@@ -198,7 +201,6 @@ always_ff@(posedge clk) begin
         end
         else begin
             OUT_branchMispred <= 0;
-            //OUT_valid <= 0;
             OUT_uop.valid <= 0;
             OUT_isBranch <= 0;
         end
