@@ -17,4 +17,4 @@ and also supports speculative execution and precise exceptions.
 4. Open `view.gtkw` for a waveform view of the core's internals.
 
 ## Basic Architecture
-![soomrv](https://user-images.githubusercontent.com/39701487/189920766-0fa0f296-ef00-4983-acc0-1c024d90e1f4.svg)
+![soomrv](https://user-images.githubusercontent.com/39701487/191944891-083a4855-76c8-482b-99e3-48dd6bacaa15.svg)
