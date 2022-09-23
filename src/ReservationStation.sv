@@ -1,9 +1,6 @@
 typedef struct packed
 {
-    logic isJumpBranch;
-    logic isStore;
-    logic isLoad;
-    logic preValid;
+    //logic isJumpBranch;
     logic valid;
 } UOpInfo;
 
@@ -100,17 +97,13 @@ always_comb begin
                         ) &&
                         
                     // Second FU only gets simple int ops
-                    (i == 0 || (!queueInfo[j].isLoad && !queueInfo[j].isStore && queue[j].fu != FU_DIV)) &&
+                    (i == 0 || (queue[j].fu != FU_LSU && queue[j].fu != FU_DIV)) &&
                     (i == 1 || (queue[j].fu != FU_MUL)) &&
                     (!IN_DIV_doNotIssue || queue[j].fu != FU_DIV) &&
                     (!IN_MUL_doNotIssue || queue[j].fu != FU_MUL) &&
-                    //(i == 1 || (queueInfo[j].isLoad || queueInfo[j].isStore)) &&
-                    
-                    // Branches only to FU 1
-                    (!queueInfo[j].isJumpBranch || i == 1) &&
+
                     (queue[j].fu != FU_INT || !reservedWBs[i][0])
                     
-                    // TODO: do comparisons in tree structure instead of linear
                     /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
                     
                     //deqValid[i] = 1;
@@ -250,10 +243,6 @@ always_ff@(posedge clk) begin
                     freeEntries = freeEntries + 1;
             end
         end
-        
-        //for (i = 0; i < NUM_UOPS; i=i+1)
-        //    if ($signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)
-        //        OUT_valid[i] <= 0;
     end
     else begin
         // issue uops
@@ -265,7 +254,6 @@ always_ff@(posedge clk) begin
                     OUT_valid[i] <= 1;
                     queueInfo[deqIndex[i]].valid <= 0;
                     
-                    //if (queue[deqIndex[i]].fu == FU_MUL)
                     reservedWBs[i] <= {
                         (queue[deqIndex[i]].fu == FU_DIV), 
                         reservedWBs[i][32:10], 
@@ -300,32 +288,6 @@ always_ff@(posedge clk) begin
                 end
                 
                 queue[insertIndex[i]] <= temp;
-                
-                queueInfo[insertIndex[i]].isJumpBranch <= (temp.fu == FU_INT) && (
-                    temp.opcode == INT_BEQ || 
-                    temp.opcode == INT_BNE || 
-                    temp.opcode == INT_BLT || 
-                    temp.opcode == INT_BGE || 
-                    temp.opcode == INT_BLTU || 
-                    temp.opcode == INT_BGEU || 
-                    temp.opcode == INT_JAL || 
-                    temp.opcode == INT_JALR ||
-                    temp.opcode == INT_F_ADDI_BEQ || 
-                    temp.opcode == INT_F_ADDI_BNE || 
-                    temp.opcode == INT_F_ADDI_BLT || 
-                    temp.opcode == INT_F_ADDI_BGE || 
-                    temp.opcode == INT_F_ADDI_BLTU ||
-                    temp.opcode == INT_F_ADDI_BGEU ||
-                    temp.opcode == INT_SYS ||
-                    temp.opcode == INT_UNDEFINED
-                );
-                
-                queueInfo[insertIndex[i]].isStore <= (temp.fu == FU_LSU) && 
-                    (temp.opcode == LSU_SB || temp.opcode == LSU_SH || temp.opcode == LSU_SW);
-                    
-                queueInfo[insertIndex[i]].isLoad <= (temp.fu == FU_LSU) && (temp.opcode == LSU_LB || temp.opcode == LSU_LH ||
-                    temp.opcode == LSU_LW || temp.opcode == LSU_LBU || temp.opcode == LSU_LHU);
-            
                 queueInfo[insertIndex[i]].valid <= 1;
 
                 freeEntries = freeEntries - 1;

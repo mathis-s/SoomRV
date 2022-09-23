@@ -204,6 +204,16 @@ typedef struct packed
 
 typedef struct packed
 {
+    bit[5:0] branchID;
+    bit[31:0] src;
+    bit[31:0] dst;
+    bit isJump;
+    bit compressed;
+    bit valid;
+} BTUpdate;
+
+typedef struct packed
+{
     logic[31:0] addr;
     logic[31:0] data;
     // could union some of these fields

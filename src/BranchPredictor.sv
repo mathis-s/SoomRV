@@ -33,16 +33,8 @@ module BranchPredictor
     output reg OUT_branchFound,
     output reg OUT_branchCompr,
     
-    
     // Branch XU interface
-    input wire IN_branchValid,
-    input wire[ID_BITS-1:0] IN_branchID,
-    input wire[31:0] IN_branchAddr,
-    input wire[31:0] IN_branchDest,
-    input wire IN_branchTaken,
-    input wire IN_branchIsJump,
-    input wire IN_branchCompr,
-    
+    input BTUpdate IN_btUpdates[NUM_IN-1:0],
     
     // Branch ROB Interface
     input CommitUOp IN_comUOp,
@@ -55,6 +47,8 @@ integer i;
 reg[ID_BITS-1:0] insertIndex;
 BTEntry entries[NUM_ENTRIES-1:0];
 
+
+// BTB lookup for iFetch
 always_comb begin
     OUT_branchFound = 0;
     // default not taken
@@ -87,6 +81,17 @@ always_comb begin
         end
 end
 
+// Try to find valid branch target update
+BTUpdate btUpdate;
+always_comb begin
+    btUpdate = 73'bx;
+    btUpdate.valid = 0;
+    for (i = 0; i < NUM_IN; i=i+1) begin
+        if (IN_btUpdates[i].valid)
+            btUpdate = IN_btUpdates[i];
+    end
+end
+
 always@(posedge clk) begin
     
     OUT_CSR_branchCommitted <= 0;
@@ -99,24 +104,21 @@ always@(posedge clk) begin
         insertIndex <= 0;
     end
     
-    else if (IN_branchValid) begin
-        
-        // No entry yet, create entry
-        if (IN_branchTaken && IN_branchID == ((1 << ID_BITS) - 1)) begin
-            entries[insertIndex[4:0]].valid <= 1;
-            entries[insertIndex[4:0]].used <= 1;
-            entries[insertIndex[4:0]].srcAddr <= IN_branchAddr;
-            entries[insertIndex[4:0]].dstAddr <= IN_branchDest;
-            // only jumps always taken
-            entries[insertIndex[4:0]].taken <= IN_branchIsJump;
-            entries[insertIndex[4:0]].counters[0] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[4:0]].counters[1] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[4:0]].counters[2] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[4:0]].counters[3] <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[4:0]].history <= {IN_branchTaken, IN_branchTaken};
-            entries[insertIndex[4:0]].compressed <= IN_branchCompr;
-            insertIndex <= insertIndex + 1;
-        end
+    else if (btUpdate.valid) begin
+    
+        entries[insertIndex[4:0]].valid <= 1;
+        entries[insertIndex[4:0]].used <= 1;
+        entries[insertIndex[4:0]].srcAddr <= btUpdate.src;
+        entries[insertIndex[4:0]].dstAddr <= btUpdate.dst;
+        // only jumps always taken
+        entries[insertIndex[4:0]].taken <= btUpdate.isJump;
+        entries[insertIndex[4:0]].counters[0] <= 2'b11;
+        entries[insertIndex[4:0]].counters[1] <= 2'b11;
+        entries[insertIndex[4:0]].counters[2] <= 2'b11;
+        entries[insertIndex[4:0]].counters[3] <= 2'b11;
+        entries[insertIndex[4:0]].history <= 2'b11;
+        entries[insertIndex[4:0]].compressed <= btUpdate.compressed;
+        insertIndex <= insertIndex + 1;
     end
     else begin
         // If not valid or not used recently, keep this entry as first to replace

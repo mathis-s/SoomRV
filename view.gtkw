@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Fri Sep 23 10:24:34 2022
+[*] Fri Sep 23 15:08:24 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Sep 23 10:10:53 2022"
-[dumpfile_size] 21330197
+[dumpfile_mtime] "Fri Sep 23 14:39:27 2022"
+[dumpfile_size] 44814272
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 0
+[timestart] 2820
 [size] 3840 2132
 [pos] -1 -1
-*-15.022985 31320 912780 13460 1840 2640 15835 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-12.022985 72610 912780 13460 1840 2640 15835 7125 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.agu.
@@ -22,6 +22,7 @@
 [treeopen] TOP.Core.cr.
 [treeopen] TOP.Core.div.
 [treeopen] TOP.Core.div.IN_uop.
+[treeopen] TOP.Core.fuse.
 [treeopen] TOP.Core.ialu.
 [treeopen] TOP.Core.ialu.OUT_uop.
 [treeopen] TOP.Core.ialu1.
@@ -117,6 +118,16 @@ TOP.Core.preDec.OUT_instrs[1].branchID[5:0]
 @28
 TOP.Core.preDec.OUT_instrs[1].valid
 @200
+-FUSE
+@28
+TOP.Core.fuse.OUT_uop[0].valid
+@22
+TOP.Core.fuse.OUT_uop[1].pc[31:0]
+@28
+TOP.Core.fuse.OUT_uop[1].valid
+@22
+TOP.Core.fuse.OUT_uop[1].pc[31:0]
+@200
 -RN_uop[0]
 @28
 #{TOP.Core.rn.OUT_uopValid[0:1]} TOP.Core.rn.OUT_uopValid[0] TOP.Core.rn.OUT_uopValid[1]
@@ -134,8 +145,9 @@ TOP.Core.RN_uop[0].tagB[5:0]
 TOP.Core.rn.OUT_uop[0].nmDst[4:0]
 @200
 -RN_uop[1]
-@22
+@23
 TOP.Core.RN_uop[1].pc[31:0]
+@22
 TOP.Core.RN_uop[1].imm[31:0]
 @28
 #{TOP.Core.rn.newTagsAvail[0:1]} TOP.Core.rn.newTagsAvail[0] TOP.Core.rn.newTagsAvail[1]
@@ -174,8 +186,6 @@ TOP.Core.rv.queueInfo[5].valid
 TOP.Core.rv.queue[6].sqN[5:0]
 @200
 -LD
-@23
-TOP.Core.ld.IN_uop[1].sqN[5:0]
 @22
 TOP.Core.ld.IN_uop[0].sqN[5:0]
 TOP.Core.ld.OUT_uop[1].sqN[5:0]
@@ -210,13 +220,18 @@ TOP.Core.agu.OUT_uop.valid
 TOP.Core.agu.OUT_uop.wmask[3:0]
 @200
 -IALU1
+@28
+TOP.Core.ialu1.isBranch
+TOP.Core.ialu1.IN_uop.branchPred
+@22
+TOP.Core.ialu1.IN_uop.pc[31:0]
+@420
+TOP.Core.ialu1.resC[31:0]
 @22
 TOP.Core.ialu1.IN_uop.srcA[31:0]
 TOP.Core.ialu1.IN_uop.srcB[31:0]
+TOP.Core.ialu1.IN_uop.imm[31:0]
 TOP.Core.ialu1.IN_uop.branchID[5:0]
-@28
-TOP.Core.ialu1.IN_uop.branchPred
-@22
 TOP.Core.ialu1.IN_uop.sqN[5:0]
 @28
 TOP.Core.ialu1.OUT_isBranch

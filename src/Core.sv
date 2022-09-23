@@ -131,12 +131,7 @@ ProgramCounter progCnt
     .OUT_instrMappingMiss(OUT_instrMappingMiss)
 );
 
-wire isBranch;
-wire[31:0] branchSource;
-wire branchIsJump;
-wire[5:0] branchID;
-wire branchTaken;
-wire branchCompr;
+BTUpdate BP_btUpdates[1:0];
 BranchPredictor bp
 (
     .clk(clk),
@@ -153,13 +148,7 @@ BranchPredictor bp
     .OUT_branchFound(BP_branchFound),
     .OUT_branchCompr(BP_branchCompr),
     
-    .IN_branchValid(isBranch),
-    .IN_branchID(branchID),
-    .IN_branchAddr(branchSource),
-    .IN_branchDest(branchProvs[1].dstPC),
-    .IN_branchTaken(branchTaken),
-    .IN_branchIsJump(branchIsJump),
-    .IN_branchCompr(branchCompr),
+    .IN_btUpdates(BP_btUpdates),
     
     .IN_comUOp(comUOps[0]),
     
@@ -355,7 +344,6 @@ Load ld
 
 
 wire INTALU_wbReq;
-initial branchProvs[0].flush = 0;
 RES_UOp INT0_uop;
 IntALU ialu
 (
@@ -370,17 +358,8 @@ IntALU ialu
 
     .OUT_wbReq(INTALU_wbReq),
     
-    .OUT_isBranch(),
-    .OUT_branchTaken(),
-    .OUT_branchMispred(branchProvs[0].taken),
-    .OUT_branchSource(),
-    .OUT_branchAddress(branchProvs[0].dstPC),
-    .OUT_branchIsJump(),
-    .OUT_branchID(),
-    .OUT_branchSqN(branchProvs[0].sqN),
-    .OUT_branchLoadSqN(branchProvs[0].loadSqN),
-    .OUT_branchStoreSqN(branchProvs[0].storeSqN),
-    .OUT_branchCompr(),
+    .OUT_branch(branchProvs[0]),
+    .OUT_btUpdate(BP_btUpdates[0]),
     
     .OUT_zcFwdResult(LD_zcFwdResult[0]),
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
@@ -499,7 +478,6 @@ StoreQueue sq
     .IN_IO_busy(IO_busy)
 );
 
-initial branchProvs[1].flush = 0;
 RES_UOp INT1_uop;
 IntALU ialu1
 (
@@ -513,18 +491,9 @@ IntALU ialu1
     .IN_invalidateSqN(branch.sqN),
 
     .OUT_wbReq(),
-    
-    .OUT_isBranch(isBranch),
-    .OUT_branchTaken(branchTaken),
-    .OUT_branchMispred(branchProvs[1].taken),
-    .OUT_branchSource(branchSource),
-    .OUT_branchAddress(branchProvs[1].dstPC),
-    .OUT_branchIsJump(branchIsJump),
-    .OUT_branchID(branchID),
-    .OUT_branchSqN(branchProvs[1].sqN),
-    .OUT_branchLoadSqN(branchProvs[1].loadSqN),
-    .OUT_branchStoreSqN(branchProvs[1].storeSqN),
-    .OUT_branchCompr(branchCompr),
+
+    .OUT_branch(branchProvs[1]),
+    .OUT_btUpdate(BP_btUpdates[1]),
     
     .OUT_zcFwdResult(LD_zcFwdResult[1]),
     .OUT_zcFwdTag(LD_zcFwdTag[1]),

@@ -10,18 +10,9 @@ module IntALU
     input[5:0] IN_invalidateSqN,
     
     output wire OUT_wbReq,
-    
-    output reg OUT_isBranch,
-    output reg OUT_branchTaken,
-    output reg OUT_branchMispred,
-    output reg[31:0] OUT_branchSource,
-    output reg[31:0] OUT_branchAddress,
-    output reg OUT_branchIsJump,
-    output reg[5:0] OUT_branchID,
-    output reg[5:0] OUT_branchSqN,
-    output reg[5:0] OUT_branchLoadSqN,
-    output reg[5:0] OUT_branchStoreSqN,
-    output reg OUT_branchCompr,
+
+    output BranchProv OUT_branch,
+    output BTUpdate OUT_btUpdate,
     
     output wire[31:0] OUT_zcFwdResult,
     output wire[5:0] OUT_zcFwdTag,
@@ -170,46 +161,57 @@ reg branchTaken;
 
 always_ff@(posedge clk) begin
     
+    OUT_branch.flush <= 0;
+    
     if (rst) begin
         OUT_uop.valid <= 0;
-        OUT_branchTaken <= 0;
-        OUT_isBranch <= 0;
-        OUT_branchMispred <= 0;
+        OUT_branch.taken <= 0;
+        OUT_btUpdate.valid <= 0;
     end
     else begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
-            OUT_branchSqN <= IN_uop.sqN;
-            OUT_branchLoadSqN <= IN_uop.loadSqN;
-            OUT_branchStoreSqN <= IN_uop.storeSqN;
+            OUT_branch.sqN <= IN_uop.sqN;
+            OUT_branch.loadSqN <= IN_uop.loadSqN;
+            OUT_branch.storeSqN <= IN_uop.storeSqN;
             
-            OUT_isBranch <= isBranch;
+            
+            OUT_btUpdate.valid <= 0;
+            OUT_branch.taken <= 0;
+            
             if (isBranch) begin
-                // Uncompressed branches are predicted only when their second halfword is fetched
-                OUT_branchSource <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
-                OUT_branchID <= IN_uop.branchID;
-                OUT_branchIsJump <= (IN_uop.opcode == INT_JAL);
-                OUT_branchTaken <= branchTaken;
-                OUT_branchCompr <= IN_uop.compressed;
+                // Send branch target to BTB if unknown.
+                if (branchTaken && (IN_uop.branchID == 63)) begin
+                    // Uncompressed branches are predicted only when their second halfword is fetched
+                    OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
+                    OUT_btUpdate.branchID <= IN_uop.branchID;
+                    OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
+                    OUT_btUpdate.compressed <= IN_uop.compressed;
+                    OUT_btUpdate.valid <= 1;
+                end
                 
                 if (branchTaken != IN_uop.branchPred) begin
-                    OUT_branchMispred <= 1;
-                    if (branchTaken)
-                        OUT_branchAddress <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                    else if (IN_uop.compressed)
-                        OUT_branchAddress <= pcPlus2;
-                    else
-                        OUT_branchAddress <= pcPlus4;
+                    OUT_branch.taken <= 1;
+                    if (branchTaken) begin
+                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                    end
+                    else if (IN_uop.compressed) begin
+                        OUT_branch.dstPC <= pcPlus2;
+                        OUT_btUpdate.dst <= pcPlus2;
+                    end
+                    else begin
+                        OUT_branch.dstPC <= pcPlus4;
+                        OUT_btUpdate.dst <= pcPlus4;
+                    end
                 end
-                else
-                    OUT_branchMispred <= 0;
             end
             // Register jumps are not predicted currently
             else if (IN_uop.opcode == INT_JALR) begin
-                OUT_branchAddress <= srcA + srcB;
-                OUT_branchMispred <= 1;
+                OUT_branch.dstPC <= srcA + srcB;
+                OUT_btUpdate.dst <= srcA + srcB;
+                OUT_branch.taken <= 1;
             end
-            else
-                OUT_branchMispred <= 0;
+
             
             OUT_uop.isBranch <= isBranch;
             OUT_uop.branchTaken <= branchTaken;
@@ -224,9 +226,9 @@ always_ff@(posedge clk) begin
             OUT_uop.pc <= IN_uop.pc;
         end
         else begin
-            OUT_branchMispred <= 0;
             OUT_uop.valid <= 0;
-            OUT_isBranch <= 0;
+            OUT_branch.taken <= 0;
+            OUT_btUpdate.valid <= 0;
         end
     end
 end
