@@ -68,10 +68,13 @@ PopCnt popc
 wire lessThan = ($signed(srcA) < $signed(srcB));
 wire lessThanU = (srcA < srcB);
 
+wire[31:0] pcPlus2 = IN_uop.pc + 2;
+wire[31:0] pcPlus4 = IN_uop.pc + 4;
+
 always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_uop.opcode)
-        INT_AUIPC,
+        INT_AUIPC: resC = IN_uop.pc + imm;
         INT_ADD: resC = srcA + srcB;
         INT_XOR: resC = srcA ^ srcB;
         INT_OR: resC = srcA | srcB;
@@ -84,8 +87,8 @@ always_comb begin
         INT_SRA: resC = srcA >>> srcB[4:0];
         INT_LUI: resC = srcB;
         INT_JALR,
-        INT_JAL: resC = srcA + (IN_uop.compressed ? 2 : 4);
-        INT_SYS: resC = 0;
+        INT_JAL: resC = (IN_uop.compressed ? pcPlus2 : pcPlus4);
+        INT_SYS: resC = 32'bx;
         INT_SH1ADD: resC = srcB + (srcA << 1);
         INT_SH2ADD: resC = srcB + (srcA << 2);
         INT_SH3ADD: resC = srcB + (srcA << 3);
@@ -104,7 +107,7 @@ always_comb begin
         INT_MIN: resC = lessThan ? srcA : srcB;
         INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
-        default: resC = 'bx;
+        default: resC = 32'bx;
     endcase
     
     case (IN_uop.opcode)
@@ -123,10 +126,10 @@ always_comb begin
         INT_JALR: branchTaken = 1;
         INT_BEQ: branchTaken = (srcA == srcB);
         INT_BNE: branchTaken = (srcA != srcB);
-        INT_BLT: branchTaken = ($signed(srcA) < $signed(srcB));
-        INT_BGE: branchTaken = !($signed(srcA) < $signed(srcB));
-        INT_BLTU: branchTaken = (srcA < srcB);
-        INT_BGEU: branchTaken = !(srcA < srcB);
+        INT_BLT: branchTaken = lessThan;
+        INT_BGE: branchTaken = !lessThan;
+        INT_BLTU: branchTaken = lessThanU;
+        INT_BGEU: branchTaken = !lessThanU;
         default: branchTaken = 0;
     endcase
     
@@ -162,7 +165,7 @@ always_ff@(posedge clk) begin
             OUT_isBranch <= isBranch;
             if (isBranch) begin
                 // Uncompressed branches are predicted only when their second halfword is fetched
-                OUT_branchSource <= (IN_uop.compressed ? IN_uop.pc : (IN_uop.pc + 2));
+                OUT_branchSource <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                 OUT_branchID <= IN_uop.branchID;
                 OUT_branchIsJump <= (IN_uop.opcode == INT_JAL);
                 OUT_branchTaken <= branchTaken;
@@ -171,18 +174,18 @@ always_ff@(posedge clk) begin
                 if (branchTaken != IN_uop.branchPred) begin
                     OUT_branchMispred <= 1;
                     if (branchTaken)
-                        OUT_branchAddress <= imm;
+                        OUT_branchAddress <= (IN_uop.pc + imm);
                     else if (IN_uop.compressed)
-                        OUT_branchAddress <= (IN_uop.pc + 2);
+                        OUT_branchAddress <= pcPlus2;
                     else
-                        OUT_branchAddress <= (IN_uop.pc + 4);
+                        OUT_branchAddress <= pcPlus4;
                 end
                 else
                     OUT_branchMispred <= 0;
             end
             // Register jumps are not predicted currently
             else if (IN_uop.opcode == INT_JALR) begin
-                OUT_branchAddress <= srcB + imm;
+                OUT_branchAddress <= srcA + srcB;
                 OUT_branchMispred <= 1;
             end
             else

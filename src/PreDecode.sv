@@ -1,7 +1,8 @@
 
 module PreDecode
 #(
-    parameter NUM_INSTRS=2,
+    parameter NUM_INSTRS_IN=4,
+    parameter NUM_INSTRS_OUT=4,
     parameter BUF_SIZE=16
 )
 (
@@ -13,8 +14,8 @@ module PreDecode
     
     output reg OUT_full,
     
-    input IF_Instr IN_instrs[NUM_INSTRS*2-1:0],
-    output PD_Instr OUT_instrs[NUM_INSTRS-1:0]
+    input IF_Instr IN_instrs[NUM_INSTRS_IN-1:0],
+    output PD_Instr OUT_instrs[NUM_INSTRS_OUT-1:0]
     
 );
 
@@ -33,14 +34,14 @@ always_ff@(posedge clk) begin
     if (rst) begin
         bufIndexIn = 0;
         bufIndexOut = 0;
-        for (i = 0; i < NUM_INSTRS; i=i+1)
+        for (i = 0; i < NUM_INSTRS_OUT; i=i+1)
             OUT_instrs[i].valid <= 0;
         freeEntries = BUF_SIZE;
     end
     else if (!mispred) begin
 
         if (outEn) begin
-            for (i = 0; i < NUM_INSTRS; i=i+1) begin
+            for (i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
             
                 if (bufIndexIn != bufIndexOut) begin
                     // 32-bit Instruction
@@ -69,7 +70,7 @@ always_ff@(posedge clk) begin
             end
         end
         
-        for (i = 0; i < NUM_INSTRS*2; i=i+1) begin
+        for (i = 0; i < NUM_INSTRS_IN; i=i+1) begin
             if (ifetchValid && IN_instrs[i].valid) begin
                 buffer[bufIndexIn] <= IN_instrs[i];
                 bufIndexIn = bufIndexIn + 1;
@@ -82,7 +83,7 @@ always_ff@(posedge clk) begin
     else begin
         bufIndexIn = 0;
         bufIndexOut = 0;
-        for (i = 0; i < NUM_INSTRS; i=i+1)
+        for (i = 0; i < NUM_INSTRS_OUT; i=i+1)
             OUT_instrs[i].valid <= 0;
         freeEntries = BUF_SIZE;
     end

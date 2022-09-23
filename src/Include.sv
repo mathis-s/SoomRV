@@ -104,7 +104,6 @@ typedef struct packed
     logic[31:0] pc;
     logic[4:0] rs0; 
     logic[4:0] rs1;
-    logic pcA;
     logic immB;
     logic[4:0] rd;
     logic[5:0] opcode;
@@ -123,7 +122,6 @@ typedef struct packed
     logic[5:0] tagA;
     logic availB;
     logic[5:0] tagB;
-    logic pcA;
     logic immB;
     logic[5:0] sqN;
     logic[5:0] tagDst;

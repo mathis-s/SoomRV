@@ -1,6 +1,6 @@
 module Fuse
 #(
-    parameter NUM_UOPS_IN=2,
+    parameter NUM_UOPS_IN=4,
     parameter NUM_UOPS_OUT=2,
     parameter BUF_SIZE=8
 )
@@ -71,6 +71,7 @@ always_comb begin
             // Can't fuse an op twice
             lastFused = 1;
         end
+        
         else lastFused = 0;
         
     end
@@ -132,7 +133,7 @@ always_ff@(posedge clk) begin
         freeEntries = BUF_SIZE;
     end
     
-    OUT_full <= (freeEntries < 4);
+    OUT_full <= (freeEntries < 5);
 
 end
 

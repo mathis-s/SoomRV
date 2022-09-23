@@ -172,7 +172,6 @@ always_ff@(posedge clk) begin
             OUT_uop[i].nmDst <= IN_uop[i].rd;
             OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].immB <= IN_uop[i].immB;
-            OUT_uop[i].pcA <= IN_uop[i].pcA;
             OUT_uop[i].branchID <= IN_uop[i].branchID;
             OUT_uop[i].branchPred <= IN_uop[i].branchPred;
             OUT_uop[i].compressed <= IN_uop[i].compressed;

@@ -76,12 +76,8 @@ always_ff@(posedge clk) begin
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 
                 OUT_uop[i].valid <= 1;
-
-                // Some instructions just use the pc as an operand.             
-                if (IN_uop[i].pcA) begin
-                    OUT_uop[i].srcA <= IN_uop[i].pc;
-                end              
-                else begin 
+             
+                begin 
                     reg found = 0;
                     
                     // Try to forward from wbs

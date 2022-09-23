@@ -181,7 +181,7 @@ always_ff@(posedge clk) begin
 end
 
 wire PD_full;
-PD_Instr PD_instrs[1:0];
+PD_Instr PD_instrs[3:0];
 PreDecode preDec
 (
     .clk(clk),
@@ -197,7 +197,7 @@ PreDecode preDec
 );
 assign ifetchEn = !PD_full;
 
-D_UOp DE_uop[NUM_UOPS-1:0];
+D_UOp DE_uop[3:0];
 
 InstrDecoder idec
 (

@@ -127,7 +127,7 @@ typedef union packed
 
 module InstrDecoder
 #(
-    parameter NUM_UOPS=2
+    parameter NUM_UOPS=4
 )
 (
     input wire en,
@@ -150,23 +150,22 @@ always_comb begin
         instr = IN_instrs[i].instr;
         instr16 = IN_instrs[i].instr[15:0];
         
-        uop = 98'b0;
+        uop = 97'b0;
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en;
         uop.branchID = IN_instrs[i].branchID;
         uop.branchPred = IN_instrs[i].branchPred;
         
-        // TODO: Unify usage of immB, pcA as well as regular imm and pc fields. Also either add to pc in here or in ALU, not mix.
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
-            `OPC_JAL:        uop.imm = {IN_instrs[i].pc, 1'b0} + $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
+            `OPC_JAL:        uop.imm = $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
             `OPC_ENV,
             `OPC_JALR,          
             `OPC_LOAD,
             `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
-            `OPC_BRANCH:     uop.imm = {IN_instrs[i].pc, 1'b0} + $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
+            `OPC_BRANCH:     uop.imm = $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
             `OPC_STORE:    uop.imm = $signed({{20{instr[31]}}, instr[31:25], instr[11:7]});
             //`OPC_REG_REG,
             default:      uop.imm = 0;
@@ -184,7 +183,6 @@ always_comb begin
                         uop.rd = 0;
                         uop.opcode = INT_SYS;
                         uop.immB = 1;
-                        uop.pcA = 1;
                         invalidEnc = 0;
                     end
                 end
@@ -192,7 +190,6 @@ always_comb begin
                     uop.fu = FU_INT;
                     uop.rs0 = 0;
                     uop.rs1 = 0;
-                    uop.pcA = 0;
                     uop.immB = 1;
                     uop.rd = instr.rd;
                     uop.opcode = INT_LUI;
@@ -202,8 +199,6 @@ always_comb begin
                     uop.fu = FU_INT;
                     uop.rs0 = 0;
                     uop.rs1 = 0;
-                    uop.pcA = 1;
-                    uop.immB = 1;
                     uop.rd = instr.rd;
                     uop.opcode = INT_AUIPC;
                     invalidEnc = 0;
@@ -212,7 +207,6 @@ always_comb begin
                     uop.fu = FU_INT;
                     uop.rs0 = 0;
                     uop.rs1 = 0;
-                    uop.pcA = 1;
                     uop.immB = 1;
                     uop.rd = instr.rd;
                     uop.opcode = INT_JAL;
@@ -220,12 +214,8 @@ always_comb begin
                 end
                 `OPC_JALR: begin
                     uop.fu = FU_INT;
-                    // (!) inverted rs0/rs1 here, to be able to pass
-                    // rs1, imm and pc in (resp.) srcB, imm, srcA
-                    uop.rs0 = 0;
-                    uop.rs1 = instr.rs0;
-                    uop.pcA = 1;
-                    uop.immB = 0;
+                    uop.rs0 = instr.rs0;
+                    uop.immB = 1;
                     uop.rd = instr.rd;
                     uop.opcode = INT_JALR; 
                     invalidEnc = 0;
@@ -233,7 +223,6 @@ always_comb begin
                 `OPC_LOAD: begin
                     uop.rs0 = instr.rs0;
                     uop.rs1 = 0;
-                    uop.pcA = 0;
                     uop.immB = 1;
                     uop.rd = instr.rd;
 
@@ -253,7 +242,6 @@ always_comb begin
                 `OPC_STORE: begin
                     uop.rs0 = instr.rs0;
                     uop.rs1 = instr.rs1;
-                    uop.pcA = 0;
                     uop.immB = 0;
                     uop.rd = 0;
 
@@ -270,7 +258,6 @@ always_comb begin
                 `OPC_BRANCH: begin
                     uop.rs0 = instr.rs0;
                     uop.rs1 = instr.rs1;
-                    uop.pcA = 0;
                     uop.immB = 0;
                     uop.rd = 0;
                     
@@ -289,7 +276,6 @@ always_comb begin
                 `OPC_REG_IMM: begin
                     uop.rs0 = instr.rs0;
                     uop.rs1 = 0;
-                    uop.pcA = 0;
                     uop.immB = 1;
                     uop.rd = instr.rd;
                     
@@ -379,7 +365,6 @@ always_comb begin
                 `OPC_REG_REG: begin
                     uop.rs0 = instr.rs0;
                     uop.rs1 = instr.rs1;
-                    uop.pcA = 0;
                     uop.immB = 0;
                     uop.rd = instr.rd;
                     uop.fu = FU_INT;
@@ -567,8 +552,7 @@ always_comb begin
                     uop.fu = FU_INT;
                     // certainly one of the encodings of all time
                     uop.imm = {{20{instr16.cj.imm[10]}}, instr16.cj.imm[10], instr16.cj.imm[6], instr16.cj.imm[8:7], instr16.cj.imm[4], 
-                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
-                    uop.pcA = 1;
+                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0};
                     uop.immB = 1;
                     invalidEnc = 0;
                 end
@@ -577,8 +561,7 @@ always_comb begin
                     uop.opcode = INT_JAL;
                     uop.fu = FU_INT;
                     uop.imm = {{20{instr16.cj.imm[10]}}, instr16.cj.imm[10], instr16.cj.imm[6], instr16.cj.imm[8:7], instr16.cj.imm[4], 
-                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
-                    uop.pcA = 1;
+                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0};
                     uop.immB = 1;
                     uop.rd = 1; // ra
                     invalidEnc = 0;
@@ -588,7 +571,7 @@ always_comb begin
                     uop.opcode = INT_BEQ;
                     uop.fu = FU_INT;
                     uop.imm = {{23{instr16.cb.imm2[2]}}, instr16.cb.imm2[2], instr16.cb.imm[4:3], 
-                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0};
                     
                     uop.rs0 = {2'b01, instr16.cb.rd_rs1};
                     invalidEnc = 0;
@@ -598,7 +581,7 @@ always_comb begin
                     uop.opcode = INT_BNE;
                     uop.fu = FU_INT;
                     uop.imm = {{23{instr16.cb.imm2[2]}}, instr16.cb.imm2[2], instr16.cb.imm[4:3], 
-                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0};
                     
                     uop.rs0 = {2'b01, instr16.cb.rd_rs1};
                     invalidEnc = 0;
@@ -715,18 +698,17 @@ always_comb begin
                 else if (instr16.cr.funct4 == 4'b1000 && !(instr16.cr.rd_rs1 == 0 || instr16.cr.rs2 != 0)) begin
                     uop.opcode = INT_JALR;
                     uop.fu = FU_INT;
-                    uop.pcA = 1;
-                    uop.rs1 = instr16.cr.rd_rs1;
+                    //uop.immB = 1;
+                    uop.rs0 = instr16.cr.rd_rs1;
                     invalidEnc = 0;
                 end
                 // c.jalr
                 else if (instr16.cr.funct4 == 4'b1001 && !(instr16.cr.rd_rs1 == 0 || instr16.cr.rs2 != 0)) begin
                     uop.opcode = INT_JALR;
                     uop.fu = FU_INT;
-                    uop.pcA = 1;
-                    uop.rs1 = instr16.cr.rd_rs1;
+                    uop.rs0 = instr16.cr.rd_rs1;
                     uop.rd = 1; // ra
-                    uop.immB = 1;
+                    //uop.immB = 1;
                     invalidEnc = 0;
                 end
                 // c.slli
