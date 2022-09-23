@@ -65,6 +65,7 @@ PopCnt popc
     .res(resPopCnt)
 );
 
+
 wire lessThan = ($signed(srcA) < $signed(srcB));
 wire lessThanU = (srcA < srcB);
 
@@ -74,7 +75,7 @@ wire[31:0] pcPlus4 = IN_uop.pc + 4;
 always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_uop.opcode)
-        INT_AUIPC: resC = IN_uop.pc + imm;
+        INT_AUIPC: resC = IN_uop.pc + imm; // could unify this add and branch add
         INT_ADD: resC = srcA + srcB;
         INT_XOR: resC = srcA ^ srcB;
         INT_OR: resC = srcA | srcB;
@@ -107,6 +108,12 @@ always_comb begin
         INT_MIN: resC = lessThan ? srcA : srcB;
         INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
+        INT_F_ADDI_BEQ: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BNE: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BLT: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BGE: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BLTU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BGEU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
         default: resC = 32'bx;
     endcase
     
@@ -130,9 +137,16 @@ always_comb begin
         INT_BGE: branchTaken = !lessThan;
         INT_BLTU: branchTaken = lessThanU;
         INT_BGEU: branchTaken = !lessThanU;
+        INT_F_ADDI_BEQ:  branchTaken = (resC == srcB); 
+        INT_F_ADDI_BNE:  branchTaken = (resC != srcB); 
+        INT_F_ADDI_BLT:  branchTaken = $signed(resC < srcB); 
+        INT_F_ADDI_BGE:  branchTaken = !($signed(resC < srcB)); 
+        INT_F_ADDI_BLTU: branchTaken = (resC < srcB); 
+        INT_F_ADDI_BGEU: branchTaken = !(resC < srcB); 
         default: branchTaken = 0;
     endcase
     
+    // TODO: Optimize order of these in OPCode_INT enum for easy decoding.
     isBranch =
         (IN_uop.opcode == INT_JAL ||
         //IN_uop.opcode == INT_JALR || (not predicted by bp)
@@ -141,7 +155,13 @@ always_comb begin
         IN_uop.opcode == INT_BLT ||
         IN_uop.opcode == INT_BGE ||
         IN_uop.opcode == INT_BLTU ||
-        IN_uop.opcode == INT_BGEU);
+        IN_uop.opcode == INT_BGEU ||
+        IN_uop.opcode == INT_F_ADDI_BEQ ||
+        IN_uop.opcode == INT_F_ADDI_BNE ||
+        IN_uop.opcode == INT_F_ADDI_BLT ||
+        IN_uop.opcode == INT_F_ADDI_BGE ||
+        IN_uop.opcode == INT_F_ADDI_BLTU ||
+        IN_uop.opcode == INT_F_ADDI_BGEU);
         
 end
 
@@ -174,7 +194,7 @@ always_ff@(posedge clk) begin
                 if (branchTaken != IN_uop.branchPred) begin
                     OUT_branchMispred <= 1;
                     if (branchTaken)
-                        OUT_branchAddress <= (IN_uop.pc + imm);
+                        OUT_branchAddress <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
                     else if (IN_uop.compressed)
                         OUT_branchAddress <= pcPlus2;
                     else

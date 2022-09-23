@@ -46,7 +46,13 @@ typedef enum logic[5:0]
     INT_BCLR,
     INT_BEXT,
     INT_BINV,
-    INT_BSET
+    INT_BSET,
+    INT_F_ADDI_BEQ,
+    INT_F_ADDI_BNE,
+    INT_F_ADDI_BLT,
+    INT_F_ADDI_BGE,
+    INT_F_ADDI_BLTU,
+    INT_F_ADDI_BGEU
 } OPCode_INT;
 
 typedef enum logic[5:0]

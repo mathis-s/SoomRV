@@ -310,6 +310,12 @@ always_ff@(posedge clk) begin
                     temp.opcode == INT_BGEU || 
                     temp.opcode == INT_JAL || 
                     temp.opcode == INT_JALR ||
+                    temp.opcode == INT_F_ADDI_BEQ || 
+                    temp.opcode == INT_F_ADDI_BNE || 
+                    temp.opcode == INT_F_ADDI_BLT || 
+                    temp.opcode == INT_F_ADDI_BGE || 
+                    temp.opcode == INT_F_ADDI_BLTU ||
+                    temp.opcode == INT_F_ADDI_BGEU ||
                     temp.opcode == INT_SYS ||
                     temp.opcode == INT_UNDEFINED
                 );
