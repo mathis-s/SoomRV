@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Fri Sep 23 09:35:56 2022
+[*] Fri Sep 23 10:24:34 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Sep 23 09:30:47 2022"
-[dumpfile_size] 49570746
+[dumpfile_mtime] "Fri Sep 23 10:10:53 2022"
+[dumpfile_size] 21330197
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
 [timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-12.022985 13460 912780 13460 1840 2640 15835 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.022985 31320 912780 13460 1840 2640 15835 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.agu.
@@ -38,6 +38,8 @@
 [treeopen] TOP.Core.mul.OUT_uop.
 [treeopen] TOP.Core.preDec.
 [treeopen] TOP.Core.preDec.buffer[0].
+[treeopen] TOP.Core.preDec.buffer[10].
+[treeopen] TOP.Core.preDec.buffer[2].
 [treeopen] TOP.Core.preDec.IN_instrs[0].
 [treeopen] TOP.Core.preDec.OUT_instrs[0].
 [treeopen] TOP.Core.preDec.OUT_instrs[1].
@@ -81,8 +83,8 @@ TOP.Core.branch.taken
 TOP.Core.branch.flush
 @22
 TOP.Core.branch.sqN[5:0]
-@23
 TOP.Core.branch.dstPC[31:0]
+TOP.Core.OUT_MEM_addr[29:0]
 @820
 TOP.Core.OUT_MEM_writeData[31:0]
 @28
@@ -94,30 +96,6 @@ TOP.Core.OUT_halt
 TOP.Core.stateValid[2:0]
 @200
 -PreDec
-@24
-TOP.Core.preDec.freeEntries[4:0]
-@22
-TOP.Core.preDec.IN_instrs[0].pc[30:0]
-@28
-TOP.Core.preDec.IN_instrs[0].branchPred
-@22
-TOP.Core.preDec.IN_instrs[0].branchID[5:0]
-TOP.Core.preDec.IN_instrs[0].instr[15:0]
-TOP.Core.preDec.IN_instrs[1].instr[15:0]
-TOP.Core.preDec.IN_instrs[2].instr[15:0]
-TOP.Core.preDec.IN_instrs[3].instr[15:0]
-@200
--
-@22
-TOP.Core.preDec.buffer[0].instr[15:0]
-TOP.Core.preDec.buffer[0].pc[30:0]
-TOP.Core.preDec.buffer[0].branchID[5:0]
-TOP.Core.preDec.buffer[1].instr[15:0]
-TOP.Core.preDec.buffer[1].pc[30:0]
-TOP.Core.preDec.buffer[2].instr[15:0]
-TOP.Core.preDec.buffer[2].pc[30:0]
-@200
--
 @22
 TOP.Core.preDec.OUT_instrs[0].instr[31:0]
 TOP.Core.preDec.OUT_instrs[0].pc[30:0]
@@ -127,6 +105,8 @@ TOP.Core.preDec.OUT_instrs[0].branchPred
 TOP.Core.preDec.OUT_instrs[0].branchID[5:0]
 @28
 TOP.Core.preDec.OUT_instrs[0].valid
+@200
+-
 @22
 TOP.Core.preDec.OUT_instrs[1].instr[31:0]
 TOP.Core.preDec.OUT_instrs[1].pc[30:0]
@@ -194,8 +174,9 @@ TOP.Core.rv.queueInfo[5].valid
 TOP.Core.rv.queue[6].sqN[5:0]
 @200
 -LD
-@22
+@23
 TOP.Core.ld.IN_uop[1].sqN[5:0]
+@22
 TOP.Core.ld.IN_uop[0].sqN[5:0]
 TOP.Core.ld.OUT_uop[1].sqN[5:0]
 @28
@@ -251,9 +232,7 @@ TOP.Core.ialu1.OUT_uop.pc[31:0]
 -SQ
 @22
 TOP.Core.sq.OUT_uop[0].pc[31:0]
-@820
 TOP.Core.sq.OUT_uop[0].result[31:0]
-@22
 TOP.Core.sq.OUT_uop[0].sqN[5:0]
 @28
 TOP.Core.sq.OUT_uop[0].valid

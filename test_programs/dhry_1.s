@@ -294,7 +294,7 @@ Proc_1:
 	.string	"Ptr_Glob->"
 	.align	2
 .LC14:
-	.string	"  Ptr_Comp:          "
+	.string	"Ptr_Comp:          "
 	.align	2
 .LC15:
 	.string	"  Discr:             "
@@ -339,36 +339,39 @@ Proc_1:
 	.string	"        should be:   DHRYSTONE PROGRAM, 2'ND STRING\n"
 	.align	2
 .LC29:
-	.string	"Runtime "
+	.string	"\n\nRESULTS\n"
 	.align	2
 .LC30:
-	.string	"Executed "
+	.string	"Runtime (cycles) "
 	.align	2
 .LC31:
-	.string	"mIPC "
+	.string	"Executed (instrs) "
 	.align	2
 .LC32:
-	.string	"mDMIPS/MHz "
+	.string	"mIPC "
 	.align	2
 .LC33:
-	.string	"DHRYSTONE PROGRAM, SOME STRING"
+	.string	"mDMIPS/MHz "
 	.align	2
 .LC34:
-	.string	"DHRYSTONE PROGRAM, 1'ST STRING"
+	.string	"DHRYSTONE PROGRAM, SOME STRING"
 	.align	2
 .LC35:
-	.string	"DHRYSTONE PROGRAM, 2'ND STRING"
+	.string	"DHRYSTONE PROGRAM, 1'ST STRING"
 	.align	2
 .LC36:
+	.string	"DHRYSTONE PROGRAM, 2'ND STRING"
+	.align	2
+.LC37:
 	.string	"DHRYSTONE PROGRAM, 3'RD STRING"
 	.section	.text.startup,"ax",@progbits
 	.align	2
 	.globl	main
 	.type	main, @function
 main:
-	lui	a5,%hi(.LC33)
+	lui	a5,%hi(.LC34)
 	addi	sp,sp,-176
-	addi	a5,a5,%lo(.LC33)
+	addi	a5,a5,%lo(.LC34)
 	sw	s4,152(sp)
 	lw	a7,20(a5)
 	lw	a6,24(a5)
@@ -398,9 +401,9 @@ main:
 	sw	s10,128(sp)
 	sw	s11,124(sp)
 	sw	a3,0(a5)
-	lui	a4,%hi(.LC34)
+	lui	a4,%hi(.LC35)
 	li	a3,2
-	addi	a4,a4,%lo(.LC34)
+	addi	a4,a4,%lo(.LC35)
 	sw	a3,8(a5)
 	li	a3,40
 	lw	a2,0(a4)
@@ -452,7 +455,7 @@ main:
 	lui	a5,%hi(Reg)
 	lw	a5,%lo(Reg)(a5)
 	li	a4,80
-	bne	a5,zero,.L108
+	bne	a5,zero,.L109
 	lui	a5,%hi(.LC2)
 	addi	a5,a5,%lo(.LC2)
 	li	a3,-33554432
@@ -461,7 +464,7 @@ main:
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L46
-.L161:
+.L163:
 	li	a5,10
 	sb	a5,0(a3)
 	lui	a5,%hi(.LC3)
@@ -487,8 +490,8 @@ main:
 	li	a4,-16777216
 	lw	a3,128(a4)
 	lw	a4,152(a4)
-	lui	a5,%hi(.LC35)
-	addi	a5,a5,%lo(.LC35)
+	lui	a5,%hi(.LC36)
+	addi	a5,a5,%lo(.LC36)
 	sw	a4,44(sp)
 	lw	a4,0(a5)
 	lbu	s11,50(sp)
@@ -499,7 +502,7 @@ main:
 	lui	s5,%hi(Arr_2_Glob+4096)
 	sw	a4,12(sp)
 	lw	a4,8(a5)
-	lui	a6,%hi(.LC36)
+	lui	a6,%hi(.LC37)
 	sw	a3,%lo(Begin_Time)(a2)
 	sw	a4,16(sp)
 	lw	a4,12(a5)
@@ -516,7 +519,7 @@ main:
 	sw	a4,28(sp)
 	lw	a4,24(a5)
 	lui	s3,%hi(Int_Glob)
-	addi	s10,a6,%lo(.LC36)
+	addi	s10,a6,%lo(.LC37)
 	sw	a4,32(sp)
 	lhu	a4,28(a5)
 	lbu	a5,30(a5)
@@ -570,7 +573,7 @@ main:
 	call	Proc_1
 	lbu	a4,%lo(Ch_2_Glob)(s2)
 	li	a5,64
-	bleu	a4,a5,.L165
+	bleu	a4,a5,.L167
 	li	t3,0
 	li	a5,65
 	li	t1,0
@@ -580,12 +583,12 @@ main:
 .L52:
 	addi	a5,a5,1
 	andi	a5,a5,0xff
-	bgtu	a5,a4,.L166
+	bgtu	a5,a4,.L168
 .L56:
-	beq	a5,a1,.L105
+	beq	a5,a1,.L106
 	li	a2,0
 .L54:
-	bne	a2,a3,.L52
+	bne	a3,a2,.L52
 	lw	t1,20(s10)
 	lw	a0,24(s10)
 	lbu	a3,30(s10)
@@ -611,11 +614,11 @@ main:
 	li	t1,1
 	li	a3,0
 	bleu	a5,a4,.L56
-.L166:
+.L168:
 	beq	t1,zero,.L57
 	sw	s7,%lo(Int_Glob)(s3)
 .L57:
-	beq	t3,zero,.L167
+	beq	t3,zero,.L169
 	li	a5,67
 	sb	a5,%lo(Ch_1_Glob)(s8)
 	li	a1,67
@@ -675,13 +678,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L64
 	lw	a0,%lo(Int_Glob)(s3)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC8)
 	li	a1,66
 	addi	a2,a2,%lo(.LC8)
@@ -692,13 +695,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L65
 	lw	a0,%lo(Bool_Glob)(s6)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC9)
 	li	a1,67
 	addi	a2,a2,%lo(.LC9)
@@ -709,13 +712,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L66
 	lbu	a0,%lo(Ch_1_Glob)(s8)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC10)
 	li	a1,67
 	addi	a2,a2,%lo(.LC10)
@@ -726,13 +729,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L67
 	lbu	a0,%lo(Ch_2_Glob)(s2)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC11)
 	li	a1,65
 	addi	a2,a2,%lo(.LC11)
@@ -743,13 +746,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L68
 	lw	a0,32(s0)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC12)
 	li	a1,65
 	addi	a2,a2,%lo(.LC12)
@@ -760,13 +763,13 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L69
 	lw	a0,1628(s9)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC13)
 	li	a1,80
 	addi	a2,a2,%lo(.LC13)
@@ -778,7 +781,7 @@ main:
 	bne	a1,zero,.L70
 	lui	a2,%hi(.LC14)
 	addi	s7,a2,%lo(.LC14)
-	li	a1,32
+	li	a1,80
 	addi	a2,a2,%lo(.LC14)
 	li	a0,-33554432
 .L71:
@@ -787,14 +790,14 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L71
 	lw	a2,%lo(Ptr_Glob)(s4)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,0(a2)
-	sw	a4,8(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC15)
 	addi	s6,a2,%lo(.LC15)
 	li	a1,32
@@ -806,14 +809,14 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L72
 	lw	a2,%lo(Ptr_Glob)(s4)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,4(a2)
-	sw	a4,8(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC16)
 	addi	s3,a2,%lo(.LC16)
 	li	a1,32
@@ -825,14 +828,14 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L73
 	lw	a2,%lo(Ptr_Glob)(s4)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,8(a2)
-	sw	a4,8(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC17)
 	addi	s2,a2,%lo(.LC17)
 	li	a1,32
@@ -844,14 +847,14 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L74
 	lw	a2,%lo(Ptr_Glob)(s4)
-	sw	a5,16(sp)
-	sw	a3,12(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,12(a2)
-	sw	a4,8(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	lui	a2,%hi(.LC18)
 	addi	s0,a2,%lo(.LC18)
 	li	a1,32
@@ -873,6 +876,9 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L76
 .L78:
+	li	a2,-33554432
+	li	a1,10
+	sb	a1,0(a2)
 	lui	a2,%hi(.LC19)
 	li	a1,78
 	addi	a2,a2,%lo(.LC19)
@@ -882,23 +888,23 @@ main:
 	sb	a1,0(a0)
 	lbu	a1,0(a2)
 	bne	a1,zero,.L77
-	li	a2,32
+	li	a2,80
 	li	a1,-33554432
 .L79:
 	addi	s7,s7,1
 	sb	a2,0(a1)
 	lbu	a2,0(s7)
 	bne	a2,zero,.L79
-	sw	a5,16(sp)
+	sw	a5,8(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a2,%lo(Next_Ptr_Glob)(a5)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,0(a2)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	li	a2,32
 	li	a1,-33554432
 .L80:
@@ -906,16 +912,16 @@ main:
 	sb	a2,0(a1)
 	lbu	a2,0(s6)
 	bne	a2,zero,.L80
-	sw	a5,16(sp)
+	sw	a5,8(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a2,%lo(Next_Ptr_Glob)(a5)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,4(a2)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	li	a2,32
 	li	a1,-33554432
 .L81:
@@ -923,16 +929,16 @@ main:
 	sb	a2,0(a1)
 	lbu	a2,0(s3)
 	bne	a2,zero,.L81
-	sw	a5,16(sp)
+	sw	a5,8(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a2,%lo(Next_Ptr_Glob)(a5)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,8(a2)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	li	a2,32
 	li	a1,-33554432
 .L82:
@@ -940,16 +946,16 @@ main:
 	sb	a2,0(a1)
 	lbu	a2,0(s2)
 	bne	a2,zero,.L82
-	sw	a5,16(sp)
+	sw	a5,8(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a2,%lo(Next_Ptr_Glob)(a5)
-	sw	a3,12(sp)
-	sw	a4,8(sp)
+	sw	a3,16(sp)
+	sw	a4,12(sp)
 	lw	a0,12(a2)
 	call	printhex
-	lw	a5,16(sp)
-	lw	a3,12(sp)
-	lw	a4,8(sp)
+	lw	a3,16(sp)
+	lw	a4,12(sp)
+	lw	a5,8(sp)
 	li	a2,32
 	li	a1,-33554432
 .L83:
@@ -969,6 +975,9 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L84
 .L86:
+	li	a2,-33554432
+	li	a1,10
+	sb	a1,0(a2)
 	lui	a2,%hi(.LC20)
 	li	a1,32
 	addi	a2,a2,%lo(.LC20)
@@ -988,11 +997,11 @@ main:
 	lbu	a1,0(a2)
 	bne	a1,zero,.L87
 	mv	a0,a4
-	sw	a5,12(sp)
-	sw	a3,8(sp)
+	sw	a3,12(sp)
+	sw	a5,8(sp)
 	call	printhex
-	lw	a5,12(sp)
-	lw	a3,8(sp)
+	lw	a3,12(sp)
+	lw	a5,8(sp)
 	lui	a4,%hi(.LC22)
 	li	a2,73
 	addi	a4,a4,%lo(.LC22)
@@ -1049,6 +1058,9 @@ main:
 	lbu	a4,0(a5)
 	bne	a4,zero,.L92
 .L94:
+	li	a5,-33554432
+	li	a4,10
+	sb	a4,0(a5)
 	lui	a5,%hi(.LC26)
 	li	a4,32
 	addi	a5,a5,%lo(.LC26)
@@ -1077,6 +1089,9 @@ main:
 	lbu	a4,0(a5)
 	bne	a4,zero,.L96
 .L98:
+	li	a5,-33554432
+	li	a4,10
+	sb	a4,0(a5)
 	lui	a5,%hi(.LC28)
 	li	a4,32
 	addi	a5,a5,%lo(.LC28)
@@ -1095,16 +1110,14 @@ main:
 	lui	a5,%hi(.LC29)
 	sub	s1,s1,a4
 	addi	a5,a5,%lo(.LC29)
-	li	a4,82
+	li	a4,10
 .L99:
 	addi	a5,a5,1
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L99
-	mv	a0,s0
-	call	printdecu
 	lui	a5,%hi(.LC30)
-	li	a4,69
+	li	a4,82
 	addi	a5,a5,%lo(.LC30)
 	li	a3,-33554432
 .L100:
@@ -1112,38 +1125,49 @@ main:
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L100
-	mv	a0,s1
+	mv	a0,s0
 	call	printdecu
-	li	a5,1000
-	mul	s1,s1,a5
 	lui	a5,%hi(.LC31)
-	li	a4,109
+	li	a4,69
 	addi	a5,a5,%lo(.LC31)
 	li	a3,-33554432
-	divu	a0,s1,s0
 .L101:
 	addi	a5,a5,1
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L101
+	mv	a0,s1
+	call	printdecu
+	li	a5,1000
+	mul	s1,s1,a5
+	lui	a5,%hi(.LC32)
+	li	a4,109
+	addi	a5,a5,%lo(.LC32)
+	li	a3,-33554432
+	divu	a0,s1,s0
+.L102:
+	addi	a5,a5,1
+	sb	a4,0(a3)
+	lbu	a4,0(a5)
+	bne	a4,zero,.L102
 	call	printdecu
 	li	a2,1757
 	li	a1,999424
 	addi	a1,a1,576
 	li	a0,200704
 	addi	a0,a0,-704
-	lui	a5,%hi(.LC32)
+	lui	a5,%hi(.LC33)
 	li	a4,109
-	addi	a5,a5,%lo(.LC32)
+	addi	a5,a5,%lo(.LC33)
 	li	a3,-33554432
 	mul	a2,s0,a2
 	divu	a2,a2,a1
 	divu	a0,a0,a2
-.L102:
+.L103:
 	addi	a5,a5,1
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
-	bne	a4,zero,.L102
+	bne	a4,zero,.L103
 	call	printdecu
 	lw	ra,172(sp)
 	lw	s0,168(sp)
@@ -1163,20 +1187,20 @@ main:
 	jr	ra
 .L51:
 	j	.L51
-.L105:
+.L106:
 	li	a2,1
 	li	t3,1
 	j	.L54
-.L165:
+.L167:
 	lbu	a1,%lo(Ch_1_Glob)(s8)
 	li	a5,13
 	li	a4,1
 	li	a3,1
 	j	.L53
-.L167:
+.L169:
 	lbu	a1,%lo(Ch_1_Glob)(s8)
 	j	.L59
-.L108:
+.L109:
 	lui	a5,%hi(.LC1)
 	addi	a5,a5,%lo(.LC1)
 	li	a3,-33554432
@@ -1185,7 +1209,7 @@ main:
 	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L44
-	j	.L161
+	j	.L163
 	.size	main, .-main
 	.text
 	.align	2
@@ -1195,9 +1219,9 @@ Proc_2:
 	lui	a5,%hi(Ch_1_Glob)
 	lbu	a4,%lo(Ch_1_Glob)(a5)
 	li	a5,65
-	beq	a4,a5,.L170
+	beq	a4,a5,.L172
 	ret
-.L170:
+.L172:
 	lw	a5,0(a0)
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
@@ -1212,11 +1236,11 @@ Proc_2:
 Proc_3:
 	lui	a4,%hi(Ptr_Glob)
 	lw	a5,%lo(Ptr_Glob)(a4)
-	beq	a5,zero,.L172
+	beq	a5,zero,.L174
 	lw	a5,0(a5)
 	sw	a5,0(a0)
 	lw	a5,%lo(Ptr_Glob)(a4)
-.L172:
+.L174:
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
 	addi	a4,a4,12
@@ -1256,28 +1280,28 @@ Proc_5:
 	.type	Proc_6, @function
 Proc_6:
 	li	a4,2
-	beq	a0,a4,.L179
+	beq	a0,a4,.L181
 	li	a5,3
 	sw	a5,0(a1)
 	li	a5,1
-	beq	a0,a5,.L180
-	bleu	a0,a5,.L184
+	beq	a0,a5,.L182
+	bleu	a0,a5,.L186
 	li	a5,4
-	bne	a0,a5,.L185
+	bne	a0,a5,.L187
 	sw	a4,0(a1)
-.L183:
+.L185:
 	ret
-.L180:
+.L182:
 	lui	a5,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a5)
 	li	a5,100
-	ble	a4,a5,.L183
-.L184:
+	ble	a4,a5,.L185
+.L186:
 	sw	zero,0(a1)
 	ret
-.L185:
+.L187:
 	ret
-.L179:
+.L181:
 	li	a5,1
 	sw	a5,0(a1)
 	ret
@@ -1328,10 +1352,10 @@ Proc_8:
 Func_1:
 	andi	a0,a0,0xff
 	andi	a1,a1,0xff
-	beq	a0,a1,.L191
+	beq	a0,a1,.L193
 	li	a0,0
 	ret
-.L191:
+.L193:
 	lui	a5,%hi(Ch_1_Glob)
 	sb	a0,%lo(Ch_1_Glob)(a5)
 	li	a0,1
@@ -1343,11 +1367,11 @@ Func_1:
 Func_2:
 	lbu	a4,2(a0)
 	lbu	a5,3(a1)
-	beq	a4,a5,.L194
+	beq	a4,a5,.L196
 	addi	sp,sp,-16
 	sw	ra,12(sp)
 	call	strcmp
-	ble	a0,zero,.L196
+	ble	a0,zero,.L198
 	lw	ra,12(sp)
 	lui	a5,%hi(Int_Glob)
 	li	a4,10
@@ -1355,9 +1379,9 @@ Func_2:
 	li	a0,1
 	addi	sp,sp,16
 	jr	ra
-.L194:
-	j	.L194
 .L196:
+	j	.L196
+.L198:
 	lw	ra,12(sp)
 	li	a0,0
 	addi	sp,sp,16

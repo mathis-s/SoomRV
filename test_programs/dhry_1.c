@@ -36,12 +36,6 @@ void     *malloc(unsigned long size)
   return retval;
 }
 
-
-/*int strcmp(const char *l, const char *r)
-{
-	for (; *l==*r && *l; l++, r++);
-	return *(unsigned char *)l - *(unsigned char *)r;
-}*/
 extern int strcmp(const char* l, const char* r);
 
 void printf (const char* c, ...)
@@ -75,15 +69,6 @@ static void printhex (uint32_t num)
     *out = hexLut[(num >> 0) & 0xf];
     
     *out = '\n';
-    
-    /*for (int i = 7; i >= 0; i--)
-    {
-        uint32_t c = (num >> (i << 2)) & 0xff;
-        if (c <= 9)
-            *out = c | '0';
-        else
-            *out = c | 'a';
-    }*/
 }
 
 extern void printdecu(uint32_t num);
@@ -263,7 +248,7 @@ int main ()
   printf ("Arr_2_Glob[8][7]:    ", Arr_2_Glob[8][7]); printhex(Arr_2_Glob[8][7]);
   //printf ("        should be:   Number_Of_Runs + 10");
   printf ("Ptr_Glob->");
-  printf ("  Ptr_Comp:          "); printhex((uint32_t) Ptr_Glob->Ptr_Comp);
+  printf ("Ptr_Comp:          "); printhex((uint32_t) Ptr_Glob->Ptr_Comp);
   //printf ("        should be:   (implementation-dependent)");
   printf ("  Discr:             ", Ptr_Glob->Discr); printhex(Ptr_Glob->Discr);
   //printf ("        should be:   %d", 0);
@@ -271,10 +256,10 @@ int main ()
   //printf ("        should be:   %d", 2);
   printf ("  Int_Comp:          ", Ptr_Glob->variant.var_1.Int_Comp); printhex(Ptr_Glob->variant.var_1.Int_Comp);
   //printf ("        should be:   %d", 17);
-  printf ("  Str_Comp:          ", Ptr_Glob->variant.var_1.Str_Comp); printf(Ptr_Glob->variant.var_1.Str_Comp);
+  printf ("  Str_Comp:          ", Ptr_Glob->variant.var_1.Str_Comp); printf(Ptr_Glob->variant.var_1.Str_Comp);  printf("\n");
   //printf ("        should be:   DHRYSTONE PROGRAM, SOME STRING");
   printf ("Next_Ptr_Glob->");
-  printf ("  Ptr_Comp:          "); printhex((uint32_t) Next_Ptr_Glob->Ptr_Comp);
+  printf ("Ptr_Comp:          "); printhex((uint32_t) Next_Ptr_Glob->Ptr_Comp);
   //printf ("        should be:   (implementation-dependent), same as above");
   printf ("  Discr:             "); printhex(Next_Ptr_Glob->Discr);
   //printf ("        should be:   %d", 0);
@@ -282,7 +267,7 @@ int main ()
   //printf ("        should be:   %d", 1);
   printf ("  Int_Comp:          "); printhex(Next_Ptr_Glob->variant.var_1.Int_Comp);
   //printf ("        should be:   %d", 18);
-  printf ("  Str_Comp:          "); printf(Next_Ptr_Glob->variant.var_1.Str_Comp);
+  printf ("  Str_Comp:          "); printf(Next_Ptr_Glob->variant.var_1.Str_Comp);  printf("\n");
   printf ("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
   printf ("Int_1_Loc:           ", Int_1_Loc); printhex(Int_1_Loc);
   //printf ("        should be:   %d", 5);
@@ -292,15 +277,16 @@ int main ()
   //printf ("        should be:   %d", 7);
   printf ("Enum_Loc:            ", Enum_Loc); printhex(Enum_Loc);
   //printf ("        should be:   %d", 1);
-  printf ("Str_1_Loc:           ", Str_1_Loc); printf(Str_1_Loc);
+  printf ("Str_1_Loc:           ", Str_1_Loc); printf(Str_1_Loc); printf("\n");
   printf ("        should be:   DHRYSTONE PROGRAM, 1'ST STRING\n");
-  printf ("Str_2_Loc:           ", Str_2_Loc); printf(Str_2_Loc);
+  printf ("Str_2_Loc:           ", Str_2_Loc); printf(Str_2_Loc); printf("\n");
   printf ("        should be:   DHRYSTONE PROGRAM, 2'ND STRING\n");
   
   uint32_t instrs = execdEnd - execdBegin;
   uint32_t cycles = End_Time - Begin_Time;
-  printf("Runtime "); printdecu(cycles);
-  printf("Executed "); printdecu(instrs);
+  printf("\n\nRESULTS\n");
+  printf("Runtime (cycles) "); printdecu(cycles);
+  printf("Executed (instrs) "); printdecu(instrs);
   uint32_t ipc = (instrs * 1000) / cycles;
   printf("mIPC "); printdecu(ipc);
   
