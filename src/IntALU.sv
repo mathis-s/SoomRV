@@ -84,7 +84,7 @@ always_comb begin
         INT_SRA: resC = srcA >>> srcB[4:0];
         INT_LUI: resC = srcB;
         INT_JALR,
-        INT_JAL: resC = srcA + 4;
+        INT_JAL: resC = srcA + (IN_uop.compressed ? 2 : 4);
         INT_SYS: resC = 0;
         INT_SH1ADD: resC = srcB + (srcA << 1);
         INT_SH2ADD: resC = srcB + (srcA << 2);
@@ -161,7 +161,8 @@ always_ff@(posedge clk) begin
             
             OUT_isBranch <= isBranch;
             if (isBranch) begin
-                OUT_branchSource <= IN_uop.pc;
+                // Uncompressed branches are predicted only when their second halfword is fetched
+                OUT_branchSource <= (IN_uop.compressed ? IN_uop.pc : (IN_uop.pc + 2));
                 OUT_branchID <= IN_uop.branchID;
                 OUT_branchIsJump <= (IN_uop.opcode == INT_JAL);
                 OUT_branchTaken <= branchTaken;

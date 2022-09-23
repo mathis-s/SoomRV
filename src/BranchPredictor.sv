@@ -126,7 +126,9 @@ always@(posedge clk) begin
         end
     end
     
-    if (IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.branchID != ((1 << ID_BITS) - 1) && {IN_comUOp.pc, 2'b00} == entries[IN_comUOp.branchID[4:0]].srcAddr) begin
+    // TODO: Currently address check is problematic, as address of uncompressed branches is incremented and might not match anymore.
+    // This means there might (rarely) be a branch prediction update coming from the wrong branch.
+    if (IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.branchID != ((1 << ID_BITS) - 1)/* && {IN_comUOp.pc, 2'b00} == entries[IN_comUOp.branchID[4:0]].srcAddr*/) begin
         
         reg[1:0] hist = entries[IN_comUOp.branchID[4:0]].history;
         

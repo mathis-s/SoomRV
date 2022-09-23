@@ -74,72 +74,67 @@ always_ff@(posedge clk) begin
                     pc <= IN_BP_branchDst[31:1];
                     pcLast <= pc;
                     
-                    // Jump is second instr in bundle
-                    if (IN_BP_branchSrc[2]) begin
-                        bMaskLast <= 4'b1111;
-                        bIndexLast[0] <= 63;
-                        bIndexLast[2] <= IN_BP_branchID;
-                        bPredLast[0] <= 0;
-                        bPredLast[2] <= 1;
+                    case (IN_BP_branchSrc[2:1])
+                        2'b00: bMaskLast <= 4'b0001;
+                        2'b01: bMaskLast <= 4'b0011;
+                        2'b10: bMaskLast <= 4'b0111;
+                        2'b11: bMaskLast <= 4'b1111;
+                    endcase
+                    for (i = 0; i < 4; i=i+1) begin
+                        bIndexLast[i] <= 63;
+                        bPredLast[i] <= 0;
                     end
-                    // Jump is first instr in bundle
-                    else begin
-                        bMaskLast <= 4'b0011;
-                        bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[2] <= 63;
-                        bPredLast[0] <= 1;
-                        bPredLast[2] <= 0;
-                    end
+                    
+                    bIndexLast[IN_BP_branchSrc[2:1]] <= IN_BP_branchID;
+                    bPredLast[IN_BP_branchSrc[2:1]] <= 1;
                 end
                 // Branch found, not taken
                 else begin
-
-                    bPredLast[0] <= 0;
-                    bPredLast[2] <= 0;
-                
                     pcLast <= pc;
                     
                     // There is a second branch in this block,
                     // go there.
                     if (IN_BP_multipleBranches) begin
-                        pc <= IN_BP_branchSrc[31:1] + 2;
-                        // only run first instr
-                        bMaskLast <= 4'b0011;
+                        pc <= IN_BP_branchSrc[31:1] + 1;
+                        case (IN_BP_branchSrc[2:1])
+                            2'b00: bMaskLast <= 4'b0001;
+                            2'b01: bMaskLast <= 4'b0011;
+                            2'b10: bMaskLast <= 4'b0111;
+                            2'b11: bMaskLast <= 4'b1111;
+                        endcase
                     end
                     else begin
                         bMaskLast <= 4'b1111;
-                        case (pc[1])
-                            1'b1: pc <= pc + 2;
-                            1'b0: pc <= pc + 4;
+                        // TODO: make this just be round down + increment
+                        case (pc[1:0])
+                            2'b00: pc <= pc + 4;
+                            2'b01: pc <= pc + 3;
+                            2'b10: pc <= pc + 2;
+                            2'b11: pc <= pc + 1;
                         endcase
                     end
                     
-                    if (IN_BP_branchSrc[2]) begin
-                        bIndexLast[0] <= 63;
-                        bIndexLast[2] <= IN_BP_branchID;
+                    for (i = 0; i < 4; i=i+1) begin
+                        bIndexLast[i] <= 63;
+                        bPredLast[i] <= 0;
                     end
-                    else begin
-                        bIndexLast[0] <= IN_BP_branchID;
-                        bIndexLast[2] <= 63;
-                    end
-                    
+                    bIndexLast[IN_BP_branchSrc[2:1]] <= IN_BP_branchID;
+                    bPredLast[IN_BP_branchSrc[2:1]] <= 0;
                 end
             end
             else begin
-                case (pc[1])
-                    1'b1: begin
-                        pc <= pc + 2;
-                    end
-                    1'b0: begin
-                        pc <= pc + 4;
-                    end
+                case (pc[1:0])
+                    2'b00: pc <= pc + 4;
+                    2'b01: pc <= pc + 3;
+                    2'b10: pc <= pc + 2;
+                    2'b11: pc <= pc + 1;
                 endcase
                 pcLast <= pc;
                 bMaskLast <= 4'b1111;
-                bIndexLast[0] <= 63;
-                bIndexLast[2] <= 63;
-                bPredLast[0] <= 0;
-                bPredLast[2] <= 0;
+                for (i = 0; i < 4; i=i+1) begin
+                    bIndexLast[i] <= 63;
+                    bPredLast[i] <= 0;
+                end
             end
         end
     end

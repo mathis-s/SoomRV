@@ -1,10 +1,10 @@
 	.file	"primes.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_f2p0_d2p0_zba_zbb"
+	.attribute arch, "rv32i2p0_f2p0_d2p0_c2p0_zba_zbb"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
-	.align	2
+	.align	1
 	.globl	mark
 	.type	mark, @function
 mark:
@@ -31,7 +31,7 @@ mark:
 	ret
 	.size	mark, .-mark
 	.section	.text.startup,"ax",@progbits
-	.align	2
+	.align	1
 	.globl	main
 	.type	main, @function
 main:

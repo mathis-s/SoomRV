@@ -77,12 +77,31 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[5:0] funct6;
+    logic[2:0] rd_rs1;
+    logic[1:0] funct2;
+    logic[2:0] rs2;
+    logic[1:0] op;
+} Instr16_CA;
+
+typedef struct packed
+{
     logic[2:0] funct3;
     logic[2:0] imm2;
-    logic[2:0] rs1;
+    logic[2:0] rd_rs1;
     logic[4:0] imm;
     logic[1:0] op;
 } Instr16_CB;
+
+typedef struct packed
+{
+    logic[2:0] funct3;
+    logic imm2;
+    logic[1:0] funct2;
+    logic[2:0] rd_rs1;
+    logic[4:0] imm;
+    logic[1:0] op;
+} Instr16_CB2;
 
 typedef struct packed
 {
@@ -100,7 +119,9 @@ typedef union packed
     Instr16_CIW ciw;
     Instr16_CL cl;
     Instr16_CS cs;
+    Instr16_CA ca;
     Instr16_CB cb;
+    Instr16_CB2 cb2;
     Instr16_CJ cj;
 } Instr16;
 
@@ -120,11 +141,15 @@ integer i;
 D_UOp uop;
 reg invalidEnc;
 Instr32 instr;
+Instr16 instr16;
 
 always_comb begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
+        
         instr = IN_instrs[i].instr;
+        instr16 = IN_instrs[i].instr[15:0];
+        
         uop = 98'b0;
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
@@ -132,6 +157,7 @@ always_comb begin
         uop.branchID = IN_instrs[i].branchID;
         uop.branchPred = IN_instrs[i].branchPred;
         
+        // TODO: Unify usage of immB, pcA as well as regular imm and pc fields. Also either add to pc in here or in ALU, not mix.
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
@@ -151,14 +177,16 @@ always_comb begin
         if (instr.opcode[1:0] == 2'b11) begin
             case (instr.opcode)
                 `OPC_ENV: begin
-                    uop.fu = FU_INT;
-                    uop.rs0 = 0;
-                    uop.rs1 = 0;
-                    uop.rd = 0;
-                    uop.opcode = INT_SYS;
-                    uop.immB = 1;
-                    uop.pcA = 1;
-                    invalidEnc = 0;
+                    if (uop.imm == 0 || uop.imm == 1) begin
+                        uop.fu = FU_INT;
+                        uop.rs0 = 0;
+                        uop.rs1 = 0;
+                        uop.rd = 0;
+                        uop.opcode = INT_SYS;
+                        uop.immB = 1;
+                        uop.pcA = 1;
+                        invalidEnc = 0;
+                    end
                 end
                 `OPC_LUI: begin
                     uop.fu = FU_INT;
@@ -502,6 +530,240 @@ always_comb begin
         // Compressed Instructions
         else begin
             uop.compressed = 1;
+            if (instr16.raw[1:0] == 2'b00) begin
+                // c.lw
+                if (instr16.cl.funct3 == 3'b010) begin
+                    uop.opcode = LSU_LW;
+                    uop.fu = FU_LSU;
+                    uop.imm = {25'b0, instr16.cl.imm[0], instr16.cl.imm2, instr16.cl.imm[1], 2'b00};
+                    uop.rs0 = {2'b01, instr16.cl.rs1};
+                    uop.rd = {2'b01, instr16.cl.rd};
+                    invalidEnc = 0;
+                end
+                // c.sw
+                else if (instr16.cs.funct3 == 3'b110) begin
+                    uop.opcode = LSU_SW;
+                    uop.fu = FU_LSU;
+                    uop.imm = {25'b0, instr16.cs.imm[0], instr16.cs.imm2, instr16.cs.imm[1], 2'b00};
+                    uop.rs0 = {2'b01, instr16.cs.rd_rs1};
+                    uop.rs1 = {2'b01, instr16.cs.rs2};
+                    invalidEnc = 0;
+                end
+                // c.addi4spn
+                else if (instr16.ciw.funct3 == 3'b000 && instr16.ciw.imm != 0) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    uop.imm = {22'b0, instr16.ciw.imm[5:2], instr16.ciw.imm[7:6], instr16.ciw.imm[0], instr16.ciw.imm[1], 2'b00};
+                    uop.rs0 = 2;
+                    uop.immB = 1;
+                    uop.rd = {2'b01, instr16.ciw.rd};
+                    invalidEnc = 0;
+                end
+            end
+            else if (instr16.raw[1:0] == 2'b01) begin
+                // c.j
+                if (instr16.cj.funct3 == 3'b101) begin
+                    uop.opcode = INT_JAL;
+                    uop.fu = FU_INT;
+                    // certainly one of the encodings of all time
+                    uop.imm = {{20{instr16.cj.imm[10]}}, instr16.cj.imm[10], instr16.cj.imm[6], instr16.cj.imm[8:7], instr16.cj.imm[4], 
+                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                    uop.pcA = 1;
+                    uop.immB = 1;
+                    invalidEnc = 0;
+                end
+                // c.jal
+                else if (instr16.cj.funct3 == 3'b001) begin
+                    uop.opcode = INT_JAL;
+                    uop.fu = FU_INT;
+                    uop.imm = {{20{instr16.cj.imm[10]}}, instr16.cj.imm[10], instr16.cj.imm[6], instr16.cj.imm[8:7], instr16.cj.imm[4], 
+                        instr16.cj.imm[5], instr16.cj.imm[0], instr16.cj.imm[9], instr16.cj.imm[3:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                    uop.pcA = 1;
+                    uop.immB = 1;
+                    uop.rd = 1; // ra
+                    invalidEnc = 0;
+                end
+                // c.beqz
+                else if (instr16.cb.funct3 == 3'b110) begin
+                    uop.opcode = INT_BEQ;
+                    uop.fu = FU_INT;
+                    uop.imm = {{23{instr16.cb.imm2[2]}}, instr16.cb.imm2[2], instr16.cb.imm[4:3], 
+                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                    
+                    uop.rs0 = {2'b01, instr16.cb.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.bnez
+                else if (instr16.cb.funct3 == 3'b111) begin
+                    uop.opcode = INT_BNE;
+                    uop.fu = FU_INT;
+                    uop.imm = {{23{instr16.cb.imm2[2]}}, instr16.cb.imm2[2], instr16.cb.imm[4:3], 
+                        instr16.cb.imm[0], instr16.cb.imm2[1:0], instr16.cb.imm[2:1], 1'b0} + {IN_instrs[i].pc, 1'b0};
+                    
+                    uop.rs0 = {2'b01, instr16.cb.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.li
+                else if (instr16.ci.funct3 == 3'b010 && !(instr16.ci.rd_rs1 == 0)) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    uop.imm = {{26{instr16.ci.imm2}}, instr16.ci.imm2, instr16.ci.imm};
+                    uop.immB = 1;
+                    uop.rd = instr16.ci.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.lui / c.addi16sp
+                else if (instr16.ci.funct3 == 3'b011 && instr16.ci.rd_rs1 != 0 && {instr16.ci.imm2, instr16.ci.imm} != 0) begin
+                    uop.fu = FU_INT;
+                    
+                    if (instr16.ci.rd_rs1 == 2) begin
+                        uop.opcode = INT_ADD;
+                        uop.rs0 = 2;
+                        uop.imm = {{22{instr16.ci.imm2}}, instr16.ci.imm2, instr16.ci.imm[2:1], 
+                            instr16.ci.imm[3], instr16.ci.imm[0], instr16.ci.imm[4], 4'b0};
+                    end
+                    else begin
+                        uop.opcode = INT_LUI;
+                        uop.imm = {{14{instr16.ci.imm2}}, instr16.ci.imm2, instr16.ci.imm, 12'b0};
+                    end
+                    
+                    uop.immB = 1;
+                    uop.rd = instr16.ci.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.addi
+                else if (instr16.ci.funct3 == 3'b000 && !(instr16.ci.rd_rs1 == 0)) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    uop.imm = {{26{instr16.ci.imm2}}, instr16.ci.imm2, instr16.ci.imm};
+                    uop.immB = 1;
+                    uop.rs0 = instr16.ci.rd_rs1;
+                    uop.rd = instr16.ci.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.srli
+                else if (instr16.cb2.funct3 == 3'b100 && instr16.cb2.funct2 == 2'b00 && !instr16.cb2.imm2 && instr16.cb2.imm[4:0] != 0) begin
+                    uop.opcode = INT_SRL;
+                    uop.fu = FU_INT;
+                    uop.imm = {27'b0, instr16.cb2.imm[4:0]};
+                    uop.immB = 1;
+                    uop.rs0 = {2'b01, instr16.cb2.rd_rs1};
+                    uop.rd = {2'b01, instr16.cb2.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.srai
+                else if (instr16.cb2.funct3 == 3'b100 && instr16.cb2.funct2 == 2'b01 && !instr16.cb2.imm2 && instr16.cb2.imm[4:0] != 0) begin
+                    uop.opcode = INT_SRA;
+                    uop.fu = FU_INT;
+                    uop.imm = {27'b0, instr16.cb2.imm[4:0]};
+                    uop.immB = 1;
+                    uop.rs0 = {2'b01, instr16.cb2.rd_rs1};
+                    uop.rd = {2'b01, instr16.cb2.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.andi
+                else if (instr16.cb2.funct3 == 3'b100 && instr16.cb2.funct2 == 2'b10) begin
+                    uop.opcode = INT_AND;
+                    uop.fu = FU_INT;
+                    uop.imm = {{26{instr16.cb2.imm2}}, instr16.cb2.imm2, instr16.cb2.imm[4:0]};
+                    uop.immB = 1;
+                    uop.rs0 = {2'b01, instr16.cb2.rd_rs1};
+                    uop.rd = {2'b01, instr16.cb2.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.and / c.or / c.xor / c.sub
+                else if (instr16.ca.funct6 == 6'b100011) begin
+                    case (instr16.ca.funct2)
+                        2'b11: uop.opcode = INT_AND;
+                        2'b10: uop.opcode = INT_OR;
+                        2'b01: uop.opcode = INT_XOR;
+                        2'b00: uop.opcode = INT_SUB;
+                    endcase
+                    uop.fu = FU_INT;
+                    uop.rs0 = {2'b01, instr16.ca.rd_rs1};
+                    uop.rs1 = {2'b01, instr16.ca.rs2};
+                    uop.rd = {2'b01, instr16.ca.rd_rs1};
+                    invalidEnc = 0;
+                end
+                // c.nop
+                else if (instr16.ci.funct3 == 3'b000 && instr16.ci.imm2 == 1'b0 && instr16.ci.rd_rs1 == 5'b0 && instr16.ci.imm == 5'b0) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    invalidEnc = 0;
+                end
+            end
+            else if (instr16.raw[1:0] == 2'b10) begin
+                // c.lwsp
+                if (instr16.ci.funct3 == 3'b010 && !(instr16.ci.rd_rs1 == 0)) begin
+                    uop.opcode = LSU_LW;
+                    uop.fu = FU_LSU;
+                    uop.imm = {24'b0, instr16.ci.imm[1:0], instr16.ci.imm2, instr16.ci.imm[4:2], 2'b00};
+                    uop.rs0 = 2; // sp
+                    uop.rd = instr16.ci.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.swsp
+                else if (instr16.css.funct3 == 3'b110) begin
+                    uop.opcode = LSU_SW;
+                    uop.fu = FU_LSU;
+                    uop.imm = {24'b0, instr16.css.imm[1:0], instr16.css.imm[5:2], 2'b00};
+                    uop.rs0 = 2; // sp
+                    uop.rs1 = instr16.css.rs2;
+                    invalidEnc = 0;
+                end
+                // c.jr
+                else if (instr16.cr.funct4 == 4'b1000 && !(instr16.cr.rd_rs1 == 0 || instr16.cr.rs2 != 0)) begin
+                    uop.opcode = INT_JALR;
+                    uop.fu = FU_INT;
+                    uop.pcA = 1;
+                    uop.rs1 = instr16.cr.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.jalr
+                else if (instr16.cr.funct4 == 4'b1001 && !(instr16.cr.rd_rs1 == 0 || instr16.cr.rs2 != 0)) begin
+                    uop.opcode = INT_JALR;
+                    uop.fu = FU_INT;
+                    uop.pcA = 1;
+                    uop.rs1 = instr16.cr.rd_rs1;
+                    uop.rd = 1; // ra
+                    uop.immB = 1;
+                    invalidEnc = 0;
+                end
+                // c.slli
+                else if (instr16.ci.funct3 == 3'b000 && !(instr16.ci.rd_rs1 == 0) && !instr16.ci.imm2 && instr16.ci.imm[4:0] != 0) begin
+                    uop.opcode = INT_SLL;
+                    uop.fu = FU_INT;
+                    uop.imm = {27'b0, instr16.ci.imm[4:0]};
+                    uop.immB = 1;
+                    uop.rs0 = instr16.ci.rd_rs1;
+                    uop.rd = instr16.ci.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.mv
+                else if (instr16.cr.funct4 == 4'b1000 && instr16.cr.rd_rs1 != 0 && instr16.cr.rs2 != 0) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    uop.rs1 = instr16.cr.rs2;
+                    uop.rd = instr16.cr.rd_rs1;
+                    invalidEnc = 0;
+                end
+                // c.add
+                else if (instr16.cr.funct4 == 4'b1001 && instr16.cr.rd_rs1 != 0 && instr16.cr.rs2 != 0) begin
+                    uop.opcode = INT_ADD;
+                    uop.fu = FU_INT;
+                    uop.rs0 = instr16.cr.rd_rs1;
+                    uop.rs1 = instr16.cr.rs2;
+                    uop.rd = instr16.cr.rd_rs1;
+                    invalidEnc = 0;
+                end
+                else if (instr16.cr.funct4 == 4'b1001 && instr16.cr.rd_rs1 == 0 && instr16.cr.rs2 == 0) begin
+                    uop.opcode = INT_SYS;
+                    uop.fu = FU_INT;
+                    uop.immB = 1;
+                    uop.imm = 1;
+                    invalidEnc = 0;
+                end
+            end
         end
         
         

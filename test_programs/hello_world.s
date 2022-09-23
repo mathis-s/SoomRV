@@ -1,10 +1,10 @@
 	.file	"hello_world.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_f2p0_d2p0"
+	.attribute arch, "rv32i2p0_f2p0_d2p0_c2p0"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
-	.align	2
+	.align	1
 	.type	print, @function
 print:
 	lbu	a5,0(a0)
@@ -25,7 +25,7 @@ print:
 hexLut:
 	.ascii	"0123456789abcdef"
 	.text
-	.align	2
+	.align	1
 	.type	printhex, @function
 printhex:
 	lui	a5,%hi(hexLut)
@@ -79,7 +79,7 @@ printhex:
 .LC1:
 	.string	"\n"
 	.text
-	.align	2
+	.align	1
 	.globl	main
 	.type	main, @function
 main:

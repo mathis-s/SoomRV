@@ -33,45 +33,50 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    system((std::string("riscv32-unknown-elf-as -march=rv32imdzba_zbb -o temp.o ") + std::string(argv[1])).c_str());
+    system((std::string("riscv32-unknown-elf-as -march=rv32imdczba_zbb -o temp.o ") + std::string(argv[1])).c_str());
     system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
     
-    size_t numInstrs = 0;
+    size_t numInstrBytes = 0;
     {
         FILE* f = fopen("text.bin", "rb");
-        while (numInstrs < 65536)
+        uint8_t* pramBytes = (uint8_t*)pram;
+        while (numInstrBytes < 65536 * 4)
         {
-            uint32_t data;
-            if (fread(&data, sizeof(uint32_t), 1, f) <= 0)
+            uint8_t data;
+            if (fread(&data, sizeof(uint8_t), 1, f) <= 0)
                 break;
-            pram[numInstrs] = data;
-            numInstrs++;
+            pramBytes[numInstrBytes] = data;
+            numInstrBytes++;
         }
         fclose(f);
-        printf("Read %zu instructions\n", numInstrs);
+        printf("Read %zu bytes of instructions\n", numInstrBytes);
+        if (numInstrBytes & 3)
+            numInstrBytes = (numInstrBytes & -4) + 4;
         
         
-        size_t dataIndex = numInstrs;
+        size_t dataIndex = numInstrBytes;
+        printf("data start %zx\n", dataIndex);
         size_t dataStart = dataIndex;
+        uint8_t* ramBytes = (uint8_t*)ram;
         f = fopen("data.bin", "rb");
-        while (dataIndex < 65536)
+        while (dataIndex < 65536 * 4)
         {
-            uint32_t data;
-            if (fread(&data, 1, sizeof(uint32_t), f) == 0)
+            uint8_t data;
+            if (fread(&data, 1, sizeof(uint8_t), f) == 0)
                 break;
-            ram[dataIndex] = data;
-            printf("%.6zx: %.8x ", dataIndex, data);
-            if (isprint(data & 0xff)) putc(data&0xff, stdout); else putc('.', stdout);
-            if (isprint((data & 0xff00)>>8)) putc((data & 0xff00)>>8, stdout); else putc('.', stdout);
-            if (isprint((data & 0xff0000)>>16)) putc((data & 0xff0000)>>16, stdout); else putc('.', stdout);
-            if (isprint((data & 0xff000000)>>24)) putc((data & 0xff000000)>>24, stdout); else putc('.', stdout);
-            putc(10, stdout);
+            ramBytes[dataIndex] = data;
+            //printf("%.6zx: %.8x ", dataIndex, data);
+            //if (isprint(data & 0xff)) putc(data&0xff, stdout); else putc('.', stdout);
+            //if (isprint((data & 0xff00)>>8)) putc((data & 0xff00)>>8, stdout); else putc('.', stdout);
+            //if (isprint((data & 0xff0000)>>16)) putc((data & 0xff0000)>>16, stdout); else putc('.', stdout);
+            //if (isprint((data & 0xff000000)>>24)) putc((data & 0xff000000)>>24, stdout); else putc('.', stdout);
+            //putc(10, stdout);
             
             dataIndex++;
         }
-        printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex-4);
+        printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
         fclose(f);
     }
 

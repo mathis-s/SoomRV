@@ -38,17 +38,17 @@ always_ff@(posedge clk) begin
         freeEntries = BUF_SIZE;
     end
     else if (!mispred) begin
-        
+
         if (outEn) begin
             for (i = 0; i < NUM_INSTRS; i=i+1) begin
             
                 if (bufIndexIn != bufIndexOut) begin
                     // 32-bit Instruction
-                    if (buffer[bufIndexOut].instr[1:0] == 2'b11 && (bufIndexOut + 1 != bufIndexIn)) begin
+                    if ((buffer[bufIndexOut].instr[1:0] == 2'b11) && ((bufIndexOut + 4'b1) != bufIndexIn)) begin
                         OUT_instrs[i].instr <= {buffer[bufIndexOut + 1].instr, buffer[bufIndexOut].instr};
                         OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
-                        OUT_instrs[i].branchID <= buffer[bufIndexOut].branchID;
-                        OUT_instrs[i].branchPred <= buffer[bufIndexOut].branchPred;
+                        OUT_instrs[i].branchID <= buffer[bufIndexOut + 1].branchID;
+                        OUT_instrs[i].branchPred <= buffer[bufIndexOut + 1].branchPred;
                         OUT_instrs[i].valid <= 1;
                         bufIndexOut = bufIndexOut + 2;
                         freeEntries = freeEntries + 2;
@@ -63,12 +63,12 @@ always_ff@(posedge clk) begin
                         bufIndexOut = bufIndexOut + 1;
                         freeEntries = freeEntries + 1;
                     end
+                    else OUT_instrs[i].valid <= 0;
                 end
                 else OUT_instrs[i].valid <= 0;
             end
         end
         
-
         for (i = 0; i < NUM_INSTRS*2; i=i+1) begin
             if (ifetchValid && IN_instrs[i].valid) begin
                 buffer[bufIndexIn] <= IN_instrs[i];
@@ -87,7 +87,7 @@ always_ff@(posedge clk) begin
         freeEntries = BUF_SIZE;
     end
     
-    OUT_full <= (freeEntries < 8);
+    OUT_full <= (freeEntries < 5);
 end
 
 endmodule
