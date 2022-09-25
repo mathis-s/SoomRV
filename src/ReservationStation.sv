@@ -55,6 +55,9 @@ reg deqValid[NUM_UOPS-1:0];
 reg[32:0] reservedWBs[NUM_UOPS-1:0];
 
 always_comb begin    
+
+    for (i = 0; i < NUM_UOPS; i=i+1)
+        deqValid[i] = 0;
     for (i = NUM_UOPS - 1; i >= 0; i=i-1) begin
     
         reg[2:0] ids0[7:0];

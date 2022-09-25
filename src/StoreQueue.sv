@@ -17,14 +17,6 @@ module StoreQueue
     input wire clk,
     input wire rst,
     
-    //input wire IN_valid[NUM_PORTS-1:0],
-    //input wire IN_isLoad[NUM_PORTS-1:0],
-    //input wire[29:0] IN_addr[NUM_PORTS-1:0],
-    //input wire[31:0] IN_data[NUM_PORTS-1:0],
-    //input wire[3:0] IN_wmask[NUM_PORTS-1:0],
-    //input wire[5:0] IN_sqN[NUM_PORTS-1:0],
-    //input wire[5:0] IN_storeSqN[NUM_PORTS-1:0],
-    
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input wire[5:0] IN_curSqN,
@@ -42,7 +34,6 @@ module StoreQueue
     input wire[31:0] IN_CSR_data[NUM_PORTS-1:0],
     output reg OUT_CSR_ce[NUM_PORTS-1:0],
     
-    //output reg[31:0] OUT_data[NUM_PORTS-1:0],
     output RES_UOp OUT_uop[NUM_PORTS-1:0],
     
     output reg[5:0] OUT_maxStoreSqN,

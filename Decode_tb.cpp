@@ -57,7 +57,6 @@ int main(int argc, char** argv)
         
         
         size_t dataIndex = numInstrBytes;
-        printf("data start %zx\n", dataIndex);
         size_t dataStart = dataIndex;
         uint8_t* ramBytes = (uint8_t*)ram;
         f = fopen("data.bin", "rb");

@@ -76,8 +76,11 @@ always_ff@(posedge clk) begin
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 
                 OUT_uop[i].valid <= 1;
-             
-                begin 
+                
+                if (IN_uop[i].tagA == 6'b0) begin
+                    OUT_uop[i].srcA <= 0;
+                end
+                else begin 
                     reg found = 0;
                     
                     // Try to forward from wbs
@@ -104,6 +107,9 @@ always_ff@(posedge clk) begin
                 
                 if (IN_uop[i].immB) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
+                end
+                else if (IN_uop[i].tagB == 6'b0) begin
+                    OUT_uop[i].srcB <= 0;
                 end
                 else begin
                     reg found = 0;
@@ -136,7 +142,7 @@ always_ff@(posedge clk) begin
                 endcase
                 outFU[i] <= IN_uop[i].fu;
             end
-            else begin//if (!(OUT_stall[i] && (!IN_invalidate || $signed(OUT_uop[i].sqN - IN_invalidateSqN) <= 0))) begin
+            else begin
                 OUT_uop[i].valid <= 0;
                 OUT_enableXU[i] <= 0;
             end

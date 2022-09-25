@@ -105,13 +105,7 @@ always_ff@(posedge clk) begin
                     end
                     else begin
                         bMaskLast <= 4'b1111;
-                        // TODO: make this just be round down + increment
-                        case (pc[1:0])
-                            2'b00: pc <= pc + 4;
-                            2'b01: pc <= pc + 3;
-                            2'b10: pc <= pc + 2;
-                            2'b11: pc <= pc + 1;
-                        endcase
+                        pc <= {pc[30:2] + 29'b1, 2'b00};
                     end
                     
                     for (i = 0; i < 4; i=i+1) begin
@@ -123,12 +117,7 @@ always_ff@(posedge clk) begin
                 end
             end
             else begin
-                case (pc[1:0])
-                    2'b00: pc <= pc + 4;
-                    2'b01: pc <= pc + 3;
-                    2'b10: pc <= pc + 2;
-                    2'b11: pc <= pc + 1;
-                endcase
+                pc <= {pc[30:2] + 29'b1, 2'b00};
                 pcLast <= pc;
                 bMaskLast <= 4'b1111;
                 for (i = 0; i < 4; i=i+1) begin
