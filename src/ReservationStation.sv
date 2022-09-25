@@ -6,7 +6,7 @@ typedef struct packed
 
 module ReservationStation
 #(
-    parameter NUM_UOPS=2,
+    parameter NUM_UOPS=3,
     parameter QUEUE_SIZE = 8,
     parameter RESULT_BUS_COUNT = 3,
     parameter STORE_QUEUE_SIZE=8
@@ -100,8 +100,10 @@ always_comb begin
                         ) &&
                         
                     // Second FU only gets simple int ops
-                    (i == 0 || (queue[j].fu != FU_LSU && queue[j].fu != FU_DIV)) &&
+                    (i == 0 || (queue[j].fu != FU_DIV)) &&
                     (i == 1 || (queue[j].fu != FU_MUL)) &&
+                    (i == 2 || (queue[j].fu != FU_LSU)) &&
+                    (i != 2 || (queue[j].fu != FU_INT)) &&
                     (!IN_DIV_doNotIssue || queue[j].fu != FU_DIV) &&
                     (!IN_MUL_doNotIssue || queue[j].fu != FU_MUL) &&
 
@@ -176,7 +178,9 @@ always_comb begin
         
         if (IN_uopValid[i]) begin
             for (j = 0; j < QUEUE_SIZE; j=j+1) begin
-                if (!queueInfo[j].valid && (i == 0 || !insertAvail[0] || insertIndex[0] != j[2:0])) begin
+                if (!queueInfo[j].valid && 
+                    (i == 0 || !insertAvail[0] || insertIndex[0] != j[2:0]) && 
+                    (i <= 1 || !insertAvail[1] || insertIndex[1] != j[2:0])) begin
                     insertAvail[i] = 1;
                     insertIndex[i] = j[2:0];
                 end

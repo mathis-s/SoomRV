@@ -8,7 +8,7 @@ typedef struct packed
 module LoadBuffer
 #(
     parameter NUM_PORTS=1,
-    parameter NUM_ENTRIES=8
+    parameter NUM_ENTRIES=16
 )
 (
     input wire clk,
@@ -78,7 +78,7 @@ always_ff@(posedge clk) begin
             if (valid[i] && (!IN_branch.taken || $signed(sqN[i] - IN_branch.sqN) <= 0)) begin
             
                 if (isLoad[i]) begin
-                    reg[2:0] index = loadSqN[i][2:0] - baseIndex[2:0];
+                    reg[$clog2(NUM_ENTRIES)-1:0] index = loadSqN[i][$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
                     assert(loadSqN[i] < baseIndex + NUM_ENTRIES);
                     
                     //mispredict[i] <= 0;

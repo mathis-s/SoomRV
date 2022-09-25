@@ -15,7 +15,7 @@ typedef struct packed
 
 module Rename
 #(
-    parameter WIDTH_UOPS = 2,
+    parameter WIDTH_UOPS = 3,
     parameter WIDTH_WR = 3
 )
 (
@@ -78,15 +78,13 @@ end
 
 reg[5:0] newTags[WIDTH_UOPS-1:0];
 reg newTagsAvail[WIDTH_UOPS-1:0];
-wire[5:0] newTagsDbg0 = newTags[0];
-wire[5:0] newTagsDbg1 = newTags[1];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         newTagsAvail[i] = 1'b0;
         newTags[i] = 6'bx;
         for (j = 0; j < 64; j=j+1) begin
             // TODO kind of hacky...
-            if (!tags[j].used && (i == 0 || newTags[0] != j[5:0])) begin
+            if (!tags[j].used && (i == 0 || newTags[0] != j[5:0]) && (i <= 1 || newTags[1] != j[5:0])) begin
                 newTags[i] = j[5:0];
                 newTagsAvail[i] = 1'b1;
             end

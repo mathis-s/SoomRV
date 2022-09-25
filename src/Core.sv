@@ -43,12 +43,12 @@ assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 
-CommitUOp comUOps[NUM_UOPS-1:0];
+CommitUOp comUOps[2:0];
 
 assign OUT_LA_robPCsample[15:0] = comUOps[0].pc[15:0];
 assign OUT_LA_robPCsample[31:16] = comUOps[1].pc[15:0];
 
-wire comValid[NUM_UOPS-1:0];
+wire comValid[2:0];
 
 wire frontendEn;
 
@@ -196,7 +196,7 @@ InstrDecoder idec
 );
 
 wire FUSE_full;
-D_UOp FUSE_uop[NUM_UOPS-1:0];
+D_UOp FUSE_uop[2:0];
 Fuse fuse
 (
     .clk(clk),
@@ -211,8 +211,8 @@ Fuse fuse
 );
 
 
-R_UOp RN_uop[NUM_UOPS-1:0];
-reg RN_uopValid[NUM_UOPS-1:0];
+R_UOp RN_uop[2:0];
+reg RN_uopValid[2:0];
 wire[5:0] RN_nextLoadSqN;
 wire[5:0] RN_nextStoreSqN;
 
@@ -244,12 +244,13 @@ Rename rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-wire RV_uopValid[NUM_UOPS-1:0];
-R_UOp RV_uop[NUM_UOPS-1:0];
+wire RV_uopValid[2:0];
+R_UOp RV_uop[2:0];
 
-wire stall[1:0];
+wire stall[2:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
+assign stall[2] = 0;
 wire wbStall[1:0];
 assign wbStall[0] = 0;
 assign wbStall[1] = 0;
@@ -282,9 +283,9 @@ ReservationStation rv
 );
 
 
-wire RF_readEnable[3:0];
-wire[5:0] RF_readAddress[3:0];
-wire[31:0] RF_readData[3:0];
+wire RF_readEnable[5:0];
+wire[5:0] RF_readAddress[5:0];
+wire[31:0] RF_readData[5:0];
 
 wire[5:0] RF_writeAddress[2:0];
 assign RF_writeAddress[0] = wbUOp[0].tagDst;
@@ -308,9 +309,9 @@ RF rf
     .IN_writeData(RF_writeData)
 );
 
-EX_UOp LD_uop[NUM_UOPS-1:0];
-wire[3:0] enabledXUs[NUM_UOPS-1:0];
-FuncUnit LD_fu[NUM_UOPS-1:0];
+EX_UOp LD_uop[2:0];
+wire[3:0] enabledXUs[2:0];
+FuncUnit LD_fu[2:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
 wire[5:0] LD_zcFwdTag[1:0];
@@ -417,12 +418,12 @@ AGU agu
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[0][1]),
+    .en(enabledXUs[2][1]),
     
     .IN_branch(branch),
     .IN_mapping(AGU_mapping),
     
-    .IN_uop(LD_uop[0]),
+    .IN_uop(LD_uop[2]),
     .OUT_uop(AGU_uop)
 );
 
@@ -565,10 +566,10 @@ ControlRegs cr
     .IN_data(OUT_MEM_writeData),
     .OUT_data(CSR_dataOut[0]),
 
-    .IN_comValid('{comUOps[0].valid, comUOps[1].valid}),
+    .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid}),
     .IN_branch(branchProvs[1]),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
-    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid}),
+    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid, DE_uop[2].valid}),
     .IN_comBranch(CSR_branchCommitted),
     
     .OUT_irqAddr(CR_irqAddr),
@@ -590,7 +591,7 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-assign frontendEn = (RV_freeEntries > NUM_UOPS) && 
+assign frontendEn = (RV_freeEntries > 3) && 
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 

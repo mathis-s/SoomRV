@@ -4,8 +4,9 @@
 main:
     
     li a1, 4096
+    
     .loop:
-        c.lui a0, 1
+        lw a2, 0(a0)
         c.addi a0, 1
         c.addi a1, -1
         c.bnez a1, .loop

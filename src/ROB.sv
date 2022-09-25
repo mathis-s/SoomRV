@@ -19,7 +19,7 @@ module ROB
     // speculatively execute?
     parameter LENGTH = 30,
 
-    parameter WIDTH = 2,
+    parameter WIDTH = 3,
     parameter WIDTH_WB = 3
 )
 (

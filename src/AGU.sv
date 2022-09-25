@@ -14,7 +14,7 @@ module AGU
 
 integer i;
 
-wire[31:0] addr = IN_uop.srcA + {20'b0, IN_uop.imm[11:0]};
+wire[31:0] addr = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
 reg[3:0] mapping;
 reg mappingValid;
 reg mappingExcept;
