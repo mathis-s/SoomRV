@@ -1,3 +1,12 @@
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[3:0] wm;
+    logic[29:0] addr;
+    logic[31:0] data;
+} CacheIF;
+
 module Top
 (
     input wire clk,
@@ -10,24 +19,38 @@ module Top
     output wire OUT_halt
 );
 
-wire[31:0] DC_dataIn;
-wire[31:0] DC_dataOut;
-wire[29:0] DC_addr;
-wire DC_we;
-wire DC_ce;
-wire[3:0] DC_wm;
+wire MC_DC_used;
+CacheIF MC_DC_if;
 
-MemRTL dcache
+wire MC_ce;
+wire MC_we;
+wire[9:0] MC_sramAddr;
+wire[31:0] MC_extAddr;
+wire[9:0] MC_progress;
+wire MC_busy;
+MemoryControllerSim memc
 (
     .clk(clk),
-    .IN_nce(DC_ce),
-    .IN_nwe(DC_we),
-    .IN_addr(DC_addr[15:0]),
-    .IN_data(DC_dataIn),
-    .IN_wm(DC_wm),
-    .OUT_data(DC_dataOut)
+    .rst(rst),
+    
+    .IN_ce(MC_ce),
+    .IN_we(MC_we),
+    .IN_sramAddr(MC_sramAddr),
+    .IN_extAddr(MC_extAddr),
+    .OUT_progress(MC_progress),
+    .OUT_busy(MC_busy),
+    
+    .OUT_CACHE_used(MC_DC_used),
+    .OUT_CACHE_we(MC_DC_if.we),
+    .OUT_CACHE_ce(MC_DC_if.ce),
+    .OUT_CACHE_wm(MC_DC_if.wm),
+    .OUT_CACHE_addr(MC_DC_if.addr[9:0]),
+    .OUT_CACHE_data(MC_DC_if.data),
+    .IN_CACHE_data(DC_dataOut)
 );
+assign MC_DC_if.addr[29:10] = 0;
 
+CacheIF CORE_DC_if;
 Core core
 (
     .clk(clk),
@@ -37,11 +60,11 @@ Core core
     .IN_instrRaw(IN_instrRaw),
     
     .IN_MEM_readData(DC_dataOut),
-    .OUT_MEM_addr(DC_addr),
-    .OUT_MEM_writeData(DC_dataIn),
-    .OUT_MEM_writeEnable(DC_we),
-    .OUT_MEM_readEnable(DC_ce),
-    .OUT_MEM_writeMask(DC_wm),
+    .OUT_MEM_addr(CORE_DC_if.addr),
+    .OUT_MEM_writeData(CORE_DC_if.data),
+    .OUT_MEM_writeEnable(CORE_DC_if.we),
+    .OUT_MEM_readEnable(CORE_DC_if.ce),
+    .OUT_MEM_writeMask(CORE_DC_if.wm),
     
     .OUT_instrAddr(OUT_instrAddr),
     .OUT_instrReadEnable(OUT_instrReadEnable),
@@ -53,14 +76,37 @@ Core core
     .OUT_SPI_clk(),
     .OUT_SPI_mosi(),
     .IN_SPI_miso(1'b0),
+    
+    .OUT_MC_ce(MC_ce),
+    .OUT_MC_we(MC_we),
+    .OUT_MC_sramAddr(MC_sramAddr),
+    .OUT_MC_extAddr(MC_extAddr),
+    .IN_MC_progress(MC_progress),
+    .IN_MC_busy(MC_busy),
+    
     .OUT_instrMappingMiss(),
     .IN_instrMappingBase(32'b0),
     .IN_instrMappingHalfSize(1'b0)
 );
 
+wire[31:0] DC_dataOut;
+CacheIF DC_if;
+assign DC_if = MC_DC_used ? MC_DC_if : CORE_DC_if;
+
+MemRTL dcache
+(
+    .clk(clk),
+    .IN_nce(!(!DC_if.ce && DC_if.addr < 1024)),
+    .IN_nwe(DC_if.we),
+    .IN_addr(DC_if.addr[15:0]),
+    .IN_data(DC_if.data),
+    .IN_wm(DC_if.wm),
+    .OUT_data(DC_dataOut)
+);
+
 always@(posedge clk) begin
-    if (!DC_ce && !DC_we && DC_wm == 4'b0001 && DC_addr == 30'h3F800000)
-        $write("%c", DC_dataIn[7:0]);
+    if (!CORE_DC_if.ce && !CORE_DC_if.we && CORE_DC_if.wm == 4'b0001 && CORE_DC_if.addr == 30'h3F800000)
+        $write("%c", CORE_DC_if.data[7:0]);
 end
 
 endmodule

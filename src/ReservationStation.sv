@@ -253,7 +253,8 @@ always_ff@(posedge clk) begin
             end
         end
         for (i = 0; i < NUM_UOPS; i=i+1)
-            OUT_valid[i] <= 0;
+            if (!IN_stall[i] || $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)
+                OUT_valid[i] <= 0;
     end
     else begin
         // issue uops

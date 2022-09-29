@@ -28,6 +28,13 @@ module Core
     output wire OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
+    output wire OUT_MC_ce,
+    output wire OUT_MC_we,
+    output wire[9:0] OUT_MC_sramAddr,
+    output wire[31:0] OUT_MC_extAddr,
+    input wire[9:0] IN_MC_progress,
+    input wire IN_MC_busy,
+    
     output wire OUT_instrMappingMiss,
     input wire[31:0] IN_instrMappingBase,
     input wire IN_instrMappingHalfSize
@@ -398,12 +405,12 @@ CacheController cc
     .IN_uop('{AGU_uop}),
     .OUT_uop('{CC_uop}),
     
-    .OUT_MC_ce(),
-    .OUT_MC_we(),
-    .OUT_MC_sramAddr(),
-    .OUT_MC_extAddr(),
-    .IN_MC_progress(8'b0),
-    .IN_MC_busy(1'b0)
+    .OUT_MC_ce(OUT_MC_ce),
+    .OUT_MC_we(OUT_MC_we),
+    .OUT_MC_sramAddr(OUT_MC_sramAddr),
+    .OUT_MC_extAddr(OUT_MC_extAddr),
+    .IN_MC_progress(IN_MC_progress),
+    .IN_MC_busy(IN_MC_busy)
 );
 
 AGU_UOp AGU_uop;
@@ -451,6 +458,7 @@ StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
+    .IN_disable(IN_MC_busy || OUT_MC_ce),
     
     .IN_uop('{CC_uop}),
     

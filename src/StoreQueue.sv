@@ -16,6 +16,7 @@ module StoreQueue
 (
     input wire clk,
     input wire rst,
+    input wire IN_disable,
     
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
@@ -38,6 +39,7 @@ module StoreQueue
     
     output reg[5:0] OUT_maxStoreSqN,
     input wire IN_IO_busy
+    
 );
 
 integer i;
@@ -149,7 +151,7 @@ always_comb begin
         end
         
         // Port 0 handles stores as well
-        else if (!rst && i == 0 && entries[0].valid && !IN_branch.taken && entries[0].ready &&
+        else if (!IN_disable && !rst && i == 0 && entries[0].valid && !IN_branch.taken && entries[0].ready &&
             // Don't issue Memory Mapped IO ops while IO is not ready
             (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff)) begin
             doingDequeue = 1;
@@ -200,7 +202,6 @@ always_comb begin
         end
     end
 end
-
 
 always_ff@(posedge clk) begin
     

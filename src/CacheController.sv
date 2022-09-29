@@ -29,7 +29,7 @@ module CacheController
     output reg OUT_MC_we,
     output reg[9:0] OUT_MC_sramAddr,
     output reg[31:0] OUT_MC_extAddr,
-    input wire[7:0] IN_MC_progress,
+    input wire[9:0] IN_MC_progress,
     input wire IN_MC_busy
 );
 
@@ -65,6 +65,7 @@ always_comb begin
 end
 
 AGU_UOp cmissUOp;
+reg waitCycle;
 
 always_ff@(posedge clk) begin
     
@@ -86,6 +87,8 @@ always_ff@(posedge clk) begin
         
         cacheMiss <= 0;
         cmissUOp.valid <= 0;
+        
+        waitCycle <= 0;
     end
     else begin
         if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
@@ -111,12 +114,17 @@ always_ff@(posedge clk) begin
                     freeEntryAvail <= 1;
                     freeEntryID <= lruPointer;
                 end
-                else begin
+                /*else if (!ctable[lruPointer].dirty) begin
+                    freeEntryAvail <= 1;
+                    freeEntryID <= lruPointer;
+                    ctable[lruPointer].
+                end*/
+                else if (!ctable[lruPointer].used) begin
                     OUT_MC_ce <= 1;
                     OUT_MC_we <= 1;
                     
                     OUT_MC_sramAddr <= {lruPointer, 4'b0};
-                    OUT_MC_extAddr <= {ctable[lruPointer].addr, 6'b0};
+                    OUT_MC_extAddr <= {2'b0, ctable[lruPointer].addr, 4'b0};
                     
                     ctable[lruPointer].valid <= 0;
                     ctable[lruPointer].used <= 0;
@@ -139,9 +147,10 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 
                     // Cache hit
-                    if (IN_uop[i].exception || cacheTableEntryFound[i]) begin
+                    if (IN_uop[i].exception || cacheTableEntryFound[i] || IN_uop[i].addr[31:24] >= 8'hfe) begin
                         OUT_uop[i] <= IN_uop[i];
-                        //OUT_uop[i].addr <= {20'b0, cacheTableEntry[i], IN_uop[i].addr[5:0]};
+                        if (IN_uop[i].addr[31:24] < 8'hfe)
+                            OUT_uop[i].addr <= {20'b0, cacheTableEntry[i], IN_uop[i].addr[5:0]};
                         ctable[cacheTableEntry[i]].used <= 1;
                     end
                     // Cache miss
@@ -155,31 +164,35 @@ always_ff@(posedge clk) begin
             end
         end
         
+        waitCycle <= 0;
+        
         // Handle cache misses
-        if (loading) begin
+        if (loading && !waitCycle) begin
             OUT_MC_ce <= 0;
             if (!IN_MC_busy) begin
                 if (cmissUOp.valid && (!IN_branch.taken || $signed(cmissUOp.sqN - IN_branch.sqN) <= 0)) begin
                     OUT_uop[0] <= cmissUOp;
-                    //OUT_uop[0].addr <= {20'b0, freeEntryID, cmissUOp.addr[5:0]};
+                    OUT_uop[0].addr <= {20'b0, freeEntryID, cmissUOp.addr[5:0]};
                 end
                     
                 loading <= 0;
                 cacheMiss <= 0;
                 cmissUOp.valid <= 0;
                 ctable[freeEntryID].valid <= 1;
+                ctable[freeEntryID].used <= 1;
             end
         end
         else if (cacheMiss && freeEntryAvail && !IN_branch.taken) begin
             OUT_MC_ce <= 1;
             OUT_MC_we <= 0;
             OUT_MC_sramAddr <= {freeEntryID, 4'b0};
-            OUT_MC_extAddr <= cmissUOp.addr;
+            OUT_MC_extAddr <= {2'b0, cmissUOp.addr[31:6], 4'b0};
             
             ctable[freeEntryID].used <= 1;
             ctable[freeEntryID].addr <= cmissUOp.addr[31:6];
             loading <= 1;
             freeEntryAvail <= 0;
+            waitCycle <= 1;
         end
     end
 
