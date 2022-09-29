@@ -6,11 +6,10 @@ module Core
 (
     input wire clk,
     input wire rst,
-    input en,
+    input wire en,
     input wire[63:0] IN_instrRaw,
 
     input wire[31:0] IN_MEM_readData,
-    
     output wire[29:0] OUT_MEM_addr,
     output wire[31:0] OUT_MEM_writeData,
     output wire OUT_MEM_writeEnable,
@@ -20,7 +19,7 @@ module Core
     output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     output wire OUT_halt,
-    
+
     output wire[15:0] OUT_GPIO_oe,
     output wire[15:0] OUT_GPIO,
     input wire[15:0] IN_GPIO,
@@ -31,8 +30,7 @@ module Core
     
     output wire OUT_instrMappingMiss,
     input wire[31:0] IN_instrMappingBase,
-    input wire IN_instrMappingHalfSize,
-    output wire[31:0] OUT_LA_robPCsample
+    input wire IN_instrMappingHalfSize
 );
 
 integer i;
@@ -44,9 +42,6 @@ assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 
 CommitUOp comUOps[2:0];
-
-assign OUT_LA_robPCsample[15:0] = comUOps[0].pc[15:0];
-assign OUT_LA_robPCsample[31:16] = comUOps[1].pc[15:0];
 
 wire comValid[2:0];
 
@@ -250,10 +245,6 @@ R_UOp RV_uop[2:0];
 wire stall[2:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
-assign stall[2] = 0;
-wire wbStall[1:0];
-assign wbStall[0] = 0;
-assign wbStall[1] = 0;
 
 wire[4:0] RV_freeEntries;
 ReservationStation rv
@@ -283,7 +274,6 @@ ReservationStation rv
 );
 
 
-wire RF_readEnable[5:0];
 wire[5:0] RF_readAddress[5:0];
 wire[31:0] RF_readData[5:0];
 
@@ -299,14 +289,20 @@ assign RF_writeData[2] = wbUOp[2].result;
 RF rf
 (
     .clk(clk),
-    .rst(rst),
-    .IN_readEnable(RF_readEnable),
-    .IN_readAddress(RF_readAddress),
-    .OUT_readData(RF_readData),
-
-    .IN_writeEnable(wbHasResult),
-    .IN_writeAddress(RF_writeAddress),
-    .IN_writeData(RF_writeData)
+    
+    .waddr0(wbUOp[0].tagDst), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
+    .waddr1(wbUOp[1].tagDst), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
+    .waddr2(wbUOp[2].tagDst), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
+    .waddr3(6'bx), .wdata3(32'bx), .wen3(1'b0),
+    
+    .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
+    .raddr1(RF_readAddress[1]), .rdata1(RF_readData[1]),
+    .raddr2(RF_readAddress[2]), .rdata2(RF_readData[2]),
+    .raddr3(RF_readAddress[3]), .rdata3(RF_readData[3]),
+    .raddr4(RF_readAddress[4]), .rdata4(RF_readData[4]),
+    .raddr5(RF_readAddress[5]), .rdata5(RF_readData[5]),
+    .raddr6(6'b0), .rdata6(),
+    .raddr7(6'b0), .rdata7()
 );
 
 EX_UOp LD_uop[2:0];
@@ -329,12 +325,12 @@ Load ld
     
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
+    .IN_stall(stall),
     
     .IN_zcFwdResult(LD_zcFwdResult),
     .IN_zcFwdTag(LD_zcFwdTag),
     .IN_zcFwdValid(LD_zcFwdValid),
 
-    .OUT_rfReadValid(RF_readEnable),
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
     
@@ -390,27 +386,25 @@ Divide div
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
 //assign wbStall[0] = DIV_busy;
 
-
-/*CacheController cc
+AGU_UOp CC_uop;
+CacheController cc
 (
     .clk(clk),
     .rst(rst),
     
-    .IN_uop(),
-    .OUT_cacheLookupAddr(),
-    .OUT_cacheLookupFound(),
+    .IN_branch(branch),
+    .OUT_stall(stall[2]),
     
-    .IN_LSU_avail(0),
-    .OUT_uop(),
-    .OUT_MC_startRead(),
-    .OUT_MC_writeBack(),
+    .IN_uop('{AGU_uop}),
+    .OUT_uop('{CC_uop}),
+    
+    .OUT_MC_ce(),
+    .OUT_MC_we(),
     .OUT_MC_sramAddr(),
     .OUT_MC_extAddr(),
-    .OUT_MC_extWBAddr(),
-    .OUT_MC_size(),
-    
-    .IN_MC_busy()
-);*/
+    .IN_MC_progress(8'b0),
+    .IN_MC_busy(1'b0)
+);
 
 AGU_UOp AGU_uop;
 wire[23:0] AGU_mapping[15:0];
@@ -419,6 +413,7 @@ AGU agu
     .clk(clk),
     .rst(rst),
     .en(enabledXUs[2][1]),
+    .stall(stall[2]),
     
     .IN_branch(branch),
     .IN_mapping(AGU_mapping),
@@ -457,7 +452,7 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     
-    .IN_uop('{AGU_uop}),
+    .IN_uop('{CC_uop}),
     
     .IN_curSqN(ROB_curSqN),
     

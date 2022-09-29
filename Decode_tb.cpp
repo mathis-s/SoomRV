@@ -1,4 +1,8 @@
-#include "VCore.h"
+#include "VTop.h"
+#include "VTop_Top.h"
+#include "VTop_Core.h"
+#include "VTop_MemRTL.h"
+#include "VTop___024root.h"
 #include <cstdio>
 #include <iostream>    // Need std::cout
 #include <unistd.h>
@@ -6,7 +10,7 @@
 #include "verilated_vcd_c.h"
 #include <array>
 
-VCore* top; // Instantiation of model
+VTop* top; // Instantiation of model
 
 uint64_t main_time = 0;
 
@@ -24,7 +28,7 @@ int main(int argc, char** argv)
     Verilated::commandArgs(argc, argv); // Remember args
     Verilated::traceEverOn(true);
 
-    top = new VCore;
+    top = new VTop;
     top->clk = 0;
     
     if (argc == 1)
@@ -66,18 +70,15 @@ int main(int argc, char** argv)
             if (fread(&data, 1, sizeof(uint8_t), f) == 0)
                 break;
             ramBytes[dataIndex] = data;
-            //printf("%.6zx: %.8x ", dataIndex, data);
-            //if (isprint(data & 0xff)) putc(data&0xff, stdout); else putc('.', stdout);
-            //if (isprint((data & 0xff00)>>8)) putc((data & 0xff00)>>8, stdout); else putc('.', stdout);
-            //if (isprint((data & 0xff0000)>>16)) putc((data & 0xff0000)>>16, stdout); else putc('.', stdout);
-            //if (isprint((data & 0xff000000)>>24)) putc((data & 0xff000000)>>24, stdout); else putc('.', stdout);
-            //putc(10, stdout);
             
             dataIndex++;
         }
         printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
         fclose(f);
     }
+    
+    for (size_t i = 0; i < 0x10000; i++)
+        top->rootp->Top->dcache->mem[i] = ram[i];
 
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
@@ -96,18 +97,10 @@ int main(int argc, char** argv)
 
     // Run
     top->en = 1;
-    top->IN_instrMappingBase = 0;
-    top->IN_instrMappingHalfSize = 0;
 
     // addresses is registered
     uint32_t instrAddrReg = 0;
-    uint32_t memAddrReg = 0;
-    uint32_t memDataReg = 0;
     bool instrCeReg = true;
-    bool memWeReg = true;
-    bool memCeReg = true;
-    uint32_t memWmReg = 0;
-    
     
     while (!Verilated::gotFinish())
     {
@@ -129,58 +122,9 @@ int main(int argc, char** argv)
                     top->IN_instrRaw = ((uint64_t)pram[index] | (((uint64_t)pram[index + 1]) << 32));
                 }
             }
-
             
-            index = memAddrReg;
-            if (!memCeReg && index >= 65536)
-            {
-                if (!memWeReg && index == (0xfe000000 / 4))
-                {
-                    printf("%c", (memDataReg));
-                    fflush(stdout);
-                }
-                else
-                {
-                    printf("tried to access ram at %zx, terminating\n", index);
-                    break;
-                }
-            }
-            else if (!memCeReg && memWeReg)
-            {
-                //printf("read at %zu: %.8x\n", index, ram[index]);
-                top->IN_MEM_readData = ram[index];
-            }
-            else if (!memCeReg && !memWeReg)
-            {
-                //printf("write at %zu: %.8x\n", index, memDataReg);
-
-                if (memWmReg == 0b1111)
-                    ram[index] = memDataReg;
-                else
-                {
-                    uint32_t word = ram[index];
-                    for (int i = 0; i < 4; i++)
-                        if (memWmReg & (1 << i))
-                        {
-                            uint32_t mask = (1 << (8 * (i+1))) - 1;
-                            if (i == 3) mask = 0xff000000;
-                            mask &= ~((1 << (8 * (i))) - 1);
-                            word = (word & ~mask) | (memDataReg & mask);
-                        }
-                    //printf("word %.8x\n", word);
-                    ram[index] = word;
-                }
-            }
-            
-            
-            memAddrReg = top->OUT_MEM_addr;
-            memDataReg = top->OUT_MEM_writeData;
-            memWeReg = top->OUT_MEM_writeEnable;
-            memCeReg = top->OUT_MEM_readEnable;
-            memWmReg = top->OUT_MEM_writeMask;
             instrCeReg = top->OUT_instrReadEnable;
             instrAddrReg = top->OUT_instrAddr;
-            
         }
 
         top->clk = !top->clk;

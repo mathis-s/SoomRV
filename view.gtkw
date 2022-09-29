@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Sun Sep 25 21:25:58 2022
+[*] Wed Sep 28 20:49:32 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Sun Sep 25 20:32:24 2022"
-[dumpfile_size] 332071047
+[dumpfile_mtime] "Wed Sep 28 20:48:04 2022"
+[dumpfile_size] 306171904
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 74274
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-5.022985 74518 74540 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.022985 24250 74540 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Core.
 [treeopen] TOP.Core.agu.
@@ -19,6 +19,7 @@
 [treeopen] TOP.Core.bp.entries[2].
 [treeopen] TOP.Core.branch.
 [treeopen] TOP.Core.branchProvs[2].
+[treeopen] TOP.Core.cc.
 [treeopen] TOP.Core.cr.
 [treeopen] TOP.Core.div.
 [treeopen] TOP.Core.div.IN_uop.
@@ -34,7 +35,9 @@
 [treeopen] TOP.Core.ld.
 [treeopen] TOP.Core.ld.IN_uop[0].
 [treeopen] TOP.Core.ld.IN_uop[1].
+[treeopen] TOP.Core.ld.IN_uop[2].
 [treeopen] TOP.Core.ld.OUT_uop[0].
+[treeopen] TOP.Core.ld.OUT_uop[1].
 [treeopen] TOP.Core.LD_uop[0].
 [treeopen] TOP.Core.mul.
 [treeopen] TOP.Core.mul.OUT_uop.
@@ -96,6 +99,28 @@ TOP.Core.PD_full
 TOP.Core.FUSE_full
 TOP.Core.OUT_halt
 TOP.Core.stateValid[2:0]
+@200
+-CC
+@28
+TOP.Core.cc.OUT_stall
+TOP.Core.cc.loading
+TOP.Core.cc.freeEntryAvail
+@22
+TOP.Core.cc.freeEntryID[5:0]
+@29
+TOP.Core.cc.evicting
+@200
+-
+@22
+TOP.Core.cc.cmissUOp.sqN[5:0]
+@28
+TOP.Core.cc.cmissUOp.valid
+@200
+-
+@22
+TOP.Core.cc.OUT_uop[0].sqN[5:0]
+@28
+TOP.Core.cc.OUT_uop[0].valid
 @200
 -PreDec
 @22
@@ -191,9 +216,15 @@ TOP.Core.rv.queueInfo[5].valid
 TOP.Core.rv.queue[6].sqN[5:0]
 @200
 -LD
+@28
+#{TOP.Core.RV_uopValid[0:2]} TOP.Core.RV_uopValid[0] TOP.Core.RV_uopValid[1] TOP.Core.RV_uopValid[2]
 @22
-TOP.Core.ld.IN_uop[0].sqN[5:0]
+>13420
+TOP.Core.ld.IN_uop[2].sqN[5:0]
+>0
+TOP.Core.ld.OUT_uop[0].sqN[5:0]
 TOP.Core.ld.OUT_uop[1].sqN[5:0]
+TOP.Core.ld.OUT_uop[2].sqN[5:0]
 @28
 TOP.Core.ld.OUT_uop[1].valid
 TOP.Core.ld.outFU[1][1:0]
@@ -214,9 +245,10 @@ TOP.Core.ialu.OUT_uop.valid
 TOP.Core.ialu.OUT_uop.result[31:0]
 @200
 -AGU
+@28
+#{TOP.Core.stall[0:2]} TOP.Core.stall[0] TOP.Core.stall[1] TOP.Core.stall[2]
 @22
 TOP.Core.agu.OUT_uop.sqN[5:0]
-@23
 TOP.Core.agu.OUT_uop.addr[31:0]
 @820
 TOP.Core.agu.OUT_uop.data[31:0]
@@ -260,7 +292,6 @@ TOP.Core.sq.OUT_uop[0].valid
 -DIV
 @28
 #{TOP.Core.stall[0:1]} TOP.Core.stall[0] TOP.Core.stall[1]
-#{TOP.Core.wbStall[0:1]} TOP.Core.wbStall[0] TOP.Core.wbStall[1]
 TOP.Core.div.IN_uop.valid
 TOP.Core.div.en
 TOP.Core.div.OUT_busy
@@ -324,5 +355,16 @@ TOP.Core.rob.baseIndex[5:0]
 TOP.Core.rob.entries[0].sqN[5:0]
 TOP.Core.rob.entries[1].sqN[5:0]
 TOP.Core.rob.entries[2].sqN[5:0]
+TOP.Core.rob.entries[3].sqN[5:0]
+TOP.Core.rob.entries[4].sqN[5:0]
+TOP.Core.rob.entries[5].sqN[5:0]
+TOP.Core.rob.entries[6].sqN[5:0]
+TOP.Core.rob.entries[7].sqN[5:0]
+TOP.Core.rob.entries[8].sqN[5:0]
+TOP.Core.rob.entries[9].sqN[5:0]
+TOP.Core.rob.entries[10].sqN[5:0]
+TOP.Core.rob.entries[11].sqN[5:0]
+TOP.Core.rob.entries[12].sqN[5:0]
+TOP.Core.rob.entries[13].sqN[5:0]
 [pattern_trace] 1
 [pattern_trace] 0

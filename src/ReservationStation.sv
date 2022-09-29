@@ -53,7 +53,7 @@ reg deqValid[NUM_UOPS-1:0];
 
 // 10 9 8 7 6 5 4 3 2
 reg[32:0] reservedWBs[NUM_UOPS-1:0];
-
+  
 always_comb begin    
 
     for (i = 0; i < NUM_UOPS; i=i+1)
@@ -194,7 +194,7 @@ always_ff@(posedge clk) begin
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         reservedWBs[i] <= {1'b0, reservedWBs[i][32:1]};
-        OUT_valid[i] <= 0;
+        //OUT_valid[i] <= 0;
     end
     
     if (!rst) begin
@@ -241,6 +241,8 @@ always_ff@(posedge clk) begin
         OUT_free <= 8;
         for (i = 0; i < NUM_UOPS; i=i+1)
             reservedWBs[i] <= 0;
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            OUT_valid[i] <= 0;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < QUEUE_SIZE; i=i+1) begin
@@ -250,10 +252,13 @@ always_ff@(posedge clk) begin
                     freeEntries = freeEntries + 1;
             end
         end
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            OUT_valid[i] <= 0;
     end
     else begin
         // issue uops
         for (i = 0; i < NUM_UOPS; i=i+1) begin
+        // TODO: Can still push op into OUT if empty, even during stall
             if (!IN_stall[i]) begin
                 if (deqValid[i]) begin
                     OUT_uop[i] <= queue[deqIndex[i]];
@@ -270,6 +275,10 @@ always_ff@(posedge clk) begin
                 end
                 else 
                     OUT_valid[i] <= 0;
+            end
+            // Make sure to invalidate uops even when stalled
+            else if (OUT_valid[i] && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0) begin
+                OUT_valid[i] <= 0;
             end
         end
                 

@@ -4,6 +4,7 @@ module AGU
     input wire clk,
     input wire rst,
     input wire en,
+    input wire stall,
     
     input BranchProv IN_branch,
     input wire[23:0] IN_mapping[15:0],
@@ -42,7 +43,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         
-        if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+        if (!stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             
             mappingExcept = 0;
             
@@ -166,7 +167,7 @@ always_ff@(posedge clk) begin
             endcase
             
         end
-        else
+        else if (!stall || (OUT_uop.valid && IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0))
             OUT_uop.valid <= 0;
     end
     

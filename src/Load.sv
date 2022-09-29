@@ -19,13 +19,14 @@ module Load
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
     
+    input wire IN_stall[NUM_UOPS-1:0],
+    
     // Zero cycle forward inputs
     input wire[31:0] IN_zcFwdResult[NUM_ZC_FWDS-1:0],
     input wire[5:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
     input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
     
     // Register File read
-    output reg OUT_rfReadValid[2*NUM_UOPS-1:0],
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
     input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
 
@@ -38,10 +39,8 @@ integer j;
 
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
-        OUT_rfReadValid[i] = 1;
         OUT_rfReadAddr[i] = IN_uop[i].tagA;
 
-        OUT_rfReadValid[i+NUM_UOPS] = 1;
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB;
     end
 end
@@ -59,7 +58,7 @@ always_ff@(posedge clk) begin
     else begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             
-            if (IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
+            if (!IN_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
                 OUT_uop[i].imm <= IN_uop[i].imm;
                 OUT_uop[i].sqN <= IN_uop[i].sqN;
@@ -142,7 +141,7 @@ always_ff@(posedge clk) begin
                 endcase
                 outFU[i] <= IN_uop[i].fu;
             end
-            else begin
+            else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
                 OUT_uop[i].valid <= 0;
                 OUT_enableXU[i] <= 0;
             end

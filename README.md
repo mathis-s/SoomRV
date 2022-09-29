@@ -13,7 +13,7 @@ and also supports speculative execution and precise exceptions.
 ## Simulating
 1. Install the [RV32 toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator.
 2. Run `make` to build a binary with Verilator.
-3. Run `./obj_dir/VCore <assembly file>` to execute the code in `<assembly file>`. For example, run `./obj_dir/VCore test_programs/dhry_1.s` to run Dhrystone.
+3. Run `./obj_dir/VTop <assembly file>` to execute the code in `<assembly file>`. For example, run `./obj_dir/VCore test_programs/dhry_1.s` to run Dhrystone.
 4. Open `view.gtkw` for a waveform view of the core's internals.
 
 ## Basic Architecture
