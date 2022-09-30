@@ -17,6 +17,7 @@ module StoreQueue
     input wire clk,
     input wire rst,
     input wire IN_disable,
+    output reg OUT_empty,
     
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
@@ -126,6 +127,15 @@ always_comb begin
     end
 end
 
+reg empty;
+always_comb begin
+    empty = 1;
+    for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+        if (entries[i].valid)
+            empty = 0;
+    end
+end
+
 // Handle Loads combinatorially (SRAM input is registered)
 always_comb begin
     doingDequeue = 0;
@@ -203,9 +213,11 @@ always_comb begin
     end
 end
 
+reg doingEnqueue;
 always_ff@(posedge clk) begin
     
     didCSRwrite <= 0;
+    doingEnqueue = 0;
 
     if (rst) begin
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -217,6 +229,7 @@ always_ff@(posedge clk) begin
         end
         baseIndex = 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
+        OUT_empty <= 1;
     end
     
     else begin
@@ -259,6 +272,7 @@ always_ff@(posedge clk) begin
                 entries[index].addr <= IN_uop[i].addr[31:2];
                 entries[index].data <= IN_uop[i].data;
                 entries[index].wmask <= IN_uop[i].wmask;
+                doingEnqueue = 1;
             end
         end
         
@@ -282,6 +296,7 @@ always_ff@(posedge clk) begin
                 i1[i].valid <= 0;
         end
         
+        OUT_empty <= empty && !doingEnqueue;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
     end
     

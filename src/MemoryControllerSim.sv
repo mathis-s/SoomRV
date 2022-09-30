@@ -50,7 +50,7 @@ always_ff@(posedge clk) begin
                     if (IN_we) begin
                         state <= 1;
                     end
-                    begin
+                    else begin
                         state <= 2;
                     end
                     
@@ -73,7 +73,7 @@ always_ff@(posedge clk) begin
             1: begin
                 
                 cnt <= cnt + 1;
-                if (cnt == LEN + 2) begin
+                if (cnt == LEN + 3) begin
                     OUT_CACHE_ce <= 1;
                     state <= 0;
                     OUT_busy <= 0;
@@ -89,8 +89,9 @@ always_ff@(posedge clk) begin
                     else
                         OUT_CACHE_ce <= 1;
                     
-                    if (cnt >= 2) begin
+                    if (cnt > 2) begin
                         extRAM[extAddr] <= IN_CACHE_data;
+                        //$display("write %x to %x", IN_CACHE_data, extAddr);
                         extAddr <= extAddr + 1;
                         OUT_progress <= OUT_progress + 1;
                     end

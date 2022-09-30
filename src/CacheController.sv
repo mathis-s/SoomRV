@@ -19,6 +19,7 @@ module CacheController
     input wire rst,
     
     input BranchProv IN_branch,
+    input wire IN_SQ_empty,
     
     output wire OUT_stall,
     
@@ -45,7 +46,7 @@ reg[$clog2(SIZE)-1:0] freeEntryID;
 reg[$clog2(SIZE)-1:0] lruPointer;
 
 reg cacheMiss;
-assign OUT_stall = cacheMiss;
+assign OUT_stall = cacheMiss || loading || evicting || waitCycle;
 
 // Cache Table Lookups
 reg cacheTableEntryFound[NUM_UOPS-1:0];
@@ -67,6 +68,7 @@ end
 AGU_UOp cmissUOp;
 reg waitCycle;
 
+reg outHistory;
 always_ff@(posedge clk) begin
     
     if (rst) begin
@@ -91,6 +93,9 @@ always_ff@(posedge clk) begin
         waitCycle <= 0;
     end
     else begin
+        waitCycle <= 0;
+        outHistory <= OUT_uop[0].valid;
+        
         if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
             if (ctable[lruPointer].valid)
                 ctable[lruPointer].used <= 0;
@@ -99,7 +104,7 @@ always_ff@(posedge clk) begin
         
         // Entry Eviction logic
         if (!loading) begin
-            if (evicting) begin
+            if (evicting && !waitCycle) begin
                 OUT_MC_ce <= 0;
                 OUT_MC_we <= 0;
                 
@@ -108,7 +113,7 @@ always_ff@(posedge clk) begin
                     evicting <= 0;
                 end
             end
-            else if (!freeEntryAvail) begin
+            else if (!freeEntryAvail && !evicting) begin
             
                 if (!ctable[lruPointer].valid) begin
                     freeEntryAvail <= 1;
@@ -119,7 +124,7 @@ always_ff@(posedge clk) begin
                     freeEntryID <= lruPointer;
                     ctable[lruPointer].
                 end*/
-                else if (!ctable[lruPointer].used) begin
+                else if (!ctable[lruPointer].used && IN_SQ_empty && ((!IN_uop[0].valid && !OUT_uop[0].valid && !outHistory) || OUT_stall)) begin
                     OUT_MC_ce <= 1;
                     OUT_MC_we <= 1;
                     
@@ -131,6 +136,7 @@ always_ff@(posedge clk) begin
                     freeEntryID <= lruPointer;
                     
                     evicting <= 1;
+                    waitCycle <= 1;
                 end
             end
         end
@@ -163,8 +169,6 @@ always_ff@(posedge clk) begin
                 else OUT_uop[i].valid <= 0;
             end
         end
-        
-        waitCycle <= 0;
         
         // Handle cache misses
         if (loading && !waitCycle) begin

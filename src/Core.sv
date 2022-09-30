@@ -400,6 +400,7 @@ CacheController cc
     .rst(rst),
     
     .IN_branch(branch),
+    .IN_SQ_empty(SQ_empty),
     .OUT_stall(stall[2]),
     
     .IN_uop('{AGU_uop}),
@@ -454,11 +455,13 @@ wire[5:0] SQ_maxStoreSqN;
 wire CSR_ce[0:0];
 wire[31:0] CSR_dataOut[0:0];
 
+wire SQ_empty;
 StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
     .IN_disable(IN_MC_busy || OUT_MC_ce),
+    .OUT_empty(SQ_empty),
     
     .IN_uop('{CC_uop}),
     
