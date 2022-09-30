@@ -80,10 +80,40 @@ typedef enum logic[5:0]
     LSU_LHU,
     LSU_SB,
     LSU_SH,
-    LSU_SW
+    LSU_SW,
+    LSU_FLW,
+    LSU_FSW
 } OPCode_LSU;
 
-typedef enum logic[1:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV} FuncUnit;
+typedef enum logic[5:0]
+{
+    FPU_FMADD_S,
+    FPU_FMSUB_S,
+    FPU_FNMSUB_S,
+    FPU_FNMADD_S,
+    FPU_FADD_S,
+    FPU_FSUB_S,
+    FPU_FMUL_S,
+    FPU_FDIV_S,
+    FPU_FSQRT_S,
+    FPU_FSGNJ_S,
+    FPU_FSGNJN_S,
+    FPU_FSGNJX_S,
+    FPU_FMIN_S,
+    FPU_FMAX_S,
+    FPU_FCVTWS,
+    FPU_FCVTWUS,
+    FPU_FMVXW,
+    FPU_FEQ_S,
+    FPU_FLE_S,
+    FPU_FLT_S,
+    FPU_FCLASS_S,
+    FPU_FCVTSW,
+    FPU_FCVTSWU,
+    FPU_FMVWX
+} OPCode_FPU;
+
+typedef enum logic[2:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV, FU_FPU} FuncUnit;
 typedef enum bit[1:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT} Flags;
 
 typedef struct packed
@@ -108,8 +138,11 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[31:0] pc;
-    logic[4:0] rs0; 
+    logic[4:0] rs0;
+    logic rs0_fp;
     logic[4:0] rs1;
+    logic rs1_fp;
+    logic[4:0] rs2;
     logic immB;
     logic[4:0] rd;
     logic[5:0] opcode;

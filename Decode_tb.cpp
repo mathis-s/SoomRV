@@ -31,14 +31,11 @@ int main(int argc, char** argv)
     top = new VTop;
     top->clk = 0;
     
-    if (argc == 1)
+    if (argc != 1)
     {
-        printf("Invalid argument\n");
-        return 0;
+        system((std::string("riscv32-unknown-elf-as -march=rv32imdczba_zbb -o temp.o ") + std::string(argv[1])).c_str());
+        system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     }
-
-    system((std::string("riscv32-unknown-elf-as -march=rv32imdczba_zbb -o temp.o ") + std::string(argv[1])).c_str());
-    system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
     

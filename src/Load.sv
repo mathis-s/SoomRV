@@ -138,6 +138,7 @@ always_ff@(posedge clk) begin
                     FU_LSU: OUT_enableXU[i] <= 4'b0010;
                     FU_MUL: OUT_enableXU[i] <= 4'b0100;
                     FU_DIV: OUT_enableXU[i] <= 4'b1000;
+                    default: begin end
                 endcase
                 outFU[i] <= IN_uop[i].fu;
             end

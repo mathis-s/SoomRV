@@ -192,8 +192,14 @@ always_ff@(posedge clk) begin
                 if (branchTaken != IN_uop.branchPred) begin
                     OUT_branch.taken <= 1;
                     if (branchTaken) begin
-                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                        if (IN_uop.opcode == INT_JAL) begin
+                            OUT_branch.dstPC <= (IN_uop.pc + imm);
+                            OUT_btUpdate.dst <= (IN_uop.pc + imm);
+                        end
+                        else begin
+                            OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                            OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                        end
                     end
                     else if (IN_uop.compressed) begin
                         OUT_branch.dstPC <= pcPlus2;
