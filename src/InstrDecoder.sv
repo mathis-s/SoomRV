@@ -1,5 +1,3 @@
-`timescale 1 ns / 10 ps
-
 `define OPC_LUI 7'b0110111
 `define OPC_AUIPC 7'b0010111
 `define OPC_JAL 7'b1101111

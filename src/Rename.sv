@@ -1,12 +1,3 @@
-
-
-typedef struct packed
-{
-    bit used;
-    bit committed;
-    bit[5:0] sqN;
-} TagBufEntry;
-
 module Rename
 #(
     parameter WIDTH_UOPS = 3,
@@ -46,8 +37,6 @@ module Rename
 integer i;
 integer j;
 
-TagBufEntry tags[63:0];
-
 wire RAT_lookupAvail[2*WIDTH_UOPS-1:0];
 wire[5:0] RAT_lookupSpecTag[2*WIDTH_UOPS-1:0];
 reg[4:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
@@ -64,6 +53,8 @@ wire[5:0] RAT_commitPrevTags[WIDTH_UOPS-1:0];
 reg[4:0] RAT_wbIDs[WIDTH_UOPS-1:0];
 reg[5:0] RAT_wbTags[WIDTH_UOPS-1:0];
 
+reg TB_issueValid[WIDTH_UOPS-1:0];
+
 reg[5:0] nextCounterSqN;
 always_comb begin
     
@@ -78,6 +69,9 @@ always_comb begin
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && IN_uop[i].valid;
+        // Only need new tag if instruction writes to a register
+        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0;
+        
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
         
@@ -120,15 +114,30 @@ RenameTable rt
     .IN_wbTag(RAT_wbTags)
 );
 
+reg[5:0] newTags[WIDTH_UOPS-1:0];
+TagBuffer tb
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_mispr(IN_branchTaken),
+    .IN_misprSqN(IN_branchSqN),
+    
+    .IN_issueValid(TB_issueValid),
+    .IN_issueSqNs(RAT_issueSqNs),
+    .OUT_issueTags(newTags),
+    
+    .IN_commitValid(commitValid),
+    .IN_commitNewest(isNewestCommit),
+    .IN_RAT_commitPrevTags(RAT_commitPrevTags),
+    .IN_commitTagDst(RAT_commitTags)
+);
+
 
 bit[5:0] counterSqN;
 bit[5:0] counterStoreSqN;
 bit[5:0] counterLoadSqN;
 assign OUT_nextSqN = counterSqN;
 
-reg temp;
-
-// Could also check this ROB-side and simply not commit older ops with same DstRegNm.
 reg isNewestCommit[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
@@ -141,49 +150,9 @@ always_comb begin
     end
 end
 
-
-reg[5:0] newTags[WIDTH_UOPS-1:0];
-reg newTagsAvail[WIDTH_UOPS-1:0];
-always_comb begin
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        newTagsAvail[i] = 1'b0;
-        newTags[i] = 6'bx;
-        for (j = 0; j < 64; j=j+1) begin
-            // TODO kind of hacky...
-            if (!tags[j].used && (i == 0 || newTags[0] != j[5:0]) && (i <= 1 || newTags[1] != j[5:0])) begin
-                newTags[i] = j[5:0];
-                newTagsAvail[i] = 1'b1;
-            end
-        end
-    end
-end
-
-int usedTags;
-always_comb begin
-    usedTags = 0;
-    for (i = 0; i < 64; i=i+1)
-        if(tags[i].used)
-            usedTags = usedTags + 1;
-end
-
-
-
-// note: ROB has to consider order when multiple instructions
-// that write to the same register are committed. Later wbs have prio.
 always_ff@(posedge clk) begin
 
     if (rst) begin
-        
-        for (i = 0; i < 32; i=i+1) begin
-            tags[i].used <= 1'b1;
-            tags[i].committed <= 1'b1;
-            tags[i].sqN <= 6'bxxxxxx;
-        end
-        for (i = 32; i < 64; i=i+1) begin
-            tags[i].used <= 1'b0;
-            tags[i].committed <= 1'b0;
-            tags[i].sqN <= 6'bxxxxxx;
-        end
         
         counterSqN <= 0;
         counterStoreSqN = 63;
@@ -203,11 +172,6 @@ always_ff@(posedge clk) begin
         
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
-        
-        for (i = 0; i < 64; i=i+1) begin
-            if (!tags[i].committed && $signed(tags[i].sqN - IN_branchSqN) > 0)
-                tags[i].used <= 0;
-        end
         
         for (i = 0; i < WIDTH_UOPS; i=i+1)
             OUT_uopValid[i] <= 0;
@@ -254,10 +218,6 @@ always_ff@(posedge clk) begin
 
                 if (IN_uop[i].rd != 0) begin
                     OUT_uop[i].tagDst <= newTags[i];
-
-                    assert(newTagsAvail[i]);
-                    tags[newTags[i]].used <= 1;
-                    tags[newTags[i]].sqN <= RAT_issueSqNs[i];
                 end
             end
             else
@@ -272,26 +232,6 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst) begin
-        // Commit results from ROB.
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            // commit at higher index is newer op, takes precedence in case of collision
-            if (commitValid[i]) begin
-                if (isNewestCommit[i]) begin
-                    // Free tag that previously held the committed value of this reg
-                    tags[RAT_commitPrevTags[i]].committed <= 0;
-                    tags[RAT_commitPrevTags[i]].used <= 0;
-                    
-                    // Set new tag as used
-                    tags[IN_comUOp[i].tagDst].committed <= 1;
-                    tags[IN_comUOp[i].tagDst].used <= 1;
-                end
-                else begin
-                    tags[IN_comUOp[i].tagDst].committed <= 0;
-                    tags[IN_comUOp[i].tagDst].used <= 0;
-                end
-            end
-        end
-        
         // If frontend is stalled right now we need to make sure 
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
