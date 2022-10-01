@@ -1,10 +1,4 @@
-typedef struct packed
-{
-    bit avail;
-    bit[5:0] comTag;
-    bit[5:0] specTag;
-    bit[5:0] newSqN;
-} RATEntry;
+
 
 typedef struct packed
 {
@@ -49,11 +43,83 @@ module Rename
     output reg[5:0] OUT_nextStoreSqN
 );
 
-TagBufEntry tags[63:0];
-
-RATEntry rat[31:0];
 integer i;
 integer j;
+
+TagBufEntry tags[63:0];
+
+wire RAT_lookupAvail[2*WIDTH_UOPS-1:0];
+wire[5:0] RAT_lookupSpecTag[2*WIDTH_UOPS-1:0];
+reg[4:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
+
+reg[4:0] RAT_issueIDs[WIDTH_UOPS-1:0];
+reg RAT_issueValid[WIDTH_UOPS-1:0];
+reg[5:0] RAT_issueSqNs[WIDTH_UOPS-1:0];
+
+reg commitValid[WIDTH_UOPS-1:0];
+reg[4:0] RAT_commitIDs[WIDTH_UOPS-1:0];
+reg[5:0] RAT_commitTags[WIDTH_UOPS-1:0];
+wire[5:0] RAT_commitPrevTags[WIDTH_UOPS-1:0];
+
+reg[4:0] RAT_wbIDs[WIDTH_UOPS-1:0];
+reg[5:0] RAT_wbTags[WIDTH_UOPS-1:0];
+
+reg[5:0] nextCounterSqN;
+always_comb begin
+    
+    nextCounterSqN = counterSqN;
+    
+    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
+        RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
+    end
+    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        // Issue/Lookup
+        RAT_issueIDs[i] = IN_uop[i].rd;
+        RAT_issueSqNs[i] = nextCounterSqN;
+        RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && IN_uop[i].valid;
+        if (RAT_issueValid[i])
+            nextCounterSqN = nextCounterSqN + 1;
+        
+        // Commit
+        commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0)
+            && (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
+        RAT_commitIDs[i] = IN_comUOp[i].nmDst;
+        RAT_commitTags[i] = IN_comUOp[i].tagDst;
+        
+        // Writeback
+        RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
+        RAT_wbTags[i] = IN_wbUOp[i].tagDst;
+    end
+end
+
+RenameTable rt
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_mispred(IN_branchTaken),
+    .IN_mispredSqN(IN_branchSqN),
+    .IN_mispredFlush(IN_mispredFlush),
+    
+    .IN_lookupIDs(RAT_lookupIDs),
+    .OUT_lookupAvail(RAT_lookupAvail),
+    .OUT_lookupSpecTag(RAT_lookupSpecTag),
+    
+    .IN_issueValid(RAT_issueValid),
+    .IN_issueIDs(RAT_issueIDs),
+    .IN_issueSqNs(RAT_issueSqNs),
+    .IN_issueTags(newTags),
+    
+    .IN_commitValid(commitValid),
+    .IN_commitIDs(RAT_commitIDs),
+    .IN_commitTags(RAT_commitTags),
+    .OUT_commitPrevTags(RAT_commitPrevTags),
+    
+    .IN_wbValid(IN_wbHasResult),
+    .IN_wbID(RAT_wbIDs),
+    .IN_wbTag(RAT_wbTags)
+);
+
 
 bit[5:0] counterSqN;
 bit[5:0] counterStoreSqN;
@@ -98,8 +164,9 @@ always_comb begin
     for (i = 0; i < 64; i=i+1)
         if(tags[i].used)
             usedTags = usedTags + 1;
-
 end
+
+
 
 // note: ROB has to consider order when multiple instructions
 // that write to the same register are committed. Later wbs have prio.
@@ -118,19 +185,13 @@ always_ff@(posedge clk) begin
             tags[i].sqN <= 6'bxxxxxx;
         end
         
-        counterSqN = 0;
+        counterSqN <= 0;
         counterStoreSqN = 63;
         // TODO: check if load sqn is correctly handled
         counterLoadSqN = 0;
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
-        
-        // Registers initialized with tags 0..31
-        for (i = 0; i < 32; i=i+1) begin
-            rat[i].avail <= 1;
-            rat[i].comTag <= i[5:0];
-            rat[i].specTag <= i[5:0];
-        end
+    
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             OUT_uop[i].sqN <= i[5:0];
             OUT_uopValid[i] <= 0;
@@ -138,23 +199,10 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branchTaken) begin
         
-        counterSqN = IN_branchSqN + 1;
+        counterSqN <= IN_branchSqN + 1;
         
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
-        
-        for (i = 0; i < 32; i=i+1) begin
-            if (rat[i].comTag != rat[i].specTag && ($signed(rat[i].newSqN - IN_branchSqN) > 0 || IN_branchFlush)) begin
-                rat[i].avail <= 1;
-                // This might not be valid, but the pipeline is flushed after branch.
-                // During the flush, the valid tag is committed and written.
-                
-                // Ideally we would set specTag to the last specTag that isn't post incoming branch.
-                // We can't keep such a history for every register though. As such, we flush the pipeline
-                // after a mispredict. After flush, all results are committed, and rename can continue again.
-                rat[i].specTag <= rat[i].comTag;
-            end
-        end
         
         for (i = 0; i < 64; i=i+1) begin
             if (!tags[i].committed && $signed(tags[i].sqN - IN_branchSqN) > 0)
@@ -196,50 +244,27 @@ always_ff@(posedge clk) begin
                         counterLoadSqN = counterLoadSqN + 1;
                 end
                 
-                OUT_uop[i].sqN <= counterSqN;
+                OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;
                 // These are affected by previous instrs
-                OUT_uop[i].tagA <= rat[IN_uop[i].rs0].specTag;
-                OUT_uop[i].tagB <= rat[IN_uop[i].rs1].specTag;
-
-                // TODO: Do this parametric
-                // Forward from WB
-                if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs0].specTag) ||
-                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs0].specTag) ||
-                    (IN_wbHasResult[2] && IN_wbUOp[2].tagDst == rat[IN_uop[i].rs0].specTag))
-                    OUT_uop[i].availA <= 1;
-                else
-                    OUT_uop[i].availA <= rat[IN_uop[i].rs0].avail;
-
-                if ((IN_wbHasResult[0] && IN_wbUOp[0].tagDst == rat[IN_uop[i].rs1].specTag) ||
-                    (IN_wbHasResult[1] && IN_wbUOp[1].tagDst == rat[IN_uop[i].rs1].specTag) ||
-                    (IN_wbHasResult[2] && IN_wbUOp[2].tagDst == rat[IN_uop[i].rs1].specTag))
-                    OUT_uop[i].availB <= 1;
-                else
-                    OUT_uop[i].availB <= rat[IN_uop[i].rs1].avail;
-
+                OUT_uop[i].tagA <= RAT_lookupSpecTag[2*i+0];
+                OUT_uop[i].tagB <= RAT_lookupSpecTag[2*i+1];
+                OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
+                OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
 
                 if (IN_uop[i].rd != 0) begin
                     OUT_uop[i].tagDst <= newTags[i];
 
                     assert(newTagsAvail[i]);
-
-                    // Mark regs written to by newly issued instructions as unavailable/pending.
-                    // These are blocking to make sure they are forwarded to the next iters of this for-loop.
-                    rat[IN_uop[i].rd].avail = 0;
-                    rat[IN_uop[i].rd].specTag = newTags[i];
-                    rat[IN_uop[i].rd].newSqN = counterSqN;
-
                     tags[newTags[i]].used <= 1;
-                    tags[newTags[i]].sqN <= counterSqN;
+                    tags[newTags[i]].sqN <= RAT_issueSqNs[i];
                 end
-                counterSqN = counterSqN + 1;
-                
-                
             end
             else
                 OUT_uopValid[i] <= 0;
         end
+        counterSqN <= nextCounterSqN;
+         
     end
     else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)
@@ -250,25 +275,15 @@ always_ff@(posedge clk) begin
         // Commit results from ROB.
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             // commit at higher index is newer op, takes precedence in case of collision
-            if (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0)
-                && (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0)) begin
-                
+            if (commitValid[i]) begin
                 if (isNewestCommit[i]) begin
                     // Free tag that previously held the committed value of this reg
-                    tags[rat[IN_comUOp[i].nmDst].comTag].committed <= 0;
-                    tags[rat[IN_comUOp[i].nmDst].comTag].used <= 0;
+                    tags[RAT_commitPrevTags[i]].committed <= 0;
+                    tags[RAT_commitPrevTags[i]].used <= 0;
                     
-                    // Set incoming tag as new committed tag of reg
-                    rat[IN_comUOp[i].nmDst].comTag <= IN_comUOp[i].tagDst;
-                    
+                    // Set new tag as used
                     tags[IN_comUOp[i].tagDst].committed <= 1;
                     tags[IN_comUOp[i].tagDst].used <= 1;
-                    
-                    // In case of mispredict, this is result is set as the most recent tag as well.
-                    if (IN_mispredFlush || IN_branchTaken) begin 
-                        rat[IN_comUOp[i].nmDst].specTag <= IN_comUOp[i].tagDst;
-                        rat[IN_comUOp[i].nmDst].avail <= 1;
-                    end
                 end
                 else begin
                     tags[IN_comUOp[i].tagDst].committed <= 0;
@@ -276,16 +291,11 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-
-        // Written back values are speculatively available
+        
+        // If frontend is stalled right now we need to make sure 
+        // the ops we're stalled on are kept up-to-date, as they will be
+        // read later.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_wbHasResult[i] && rat[IN_wbUOp[i].nmDst].specTag == IN_wbUOp[i].tagDst) begin
-                rat[IN_wbUOp[i].nmDst].avail = 1;
-            end
-            
-            // If frontend is stalled right now we need to make sure 
-            // the op we're stalled on is kept up-to-date, as it will be
-            // read later.
             if (en && !frontEn && IN_wbHasResult[i]) begin
                 for (j = 0; j < WIDTH_UOPS; j=j+1) begin
                     if (OUT_uopValid[j]) begin

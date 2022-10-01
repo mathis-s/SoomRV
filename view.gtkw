@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Fri Sep 30 13:02:19 2022
+[*] Sat Oct  1 14:56:04 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Sep 30 13:01:04 2022"
-[dumpfile_size] 162639916
+[dumpfile_mtime] "Sat Oct  1 14:55:15 2022"
+[dumpfile_size] 456900316
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 62840
+[timestart] 359899
 [size] 3840 2132
 [pos] -1 -1
-*-7.022985 63026 74540 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.022985 360343 74540 360384 360500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -51,10 +51,11 @@
 [treeopen] TOP.Top.core.preDec.OUT_instrs[1].
 [treeopen] TOP.Top.core.rn.
 [treeopen] TOP.Top.core.rn.OUT_uop[0].
-[treeopen] TOP.Top.core.rn.rat[2].
-[treeopen] TOP.Top.core.rn.rat[5].
+[treeopen] TOP.Top.core.rn.rt.
+[treeopen] TOP.Top.core.rn.rt.rat[2].
 [treeopen] TOP.Top.core.RN_uop[0].
 [treeopen] TOP.Top.core.RN_uop[1].
+[treeopen] TOP.Top.core.RN_uop[2].
 [treeopen] TOP.Top.core.rob.
 [treeopen] TOP.Top.core.rob.entries[0].
 [treeopen] TOP.Top.core.rob.entries[10].
@@ -91,9 +92,15 @@ TOP.Top.core.branch.flush
 TOP.Top.core.branch.sqN[5:0]
 TOP.Top.core.branch.dstPC[31:0]
 TOP.Top.core.OUT_MEM_addr[29:0]
-TOP.Top.core.OUT_MEM_writeData[31:0]
 @24
 TOP.Top.core.IN_MEM_readData[31:0]
+@820
+TOP.Top.core.OUT_MEM_writeData[31:0]
+@28
+TOP.Top.core.OUT_MEM_writeEnable
+TOP.Top.core.OUT_MEM_readEnable
+@200
+-
 @28
 TOP.Top.core.frontendEn
 TOP.Top.core.ifetchEn
@@ -173,13 +180,25 @@ TOP.Top.core.fuse.OUT_uop[1].valid
 @22
 TOP.Top.core.fuse.OUT_uop[1].pc[31:0]
 @200
+-RAT
+@28
+#{TOP.Top.core.rn.rt.OUT_lookupAvail[0:5]} TOP.Top.core.rn.rt.OUT_lookupAvail[0] TOP.Top.core.rn.rt.OUT_lookupAvail[1] TOP.Top.core.rn.rt.OUT_lookupAvail[2] TOP.Top.core.rn.rt.OUT_lookupAvail[3] TOP.Top.core.rn.rt.OUT_lookupAvail[4] TOP.Top.core.rn.rt.OUT_lookupAvail[5]
+@200
+-
+@28
+TOP.Top.core.rn.rt.rat[12].avail
+@22
+TOP.Top.core.rn.rt.rat[12].comTag[5:0]
+TOP.Top.core.rn.rt.rat[12].newSqN[5:0]
+@23
+TOP.Top.core.rn.rt.rat[12].specTag[5:0]
+@200
 -RN_uop[0]
 @28
 #{TOP.Top.core.rn.OUT_uopValid[0:2]} TOP.Top.core.rn.OUT_uopValid[0] TOP.Top.core.rn.OUT_uopValid[1] TOP.Top.core.rn.OUT_uopValid[2]
 @22
 TOP.Top.core.RN_uop[0].pc[31:0]
 TOP.Top.core.RN_uop[0].imm[31:0]
-@23
 TOP.Top.core.RN_uop[0].sqN[5:0]
 @28
 TOP.Top.core.RN_uop[0].availA
@@ -220,6 +239,14 @@ TOP.Top.core.rn.OUT_uop[1].nmDst[4:0]
 -RN_uop[2]
 @22
 TOP.Top.core.RN_uop[2].sqN[5:0]
+TOP.Top.core.RN_uop[2].nmDst[4:0]
+@28
+TOP.Top.core.RN_uop[2].availA
+TOP.Top.core.RN_uop[2].availB
+@22
+TOP.Top.core.RN_uop[2].tagA[5:0]
+TOP.Top.core.RN_uop[2].tagB[5:0]
+TOP.Top.core.RN_uop[2].tagDst[5:0]
 TOP.Top.core.RN_uop[2].pc[31:0]
 @200
 -RV[0]
@@ -244,7 +271,6 @@ TOP.Top.core.ld.OUT_uop[1].sqN[5:0]
 TOP.Top.core.ld.OUT_uop[2].sqN[5:0]
 @28
 TOP.Top.core.ld.OUT_uop[1].valid
-TOP.Top.core.ld.outFU[1][1:0]
 @200
 -IALU0
 @28
