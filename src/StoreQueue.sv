@@ -277,7 +277,7 @@ always_ff@(posedge clk) begin
         end
         
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+            if (!IN_disable && IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 i0[i] <= IN_uop[i];
                 i0_isCsrRead[i] <= isCsrRead[i];
             end

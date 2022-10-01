@@ -148,6 +148,10 @@ always_ff@(posedge clk) begin
                 rat[i].avail <= 1;
                 // This might not be valid, but the pipeline is flushed after branch.
                 // During the flush, the valid tag is committed and written.
+                
+                // Ideally we would set specTag to the last specTag that isn't post incoming branch.
+                // We can't keep such a history for every register though. As such, we flush the pipeline
+                // after a mispredict. After flush, all results are committed, and rename can continue again.
                 rat[i].specTag <= rat[i].comTag;
             end
         end
@@ -250,17 +254,17 @@ always_ff@(posedge clk) begin
                 && (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0)) begin
                 
                 if (isNewestCommit[i]) begin
+                    // Free tag that previously held the committed value of this reg
                     tags[rat[IN_comUOp[i].nmDst].comTag].committed <= 0;
                     tags[rat[IN_comUOp[i].nmDst].comTag].used <= 0;
                     
-                    
+                    // Set incoming tag as new committed tag of reg
                     rat[IN_comUOp[i].nmDst].comTag <= IN_comUOp[i].tagDst;
-                    
                     
                     tags[IN_comUOp[i].tagDst].committed <= 1;
                     tags[IN_comUOp[i].tagDst].used <= 1;
                     
-
+                    // In case of mispredict, this is result is set as the most recent tag as well.
                     if (IN_mispredFlush || IN_branchTaken) begin 
                         rat[IN_comUOp[i].nmDst].specTag <= IN_comUOp[i].tagDst;
                         rat[IN_comUOp[i].nmDst].avail <= 1;

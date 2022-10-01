@@ -159,9 +159,12 @@ typedef struct packed
     logic[31:0] pc;
     logic availA;
     logic[5:0] tagA;
+    logic tagA_fp;
     logic availB;
     logic[5:0] tagB;
+    logic tagB_fp;
     logic immB;
+    logic[5:0] tagC;
     logic[5:0] sqN;
     logic[5:0] tagDst;
     logic[4:0] nmDst;
