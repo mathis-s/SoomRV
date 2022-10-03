@@ -3,7 +3,6 @@ typedef struct packed
     bit avail;
     bit[5:0] comTag;
     bit[5:0] specTag;
-    bit[5:0] newSqN;
 } RATEntry;
 
 module RenameTable
@@ -17,7 +16,6 @@ module RenameTable
     input wire clk,
     input wire rst,
     input wire IN_mispred,
-    input wire[5:0] IN_mispredSqN,
     input wire IN_mispredFlush,
 
     input wire[4:0] IN_lookupIDs[NUM_LOOKUP-1:0],
@@ -26,7 +24,6 @@ module RenameTable
     
     input wire IN_issueValid[NUM_ISSUE-1:0],
     input wire[4:0] IN_issueIDs[NUM_ISSUE-1:0],
-    input wire[5:0] IN_issueSqNs[NUM_ISSUE-1:0],
     input wire[5:0] IN_issueTags[NUM_ISSUE-1:0],
     
     input wire IN_commitValid[NUM_COMMIT-1:0],
@@ -88,13 +85,11 @@ always_ff@(posedge clk) begin
         
         if (IN_mispred) begin
             for (i = 0; i < 32; i=i+1) begin
-                if (rat[i].comTag != rat[i].specTag && ($signed(rat[i].newSqN - IN_mispredSqN) > 0)) begin
-                    rat[i].avail <= 1;
-                    // Ideally we would set specTag to the last specTag that isn't post incoming branch.
-                    // We can't keep such a history for every register though. As such, we flush the pipeline
-                    // after a mispredict. After flush, all results are committed, and rename can continue again.
-                    rat[i].specTag <= rat[i].comTag;
-                end
+                rat[i].avail <= 1;
+                // Ideally we would set specTag to the last specTag that isn't post incoming branch.
+                // We can't keep such a history for every register though. As such, we flush the pipeline
+                // after a mispredict. After flush, all results are committed, and rename can continue again.
+                rat[i].specTag <= rat[i].comTag;
             end
         end
         else begin
@@ -102,7 +97,6 @@ always_ff@(posedge clk) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
                     rat[IN_issueIDs[i]].avail <= 0;
                     rat[IN_issueIDs[i]].specTag <= IN_issueTags[i];
-                    rat[IN_issueIDs[i]].newSqN <= IN_issueSqNs[i];
                 end
             end
         end
@@ -112,7 +106,7 @@ always_ff@(posedge clk) begin
                 rat[IN_commitIDs[i]].comTag <= IN_commitTags[i];
                 if (IN_mispredFlush || IN_mispred) begin
                     rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
-                    rat[IN_commitIDs[i]].avail <= 1;
+                    //rat[IN_commitIDs[i]].avail <= 1;
                 end
             end
         end

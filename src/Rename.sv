@@ -92,7 +92,6 @@ RenameTable rt
     .clk(clk),
     .rst(rst),
     .IN_mispred(IN_branchTaken),
-    .IN_mispredSqN(IN_branchSqN),
     .IN_mispredFlush(IN_mispredFlush),
     
     .IN_lookupIDs(RAT_lookupIDs),
@@ -101,7 +100,6 @@ RenameTable rt
     
     .IN_issueValid(RAT_issueValid),
     .IN_issueIDs(RAT_issueIDs),
-    .IN_issueSqNs(RAT_issueSqNs),
     .IN_issueTags(newTags),
     
     .IN_commitValid(commitValid),
