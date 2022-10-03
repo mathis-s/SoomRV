@@ -10,7 +10,10 @@ module RenameTable
     parameter NUM_LOOKUP=6,
     parameter NUM_ISSUE=3,
     parameter NUM_COMMIT=3,
-    parameter NUM_WB=3
+    parameter NUM_WB=3,
+    parameter NUM_REGS=32,
+    parameter ID_SIZE=$clog2(NUM_REGS),
+    parameter TAG_SIZE=6
 )
 (
     input wire clk,
@@ -18,27 +21,27 @@ module RenameTable
     input wire IN_mispred,
     input wire IN_mispredFlush,
 
-    input wire[4:0] IN_lookupIDs[NUM_LOOKUP-1:0],
+    input wire[ID_SIZE-1:0] IN_lookupIDs[NUM_LOOKUP-1:0],
     output reg OUT_lookupAvail[NUM_LOOKUP-1:0],
-    output reg[5:0] OUT_lookupSpecTag[NUM_LOOKUP-1:0],
+    output reg[TAG_SIZE-1:0] OUT_lookupSpecTag[NUM_LOOKUP-1:0],
     
     input wire IN_issueValid[NUM_ISSUE-1:0],
-    input wire[4:0] IN_issueIDs[NUM_ISSUE-1:0],
-    input wire[5:0] IN_issueTags[NUM_ISSUE-1:0],
+    input wire[ID_SIZE-1:0] IN_issueIDs[NUM_ISSUE-1:0],
+    input wire[TAG_SIZE-1:0] IN_issueTags[NUM_ISSUE-1:0],
     
     input wire IN_commitValid[NUM_COMMIT-1:0],
-    input wire[4:0] IN_commitIDs[NUM_COMMIT-1:0],
-    input wire[5:0] IN_commitTags[NUM_COMMIT-1:0],
-    output reg[5:0] OUT_commitPrevTags[NUM_COMMIT-1:0],
+    input wire[ID_SIZE-1:0] IN_commitIDs[NUM_COMMIT-1:0],
+    input wire[TAG_SIZE-1:0] IN_commitTags[NUM_COMMIT-1:0],
+    output reg[TAG_SIZE-1:0] OUT_commitPrevTags[NUM_COMMIT-1:0],
 
     input wire IN_wbValid[NUM_WB-1:0],
-    input wire[4:0] IN_wbID[NUM_WB-1:0],
-    input wire[5:0] IN_wbTag[NUM_WB-1:0]
+    input wire[ID_SIZE-1:0] IN_wbID[NUM_WB-1:0],
+    input wire[TAG_SIZE-1:0] IN_wbTag[NUM_WB-1:0]
 );
 integer i;
 integer j;
 
-RATEntry rat[31:0];
+RATEntry rat[NUM_REGS-1:0];
 
 always_comb begin
     for (i = 0; i < NUM_LOOKUP; i=i+1) begin
@@ -68,7 +71,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         // Registers initialized with tags 0..31
-        for (i = 0; i < 32; i=i+1) begin
+        for (i = 0; i < NUM_REGS; i=i+1) begin
             rat[i].avail <= 1;
             rat[i].comTag <= i[5:0];
             rat[i].specTag <= i[5:0];
@@ -84,7 +87,7 @@ always_ff@(posedge clk) begin
         end
         
         if (IN_mispred) begin
-            for (i = 0; i < 32; i=i+1) begin
+            for (i = 0; i < NUM_REGS; i=i+1) begin
                 rat[i].avail <= 1;
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
                 // We can't keep such a history for every register though. As such, we flush the pipeline

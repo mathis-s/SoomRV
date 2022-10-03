@@ -118,10 +118,8 @@ TagBuffer tb
     .clk(clk),
     .rst(rst),
     .IN_mispr(IN_branchTaken),
-    .IN_misprSqN(IN_branchSqN),
     
     .IN_issueValid(TB_issueValid),
-    .IN_issueSqNs(RAT_issueSqNs),
     .OUT_issueTags(newTags),
     
     .IN_commitValid(commitValid),

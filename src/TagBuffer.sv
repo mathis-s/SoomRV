@@ -2,7 +2,6 @@ typedef struct packed
 {
     bit used;
     bit committed;
-    bit[5:0] sqN;
 } TagBufEntry;
 
 module TagBuffer
@@ -14,10 +13,8 @@ module TagBuffer
     input wire clk,
     input wire rst,
     input wire IN_mispr,
-    input wire[5:0] IN_misprSqN,
     
     input wire IN_issueValid[NUM_UOPS-1:0],
-    input wire[5:0] IN_issueSqNs[NUM_UOPS-1:0],
     output reg[5:0] OUT_issueTags[NUM_UOPS-1:0],
     
     
@@ -62,7 +59,7 @@ always_ff@(posedge clk) begin
         if (IN_mispr) begin
             // Issue
             for (i = 0; i < 64; i=i+1) begin
-                if (!tags[i].committed && $signed(tags[i].sqN - IN_misprSqN) > 0)
+                if (!tags[i].committed/* && $signed(tags[i].sqN - IN_misprSqN) > 0*/)
                     tags[i].used <= 0;
             end
         end
@@ -71,7 +68,7 @@ always_ff@(posedge clk) begin
                 if (IN_issueValid[i]) begin
                     assert(tagValid[i]);
                     tags[OUT_issueTags[i]].used <= 1;
-                    tags[OUT_issueTags[i]].sqN <= IN_issueSqNs[i];
+                    //tags[OUT_issueTags[i]].sqN <= IN_issueSqNs[i];
                 end
             end
         end
