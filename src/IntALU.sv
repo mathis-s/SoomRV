@@ -15,7 +15,7 @@ module IntALU
     output BTUpdate OUT_btUpdate,
     
     output wire[31:0] OUT_zcFwdResult,
-    output wire[5:0] OUT_zcFwdTag,
+    output wire[6:0] OUT_zcFwdTag,
     output wire OUT_zcFwdValid,
 
     output RES_UOp OUT_uop

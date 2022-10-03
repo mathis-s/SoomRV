@@ -1,4 +1,6 @@
 
+typedef logic[5:0] RegNm;
+
 typedef enum logic[5:0]
 {
     INT_ADD,
@@ -145,6 +147,7 @@ typedef struct packed
     logic[4:0] rs2;
     logic immB;
     logic[4:0] rd;
+    logic rd_fp;
     logic[5:0] opcode;
     FuncUnit fu;
     logic[5:0] branchID;
@@ -158,16 +161,16 @@ typedef struct packed
     logic[31:0] imm;
     logic[31:0] pc;
     logic availA;
-    logic[5:0] tagA;
+    logic[6:0] tagA;
     logic tagA_fp;
     logic availB;
-    logic[5:0] tagB;
+    logic[6:0] tagB;
     logic tagB_fp;
     logic immB;
-    logic[5:0] tagC;
+    logic[6:0] tagC;
     logic[5:0] sqN;
-    logic[5:0] tagDst;
-    logic[4:0] nmDst;
+    logic[6:0] tagDst;
+    logic[5:0] nmDst;
     logic[5:0] opcode;
     logic[5:0] branchID;
     logic branchPred;
@@ -183,13 +186,13 @@ typedef struct packed
     logic[31:0] imm;
     logic[31:0] srcA;
     logic availA;
-    logic[5:0] tagA;
+    logic[6:0] tagA;
     logic[31:0] srcB;
     logic availB;
-    logic[5:0] tagB;
+    logic[6:0] tagB;
     logic[5:0] sqN;
-    logic[5:0] tagDst;
-    logic[4:0] nmDst;
+    logic[6:0] tagDst;
+    logic[5:0] nmDst;
     logic[5:0] opcode;
     logic valid;
 } UOp;
@@ -201,8 +204,8 @@ typedef struct packed
     logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;
-    logic[5:0] tagDst;
-    logic[4:0] nmDst;
+    logic[6:0] tagDst;
+    logic[5:0] nmDst;
     logic[5:0] sqN;
     logic[5:0] branchID;
     logic branchPred;
@@ -214,9 +217,26 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[32:0] srcA;
+    logic[32:0] srcB;
+    logic[31:0] pc;
+    logic[32:0] srcC;
+    logic[5:0] opcode;
+    logic[6:0] tagDst;
+    logic[5:0] nmDst;
+    logic[5:0] sqN;
+    logic[2:0] rm;
+    logic[5:0] storeSqN;
+    logic[5:0] loadSqN;
+    logic compressed;
+    logic valid;
+} FPU_EX_UOp;
+
+typedef struct packed
+{
     bit[31:0] result;
-    bit[5:0] tagDst;
-    bit[4:0] nmDst;
+    bit[6:0] tagDst;
+    bit[5:0] nmDst;
     bit[5:0] sqN; // 43
     bit[31:0] pc; // 11
     bit isBranch; // 10
@@ -225,6 +245,16 @@ typedef struct packed
     Flags flags; // 1
     bit valid; // 0
 } RES_UOp;
+
+typedef struct packed
+{
+    bit[32:0] result;
+    bit[6:0] tagDst;
+    bit[5:0] nmDst;
+    bit[5:0] sqN;
+    bit[31:0] pc;
+    bit valid;
+} FPU_RES_UOp;
 
 
 typedef struct packed
@@ -259,8 +289,8 @@ typedef struct packed
     logic[1:0] size;
     logic isLoad;
     logic[31:0] pc;
-    logic[5:0] tagDst;
-    logic[4:0] nmDst;
+    logic[6:0] tagDst;
+    logic[5:0] nmDst;
     logic[5:0] sqN;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
@@ -271,8 +301,8 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[4:0] nmDst;
-    logic[5:0] tagDst;
+    logic[5:0] nmDst;
+    logic[6:0] tagDst;
     logic[5:0] sqN;
     logic isBranch;
     logic branchTaken;

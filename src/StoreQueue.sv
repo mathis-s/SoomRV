@@ -116,7 +116,7 @@ always_comb begin
 
         OUT_uop[i].result = result;
         OUT_uop[i].tagDst = i1[i].tagDst;
-        OUT_uop[i].nmDst = i1[i].exception ? i1[i].addr[22:18] : i1[i].nmDst;
+        OUT_uop[i].nmDst = i1[i].exception ? i1[i].addr[23:18] : i1[i].nmDst;
         OUT_uop[i].sqN = i1[i].sqN;
         OUT_uop[i].pc = i1[i].pc;
         OUT_uop[i].valid = i1[i].valid;

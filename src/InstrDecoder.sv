@@ -1,3 +1,4 @@
+
 `define OPC_LUI 7'b0110111
 `define OPC_AUIPC 7'b0010111
 `define OPC_JAL 7'b1101111
@@ -208,7 +209,7 @@ always_comb begin
         i32 = IN_instrs[i].instr;
         i16 = IN_instrs[i].instr[15:0];
         
-        uop = 105'b0;
+        uop = 106'b0;
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en;
@@ -574,6 +575,7 @@ always_comb begin
                         uop.opcode = LSU_FLW;
                         uop.rs0 = i32.flw.rs1;
                         uop.rd = i32.flw.rd;
+                        uop.rd_fp = 1;
                         uop.imm = {{20{i32.flw.offset[11]}}, i32.flw.offset[11:0]};
                         invalidEnc = 0;
                     end
@@ -600,6 +602,7 @@ always_comb begin
                         uop.rs1_fp = 1;
                         uop.rs2 = i32.fma.rs3;
                         uop.rd = i32.fma.rd;
+                        uop.rd_fp = 1;
                         invalidEnc = 0;
                     end
                 end
@@ -614,6 +617,7 @@ always_comb begin
                         uop.rs1_fp = 1;
                         uop.rs2 = i32.fma.rs3;
                         uop.rd = i32.fma.rd;
+                        uop.rd_fp = 1;
                         invalidEnc = 0;
                     end
                 end
@@ -628,6 +632,7 @@ always_comb begin
                         uop.rs1_fp = 1;
                         uop.rs2 = i32.fma.rs3;
                         uop.rd = i32.fma.rd;
+                        uop.rd_fp = 1;
                         invalidEnc = 0;
                     end
                 end
@@ -642,6 +647,7 @@ always_comb begin
                         uop.rs1_fp = 1;
                         uop.rs2 = i32.fma.rs3;
                         uop.rd = i32.fma.rd;
+                        uop.rd_fp = 1;
                         invalidEnc = 0;
                     end
                 end
@@ -655,6 +661,7 @@ always_comb begin
                         uop.rs1 = i32.fp.rs2;
                         uop.rs1_fp = 1;
                         uop.rd = i32.fp.rd;
+                        uop.rd_fp = 1;
                         invalidEnc = 0;
                         
                         case (i32.fp.funct5)
@@ -688,6 +695,7 @@ always_comb begin
                             5'b11000: begin
                                 uop.rs1 = 0;
                                 uop.rs1_fp = 0;
+                                uop.rd_fp = 0;
                                 if (i32.fp.rs2 == 5'b00000)
                                     uop.opcode = FPU_FCVTWS;
                                 else if (i32.fp.rs2 == 5'b00001)
@@ -695,13 +703,17 @@ always_comb begin
                                 else invalidEnc = 1;
                             end
                             5'b11100: begin
+                                uop.rd_fp = 0;
                                 if (i32.fp.rs2 == 5'b00000 && i32.fp.rm == 3'b000)
                                     uop.opcode = FPU_FMVXW;
-                                else if (i32.fp.rs2 == 5'b00000 && i32.fp.rm == 3'b001)
+                                else if (i32.fp.rs2 == 5'b00000 && i32.fp.rm == 3'b001) begin
                                     uop.opcode = FPU_FCLASS_S;
+                                    uop.rd_fp = 0;
+                                end
                                 else invalidEnc = 1;
                             end
                             5'b10100: begin
+                                uop.rd_fp = 0;
                                 if (i32.fp.rm == 3'b010)
                                     uop.opcode = FPU_FEQ_S;
                                 else if (i32.fp.rm == 3'b001)
@@ -711,13 +723,19 @@ always_comb begin
                                 else invalidEnc = 1;
                             end
                             5'b11010: begin
-                                if (i32.fp.rs2 == 5'b00000)
+                                uop.rs0_fp = 0;
+                                uop.rs1_fp = 0;
+                                
+                                if (i32.fp.rs2 == 5'b00000) begin
                                     uop.opcode = FPU_FCVTSW;
-                                else if (i32.fp.rs2 == 5'b00001)
+                                end
+                                else if (i32.fp.rs2 == 5'b00001) begin
                                     uop.opcode = FPU_FCVTSWU;
+                                end
                                 else invalidEnc = 1;
                             end
                             5'b11110: begin
+                                uop.rs0_fp = 0;
                                 if (i32.fp.rs2 == 0 && i32.fp.rm == 0)
                                     uop.opcode = FPU_FMVWX;
                                 else invalidEnc = 1;

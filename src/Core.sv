@@ -284,22 +284,13 @@ ReservationStation rv
 wire[5:0] RF_readAddress[5:0];
 wire[31:0] RF_readData[5:0];
 
-wire[5:0] RF_writeAddress[2:0];
-assign RF_writeAddress[0] = wbUOp[0].tagDst;
-assign RF_writeAddress[1] = wbUOp[1].tagDst;
-assign RF_writeAddress[2] = wbUOp[2].tagDst;
-wire[31:0] RF_writeData[2:0];
-assign RF_writeData[0] = wbUOp[0].result;
-assign RF_writeData[1] = wbUOp[1].result;
-assign RF_writeData[2] = wbUOp[2].result;
-
 RF rf
 (
     .clk(clk),
     
-    .waddr0(wbUOp[0].tagDst), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
-    .waddr1(wbUOp[1].tagDst), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
-    .waddr2(wbUOp[2].tagDst), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
+    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
+    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
+    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
     .waddr3(6'bx), .wdata3(32'bx), .wen3(1'b0),
     
     .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
@@ -317,7 +308,7 @@ wire[3:0] enabledXUs[2:0];
 FuncUnit LD_fu[2:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
-wire[5:0] LD_zcFwdTag[1:0];
+wire[6:0] LD_zcFwdTag[1:0];
 wire LD_zcFwdValid[1:0];
 Load ld
 (
@@ -534,7 +525,7 @@ wire[5:0] ROB_maxSqN;
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
-wire[11:0] ROB_irqMemAddr;
+wire[12:0] ROB_irqMemAddr;
 ROB rob
 (
     .clk(clk),

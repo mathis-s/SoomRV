@@ -3,11 +3,11 @@ typedef struct packed
 {
     bit valid;
     Flags flags;
-    bit[5:0] tag;
+    bit[6:0] tag;
     // for debugging
     bit[5:0] sqN;
     bit[29:0] pc;
-    bit[4:0] name;
+    bit[5:0] name;
     bit isBranch;
     bit branchTaken;
     bit[5:0] branchID;
@@ -40,7 +40,7 @@ module ROB
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
-    output reg[11:0] OUT_irqMemAddr,
+    output reg[12:0] OUT_irqMemAddr,
     
     output BranchProv OUT_branch,
     

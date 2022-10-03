@@ -1,8 +1,8 @@
 typedef struct packed
 {
     bit avail;
-    bit[5:0] comTag;
-    bit[5:0] specTag;
+    bit[6:0] comTag;
+    bit[6:0] specTag;
 } RATEntry;
 
 module RenameTable
@@ -11,9 +11,9 @@ module RenameTable
     parameter NUM_ISSUE=3,
     parameter NUM_COMMIT=3,
     parameter NUM_WB=3,
-    parameter NUM_REGS=32,
+    parameter NUM_REGS=64,
     parameter ID_SIZE=$clog2(NUM_REGS),
-    parameter TAG_SIZE=6
+    parameter TAG_SIZE=7
 )
 (
     input wire clk,
@@ -73,8 +73,8 @@ always_ff@(posedge clk) begin
         // Registers initialized with tags 0..31
         for (i = 0; i < NUM_REGS; i=i+1) begin
             rat[i].avail <= 1;
-            rat[i].comTag <= i[5:0];
-            rat[i].specTag <= i[5:0];
+            rat[i].comTag <= i[TAG_SIZE-1:0];
+            rat[i].specTag <= i[TAG_SIZE-1:0];
         end
     end
     else begin

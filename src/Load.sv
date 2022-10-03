@@ -23,7 +23,7 @@ module Load
     
     // Zero cycle forward inputs
     input wire[31:0] IN_zcFwdResult[NUM_ZC_FWDS-1:0],
-    input wire[5:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
+    input wire[6:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
     input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
     
     // Register File read
@@ -39,9 +39,8 @@ integer j;
 
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
-        OUT_rfReadAddr[i] = IN_uop[i].tagA;
-
-        OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB;
+        OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
+        OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
     end
 end
 
@@ -76,7 +75,7 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].valid <= 1;
                 
-                if (IN_uop[i].tagA == 6'b0) begin
+                if (IN_uop[i].tagA == 0) begin
                     OUT_uop[i].srcA <= 0;
                 end
                 else begin 
@@ -107,7 +106,7 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].immB) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
-                else if (IN_uop[i].tagB == 6'b0) begin
+                else if (IN_uop[i].tagB == 0) begin
                     OUT_uop[i].srcB <= 0;
                 end
                 else begin
