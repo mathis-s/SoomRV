@@ -6,4 +6,5 @@ compile_flags.txt
 text.bin
 *.o
 *.bin
+src_v
 !test_programs/entry.o

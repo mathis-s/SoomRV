@@ -102,6 +102,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.size <= 1;
                     OUT_uop.signExtend <= 1;
                 end
+                LSU_FLW,
                 LSU_LW: begin
                     OUT_uop.isLoad <= 1;
                     OUT_uop.shamt <= 2'b0;
@@ -156,7 +157,8 @@ always_ff@(posedge clk) begin
                         end
                     endcase
                 end
-
+                
+                LSU_FSW,
                 LSU_SW: begin
                     OUT_uop.isLoad <= 0;
                     OUT_uop.wmask <= 4'b1111;

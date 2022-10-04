@@ -99,15 +99,15 @@ always_comb begin
                         (OUT_valid[1] && OUT_uop[1].nmDst != 0 && OUT_uop[1].tagDst == queue[j].tagB && OUT_uop[1].fu == FU_INT)
                         ) &&
                         
-                    // Second FU only gets simple int ops
                     (i == 0 || (queue[j].fu != FU_DIV)) &&
+                    (i == 0 || (queue[j].fu != FU_FPU)) &&
                     (i == 1 || (queue[j].fu != FU_MUL)) &&
                     (i == 2 || (queue[j].fu != FU_LSU)) &&
                     (i != 2 || (queue[j].fu != FU_INT)) &&
                     (!IN_DIV_doNotIssue || queue[j].fu != FU_DIV) &&
                     (!IN_MUL_doNotIssue || queue[j].fu != FU_MUL) &&
 
-                    (queue[j].fu != FU_INT || !reservedWBs[i][0])
+                    ((queue[j].fu != FU_INT && queue[j].fu != FU_FPU) || !reservedWBs[i][0])
                     
                     /*(!deqValid[i] || $signed(queue[j].sqN - queue[deqIndex[i]].sqN) < 0)*/) begin
                     

@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Sat Oct  1 14:56:04 2022
+[*] Tue Oct  4 13:11:22 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Sat Oct  1 14:55:15 2022"
-[dumpfile_size] 456900316
+[dumpfile_mtime] "Tue Oct  4 13:08:06 2022"
+[dumpfile_size] 1079344
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 359899
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-6.022985 360343 74540 360384 360500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.140254 18 74540 360384 360500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -24,6 +24,8 @@
 [treeopen] TOP.Top.core.cr.
 [treeopen] TOP.Top.core.div.
 [treeopen] TOP.Top.core.div.IN_uop.
+[treeopen] TOP.Top.core.fpu.
+[treeopen] TOP.Top.core.fpu.OUT_uop.
 [treeopen] TOP.Top.core.fuse.
 [treeopen] TOP.Top.core.ialu.
 [treeopen] TOP.Top.core.ialu.IN_uop.
@@ -77,6 +79,7 @@
 [treeopen] TOP.Top.core.rv.queue[0].
 [treeopen] TOP.Top.core.rv.queue[5].
 [treeopen] TOP.Top.core.sq.
+[treeopen] TOP.Top.core.sq.OUT_uop[0].
 [sst_width] 314
 [signals_width] 428
 [sst_expanded] 1
@@ -94,7 +97,7 @@ TOP.Top.core.branch.dstPC[31:0]
 TOP.Top.core.OUT_MEM_addr[29:0]
 @24
 TOP.Top.core.IN_MEM_readData[31:0]
-@820
+@22
 TOP.Top.core.OUT_MEM_writeData[31:0]
 @28
 TOP.Top.core.OUT_MEM_writeEnable
@@ -187,11 +190,6 @@ TOP.Top.core.fuse.OUT_uop[1].pc[31:0]
 -
 @28
 TOP.Top.core.rn.rt.rat[12].avail
-@22
-TOP.Top.core.rn.rt.rat[12].comTag[5:0]
-TOP.Top.core.rn.rt.rat[12].newSqN[5:0]
-@23
-TOP.Top.core.rn.rt.rat[12].specTag[5:0]
 @200
 -RN_uop[0]
 @28
@@ -204,49 +202,46 @@ TOP.Top.core.RN_uop[0].sqN[5:0]
 TOP.Top.core.RN_uop[0].availA
 TOP.Top.core.RN_uop[0].availB
 @22
-TOP.Top.core.RN_uop[0].tagDst[5:0]
-TOP.Top.core.RN_uop[0].tagA[5:0]
-TOP.Top.core.RN_uop[0].tagB[5:0]
-TOP.Top.core.rn.OUT_uop[0].nmDst[4:0]
+TOP.Top.core.RN_uop[0].tagDst[6:0]
+TOP.Top.core.RN_uop[0].tagA[6:0]
+TOP.Top.core.RN_uop[0].tagB[6:0]
+TOP.Top.core.rn.OUT_uop[0].nmDst[5:0]
 @200
 -RN_uop[1]
 @22
 TOP.Top.core.RN_uop[1].pc[31:0]
 TOP.Top.core.RN_uop[1].imm[31:0]
-@28
-#{TOP.Top.core.rn.newTagsAvail[0:1]} TOP.Top.core.rn.newTagsAvail[0] TOP.Top.core.rn.newTagsAvail[1]
-@22
-TOP.Top.core.RN_uop[1].tagA[5:0]
-TOP.Top.core.RN_uop[1].tagB[5:0]
+TOP.Top.core.RN_uop[1].tagA[6:0]
+TOP.Top.core.RN_uop[1].tagB[6:0]
 TOP.Top.core.RN_uop[1].sqN[5:0]
 @28
 TOP.Top.core.RN_uop[1].availA
 TOP.Top.core.RN_uop[1].availB
 @c00022
-TOP.Top.core.RN_uop[1].tagDst[5:0]
+TOP.Top.core.RN_uop[1].tagDst[6:0]
 @28
-(0)TOP.Top.core.RN_uop[1].tagDst[5:0]
-(1)TOP.Top.core.RN_uop[1].tagDst[5:0]
-(2)TOP.Top.core.RN_uop[1].tagDst[5:0]
-(3)TOP.Top.core.RN_uop[1].tagDst[5:0]
-(4)TOP.Top.core.RN_uop[1].tagDst[5:0]
-(5)TOP.Top.core.RN_uop[1].tagDst[5:0]
+(0)TOP.Top.core.RN_uop[1].tagDst[6:0]
+(1)TOP.Top.core.RN_uop[1].tagDst[6:0]
+(2)TOP.Top.core.RN_uop[1].tagDst[6:0]
+(3)TOP.Top.core.RN_uop[1].tagDst[6:0]
+(4)TOP.Top.core.RN_uop[1].tagDst[6:0]
+(5)TOP.Top.core.RN_uop[1].tagDst[6:0]
 @1401200
 -group_end
 @22
-TOP.Top.core.rn.OUT_uop[1].nmDst[4:0]
+TOP.Top.core.rn.OUT_uop[1].nmDst[5:0]
 @200
 -RN_uop[2]
 @22
 TOP.Top.core.RN_uop[2].sqN[5:0]
-TOP.Top.core.RN_uop[2].nmDst[4:0]
+TOP.Top.core.RN_uop[2].nmDst[5:0]
 @28
 TOP.Top.core.RN_uop[2].availA
 TOP.Top.core.RN_uop[2].availB
 @22
-TOP.Top.core.RN_uop[2].tagA[5:0]
-TOP.Top.core.RN_uop[2].tagB[5:0]
-TOP.Top.core.RN_uop[2].tagDst[5:0]
+TOP.Top.core.RN_uop[2].tagA[6:0]
+TOP.Top.core.RN_uop[2].tagB[6:0]
+TOP.Top.core.RN_uop[2].tagDst[6:0]
 TOP.Top.core.RN_uop[2].pc[31:0]
 @200
 -RV[0]
@@ -324,6 +319,9 @@ TOP.Top.core.ialu1.OUT_uop.pc[31:0]
 @200
 -SQ
 @22
+TOP.Top.core.sq.IN_uop[0].sqN[5:0]
+TOP.Top.core.sq.entries[0].addr[29:0]
+TOP.Top.core.sq.entries[0].data[31:0]
 TOP.Top.core.sq.OUT_uop[0].pc[31:0]
 TOP.Top.core.sq.OUT_uop[0].result[31:0]
 TOP.Top.core.sq.OUT_uop[0].sqN[5:0]
@@ -378,6 +376,18 @@ TOP.Top.core.div.IN_uop.srcA[31:0]
 TOP.Top.core.div.IN_uop.srcB[31:0]
 TOP.Top.core.div.OUT_uop.result[31:0]
 @200
+-FPU
+@22
+TOP.Top.core.fpu.IN_uop.srcA[31:0]
+TOP.Top.core.fpu.IN_uop.srcB[31:0]
+TOP.Top.core.fpu.IN_uop.sqN[5:0]
+@28
+TOP.Top.core.fpu.OUT_uop.valid
+@22
+TOP.Top.core.fpu.OUT_uop.pc[31:0]
+@23
+TOP.Top.core.fpu.OUT_uop.result[31:0]
+@200
 -Mul
 @22
 TOP.Top.core.mul.IN_uop.sqN[5:0]
@@ -386,7 +396,7 @@ TOP.Top.core.mul.en
 TOP.Top.core.mul.OUT_uop.valid
 @22
 TOP.Top.core.mul.OUT_uop.pc[31:0]
-TOP.Top.core.mul.OUT_uop.tagDst[5:0]
+TOP.Top.core.mul.OUT_uop.tagDst[6:0]
 TOP.Top.core.mul.OUT_uop.sqN[5:0]
 TOP.Top.core.mul.OUT_uop.result[31:0]
 @200

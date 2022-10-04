@@ -44,9 +44,20 @@ integer i;
 
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
+wire wbHasResult_int[NUM_WBS-1:0];
+wire wbHasResult_fp[NUM_WBS-1:0];
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
+
+assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0 && !wbUOp[0].nmDst[5];
+assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0 && !wbUOp[1].nmDst[5];
+assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0 && !wbUOp[2].nmDst[5];
+
+assign wbHasResult_fp[0] = wbUOp[0].valid && wbUOp[0].nmDst[5];
+assign wbHasResult_fp[1] = wbUOp[1].valid && wbUOp[1].nmDst[5];
+assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
+
 
 CommitUOp comUOps[2:0];
 
@@ -288,9 +299,9 @@ RF rf
 (
     .clk(clk),
     
-    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
-    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
-    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
+    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult_int[0]),
+    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult_int[1]),
+    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult_int[2]),
     .waddr3(6'bx), .wdata3(32'bx), .wen3(1'b0),
     
     .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
@@ -303,8 +314,22 @@ RF rf
     .raddr7(6'b0), .rdata7()
 );
 
+wire[5:0] RF_FP_readAddress[3:0];
+wire[31:0] RF_FP_readData[3:0];
+RF_FP rf_fp
+(
+    .clk(clk),
+    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult_fp[0]),
+    .waddr1(wbUOp[2].tagDst[5:0]), .wdata1(wbUOp[2].result), .wen1(wbHasResult_fp[2]),
+    
+    .raddr0(RF_FP_readAddress[0]), .rdata0(RF_FP_readData[0]),
+    .raddr1(RF_FP_readAddress[1]), .rdata1(RF_FP_readData[1]),
+    .raddr2(RF_FP_readAddress[2]), .rdata2(RF_FP_readData[2]),
+    .raddr3(RF_FP_readAddress[3]), .rdata3(RF_FP_readData[3])
+);
+
 EX_UOp LD_uop[2:0];
-wire[3:0] enabledXUs[2:0];
+wire[4:0] enabledXUs[2:0];
 FuncUnit LD_fu[2:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
@@ -331,6 +356,9 @@ Load ld
 
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
+    
+    .OUT_rfReadAddr_fp(RF_FP_readAddress),
+    .IN_rfReadData_fp(RF_FP_readData),
     
     .OUT_enableXU(enabledXUs),
     .OUT_funcUnit(LD_fu),
@@ -381,7 +409,19 @@ Divide div
 
 );
 
-assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
+RES_UOp FPU_uop;
+FPU fpu
+(
+    .clk(clk),
+    .rst(rst),
+    .en(enabledXUs[0][4]),
+    
+    .IN_branch(branch),
+    .IN_uop(LD_uop[0]),
+    .OUT_uop(FPU_uop)
+);
+
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
 //assign wbStall[0] = DIV_busy;
 
 AGU_UOp CC_uop;

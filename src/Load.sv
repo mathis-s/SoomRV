@@ -2,7 +2,7 @@ module Load
 #(
     parameter NUM_UOPS=3,
     parameter NUM_WBS=3,
-    parameter NUM_XUS=4,
+    parameter NUM_XUS=5,
     parameter NUM_ZC_FWDS=2
 )
 (
@@ -29,6 +29,9 @@ module Load
     // Register File read
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
     input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
+    
+    output reg[5:0] OUT_rfReadAddr_fp[3:0],
+    input wire[31:0] IN_rfReadData_fp[3:0],
 
     output reg[NUM_XUS-1:0] OUT_enableXU[NUM_UOPS-1:0],
     output FuncUnit OUT_funcUnit[NUM_UOPS-1:0],
@@ -38,10 +41,20 @@ integer i;
 integer j;
 
 always_comb begin
+
+    // All ports get to read from integer rf
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
     end
+    
+    // Port 2 has one read from fp rf
+    OUT_rfReadAddr_fp[3] = IN_uop[2].tagB[5:0];
+    
+    // Port 0 has three reads from fp rf
+    OUT_rfReadAddr_fp[0] = IN_uop[0].tagA[5:0];
+    OUT_rfReadAddr_fp[1] = IN_uop[0].tagB[5:0];
+    OUT_rfReadAddr_fp[2] = IN_uop[0].tagC[5:0];
 end
 
 FuncUnit outFU[NUM_UOPS-1:0];
@@ -99,7 +112,11 @@ always_ff@(posedge clk) begin
                     end
                 
                     if (!found) begin
-                        OUT_uop[i].srcA <= IN_rfReadData[i];
+                        // Upper half of tag space is for FP registers
+                        if (i == 0 && IN_uop[i].tagA[6])
+                            OUT_uop[i].srcA <= IN_rfReadData_fp[0];
+                        else
+                            OUT_uop[i].srcA <= IN_rfReadData[i];
                     end
                 end
                 
@@ -128,15 +145,21 @@ always_ff@(posedge clk) begin
                     end
                     
                     if (!found) begin
-                        OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                        if (i == 0 && IN_uop[i].tagB[6])
+                            OUT_uop[i].srcB <= IN_rfReadData_fp[1];
+                        else if (i == 2 && IN_uop[i].tagB[6])
+                            OUT_uop[i].srcB <= IN_rfReadData_fp[3];
+                        else
+                            OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                     end
                 end
                 // Try to get from current WB
                 case (IN_uop[i].fu)
-                    FU_INT: OUT_enableXU[i] <= 4'b0001;
-                    FU_LSU: OUT_enableXU[i] <= 4'b0010;
-                    FU_MUL: OUT_enableXU[i] <= 4'b0100;
-                    FU_DIV: OUT_enableXU[i] <= 4'b1000;
+                    FU_INT:  OUT_enableXU[i] <= 5'b00001;
+                    FU_LSU:  OUT_enableXU[i] <= 5'b00010;
+                    FU_MUL:  OUT_enableXU[i] <= 5'b00100;
+                    FU_DIV:  OUT_enableXU[i] <= 5'b01000;
+                    FU_FPU: OUT_enableXU[i] <= 5'b10000;
                     default: begin end
                 endcase
                 outFU[i] <= IN_uop[i].fu;
