@@ -446,7 +446,6 @@ CacheController cc
 );
 
 AGU_UOp AGU_uop;
-wire[23:0] AGU_mapping[15:0];
 AGU agu
 (
     .clk(clk),
@@ -455,8 +454,7 @@ AGU agu
     .stall(stall[2]),
     
     .IN_branch(branch),
-    .IN_mapping(AGU_mapping),
-    
+
     .IN_uop(LD_uop[2]),
     .OUT_uop(AGU_uop)
 );
@@ -622,9 +620,7 @@ ControlRegs cr
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
-    
-    .OUT_AGU_mapping(AGU_mapping),
-    
+
     .OUT_IO_busy(IO_busy)
 );
 

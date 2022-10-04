@@ -40,8 +40,6 @@ module ControlRegs
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
-    output wire[23:0] OUT_AGU_mapping[15:0],
-    
     output wire OUT_IO_busy
 );
 
@@ -90,23 +88,6 @@ always_comb begin
     OUT_GPIO = cRegs[5][31:16];
 end
 assign OUT_irqAddr = cRegs[0];
-
-assign OUT_AGU_mapping[0] = cRegs[8][31:8];
-assign OUT_AGU_mapping[1] = cRegs[9][31:8];
-assign OUT_AGU_mapping[2] = cRegs[10][31:8];
-assign OUT_AGU_mapping[3] = cRegs[11][31:8];
-assign OUT_AGU_mapping[4] = cRegs[12][31:8];
-assign OUT_AGU_mapping[5] = cRegs[13][31:8];
-assign OUT_AGU_mapping[6] = cRegs[14][31:8];
-assign OUT_AGU_mapping[7] = cRegs[15][31:8];
-assign OUT_AGU_mapping[8] = cRegs[16][31:8];
-assign OUT_AGU_mapping[9] = cRegs[17][31:8];
-assign OUT_AGU_mapping[10] = cRegs[18][31:8];
-assign OUT_AGU_mapping[11] = cRegs[19][31:8];
-assign OUT_AGU_mapping[12] = cRegs[20][31:8];
-assign OUT_AGU_mapping[13] = cRegs[21][31:8];
-assign OUT_AGU_mapping[14] = cRegs[22][31:8];
-assign OUT_AGU_mapping[15] = cRegs[23][31:8];
 
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;

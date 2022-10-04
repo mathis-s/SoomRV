@@ -45,7 +45,6 @@ always@(posedge clk) begin
             OUT_data <= mem[addr_reg];
         end
     end
-
 end
 
 endmodule
