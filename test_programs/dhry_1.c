@@ -45,15 +45,6 @@ void printf (const char* c, ...)
         *out = *c++;
 }
 
-void memcpy (void* dst, const void* src, size_t len)
-{
-  char* _dst = dst;
-  const char* _src = src;
-  
-  for (size_t i = 0; i < len; i=i+1)
-      _dst[i] = _src[i];
-}
-
 static const char hexLut[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 static void printhex (uint32_t num)
 {

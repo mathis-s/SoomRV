@@ -110,7 +110,7 @@ wire BP_branchTaken;
 wire BP_isJump;
 wire[31:0] BP_branchSrc;
 wire[31:0] BP_branchDst;
-wire[5:0] BP_branchID;
+wire[7:0] BP_branchID;
 wire BP_multipleBranches;
 wire BP_branchFound;
 wire BP_branchCompr;
@@ -149,6 +149,7 @@ BranchPredictor bp
 (
     .clk(clk),
     .rst(rst),
+    .IN_mispredFlush(mispredFlush),
     
     .IN_pcValid(stateValid[0] && ifetchEn),
     .IN_pc(PC_pc),
@@ -566,7 +567,7 @@ wire[5:0] ROB_maxSqN;
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
-wire[12:0] ROB_irqMemAddr;
+wire[14:0] ROB_irqMemAddr;
 ROB rob
 (
     .clk(clk),

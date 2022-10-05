@@ -65,9 +65,6 @@ main:
 	add	a4,a4,a3
 	or	a2,a2,a7
 	sw	a2,0(a5)
-	nop
-	nop
-	nop
 	srli	a5,a4,5
 	bleu	a5,t4,.L8
 .L9:

@@ -10,7 +10,7 @@ typedef struct packed
     bit[5:0] name;
     bit isBranch;
     bit branchTaken;
-    bit[5:0] branchID;
+    bit[7:0] branchID;
 } ROBEntry;
 
 
@@ -40,7 +40,7 @@ module ROB
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
-    output reg[12:0] OUT_irqMemAddr,
+    output reg[14:0] OUT_irqMemAddr,
     
     output BranchProv OUT_branch,
     

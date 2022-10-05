@@ -180,36 +180,36 @@ always_ff@(posedge clk) begin
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
-                if (branchTaken && (IN_uop.branchID == 63)) begin
+                if (branchTaken && !IN_uop.branchPred) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
-                    OUT_btUpdate.branchID <= IN_uop.branchID;
                     OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
                     OUT_btUpdate.compressed <= IN_uop.compressed;
                     OUT_btUpdate.valid <= 1;
                 end
                 
-                if (branchTaken != IN_uop.branchPred) begin
-                    OUT_branch.taken <= 1;
-                    if (branchTaken) begin
-                        if (IN_uop.opcode == INT_JAL) begin
-                            OUT_branch.dstPC <= (IN_uop.pc + imm);
-                            OUT_btUpdate.dst <= (IN_uop.pc + imm);
-                        end
-                        else begin
-                            OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                            OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                        end
-                    end
-                    else if (IN_uop.compressed) begin
-                        OUT_branch.dstPC <= pcPlus2;
-                        OUT_btUpdate.dst <= pcPlus2;
+                if (branchTaken) begin
+                    if (IN_uop.opcode == INT_JAL) begin
+                        OUT_branch.dstPC <= (IN_uop.pc + imm);
+                        OUT_btUpdate.dst <= (IN_uop.pc + imm);
                     end
                     else begin
-                        OUT_branch.dstPC <= pcPlus4;
-                        OUT_btUpdate.dst <= pcPlus4;
+                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
                     end
                 end
+                else if (IN_uop.compressed) begin
+                    OUT_branch.dstPC <= pcPlus2;
+                    OUT_btUpdate.dst <= pcPlus2;
+                end
+                else begin
+                    OUT_branch.dstPC <= pcPlus4;
+                    OUT_btUpdate.dst <= pcPlus4;
+                end
+                
+                if (branchTaken != IN_uop.branchPred)
+                    OUT_branch.taken <= 1;
+
             end
             // Register jumps are not predicted currently
             else if (IN_uop.opcode == INT_JALR) begin
@@ -219,7 +219,7 @@ always_ff@(posedge clk) begin
             end
 
             
-            OUT_uop.isBranch <= isBranch;
+            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
             OUT_uop.branchTaken <= branchTaken;
             OUT_uop.branchID <= IN_uop.branchID;
             

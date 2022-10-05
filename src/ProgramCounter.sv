@@ -19,7 +19,7 @@ module ProgramCounter
     input wire IN_BP_isJump,
     input wire[31:0] IN_BP_branchSrc,
     input wire[31:0] IN_BP_branchDst,
-    input wire[5:0] IN_BP_branchID,
+    input wire[7:0] IN_BP_branchID,
     input wire IN_BP_multipleBranches,
     input wire IN_BP_branchCompr,
 
@@ -37,7 +37,7 @@ integer i;
 reg[30:0] pc;
 reg[30:0] pcLast;
 reg[3:0] bMaskLast;
-reg[5:0] bIndexLast[3:0];
+reg[7:0] bIndexLast[3:0];
 reg bPredLast[3:0];
 
 assign OUT_pcRaw = {pc, 1'b0};
@@ -81,7 +81,7 @@ always_ff@(posedge clk) begin
                         2'b11: bMaskLast <= 4'b1111;
                     endcase
                     for (i = 0; i < 4; i=i+1) begin
-                        bIndexLast[i] <= 63;
+                        bIndexLast[i] <= 0;
                         bPredLast[i] <= 0;
                     end
                     
@@ -109,7 +109,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     for (i = 0; i < 4; i=i+1) begin
-                        bIndexLast[i] <= 63;
+                        bIndexLast[i] <= 0;
                         bPredLast[i] <= 0;
                     end
                     bIndexLast[IN_BP_branchSrc[2:1]] <= IN_BP_branchID;
@@ -121,7 +121,7 @@ always_ff@(posedge clk) begin
                 pcLast <= pc;
                 bMaskLast <= 4'b1111;
                 for (i = 0; i < 4; i=i+1) begin
-                    bIndexLast[i] <= 63;
+                    bIndexLast[i] <= 0;
                     bPredLast[i] <= 0;
                 end
             end

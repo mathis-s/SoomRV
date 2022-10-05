@@ -1,7 +1,6 @@
 # SoomRV
 ## Description
-SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execute 2 Instructions per cycle completely out of order,
-and also supports speculative execution and precise exceptions.
+SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execute up to 4 instructions per cycle completely out of order, and also supports speculative execution and precise exceptions.
 
 ## Features
 - RV32IMCZbaZbb Instruction Set (other instructions can be emulated via traps)
@@ -9,6 +8,8 @@ and also supports speculative execution and precise exceptions.
 - Fully Out-of-Order Load/Store
 - Local Adaptive Branch Predictor
 - Tag-based OoO Execution with 32 speculative registers (in addition to the 32 architectural registers)
+- Fuses `aui(pc)`+`addi` as well as `addi`+branch
+- Currently scores 3.125 DMIPS/MHz
 
 ## Simulating
 1. Install the [RV32 toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator.

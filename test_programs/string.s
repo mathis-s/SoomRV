@@ -8,7 +8,7 @@
 
 main:
     
-    li s0, 8
+    li s0, 24
     .main_loop:
         la a0, .string
         call print

@@ -30,7 +30,7 @@ module ControlRegs
     input wire IN_irqTaken,
     input wire[31:0] IN_irqSrc,
     input Flags IN_irqFlags,
-    input wire[12:0] IN_irqMemAddr,
+    input wire[14:0] IN_irqMemAddr,
     
     output reg[15:0] OUT_GPIO_oe,
     output reg[15:0] OUT_GPIO,
@@ -192,7 +192,7 @@ always_ff@(posedge clk) begin
         
         if (IN_irqTaken) begin
             cRegs[1] <= IN_irqSrc;
-            cRegs[2] <= {4'b0, IN_irqMemAddr, 13'b0, IN_irqFlags[1:0]};
+            cRegs[2] <= {4'b0, IN_irqMemAddr, 11'b0, IN_irqFlags[1:0]};
         end
         
         ceReg <= IN_ce;

@@ -15,23 +15,24 @@ module BranchPredictor
 #(
     parameter NUM_IN=2,
     parameter NUM_ENTRIES=32,
-    parameter ID_BITS=6
+    parameter ID_BITS=8
 )
 (
     input wire clk,
     input wire rst,
+    input wire IN_mispredFlush,
     
     // IF interface
     input wire IN_pcValid,
     input wire[31:0] IN_pc,
-    output reg OUT_branchTaken,
-    output reg OUT_isJump,
-    output reg[31:0] OUT_branchSrc,
-    output reg[31:0] OUT_branchDst,
-    output reg[ID_BITS-1:0] OUT_branchID,
-    output reg OUT_multipleBranches,
-    output reg OUT_branchFound,
-    output reg OUT_branchCompr,
+    output wire OUT_branchTaken,
+    output wire OUT_isJump,
+    output wire[31:0] OUT_branchSrc,
+    output wire[31:0] OUT_branchDst,
+    output wire[ID_BITS-1:0] OUT_branchID,
+    output wire OUT_multipleBranches,
+    output wire OUT_branchFound,
+    output wire OUT_branchCompr,
     
     // Branch XU interface
     input BTUpdate IN_btUpdates[NUM_IN-1:0],
@@ -39,53 +40,21 @@ module BranchPredictor
     // Branch ROB Interface
     input CommitUOp IN_comUOp,
     
-    output reg OUT_CSR_branchCommitted
+    output wire OUT_CSR_branchCommitted
 );
 
 integer i;
 
-reg[ID_BITS-1:0] insertIndex;
-BTEntry entries[NUM_ENTRIES-1:0];
+reg[ID_BITS-1:0] gHistory;
+reg[ID_BITS-1:0] gHistoryCom;
 
 // Primes 135037 cycles
 // Dhrys 58573 cycles
-// BTB lookup for iFetch
-always_comb begin
-    OUT_branchFound = 0;
-    // default not taken
-    OUT_branchTaken = 0;
-    OUT_multipleBranches = 0;
-    OUT_isJump = 1'bx;
-    OUT_branchSrc = 32'bx;
-    OUT_branchDst = 32'bx;
-    OUT_branchID = 6'bx;
-    OUT_branchCompr = 1'bx;
-    
-    // TODO: Compare: Could also have the mux 2x (4x for final design) to extract 0,1,2,3 at the same time.
-    // that would allow one-hot encoding and much faster readout.
-    if (IN_pcValid)
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (entries[i].valid && 
-                entries[i].srcAddr[31:3] == IN_pc[31:3] && entries[i].srcAddr[2:1] >= IN_pc[2:1] &&
-                (!OUT_branchFound || (entries[i].srcAddr[2:1] < OUT_branchSrc[2:1]))) begin
-                
-                if (OUT_branchFound) OUT_multipleBranches = 1;
-                    
-                OUT_branchFound = 1;
-                OUT_branchTaken = entries[i].taken || entries[i].counters[entries[i].history][1];
-                OUT_isJump = entries[i].taken;
-                OUT_branchSrc = entries[i].srcAddr;
-                OUT_branchDst = entries[i].dstAddr;
-                OUT_branchID = i[ID_BITS-1:0];
-                OUT_branchCompr = entries[i].compressed;
-            end
-        end
-end
 
 // Try to find valid branch target update
 BTUpdate btUpdate;
 always_comb begin
-    btUpdate = 73'bx;
+    btUpdate = 67'bx;
     btUpdate.valid = 0;
     for (i = 0; i < NUM_IN; i=i+1) begin
         if (IN_btUpdates[i].valid)
@@ -93,65 +62,56 @@ always_comb begin
     end
 end
 
+wire[ID_BITS-1:0] hash = IN_pc[8:1] ^ gHistory;
+assign OUT_branchID = hash;//(OUT_branchFound && !OUT_isJump) ? hash : 0;
+
+assign OUT_branchDst[0] = 1'b0;
+assign OUT_branchSrc[0] = 1'b0;
+BranchTargetBuffer btb
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_pcValid(IN_pcValid),
+    .IN_pc(IN_pc[31:1]),
+    .OUT_branchFound(OUT_branchFound),
+    .OUT_branchDst(OUT_branchDst[31:1]),
+    .OUT_branchSrc(OUT_branchSrc[31:1]),
+    .OUT_branchIsJump(OUT_isJump),
+    .OUT_branchCompr(OUT_branchCompr),
+    .OUT_multipleBranches(OUT_multipleBranches),
+    .IN_BPT_branchTaken(OUT_branchTaken),
+    .IN_btUpdate(btUpdate)
+);
+
+BranchPredictionTable bpt
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_readAddr(hash),
+    .OUT_taken(OUT_branchTaken),
+    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch),
+    .IN_writeAddr(IN_comUOp.branchID),
+    .IN_writeTaken(IN_comUOp.branchTaken)
+);
+
+assign OUT_CSR_branchCommitted = 0;
+
 always@(posedge clk) begin
     
-    OUT_CSR_branchCommitted <= 0;
-    
     if (rst) begin
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-            entries[i].valid <= 0;
-        end
-        
-        insertIndex <= 0;
-    end
-    
-    else if (btUpdate.valid) begin
-    
-        entries[insertIndex[4:0]].valid <= 1;
-        entries[insertIndex[4:0]].used <= 1;
-        entries[insertIndex[4:0]].srcAddr <= btUpdate.src;
-        entries[insertIndex[4:0]].dstAddr <= btUpdate.dst;
-        // only jumps always taken
-        entries[insertIndex[4:0]].taken <= btUpdate.isJump;
-        entries[insertIndex[4:0]].counters[0] <= 2'b00;
-        entries[insertIndex[4:0]].counters[1] <= 2'b10;
-        entries[insertIndex[4:0]].counters[2] <= 2'b01;
-        entries[insertIndex[4:0]].counters[3] <= 2'b11;
-        entries[insertIndex[4:0]].history <= 2'b01;
-        entries[insertIndex[4:0]].compressed <= btUpdate.compressed;
-        insertIndex <= insertIndex + 1;
+        gHistory <= 0;
+        gHistoryCom <= 0;
     end
     else begin
-        // If not valid or not used recently, keep this entry as first to replace
-        if (entries[insertIndex[4:0]].valid && entries[insertIndex[4:0]].used) begin
-            insertIndex[4:0] <= insertIndex[4:0] + 1;
-            entries[insertIndex[4:0]].used <= 0;
-        end
-    end
-    
-    // TODO: Currently address check is problematic, as address of uncompressed branches is incremented and might not match anymore.
-    // This means there might (rarely) be a branch prediction update coming from the wrong branch.
-    if (IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.branchID != ((1 << ID_BITS) - 1)/* && {IN_comUOp.pc, 2'b00} == entries[IN_comUOp.branchID[4:0]].srcAddr*/) begin
+        if (OUT_branchFound && !OUT_isJump)
+            gHistory <= {gHistory[6:0], OUT_branchTaken};
         
-        reg[1:0] hist = entries[IN_comUOp.branchID[4:0]].history;
-        
-        entries[IN_comUOp.branchID[4:0]].history <= {hist[0], IN_comUOp.branchTaken};
-        
-        OUT_CSR_branchCommitted <= !entries[IN_comUOp.branchID[4:0]].taken;
-        
-        if (IN_comUOp.branchTaken) begin
-            if (entries[IN_comUOp.branchID[4:0]].counters[hist] != 2'b11)
-                entries[IN_comUOp.branchID[4:0]].counters[hist] <= entries[IN_comUOp.branchID[4:0]].counters[hist] + 1;
-        end
-        else if (entries[IN_comUOp.branchID[4:0]].counters[hist] != 2'b00)
-            entries[IN_comUOp.branchID[4:0]].counters[hist] <= entries[IN_comUOp.branchID[4:0]].counters[hist] - 1;
+        if (IN_comUOp.valid && IN_comUOp.isBranch)
+            gHistoryCom <= {gHistoryCom[6:0], IN_comUOp.branchTaken};
             
-    end
-    
-    if (!rst && IN_pcValid && OUT_branchTaken) begin
-        entries[OUT_branchID[4:0]].used <= 1;
+        if (IN_mispredFlush)
+            gHistory <= gHistoryCom;
     end
 end
-
 
 endmodule

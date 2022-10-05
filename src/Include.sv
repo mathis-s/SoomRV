@@ -122,7 +122,7 @@ typedef struct packed
 {
     logic[15:0] instr;
     logic[30:0] pc;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic branchPred;
     logic valid;
 } IF_Instr;
@@ -131,7 +131,7 @@ typedef struct packed
 {
     logic[31:0] instr;
     logic[30:0] pc;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic branchPred;
     logic valid;
 } PD_Instr;
@@ -150,7 +150,7 @@ typedef struct packed
     logic rd_fp;
     logic[5:0] opcode;
     FuncUnit fu;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic branchPred;
     logic compressed;
     logic valid;
@@ -172,7 +172,7 @@ typedef struct packed
     logic[6:0] tagDst;
     logic[5:0] nmDst;
     logic[5:0] opcode;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic branchPred;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
@@ -207,7 +207,7 @@ typedef struct packed
     logic[6:0] tagDst;
     logic[5:0] nmDst;
     logic[5:0] sqN;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic branchPred;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
@@ -241,7 +241,7 @@ typedef struct packed
     bit[31:0] pc; // 11
     bit isBranch; // 10
     bit branchTaken; // 9
-    bit[5:0] branchID; // 3
+    bit[7:0] branchID; // 3
     Flags flags; // 1
     bit valid; // 0
 } RES_UOp;
@@ -270,7 +270,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit[5:0] branchID;
     bit[31:0] src;
     bit[31:0] dst;
     bit isJump;
@@ -306,7 +305,7 @@ typedef struct packed
     logic[5:0] sqN;
     logic isBranch;
     logic branchTaken;
-    logic[5:0] branchID;
+    logic[7:0] branchID;
     logic[29:0] pc;
     logic valid;
 } CommitUOp;

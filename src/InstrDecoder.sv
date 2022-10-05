@@ -214,7 +214,7 @@ always_comb begin
         i32 = IN_instrs[i].instr;
         i16 = IN_instrs[i].instr[15:0];
         
-        uop = 106'b0;
+        uop = 108'b0;
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en;
