@@ -187,7 +187,10 @@ module InstrDecoder
     parameter NUM_UOPS=4
 )
 (
+    input wire clk,
+    input wire rst,
     input wire en,
+    input wire IN_invalidate,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
@@ -200,6 +203,8 @@ reg invalidEnc;
 Instr32 instr;
 Instr16 i16;
 I32 i32;
+
+D_UOp uopsComb[NUM_UOPS-1:0];
 
 always_comb begin
     
@@ -990,7 +995,18 @@ always_comb begin
             uop.opcode = INT_UNDEFINED;
             uop.fu = FU_INT;
         end
-        OUT_uop[i] = uop;
+        uopsComb[i] = uop;
+    end
+end
+
+always@(posedge clk) begin
+    if (rst || IN_invalidate) begin
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            OUT_uop[i].valid <= 0;
+    end
+    else if (en) begin
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            OUT_uop[i] <= uopsComb[i];
     end
 end
 

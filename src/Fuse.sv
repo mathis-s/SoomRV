@@ -130,10 +130,10 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         for (i = 0; i < NUM_UOPS_OUT; i=i+1)
-            OUT_uop[i].valid = 0;
+            OUT_uop[i].valid <= 0;
             
         for (i = 0; i < NUM_UOPS_IN; i=i+1) begin
-            uop[i].valid = 0;
+            uop[i].valid <= 0;
             bufInsertUOps[i].valid <= 0;
         end
 

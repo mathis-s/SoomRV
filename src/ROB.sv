@@ -13,7 +13,7 @@ typedef struct packed
     bit[5:0] branchID;
 } ROBEntry;
 
-// old 11880
+
 module ROB
 #(
     // how many entries, ie how many instructions can we

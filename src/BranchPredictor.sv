@@ -47,7 +47,8 @@ integer i;
 reg[ID_BITS-1:0] insertIndex;
 BTEntry entries[NUM_ENTRIES-1:0];
 
-
+// Primes 135037 cycles
+// Dhrys 58573 cycles
 // BTB lookup for iFetch
 always_comb begin
     OUT_branchFound = 0;
@@ -112,11 +113,11 @@ always@(posedge clk) begin
         entries[insertIndex[4:0]].dstAddr <= btUpdate.dst;
         // only jumps always taken
         entries[insertIndex[4:0]].taken <= btUpdate.isJump;
-        entries[insertIndex[4:0]].counters[0] <= 2'b11;
-        entries[insertIndex[4:0]].counters[1] <= 2'b11;
-        entries[insertIndex[4:0]].counters[2] <= 2'b11;
+        entries[insertIndex[4:0]].counters[0] <= 2'b00;
+        entries[insertIndex[4:0]].counters[1] <= 2'b10;
+        entries[insertIndex[4:0]].counters[2] <= 2'b01;
         entries[insertIndex[4:0]].counters[3] <= 2'b11;
-        entries[insertIndex[4:0]].history <= 2'b11;
+        entries[insertIndex[4:0]].history <= 2'b01;
         entries[insertIndex[4:0]].compressed <= btUpdate.compressed;
         insertIndex <= insertIndex + 1;
     end

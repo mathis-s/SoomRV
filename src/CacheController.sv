@@ -91,6 +91,9 @@ always_ff@(posedge clk) begin
         cmissUOp.valid <= 0;
         
         waitCycle <= 0;
+        
+        for (i = 0; i < NUM_UOPS; i=i+1)
+            OUT_uop[i].valid <= 0;
     end
     else begin
         waitCycle <= 0;

@@ -203,7 +203,10 @@ D_UOp DE_uop[3:0];
 
 InstrDecoder idec
 (
-    .en(1'b1),
+    .clk(clk),
+    .rst(rst),
+    .IN_invalidate(branch.taken),
+    .en(!FUSE_full),
     .IN_instrs(PD_instrs),
     .OUT_uop(DE_uop)
 );
