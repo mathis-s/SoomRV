@@ -48,9 +48,6 @@ integer i;
 reg[ID_BITS-1:0] gHistory;
 reg[ID_BITS-1:0] gHistoryCom;
 
-// Primes 135037 cycles
-// Dhrys 58573 cycles
-
 // Try to find valid branch target update
 BTUpdate btUpdate;
 always_comb begin
@@ -63,7 +60,8 @@ always_comb begin
 end
 
 wire[ID_BITS-1:0] hash = IN_pc[8:1] ^ gHistory;
-assign OUT_branchID = hash;//(OUT_branchFound && !OUT_isJump) ? hash : 0;
+// Non-branches (including jumps) get 0 as their ID.
+assign OUT_branchID = (OUT_branchFound && !OUT_isJump) ? hash : 0;
 
 assign OUT_branchDst[0] = 1'b0;
 assign OUT_branchSrc[0] = 1'b0;

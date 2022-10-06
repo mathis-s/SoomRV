@@ -123,8 +123,8 @@ ProgramCounter progCnt
     .en0(stateValid[0] && ifetchEn),
     .en1(stateValid[1] && ifetchEn),
     .rst(rst),
-    .IN_pc(branch.dstPC),
-    .IN_write(branch.taken),
+    .IN_pc(branch.taken ? branch.dstPC : {DEC_branchDst, 1'b0}),
+    .IN_write(branch.taken || DEC_branch),
     .IN_instr(instrRaw),
     
     .IN_BP_branchTaken(BP_branchTaken),
@@ -177,7 +177,7 @@ always_ff@(posedge clk) begin
         stateValid <= 3'b000;
     // When a branch mispredict happens, we need to let the pipeline
     // run entirely dry.
-    else if (branch.taken)
+    else if (branch.taken || DEC_branch)
         stateValid <= 3'b000;
     else if (ifetchEn)
         stateValid <= {stateValid[1:0], 1'b1};
@@ -194,7 +194,7 @@ PreDecode preDec
     
     .OUT_full(PD_full),
     
-    .mispred(branch.taken),
+    .mispred(branch.taken || DEC_branch),
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
@@ -202,6 +202,8 @@ assign ifetchEn = !PD_full;
 
 D_UOp DE_uop[3:0];
 
+wire DEC_branch;
+wire[30:0] DEC_branchDst;
 InstrDecoder idec
 (
     .clk(clk),
@@ -209,6 +211,10 @@ InstrDecoder idec
     .IN_invalidate(branch.taken),
     .en(!FUSE_full),
     .IN_instrs(PD_instrs),
+    
+    .OUT_decBranch(DEC_branch),
+    .OUT_decBranchDst(DEC_branchDst),
+    
     .OUT_uop(DE_uop)
 );
 

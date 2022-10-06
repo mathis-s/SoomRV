@@ -180,7 +180,7 @@ always_ff@(posedge clk) begin
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
-                if (branchTaken && !IN_uop.branchPred) begin
+                if (branchTaken && !IN_uop.branchPred && IN_uop.branchID == 0) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                     OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
@@ -217,7 +217,15 @@ always_ff@(posedge clk) begin
                 OUT_btUpdate.dst <= srcA + srcB;
                 OUT_branch.taken <= 1;
             end
-
+            // Check speculated return address
+            else if (IN_uop.opcode == INT_V_RET) begin
+                if (srcA != srcB) begin
+                    //$display("Ret misspeculation %x %x", srcA, srcB);
+                    OUT_branch.dstPC <= srcA;
+                    OUT_branch.taken <= 1;
+                end
+                //else $display("Ret correct");
+            end
             
             OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
             OUT_uop.branchTaken <= branchTaken;

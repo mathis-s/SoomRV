@@ -35,6 +35,7 @@ decoder_tb:
 	src/FPU.sv \
 	src/BranchTargetBuffer.sv \
 	src/BranchPredictionTable.sv \
+	src/ReturnStack.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
