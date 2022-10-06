@@ -9,7 +9,7 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 - Local Adaptive Branch Predictor
 - Tag-based OoO Execution with 32 speculative registers (in addition to the 32 architectural registers)
 - Fuses `aui(pc)`+`addi` as well as `addi`+branch
-- Currently scores 3.125 DMIPS/MHz
+- Currently scores 3.57 DMIPS/MHz
 
 ## Simulating
 1. Install the [RV32 toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator.

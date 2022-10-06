@@ -6,7 +6,7 @@ module Fuse
 )
 (
     input wire clk,
-    input wire frontEn,
+    input wire outEn,
     input wire rst,
     input wire mispredict,
     
@@ -143,7 +143,7 @@ always_ff@(posedge clk) begin
     end
     else if (!mispredict) begin
         
-        if (frontEn) begin
+        if (outEn) begin
             for (i = 0; i < NUM_UOPS_OUT; i=i+1) begin
                 if (obufIndexOut != obufIndexIn) begin
                     OUT_uop[i] <= outBuffer[obufIndexOut];

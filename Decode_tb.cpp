@@ -105,7 +105,10 @@ int main(int argc, char** argv)
     while (!Verilated::gotFinish())
     {
         if (top->OUT_halt)
+        {
+            top->en = 0;
             break;
+        }
     
         // zero right now, going to be one, so rising edge
         if (top->clk == 0)
@@ -127,6 +130,15 @@ int main(int argc, char** argv)
             instrAddrReg = top->OUT_instrAddr;
         }
 
+        top->clk = !top->clk;
+        top->eval();              // Evaluate model
+        tfp->dump(main_time);
+        main_time++;              // Time passes...
+    }
+    
+    // Run a few more cycles ...
+    for (int i = 0; i < 10; i=i+1)
+    {
         top->clk = !top->clk;
         top->eval();              // Evaluate model
         tfp->dump(main_time);

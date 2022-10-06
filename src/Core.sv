@@ -223,7 +223,7 @@ D_UOp FUSE_uop[2:0];
 Fuse fuse
 (
     .clk(clk),
-    .frontEn(frontendEn),
+    .outEn(frontendEn && !RN_stall),
     .rst(rst),
     .mispredict(branch.taken),
     
@@ -238,13 +238,15 @@ R_UOp RN_uop[2:0];
 reg RN_uopValid[2:0];
 wire[5:0] RN_nextLoadSqN;
 wire[5:0] RN_nextStoreSqN;
-
+wire RN_stall;
 Rename rn 
 (
     .clk(clk),
     .en(!branch.taken && !mispredFlush),
     .frontEn(frontendEn),
     .rst(rst),
+    
+    .OUT_stall(RN_stall),
 
     .IN_uop(FUSE_uop),
 
@@ -636,7 +638,7 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-assign frontendEn = (RV_freeEntries > 3) && 
+assign frontendEn = (RV_freeEntries > 2) && 
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 

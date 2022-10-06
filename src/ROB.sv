@@ -51,7 +51,7 @@ ROBEntry entries[LENGTH-1:0];
 reg[5:0] baseIndex;
 reg[31:0] committedInstrs;
 
-assign OUT_maxSqN = baseIndex + LENGTH - 1 - 2;
+assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
 
 integer i;

@@ -234,13 +234,13 @@ always_ff@(posedge clk) begin
         end
         
         // Load fowarding is handled separately, as loads might be delayed due to caching
-        if (IN_loadFwdUOp.valid && IN_loadFwdUOp.nmDst != 0)
+        /*if (IN_loadFwdUOp.valid && IN_loadFwdUOp.nmDst != 0)
             for (i = 0; i < QUEUE_SIZE; i=i+1) begin
                 if (queue[i].tagA == IN_loadFwdUOp.tagDst)
                     queue[i].availA <= 1;
                 if (queue[i].tagB == IN_loadFwdUOp.tagDst)
                     queue[i].availB <= 1;
-            end
+            end*/
         
     end
     

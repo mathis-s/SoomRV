@@ -8,6 +8,8 @@ module Rename
     input wire en,
     input wire frontEn,
     input wire rst,
+    
+    output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
     input D_UOp IN_uop[WIDTH_UOPS-1:0],
@@ -72,7 +74,7 @@ always_comb begin
         // Issue/Lookup
         RAT_issueIDs[i] = {IN_uop[i].rd_fp, IN_uop[i].rd};
         RAT_issueSqNs[i] = nextCounterSqN;
-        RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && IN_uop[i].valid;
+        RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
         // Only need new tag if instruction writes to a register
         TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && !IN_uop[i].rd_fp;
         TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
@@ -127,6 +129,8 @@ reg[6:0] newTags[WIDTH_UOPS-1:0];
 reg[5:0] TB_FP_tags[WIDTH_UOPS-1:0];
 reg[5:0] TB_RAT_commitPrevTags[WIDTH_UOPS-1:0];
 reg[5:0] TB_RAT_commitTags[WIDTH_UOPS-1:0];
+reg TB_tagsValid[WIDTH_UOPS-1:0];
+reg TB_FP_tagsValid[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         if (TB_issueValid[i])
@@ -147,6 +151,7 @@ TagBuffer tb
     
     .IN_issueValid(TB_issueValid),
     .OUT_issueTags(TB_tags),
+    .OUT_issueTagsValid(TB_tagsValid),
     
     .IN_commitValid(commitValid_int),
     .IN_commitNewest(isNewestCommit),
@@ -161,12 +166,22 @@ TagBuffer tb_fp
     
     .IN_issueValid(TB_issueValid_fp),
     .OUT_issueTags(TB_FP_tags),
+    .OUT_issueTagsValid(TB_FP_tagsValid),
     
     .IN_commitValid(commitValid_fp),
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(TB_RAT_commitPrevTags),
     .IN_commitTagDst(TB_RAT_commitTags)
 );
+
+always_comb begin
+    OUT_stall = 0;
+    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        if ((!TB_tagsValid[i] || !TB_FP_tagsValid[i]) && IN_uop[i].valid)
+            OUT_stall = 1;
+    end
+        
+end
 
 
 bit[5:0] counterSqN;
@@ -213,7 +228,7 @@ always_ff@(posedge clk) begin
             OUT_uopValid[i] <= 0;
     end
 
-    else if (en && frontEn) begin
+    else if (en && frontEn && !OUT_stall) begin
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             OUT_uop[i].imm <= IN_uop[i].imm;

@@ -16,6 +16,7 @@ module TagBuffer
     
     input wire IN_issueValid[NUM_UOPS-1:0],
     output reg[5:0] OUT_issueTags[NUM_UOPS-1:0],
+    output reg OUT_issueTagsValid[NUM_UOPS-1:0],
     
     
     input wire IN_commitValid[NUM_UOPS-1:0],
@@ -28,17 +29,16 @@ integer j;
 
 TagBufEntry tags[63:0];
 
-reg tagValid[NUM_UOPS-1:0];
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_issueTags[i] = 6'bx;
-        tagValid[i] = 0;
+        OUT_issueTagsValid[i] = 0;
         for (j = 0; j < 64; j=j+1) begin
             if (!tags[j].used && 
                 (i <= 0 || OUT_issueTags[0] != j[5:0]) &&
                 (i <= 1 || OUT_issueTags[1] != j[5:0])) begin
                 OUT_issueTags[i] = j[5:0];
-                tagValid[i] = 1;
+                OUT_issueTagsValid[i] = 1;
             end
         end
     end
@@ -66,7 +66,7 @@ always_ff@(posedge clk) begin
         else begin
             for (i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_issueValid[i]) begin
-                    assert(tagValid[i]);
+                    assert(OUT_issueTagsValid[i]);
                     tags[OUT_issueTags[i]].used <= 1;
                     //tags[OUT_issueTags[i]].sqN <= IN_issueSqNs[i];
                 end
