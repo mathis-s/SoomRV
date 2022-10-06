@@ -1,5 +1,7 @@
 
 typedef logic[5:0] RegNm;
+typedef logic[6:0] Tag;
+typedef logic[5:0] SeqNum;
 
 typedef enum logic[5:0]
 {
@@ -238,13 +240,13 @@ typedef struct packed
     bit[31:0] result;
     bit[6:0] tagDst;
     bit[5:0] nmDst;
-    bit[5:0] sqN; // 43
-    bit[31:0] pc; // 11
-    bit isBranch; // 10
-    bit branchTaken; // 9
-    bit[7:0] branchID; // 3
-    Flags flags; // 1
-    bit valid; // 0
+    bit[5:0] sqN;
+    bit[31:0] pc;
+    bit isBranch;
+    bit branchTaken;
+    bit[7:0] branchID;
+    Flags flags;
+    bit valid;
 } RES_UOp;
 
 typedef struct packed

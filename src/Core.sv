@@ -288,6 +288,8 @@ ReservationStation rv
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     
+    .IN_loadFwdUOp(CC_uop),
+    
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
 
