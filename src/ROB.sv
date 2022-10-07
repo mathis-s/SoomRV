@@ -6,7 +6,7 @@ typedef struct packed
     bit[6:0] tag;
     // for debugging
     bit[5:0] sqN;
-    bit[29:0] pc;
+    bit[30:0] pc;
     bit[5:0] name;
     bit isBranch;
     bit branchTaken;
@@ -41,6 +41,8 @@ module ROB
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
     output reg[14:0] OUT_irqMemAddr,
+    
+    output reg OUT_fence,
     
     output BranchProv OUT_branch,
     
@@ -88,6 +90,7 @@ always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
     OUT_halt <= 0;
+    OUT_fence <= 0;
     
     if (rst) begin
         baseIndex = 0;
@@ -148,7 +151,7 @@ always_ff@(posedge clk) begin
                 // this way the debugger can see the state right after ebreak exec'd.
                 OUT_halt <= 1;
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {entries[baseIndex[4:0]].pc + 1'b1, 2'b0};
+                OUT_branch.dstPC <= {entries[baseIndex[4:0]].pc + 31'h2, 1'b0};
                 OUT_branch.sqN <= baseIndex;
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
@@ -170,9 +173,20 @@ always_ff@(posedge clk) begin
                     OUT_comUOp[0].nmDst <= 0;
                 
                 OUT_irqFlags <= entries[baseIndex[4:0]].flags;
-                OUT_irqSrc <= {entries[baseIndex[4:0]].pc, 2'b0};
+                OUT_irqSrc <= {entries[baseIndex[4:0]].pc, 1'b0};
                 // For exceptions, some fields are reused to get the segment of the violating address
                 OUT_irqMemAddr <= {entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID};
+            end
+            else if (entries[baseIndex[4:0]].flags == FLAGS_FENCE) begin
+                
+                // Jump to instruction after fence to invalidate all speculative state
+                OUT_branch.taken <= 1;
+                OUT_branch.dstPC <= {entries[baseIndex[4:0]].pc + 31'h2, 1'b0};
+                OUT_branch.flush <= 1;
+                OUT_branch.storeSqN <= 0;
+                OUT_branch.loadSqN <= 0;
+                
+                OUT_fence <= 1;
             end
 
             for (i = 1; i < WIDTH; i=i+1) begin
@@ -199,7 +213,7 @@ always_ff@(posedge clk) begin
                 entries[IN_uop[i].sqN[4:0]].tag <= IN_uop[i].tagDst;
                 entries[IN_uop[i].sqN[4:0]].name <= IN_uop[i].nmDst;
                 entries[IN_uop[i].sqN[4:0]].sqN <= IN_uop[i].sqN;
-                entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:2];
+                entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:1];
                 entries[IN_uop[i].sqN[4:0]].isBranch <= IN_uop[i].isBranch;
                 entries[IN_uop[i].sqN[4:0]].branchTaken <= IN_uop[i].branchTaken;
                 entries[IN_uop[i].sqN[4:0]].branchID <= IN_uop[i].branchID;

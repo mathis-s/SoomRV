@@ -289,9 +289,9 @@ always_ff@(posedge clk) begin
                     OUT_valid[i] <= 0;
             end
             // Make sure to invalidate uops even when stalled
-            else if (OUT_valid[i] && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0) begin
-                OUT_valid[i] <= 0;
-            end
+            //else if (OUT_valid[i] && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0) begin
+            //    OUT_valid[i] <= 0;
+            //end
         end
                 
 

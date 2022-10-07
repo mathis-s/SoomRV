@@ -119,7 +119,7 @@ typedef enum logic[5:0]
 } OPCode_FPU;
 
 typedef enum logic[2:0] {FU_INT, FU_LSU, FU_MUL, FU_DIV, FU_FPU} FuncUnit;
-typedef enum bit[1:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT} Flags;
+typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FENCE} Flags;
 
 typedef struct packed
 {
@@ -309,6 +309,6 @@ typedef struct packed
     logic isBranch;
     logic branchTaken;
     logic[7:0] branchID;
-    logic[29:0] pc;
+    logic[30:0] pc;
     logic valid;
 } CommitUOp;

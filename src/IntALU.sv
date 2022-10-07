@@ -99,18 +99,18 @@ always_comb begin
         INT_MIN: resC = lessThan ? srcA : srcB;
         INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
-        INT_F_ADDI_BEQ: resC = srcA + {{20{imm[31]}}, imm[31:20]};
-        INT_F_ADDI_BNE: resC = srcA + {{20{imm[31]}}, imm[31:20]};
-        INT_F_ADDI_BLT: resC = srcA + {{20{imm[31]}}, imm[31:20]};
-        INT_F_ADDI_BGE: resC = srcA + {{20{imm[31]}}, imm[31:20]};
-        INT_F_ADDI_BLTU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        INT_F_ADDI_BEQ,
+        INT_F_ADDI_BNE,
+        INT_F_ADDI_BLT,
+        INT_F_ADDI_BGE,
+        INT_F_ADDI_BLTU,
         INT_F_ADDI_BGEU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
         default: resC = 32'bx;
     endcase
     
     case (IN_uop.opcode)
         INT_UNDEFINED: flags = FLAGS_EXCEPT;
-        INT_SYS: flags = imm[0] ? FLAGS_BRK : FLAGS_TRAP;
+        INT_SYS: flags = imm[2:0];
         default: flags = FLAGS_NONE;
     endcase
 end 

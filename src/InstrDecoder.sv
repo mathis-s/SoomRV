@@ -18,6 +18,7 @@
 `define OPC_FNMSUB 7'b1001011
 `define OPC_FNMADD 7'b1001111
 `define OPC_FP 7'b1010011
+`define OPC_FENCE 7'b0001111
 
 typedef struct packed
 {
@@ -263,7 +264,7 @@ always_comb begin
             default:      uop.imm = 0;
         endcase
         
-        if (IN_instrs[i].valid && en) begin
+        if (IN_instrs[i].valid && en && !OUT_decBranch) begin
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
@@ -369,6 +370,13 @@ always_comb begin
                         endcase
                         invalidEnc =
                             (uop.opcode == 2) || (uop.opcode == 3);
+                    end
+                    `OPC_FENCE: begin
+                        if (instr.funct3 == 0) begin
+                            uop.fu = FU_INT;
+                            uop.opcode = INT_SYS;
+                            uop.imm = {29'bx, 3'h4};
+                        end
                     end
                     `OPC_REG_IMM: begin
                         uop.rs0 = instr.rs0;
@@ -1039,7 +1047,6 @@ always_comb begin
         
         
         if (invalidEnc) begin
-            //uop = 97'bx;
             uop.opcode = INT_UNDEFINED;
             uop.fu = FU_INT;
         end

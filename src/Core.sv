@@ -597,6 +597,8 @@ ROB rob
     .OUT_irqSrc(ROB_irqSrc),
     .OUT_irqMemAddr(ROB_irqMemAddr),
     
+    .OUT_fence(),
+    
     .OUT_branch(branchProvs[3]),
     
     .OUT_halt(OUT_halt)
