@@ -277,7 +277,7 @@ assign stall[0] = 0;
 assign stall[1] = 0;
 
 wire[4:0] RV_freeEntries;
-ReservationStation rv
+/*ReservationStation rv
 (
     .clk(clk),
     .rst(rst),
@@ -303,6 +303,81 @@ ReservationStation rv
     .OUT_valid(RV_uopValid),
     .OUT_uop(RV_uop),
     .OUT_free(RV_freeEntries)
+);*/
+wire IQ0_full;
+IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
+(
+    .clk(clk),
+    .rst(rst),
+    .frontEn(frontendEn),
+    
+    .IN_stall(stall[0]),
+    .IN_doNotIssueFU1(DIV_doNotIssue),
+    
+    .IN_uopValid(RN_uopValid),
+    .IN_uop(RN_uop),
+    
+    .IN_resultValid(wbHasResult),
+    .IN_resultUOp(wbUOp),
+    
+    .IN_branch(branch),
+    
+    .IN_issueValid(RV_uopValid),
+    .IN_issueUOps(RV_uop),
+    
+    .OUT_valid(RV_uopValid[0]),
+    .OUT_uop(RV_uop[0]),
+    .OUT_full(IQ0_full)
+);
+wire IQ1_full;
+IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9) iq1
+(
+    .clk(clk),
+    .rst(rst),
+    .frontEn(frontendEn),
+    
+    .IN_stall(stall[1]),
+    .IN_doNotIssueFU1(MUL_doNotIssue),
+    
+    .IN_uopValid(RN_uopValid),
+    .IN_uop(RN_uop),
+    
+    .IN_resultValid(wbHasResult),
+    .IN_resultUOp(wbUOp),
+    
+    .IN_branch(branch),
+    
+    .IN_issueValid(RV_uopValid),
+    .IN_issueUOps(RV_uop),
+    
+    .OUT_valid(RV_uopValid[1]),
+    .OUT_uop(RV_uop[1]),
+    .OUT_full(IQ1_full)
+);
+wire IQ2_full;
+IssueQueue#(8,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
+(
+    .clk(clk),
+    .rst(rst),
+    .frontEn(frontendEn),
+    
+    .IN_stall(stall[2]),
+    .IN_doNotIssueFU1(1'b0),
+    
+    .IN_uopValid(RN_uopValid),
+    .IN_uop(RN_uop),
+    
+    .IN_resultValid(wbHasResult),
+    .IN_resultUOp(wbUOp),
+    
+    .IN_branch(branch),
+    
+    .IN_issueValid(RV_uopValid),
+    .IN_issueUOps(RV_uop),
+    
+    .OUT_valid(RV_uopValid[2]),
+    .OUT_uop(RV_uop[2]),
+    .OUT_full(IQ2_full)
 );
 
 
@@ -640,7 +715,7 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-assign frontendEn = (RV_freeEntries > 2) && 
+assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && 
     ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 

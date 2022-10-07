@@ -1,4 +1,4 @@
-VERILATOR_FLAGS = --cc --trace-structs --build --trace --unroll-stmts 99999 -unroll-count 9999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --public --trace-max-width 128 --trace-max-array 512 --x-assign unique --x-initial unique -O3 -CFLAGS -O2 -MAKEFLAGS -j16
+VERILATOR_FLAGS = --cc --trace-structs --build --trace --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --public --trace-max-width 128 --trace-max-array 512 --x-assign unique --x-initial unique -O3 -CFLAGS -O2 -MAKEFLAGS -j16
 
 
 decoder_tb:
@@ -7,7 +7,7 @@ decoder_tb:
 	src/InstrDecoder.sv  \
 	src/Rename.sv  \
 	src/Core.sv  \
-	src/ReservationStation.sv  \
+	src/IssueQueue  \
 	src/IntALU.sv  \
 	src/ProgramCounter.sv \
 	src/RF.sv \
