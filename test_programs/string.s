@@ -5,7 +5,6 @@
 .text
 .globl main
 
-
 main:
     
     li s0, 24
@@ -33,6 +32,14 @@ main:
         
         addi s0, s0, -1
         bnez s0, .main_loop
+    
+    # Print mispreds and total branches
+    li a0, 0xff0000a0
+    lw s0, 8(a0)
+    lw a0, 0(a0)
+    call printdecu
+    mv a0, s0
+    call printdecu
     
     ebreak
 

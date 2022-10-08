@@ -37,7 +37,7 @@ int main(int argc, char** argv)
         system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     }
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
-    system("riscv32-unknown-elf-objcopy -I elf32-little -j .rodata -O binary ./a.out data.bin");
+    system("riscv32-unknown-elf-objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
     
     size_t numInstrBytes = 0;
     {
@@ -134,6 +134,8 @@ int main(int argc, char** argv)
         top->eval();              // Evaluate model
         tfp->dump(main_time);
         main_time++;              // Time passes...
+        
+        //if (!(main_time & 0xffff)) printf("pc %.8x\n", instrAddrReg);
     }
     
     // Run a few more cycles ...

@@ -19,7 +19,7 @@ module ProgramCounter
     input wire IN_BP_isJump,
     input wire[31:0] IN_BP_branchSrc,
     input wire[31:0] IN_BP_branchDst,
-    input wire[7:0] IN_BP_branchID,
+    input BrID IN_BP_branchID,
     input wire IN_BP_multipleBranches,
     input wire IN_BP_branchCompr,
 
@@ -37,7 +37,7 @@ integer i;
 reg[30:0] pc;
 reg[30:0] pcLast;
 reg[3:0] bMaskLast;
-reg[7:0] bIndexLast[3:0];
+BrID bIndexLast[3:0];
 reg bPredLast[3:0];
 
 assign OUT_pcRaw = {pc, 1'b0};

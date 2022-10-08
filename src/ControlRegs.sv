@@ -20,7 +20,7 @@ module ControlRegs
     
     // Various Signals to update perf counters
     input wire IN_comValid[NUM_UOPS-1:0],
-    input BranchProv IN_branch,
+    input wire IN_branchMispred,
     input wire IN_wbValid[NUM_WBS-1:0],
     input wire IN_ifValid[NUM_UOPS-1:0],
     input wire IN_comBranch,
@@ -30,7 +30,7 @@ module ControlRegs
     input wire IN_irqTaken,
     input wire[31:0] IN_irqSrc,
     input Flags IN_irqFlags,
-    input wire[14:0] IN_irqMemAddr,
+    input wire[31:0] IN_irqMemAddr,
     
     output reg[15:0] OUT_GPIO_oe,
     output reg[15:0] OUT_GPIO,
@@ -54,12 +54,12 @@ reg[31:0] dataReg;
 
 
 // 64-bit Regs
-// 0 CR_cycles
-// 1 CR_decInstrs
-// 2 CR_exeInstrs
-// 3 CR_comInstrs
-// 4 CR_invalids
-// 5 CR_branches
+// 0 CR_cycles 80
+// 1 CR_decInstrs 88
+// 2 CR_exeInstrs 90
+// 3 CR_comInstrs 98
+// 4 CR_invalids a0
+// 5 CR_branches a8
 reg[63:0] cRegs64[5:0];
 
 
@@ -192,7 +192,7 @@ always_ff@(posedge clk) begin
         
         if (IN_irqTaken) begin
             cRegs[1] <= IN_irqSrc;
-            cRegs[2] <= {4'b0, IN_irqMemAddr, 11'b0, IN_irqFlags[1:0]};
+            cRegs[2] <= {IN_irqMemAddr[31:2], IN_irqFlags[1:0]};
         end
         
         ceReg <= IN_ce;
@@ -215,7 +215,7 @@ always_ff@(posedge clk) begin
             if (IN_wbValid[i])
                 cRegs64[2] = cRegs64[2] + 1;
         end
-        if (IN_branch.taken)
+        if (IN_branchMispred)
             cRegs64[4] <= cRegs64[4] + 1;
         
         if (IN_comBranch)

@@ -1,16 +1,3 @@
-
-typedef struct packed
-{
-    bit valid;
-    bit used; // for pseudo-LRU
-    bit[31:0] srcAddr;
-    bit[31:0] dstAddr;
-    bit compressed;
-    bit taken;  // always taken or dynamic bp?
-    bit[1:0] history;
-    bit[3:0][1:0] counters;
-} BTEntry;
-
 module BranchPredictor
 #(
     parameter NUM_IN=2,
@@ -21,6 +8,7 @@ module BranchPredictor
     input wire clk,
     input wire rst,
     input wire IN_mispredFlush,
+    input BranchProv IN_branch,
     
     // IF interface
     input wire IN_pcValid,
@@ -37,10 +25,11 @@ module BranchPredictor
     // Branch XU interface
     input BTUpdate IN_btUpdates[NUM_IN-1:0],
     
+    
     // Branch ROB Interface
     input CommitUOp IN_comUOp,
     
-    output wire OUT_CSR_branchCommitted
+    output reg OUT_CSR_branchCommitted
 );
 
 integer i;
@@ -59,9 +48,10 @@ always_comb begin
     end
 end
 
-wire[ID_BITS-1:0] hash = IN_pc[8:1] ^ gHistory;
+wire[7:0] hash = IN_pc[8:1] ^ gHistory[7:0];
+
 // Non-branches (including jumps) get 0 as their ID.
-assign OUT_branchID = (OUT_branchFound && !OUT_isJump) ? hash : 0;
+assign OUT_branchID = (OUT_branchFound && !OUT_isJump) ? {hash} : 0;
 
 assign OUT_branchDst[0] = 1'b0;
 assign OUT_branchSrc[0] = 1'b0;
@@ -92,23 +82,37 @@ BranchPredictionTable bpt
     .IN_writeTaken(IN_comUOp.branchTaken)
 );
 
-assign OUT_CSR_branchCommitted = 0;
-
+reg lastMispred;
 always@(posedge clk) begin
+    
+    lastMispred <= IN_mispredFlush;
     
     if (rst) begin
         gHistory <= 0;
         gHistoryCom <= 0;
+        OUT_CSR_branchCommitted <= 0;
     end
     else begin
         if (OUT_branchFound && !OUT_isJump)
-            gHistory <= {gHistory[6:0], OUT_branchTaken};
+            gHistory <= {gHistory[ID_BITS-2:0], OUT_branchTaken};
         
-        if (IN_comUOp.valid && IN_comUOp.isBranch)
-            gHistoryCom <= {gHistoryCom[6:0], IN_comUOp.branchTaken};
+        if (IN_comUOp.valid && IN_comUOp.isBranch) begin
+            gHistoryCom <= {gHistoryCom[ID_BITS-2:0], IN_comUOp.branchTaken};
+            OUT_CSR_branchCommitted <= 1;
+        end
+        else OUT_CSR_branchCommitted <= 0;
             
-        if (IN_mispredFlush)
-            gHistory <= gHistoryCom;
+        //if (IN_mispredFlush || IN_branch.taken)
+        //if (lastMispred && !IN_mispredFlush)
+        //    gHistory <= gHistoryCom;
+    end
+    
+    if (!rst && IN_branch.taken) begin
+        //if (IN_branch.branchID[7:0] == 0)
+        gHistory <= 0;
+        //else
+        //    gHistory <= {3'b0, IN_branch.branchID[11:0] ^ IN_branch.srcPC[15:4], IN_branch.branchTaken};
+            //{IN_branch.branchID[14:0] ^ IN_branch.srcPC[18:4], IN_branch.branchTaken};
     end
 end
 

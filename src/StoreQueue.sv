@@ -11,7 +11,7 @@ typedef struct packed
 module StoreQueue
 #(
     parameter NUM_PORTS=1,
-    parameter NUM_ENTRIES=16
+    parameter NUM_ENTRIES=24
 )
 (
     input wire clk,

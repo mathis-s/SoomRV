@@ -10,7 +10,7 @@ typedef struct packed
     bit[5:0] name;
     bit isBranch;
     bit branchTaken;
-    bit[7:0] branchID;
+    BrID branchID;
 } ROBEntry;
 
 
@@ -40,7 +40,7 @@ module ROB
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
-    output reg[14:0] OUT_irqMemAddr,
+    output reg[31:0] OUT_irqMemAddr,
     
     output reg OUT_fence,
     
@@ -175,7 +175,7 @@ always_ff@(posedge clk) begin
                 OUT_irqFlags <= entries[baseIndex[4:0]].flags;
                 OUT_irqSrc <= {entries[baseIndex[4:0]].pc, 1'b0};
                 // For exceptions, some fields are reused to get the segment of the violating address
-                OUT_irqMemAddr <= {entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID};
+                OUT_irqMemAddr <= {7'b0, entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID, 10'b0};
             end
             else if (entries[baseIndex[4:0]].flags == FLAGS_FENCE) begin
                 

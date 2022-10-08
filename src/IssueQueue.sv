@@ -48,7 +48,7 @@ reg valid[SIZE-1:0];
 reg[$clog2(SIZE):0] insertIndex;
 reg[32:0] reservedWBs;
 
-assign OUT_full = insertIndex > 5;
+assign OUT_full = insertIndex > (SIZE-NUM_UOPS);
 
 reg newAvailA[SIZE-1:0];
 reg newAvailB[SIZE-1:0];

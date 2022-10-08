@@ -243,7 +243,7 @@ always_comb begin
         i32 = IN_instrs[i].instr;
         i16 = IN_instrs[i].instr[15:0];
         
-        uop = 108'b0;
+        uop = 0;
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
@@ -307,6 +307,10 @@ always_comb begin
                             RS_inValid = 1;
                             RS_inData = IN_instrs[i].pc + 2;
                         end
+                        /*else if (uop.rd == 0 && !uop.branchPred) begin
+                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch = 1;
+                        end*/
                         uop.opcode = INT_JAL;
                         invalidEnc = 0;
                     end

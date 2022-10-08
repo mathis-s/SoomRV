@@ -117,6 +117,7 @@ end
 
 
 reg isBranch;
+reg branchTaken;
 
 always_comb begin
     case (IN_uop.opcode)
@@ -157,7 +158,6 @@ always_comb begin
 end
 
 
-reg branchTaken;
 
 always_ff@(posedge clk) begin
     
@@ -173,7 +173,6 @@ always_ff@(posedge clk) begin
             OUT_branch.sqN <= IN_uop.sqN;
             OUT_branch.loadSqN <= IN_uop.loadSqN;
             OUT_branch.storeSqN <= IN_uop.storeSqN;
-            
             
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
@@ -227,7 +226,7 @@ always_ff@(posedge clk) begin
                 //else $display("Ret correct");
             end
             
-            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
+            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL) && IN_uop.branchID != 0;
             OUT_uop.branchTaken <= branchTaken;
             OUT_uop.branchID <= IN_uop.branchID;
             

@@ -104,7 +104,6 @@ printdecu:
         ori a2, a2, 0x30
         
         beqz a5, .skip2
-            
             sb a2, 0(a4)
         .skip2:
         
@@ -116,31 +115,33 @@ printdecu:
     sb a0, 0(a4)
     ret
     
-#.globl memcpy
-#memcpy:
-#    beqz a2, .memcpy_end
-#    mv a3, a0
-#    .memcpy_loop:
-#        lb a4, 0(a1)
-#        sb a4, 0(a3)
-#        addi a1, a1, 1
-#        addi a3, a3, 1
-#        addi a2, a2, -1
-#        bnez a2, .memcpy_loop
-#    .memcpy_end:
-#    ret
-#    
-#.globl memset
-#memset:
-#    beqz a2, .memset_end
-#    mv a3, a0
-#    .memset_loop:
-#        sb a1, 0(a3)
-#        addi a3, a3, 1
-#        addi a2, a2, -1
-#        bnez a2, .memset_loop
-#    .memset_end:
-#    ret
+.globl memcpy
+.type	memcpy, @function
+memcpy:
+    beqz a2, .memcpy_end
+    mv a3, a0
+    .memcpy_loop:
+        lb a4, 0(a1)
+        sb a4, 0(a3)
+        addi a1, a1, 1
+        addi a3, a3, 1
+        addi a2, a2, -1
+        bnez a2, .memcpy_loop
+    .memcpy_end:
+    ret
+    
+.globl memset
+.type	memset, @function
+memset:
+    beqz a2, .memset_end
+    mv a3, a0
+    .memset_loop:
+        sb a1, 0(a3)
+        addi a3, a3, 1
+        addi a2, a2, -1
+        bnez a2, .memset_loop
+    .memset_end:
+    ret
 
 .section .rodata
 hexLut:

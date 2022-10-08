@@ -110,7 +110,7 @@ wire BP_branchTaken;
 wire BP_isJump;
 wire[31:0] BP_branchSrc;
 wire[31:0] BP_branchDst;
-wire[7:0] BP_branchID;
+BrID BP_branchID;
 wire BP_multipleBranches;
 wire BP_branchFound;
 wire BP_branchCompr;
@@ -150,6 +150,7 @@ BranchPredictor bp
     .clk(clk),
     .rst(rst),
     .IN_mispredFlush(mispredFlush),
+    .IN_branch(branch),
     
     .IN_pcValid(stateValid[0] && ifetchEn),
     .IN_pc(PC_pc),
@@ -355,7 +356,7 @@ IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9) iq1
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
-IssueQueue#(8,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
+IssueQueue#(16,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -652,7 +653,7 @@ wire[5:0] ROB_maxSqN;
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
-wire[14:0] ROB_irqMemAddr;
+wire[31:0] ROB_irqMemAddr;
 ROB rob
 (
     .clk(clk),
@@ -693,7 +694,7 @@ ControlRegs cr
     .OUT_data(CSR_dataOut[0]),
 
     .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid}),
-    .IN_branch(branchProvs[1]),
+    .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
     .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid, DE_uop[2].valid}),
     .IN_comBranch(CSR_branchCommitted),

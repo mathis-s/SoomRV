@@ -83,9 +83,8 @@ always_ff@(posedge clk) begin
             endcase
             pl.high <= IN_uop.opcode != MUL_MUL;
         end
-        
-        begin
-            if (pl.valid && (!IN_branch.taken || $signed(pl.sqN - IN_branch.sqN) <= 0)) begin
+        else if ((!IN_branch.taken || $signed(pl.sqN - IN_branch.sqN) <= 0)) begin
+            if (pl.valid) begin
                 if (stage != NUM_STAGES) begin
                     pl.res <= pl.res + ((pl.srcA * pl.srcB[(BITS*stage)+:BITS]) << (BITS*stage));
                     stage <= stage + 1;
@@ -110,6 +109,9 @@ always_ff@(posedge clk) begin
                         OUT_uop.result <= result[31:0];
                 end
             end
+        end
+        else begin
+            pl.valid <= 0;
         end
     end
 end
