@@ -33,6 +33,13 @@ always_comb begin
             OUT_branch.loadSqN = IN_branches[i].loadSqN;
             OUT_branch.storeSqN = IN_branches[i].storeSqN;
             OUT_branch.flush = IN_branches[i].flush;
+            
+            if (i == 0 || i == 1) begin
+                OUT_branch.predicted = IN_branches[i].predicted;
+                OUT_branch.branchID = IN_branches[i].branchID;
+                OUT_branch.branchTaken = IN_branches[i].branchTaken;
+            end
+            else OUT_branch.predicted = 0;
         end
     end
 end

@@ -2,7 +2,7 @@
 typedef logic[5:0] RegNm;
 typedef logic[6:0] Tag;
 typedef logic[5:0] SeqNum;
-typedef logic[7:0] BrID;
+typedef logic[11:0] BrID;
 
 typedef enum logic[5:0]
 {
@@ -128,6 +128,7 @@ typedef struct packed
     logic[30:0] pc;
     BrID branchID;
     logic branchPred;
+    logic predicted;
     logic valid;
 } IF_Instr;
 
@@ -137,6 +138,7 @@ typedef struct packed
     logic[30:0] pc;
     BrID branchID;
     logic branchPred;
+    logic predicted;
     logic valid;
 } PD_Instr;
 
@@ -156,6 +158,7 @@ typedef struct packed
     FuncUnit fu;
     BrID branchID;
     logic branchPred;
+    logic predicted;
     logic compressed;
     logic valid;
 } D_UOp;
@@ -178,6 +181,7 @@ typedef struct packed
     logic[5:0] opcode;
     BrID branchID;
     logic branchPred;
+    logic predicted;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     FuncUnit fu;
@@ -213,6 +217,7 @@ typedef struct packed
     logic[5:0] sqN;
     BrID branchID;
     logic branchPred;
+    logic predicted;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     logic compressed;
@@ -247,6 +252,8 @@ typedef struct packed
     bit branchTaken;
     BrID branchID;
     Flags flags;
+    logic compressed;
+    logic predicted;
     bit valid;
 } RES_UOp;
 
@@ -263,12 +270,15 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit taken;
     bit[31:0] dstPC;
     bit[5:0] sqN;
     bit[5:0] storeSqN;
     bit[5:0] loadSqN;
     bit flush;
+    BrID branchID;
+    bit branchTaken;
+    bit predicted;
+    bit taken;
     
 } BranchProv;
 
@@ -298,6 +308,7 @@ typedef struct packed
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     logic exception;
+    logic compressed;
     logic valid;
 } AGU_UOp;
 
@@ -311,5 +322,7 @@ typedef struct packed
     logic branchTaken;
     BrID branchID;
     logic[30:0] pc;
+    logic compressed;
+    logic predicted;
     logic valid;
 } CommitUOp;

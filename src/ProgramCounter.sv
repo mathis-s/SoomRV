@@ -39,6 +39,7 @@ reg[30:0] pcLast;
 reg[3:0] bMaskLast;
 BrID bIndexLast[3:0];
 reg bPredLast[3:0];
+reg predictedLast[3:0];
 
 assign OUT_pcRaw = {pc, 1'b0};
 
@@ -64,6 +65,7 @@ always_ff@(posedge clk) begin
                 OUT_instrs[i].valid <= (i[1:0] >= pcLast[1:0]) && bMaskLast[i];
                 OUT_instrs[i].branchID <= bIndexLast[i];
                 OUT_instrs[i].branchPred <= bPredLast[i];
+                OUT_instrs[i].predicted <= predictedLast[i];
             end
         end
 
@@ -81,12 +83,17 @@ always_ff@(posedge clk) begin
                         2'b11: bMaskLast <= 4'b1111;
                     endcase
                     for (i = 0; i < 4; i=i+1) begin
-                        bIndexLast[i] <= 0;
+                        bIndexLast[i] <= 
+                            (i[1:0] > IN_BP_branchSrc[2:1] && !IN_BP_isJump) ? 
+                                {IN_BP_branchID[10:0], 1'b1} :
+                                IN_BP_branchID;
                         bPredLast[i] <= 0;
+                        predictedLast[i] <= 0;
                     end
                     
                     bIndexLast[IN_BP_branchSrc[2:1]] <= IN_BP_branchID;
                     bPredLast[IN_BP_branchSrc[2:1]] <= 1;
+                    predictedLast[IN_BP_branchSrc[2:1]] <= 1;
                 end
                 // Branch found, not taken
                 else begin
@@ -109,11 +116,16 @@ always_ff@(posedge clk) begin
                     end
                     
                     for (i = 0; i < 4; i=i+1) begin
-                        bIndexLast[i] <= 0;
+                        bIndexLast[i] <= 
+                            (i[1:0] > IN_BP_branchSrc[2:1] && !IN_BP_isJump) ? 
+                                {IN_BP_branchID[10:0], 1'b0} :
+                                IN_BP_branchID;
                         bPredLast[i] <= 0;
+                        predictedLast[i] <= 0;
                     end
                     bIndexLast[IN_BP_branchSrc[2:1]] <= IN_BP_branchID;
                     bPredLast[IN_BP_branchSrc[2:1]] <= 0;
+                    predictedLast[IN_BP_branchSrc[2:1]] <= 1;
                 end
             end
             else begin
@@ -121,8 +133,9 @@ always_ff@(posedge clk) begin
                 pcLast <= pc;
                 bMaskLast <= 4'b1111;
                 for (i = 0; i < 4; i=i+1) begin
-                    bIndexLast[i] <= 0;
+                    bIndexLast[i] <= IN_BP_branchID;
                     bPredLast[i] <= 0;
+                    predictedLast[i] <= 0;
                 end
             end
         end

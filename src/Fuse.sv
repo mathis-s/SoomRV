@@ -109,6 +109,7 @@ always_comb begin
             fusedUOps[i+0].branchID = fusionWindow[i+1].branchID;
             fusedUOps[i+0].branchPred = fusionWindow[i+1].branchPred;
             fusedUOps[i+0].compressed = fusionWindow[i+1].compressed;
+            fusedUOps[i+0].predicted = fusionWindow[i+1].predicted;
 
             
             // Invalidate upper op as is fused into lower

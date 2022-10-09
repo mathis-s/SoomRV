@@ -2,7 +2,7 @@ module BranchPredictor
 #(
     parameter NUM_IN=2,
     parameter NUM_ENTRIES=32,
-    parameter ID_BITS=8
+    parameter ID_BITS=12
 )
 (
     input wire clk,
@@ -48,10 +48,9 @@ always_comb begin
     end
 end
 
-wire[7:0] hash = IN_pc[8:1] ^ gHistory[7:0];
+wire[ID_BITS-1:0] hash = (OUT_branchCompr ? OUT_branchSrc[ID_BITS:1] : OUT_branchSrc[ID_BITS:1] - 1) ^ gHistory;
 
-// Non-branches (including jumps) get 0 as their ID.
-assign OUT_branchID = (OUT_branchFound && !OUT_isJump) ? {hash} : 0;
+assign OUT_branchID = gHistory;
 
 assign OUT_branchDst[0] = 1'b0;
 assign OUT_branchSrc[0] = 1'b0;
@@ -77,16 +76,13 @@ BranchPredictionTable bpt
     .rst(rst),
     .IN_readAddr(hash),
     .OUT_taken(OUT_branchTaken),
-    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch),
-    .IN_writeAddr(IN_comUOp.branchID),
+    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted),
+    .IN_writeAddr(IN_comUOp.branchID ^ IN_comUOp.pc[ID_BITS-1:0]),
     .IN_writeTaken(IN_comUOp.branchTaken)
 );
 
-reg lastMispred;
 always@(posedge clk) begin
-    
-    lastMispred <= IN_mispredFlush;
-    
+
     if (rst) begin
         gHistory <= 0;
         gHistoryCom <= 0;
@@ -101,18 +97,13 @@ always@(posedge clk) begin
             OUT_CSR_branchCommitted <= 1;
         end
         else OUT_CSR_branchCommitted <= 0;
-            
-        //if (IN_mispredFlush || IN_branch.taken)
-        //if (lastMispred && !IN_mispredFlush)
-        //    gHistory <= gHistoryCom;
     end
     
     if (!rst && IN_branch.taken) begin
-        //if (IN_branch.branchID[7:0] == 0)
-        gHistory <= 0;
-        //else
-        //    gHistory <= {3'b0, IN_branch.branchID[11:0] ^ IN_branch.srcPC[15:4], IN_branch.branchTaken};
-            //{IN_branch.branchID[14:0] ^ IN_branch.srcPC[18:4], IN_branch.branchTaken};
+        if (IN_branch.predicted)
+            gHistory <= {IN_branch.branchID[ID_BITS-2:0], IN_branch.branchTaken};
+        else
+            gHistory <= IN_branch.branchID;
     end
 end
 

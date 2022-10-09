@@ -1,7 +1,6 @@
 
 typedef struct packed 
 {
-    bit valid;
     Flags flags;
     bit[6:0] tag;
     // for debugging
@@ -11,6 +10,9 @@ typedef struct packed
     bit isBranch;
     bit branchTaken;
     BrID branchID;
+    bit compressed;
+    bit predicted;
+    bit valid;
 } ROBEntry;
 
 
@@ -67,9 +69,9 @@ always_comb begin
             headValid = 0;
     end
     
-    if (entries[baseIndex[4:0]+1].isBranch)
+    if (entries[baseIndex[4:0]+1].predicted)
         headValid = 0;
-    if (entries[baseIndex[4:0]+2].isBranch)
+    if (entries[baseIndex[4:0]+2].predicted)
         headValid = 0;
 end
 
@@ -127,6 +129,8 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].branchID <= entries[baseIndex[4:0]+i[4:0]].branchID;
                 OUT_comUOp[i].valid <= 1;
                 OUT_comUOp[i].pc <= entries[baseIndex[4:0]+i[4:0]].pc;
+                OUT_comUOp[i].compressed <= entries[baseIndex[4:0]+i[4:0]].compressed;
+                OUT_comUOp[i].predicted <= entries[baseIndex[4:0]+i[4:0]].predicted;
                 entries[baseIndex[4:0]+i[4:0]].valid <= 0;
             end
             // Blocking for proper insertion
@@ -144,6 +148,8 @@ always_ff@(posedge clk) begin
             OUT_comUOp[0].branchID <= entries[baseIndex[4:0]].branchID;
             OUT_comUOp[0].valid <= 1;
             OUT_comUOp[0].pc <= entries[baseIndex[4:0]].pc;
+            OUT_comUOp[0].compressed <= entries[baseIndex[4:0]].compressed;
+            OUT_comUOp[0].predicted <= entries[baseIndex[4:0]].predicted;
             entries[baseIndex[4:0]].valid <= 0;
             
             if (entries[baseIndex[4:0]].flags == FLAGS_BRK) begin
@@ -175,7 +181,7 @@ always_ff@(posedge clk) begin
                 OUT_irqFlags <= entries[baseIndex[4:0]].flags;
                 OUT_irqSrc <= {entries[baseIndex[4:0]].pc, 1'b0};
                 // For exceptions, some fields are reused to get the segment of the violating address
-                OUT_irqMemAddr <= {7'b0, entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID, 10'b0};
+                //OUT_irqMemAddr <= {7'b0, entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID, 10'b0};
             end
             else if (entries[baseIndex[4:0]].flags == FLAGS_FENCE) begin
                 
@@ -217,6 +223,8 @@ always_ff@(posedge clk) begin
                 entries[IN_uop[i].sqN[4:0]].isBranch <= IN_uop[i].isBranch;
                 entries[IN_uop[i].sqN[4:0]].branchTaken <= IN_uop[i].branchTaken;
                 entries[IN_uop[i].sqN[4:0]].branchID <= IN_uop[i].branchID;
+                entries[IN_uop[i].sqN[4:0]].compressed <= IN_uop[i].compressed;
+                entries[IN_uop[i].sqN[4:0]].predicted <= IN_uop[i].predicted;
             end
         end
     end

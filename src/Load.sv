@@ -83,6 +83,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
                 OUT_uop[i].compressed <= IN_uop[i].compressed;
+                OUT_uop[i].predicted <= IN_uop[i].predicted;
                 
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 

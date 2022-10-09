@@ -116,6 +116,8 @@ always@(posedge clk) begin
         OUT_uop.flags <= 0;
         OUT_uop.valid <= 1;
         OUT_uop.pc <= IN_uop.pc;
+        OUT_uop.compressed <= 0;
+        OUT_uop.predicted <= 0;
             
         case (IN_uop.opcode)
             

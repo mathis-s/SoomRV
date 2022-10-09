@@ -3,7 +3,6 @@
 main:
     li a0, 1000
     
-    
     .loop:
         addi a0, a0, -1
         andi a1, a0, 1

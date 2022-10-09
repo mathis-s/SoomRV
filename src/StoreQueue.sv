@@ -116,14 +116,16 @@ always_comb begin
 
         OUT_uop[i].result = result;
         OUT_uop[i].tagDst = i1[i].tagDst;
-        OUT_uop[i].nmDst = i1[i].exception ? i1[i].addr[25:20] : i1[i].nmDst;
+        OUT_uop[i].nmDst = /*i1[i].exception ? i1[i].addr[25:20] : */i1[i].nmDst;
         OUT_uop[i].sqN = i1[i].sqN;
         OUT_uop[i].pc = i1[i].pc;
         OUT_uop[i].valid = i1[i].valid;
         OUT_uop[i].flags = i1[i].exception ? FLAGS_EXCEPT : FLAGS_NONE;
         OUT_uop[i].isBranch = 0;
-        OUT_uop[i].branchTaken = i1[i].addr[19];
-        OUT_uop[i].branchID = i1[i].addr[18:11];
+        OUT_uop[i].branchTaken = 0;//i1[i].addr[19];
+        OUT_uop[i].branchID = 0;//i1[i].addr[18:11];
+        OUT_uop[i].compressed = i1[i].compressed;//i1[i].addr[18:11];
+        OUT_uop[i].predicted = 0;//i1[i].addr[18:11];
     end
 end
 

@@ -87,6 +87,8 @@ always_ff@(posedge clk) begin
                 OUT_uop.isBranch <= 0;
                 OUT_uop.branchTaken <= 0;
                 OUT_uop.branchID <= 0;
+                OUT_uop.compressed <= 0;
+                OUT_uop.predicted <= 0;
                 
                 OUT_uop.flags <= FLAGS_NONE;
                 OUT_uop.valid <= 1;

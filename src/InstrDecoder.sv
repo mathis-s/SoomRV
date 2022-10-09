@@ -249,6 +249,7 @@ always_comb begin
         uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
         uop.branchID = IN_instrs[i].branchID;
         uop.branchPred = IN_instrs[i].branchPred;
+        uop.predicted = IN_instrs[i].predicted;
         
         case (instr.opcode)
             `OPC_LUI,

@@ -161,8 +161,6 @@ end
 
 always_ff@(posedge clk) begin
     
-    OUT_branch.flush <= 0;
-    
     if (rst) begin
         OUT_uop.valid <= 0;
         OUT_branch.taken <= 0;
@@ -176,10 +174,14 @@ always_ff@(posedge clk) begin
             
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
+            OUT_branch.flush <= 0;
+            OUT_branch.branchTaken <= branchTaken;
+            OUT_branch.branchID <= IN_uop.branchID;
+            OUT_branch.predicted <= IN_uop.predicted;
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
-                if (branchTaken && !IN_uop.branchPred && IN_uop.branchID == 0) begin
+                if (branchTaken && !IN_uop.predicted) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                     OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
@@ -226,10 +228,12 @@ always_ff@(posedge clk) begin
                 //else $display("Ret correct");
             end
             
-            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL) && IN_uop.branchID != 0;
+            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
             OUT_uop.branchTaken <= branchTaken;
             OUT_uop.branchID <= IN_uop.branchID;
+            OUT_uop.predicted <= IN_uop.predicted;
             
+            OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.result <= resC;
