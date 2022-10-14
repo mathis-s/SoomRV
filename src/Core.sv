@@ -100,7 +100,8 @@ BranchSelector bsel
     
     .IN_ROB_curSqN(ROB_curSqN),
     .IN_RN_nextSqN(RN_nextSqN),
-    .OUT_mispredFlush(mispredFlush)
+    .IN_mispredFlush(mispredFlush)
+    //.OUT_mispredFlush()
 );
 
 wire[31:0] PC_pc;
@@ -658,7 +659,10 @@ ROB rob
 (
     .clk(clk),
     .rst(rst),
-    .IN_uop(wbUOp),
+    .IN_uop(RN_uop),
+    .IN_uopValid(RN_uopValid),
+    
+    .IN_wbUOps(wbUOp),
 
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -677,7 +681,8 @@ ROB rob
     
     .OUT_branch(branchProvs[3]),
     
-    .OUT_halt(OUT_halt)
+    .OUT_halt(OUT_halt),
+    .OUT_mispredFlush(mispredFlush)
 );
 
 wire IO_busy;
@@ -686,6 +691,7 @@ ControlRegs cr
 (
     .clk(clk),
     .rst(rst),
+    .IN_mispredFlush(mispredFlush),
     .IN_ce(CSR_ce[0]),
     .IN_we(OUT_MEM_writeEnable),
     .IN_wm(OUT_MEM_writeMask),

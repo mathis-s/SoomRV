@@ -39,7 +39,9 @@ typedef struct packed
 integer i;
 
 MulPS pl;
+/* verilator lint_off UNSIGNED */
 assign OUT_busy = pl.valid && (stage < NUM_STAGES - 1);
+/* verilator lint_on UNSIGNED */
 
 reg[63:0] result;
 reg[3:0] stage;

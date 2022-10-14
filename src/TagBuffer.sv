@@ -13,6 +13,7 @@ module TagBuffer
     input wire clk,
     input wire rst,
     input wire IN_mispr,
+    input wire IN_mispredFlush,
     
     input wire IN_issueValid[NUM_UOPS-1:0],
     output reg[5:0] OUT_issueTags[NUM_UOPS-1:0],
@@ -77,16 +78,21 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             if (IN_commitValid[i]) begin
                 
-                if (IN_commitNewest[i]) begin
-                    tags[IN_RAT_commitPrevTags[i]].committed <= 0;
-                    tags[IN_RAT_commitPrevTags[i]].used <= 0;
-                    
-                    tags[IN_commitTagDst[i]].committed <= 1;
-                    tags[IN_commitTagDst[i]].used <= 1;
+                if (IN_mispredFlush) begin
+                    if (!IN_mispr) tags[IN_commitTagDst[i]].used <= 1;
                 end
                 else begin
-                    tags[IN_commitTagDst[i]].committed <= 0;
-                    tags[IN_commitTagDst[i]].used <= 0;
+                    if (IN_commitNewest[i]) begin
+                        tags[IN_RAT_commitPrevTags[i]].committed <= 0;
+                        tags[IN_RAT_commitPrevTags[i]].used <= 0;
+                        
+                        tags[IN_commitTagDst[i]].committed <= 1;
+                        tags[IN_commitTagDst[i]].used <= 1;
+                    end
+                    else begin
+                        tags[IN_commitTagDst[i]].committed <= 0;
+                        tags[IN_commitTagDst[i]].used <= 0;
+                    end
                 end
             end
         end

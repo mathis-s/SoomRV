@@ -76,7 +76,7 @@ BranchPredictionTable bpt
     .rst(rst),
     .IN_readAddr(hash),
     .OUT_taken(OUT_branchTaken),
-    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted),
+    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted && !IN_mispredFlush),
     .IN_writeAddr(IN_comUOp.branchID ^ IN_comUOp.pc[ID_BITS-1:0]),
     .IN_writeTaken(IN_comUOp.branchTaken)
 );
@@ -92,7 +92,7 @@ always@(posedge clk) begin
         if (OUT_branchFound && !OUT_isJump)
             gHistory <= {gHistory[ID_BITS-2:0], OUT_branchTaken};
         
-        if (IN_comUOp.valid && IN_comUOp.isBranch) begin
+        if (IN_comUOp.valid && IN_comUOp.isBranch && !IN_mispredFlush) begin
             gHistoryCom <= {gHistoryCom[ID_BITS-2:0], IN_comUOp.branchTaken};
             OUT_CSR_branchCommitted <= 1;
         end

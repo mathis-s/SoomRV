@@ -8,6 +8,7 @@ module ControlRegs
 (
     input wire clk,
     input wire rst,
+    input wire IN_mispredFlush,
     
     input wire IN_ce,
     input wire IN_we,
@@ -208,7 +209,7 @@ always_ff@(posedge clk) begin
         
             if (IN_ifValid[i])
                 cRegs64[1] = cRegs64[1] + 1;
-            if (IN_comValid[i])
+            if (IN_comValid[i] && !IN_mispredFlush)
                 cRegs64[3] = cRegs64[3] + 1;
         end
         for (i = 0; i < NUM_WBS; i=i+1) begin

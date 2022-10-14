@@ -1,4 +1,4 @@
-
+  
 typedef struct packed 
 {
     Flags flags;
@@ -13,6 +13,7 @@ typedef struct packed
     bit compressed;
     bit predicted;
     bit valid;
+    bit executed;
 } ROBEntry;
 
 
@@ -29,7 +30,10 @@ module ROB
     input wire clk,
     input wire rst,
 
-    input RES_UOp IN_uop[WIDTH_WB-1:0],
+    input R_UOp IN_uop[WIDTH-1:0],
+    input wire IN_uopValid[WIDTH-1:0],
+    
+    input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
 
     input wire IN_invalidate,
     input wire[5:0] IN_invalidateSqN,
@@ -48,7 +52,9 @@ module ROB
     
     output BranchProv OUT_branch,
     
-    output reg OUT_halt
+    output reg OUT_halt,
+    
+    output reg OUT_mispredFlush
 );
 
 ROBEntry entries[LENGTH-1:0];
@@ -65,7 +71,7 @@ reg headValid;
 always_comb begin
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[baseIndex[4:0] + i[4:0]].valid || entries[baseIndex[4:0] + i[4:0]].flags != FLAGS_NONE)
+        if (!entries[baseIndex[4:0] + i[4:0]].executed || entries[baseIndex[4:0] + i[4:0]].flags != FLAGS_NONE)
             headValid = 0;
     end
     
@@ -83,9 +89,14 @@ always_comb begin
     //    if (entries[i].valid)
     //        allowSingleDequeue = 0;
             
-    if (!entries[baseIndex[4:0]].valid)
+    if (!entries[baseIndex[4:0]].executed)
         allowSingleDequeue = 0;
 end
+
+reg misprReplay;
+reg misprReplayEnd;
+reg[5:0] misprReplayIter;
+reg[5:0] misprReplayEndSqN;
 
 wire doDequeue = headValid; // placeholder
 always_ff@(posedge clk) begin
@@ -98,26 +109,65 @@ always_ff@(posedge clk) begin
         baseIndex = 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
+            entries[i].executed <= 0;
         end
         for (i = 0; i < WIDTH; i=i+1) begin
             OUT_comUOp[i].valid <= 0;
         end
         committedInstrs <= 0;
         OUT_branch.taken <= 0;
+        misprReplay <= 0;
+        OUT_mispredFlush <= 0;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
             if ($signed(entries[i].sqN - IN_invalidateSqN) > 0) begin
                 entries[i].valid <= 0;
+                entries[i].executed <= 0;
             end
         end
+        
+        misprReplay <= 1;
+        misprReplayEndSqN <= IN_invalidateSqN;
+        misprReplayIter <= baseIndex;
+        misprReplayEnd <= 0;
+        OUT_mispredFlush <= 0;
     end
     
     if (!rst) begin
-        // Dequeue and push forward fifo entries
         
+        // After mispredict, we replay all ops from last committed to the branch
+        // without actually committing them, to roll back the Rename Map.
+        if (misprReplay && !IN_invalidate) begin
+            
+            if (misprReplayEnd) begin
+                misprReplay <= 0;
+                for (i = 0; i < WIDTH; i=i+1)
+                    OUT_comUOp[i].valid <= 0;
+                OUT_mispredFlush <= 0;
+            end
+            else begin
+                OUT_mispredFlush <= 1;
+                for (i = 0; i < WIDTH; i=i+1) begin
+                    if ($signed((misprReplayIter + i[4:0]) - misprReplayEndSqN) <= 0) begin
+                        OUT_comUOp[i].valid <= 1;
+                        OUT_comUOp[i].nmDst <= entries[misprReplayIter[4:0]+i[4:0]].name;
+                        OUT_comUOp[i].tagDst <= entries[misprReplayIter[4:0]+i[4:0]].tag;
+                        OUT_comUOp[i].predicted <= entries[misprReplayIter[4:0]+i[4:0]].executed;
+                        for (j = 0; j < WIDTH_WB; j=j+1)
+                            if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == entries[misprReplayIter[4:0]+i[4:0]].tag)
+                                OUT_comUOp[i].predicted <= 1;
+                    end
+                    else begin
+                        OUT_comUOp[i].valid <= 0;
+                        misprReplayEnd <= 1;
+                    end
+                end
+                misprReplayIter <= misprReplayIter + WIDTH;
+            end
+        end
         // Two Entries
-        if (doDequeue && !IN_invalidate) begin
+        else if (doDequeue && !IN_invalidate) begin
             committedInstrs <= committedInstrs + 3;
 
             for (i = 0; i < WIDTH; i=i+1) begin
@@ -132,6 +182,7 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].compressed <= entries[baseIndex[4:0]+i[4:0]].compressed;
                 OUT_comUOp[i].predicted <= entries[baseIndex[4:0]+i[4:0]].predicted;
                 entries[baseIndex[4:0]+i[4:0]].valid <= 0;
+                entries[baseIndex[4:0]+i[4:0]].executed <= 0;
             end
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
@@ -151,6 +202,7 @@ always_ff@(posedge clk) begin
             OUT_comUOp[0].compressed <= entries[baseIndex[4:0]].compressed;
             OUT_comUOp[0].predicted <= entries[baseIndex[4:0]].predicted;
             entries[baseIndex[4:0]].valid <= 0;
+            entries[baseIndex[4:0]].executed <= 0;
             
             if (entries[baseIndex[4:0]].flags == FLAGS_BRK) begin
                 // ebreak does a jump to the instruction after itself,
@@ -207,26 +259,37 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].valid <= 0;
         end
 
-        // Enqueue if entries are unused (or if we just dequeued, which frees space).
-        for (i = 0; i < WIDTH_WB; i=i+1) begin
-            if (IN_uop[i].valid && (!IN_invalidate || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0)) begin
+        // Enqueue ops directly from Rename
+        for (i = 0; i < WIDTH; i=i+1) begin
+            if (IN_uopValid[i] && (!IN_invalidate/* || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0*/)) begin
                 
                 //assert(!IN_invalidate || !entries[IN_uop[i].sqN[4:0]].valid);
                 //$display("insert %d", IN_uop[i].sqN);
                 
                 entries[IN_uop[i].sqN[4:0]].valid <= 1;
-                entries[IN_uop[i].sqN[4:0]].flags <= IN_uop[i].flags;
+                //entries[IN_uop[i].sqN[4:0]].flags <= IN_uop[i].flags;
                 entries[IN_uop[i].sqN[4:0]].tag <= IN_uop[i].tagDst;
                 entries[IN_uop[i].sqN[4:0]].name <= IN_uop[i].nmDst;
                 entries[IN_uop[i].sqN[4:0]].sqN <= IN_uop[i].sqN;
                 entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:1];
-                entries[IN_uop[i].sqN[4:0]].isBranch <= IN_uop[i].isBranch;
-                entries[IN_uop[i].sqN[4:0]].branchTaken <= IN_uop[i].branchTaken;
                 entries[IN_uop[i].sqN[4:0]].branchID <= IN_uop[i].branchID;
                 entries[IN_uop[i].sqN[4:0]].compressed <= IN_uop[i].compressed;
                 entries[IN_uop[i].sqN[4:0]].predicted <= IN_uop[i].predicted;
+                entries[IN_uop[i].sqN[4:0]].executed <= 0;
             end
         end
+        
+        // Mark committed ops as valid and set flags
+        for (i = 0; i < WIDTH_WB; i=i+1) begin
+            if (IN_wbUOps[i].valid && (!IN_invalidate || $signed(IN_wbUOps[i].sqN - IN_invalidateSqN) <= 0)) begin
+                entries[IN_wbUOps[i].sqN[4:0]].executed <= 1;
+                entries[IN_wbUOps[i].sqN[4:0]].flags <= IN_wbUOps[i].flags;
+                entries[IN_wbUOps[i].sqN[4:0]].isBranch <= IN_wbUOps[i].isBranch;
+                entries[IN_wbUOps[i].sqN[4:0]].branchTaken <= IN_wbUOps[i].branchTaken;
+            end
+        end
+        
+        
     end
 end
 

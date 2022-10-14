@@ -54,6 +54,7 @@ reg commitValid_fp[WIDTH_UOPS-1:0];
 reg[5:0] RAT_commitIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_commitTags[WIDTH_UOPS-1:0];
 wire[6:0] RAT_commitPrevTags[WIDTH_UOPS-1:0];
+reg RAT_commitAvail[WIDTH_UOPS-1:0];
 
 reg[5:0] RAT_wbIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_wbTags[WIDTH_UOPS-1:0];
@@ -92,6 +93,8 @@ always_comb begin
         
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
+        // Only using during mispredict replay
+        RAT_commitAvail[i] = IN_comUOp[i].predicted;
         
         // Writeback
         RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
@@ -117,6 +120,7 @@ RenameTable rt
     .IN_commitValid(commitValid),
     .IN_commitIDs(RAT_commitIDs),
     .IN_commitTags(RAT_commitTags),
+    .IN_commitAvail(RAT_commitAvail),
     .OUT_commitPrevTags(RAT_commitPrevTags),
     
     .IN_wbValid(IN_wbHasResult),
@@ -148,6 +152,7 @@ TagBuffer tb
     .clk(clk),
     .rst(rst),
     .IN_mispr(IN_branchTaken),
+    .IN_mispredFlush(IN_mispredFlush),
     
     .IN_issueValid(TB_issueValid),
     .OUT_issueTags(TB_tags),
@@ -163,6 +168,7 @@ TagBuffer tb_fp
     .clk(clk),
     .rst(rst),
     .IN_mispr(IN_branchTaken),
+    .IN_mispredFlush(IN_mispredFlush),
     
     .IN_issueValid(TB_issueValid_fp),
     .OUT_issueTags(TB_FP_tags),

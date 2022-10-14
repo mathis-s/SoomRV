@@ -32,6 +32,7 @@ module RenameTable
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire[ID_SIZE-1:0] IN_commitIDs[NUM_COMMIT-1:0],
     input wire[TAG_SIZE-1:0] IN_commitTags[NUM_COMMIT-1:0],
+    input wire IN_commitAvail[NUM_COMMIT-1:0],
     output reg[TAG_SIZE-1:0] OUT_commitPrevTags[NUM_COMMIT-1:0],
 
     input wire IN_wbValid[NUM_WB-1:0],
@@ -78,7 +79,6 @@ always_ff@(posedge clk) begin
         end
     end
     else begin
-        
         // Written back values are speculatively available
         for (i = 0; i < NUM_WB; i=i+1) begin
             if (IN_wbValid[i] && rat[IN_wbID[i]].specTag == IN_wbTag[i]) begin
@@ -106,10 +106,19 @@ always_ff@(posedge clk) begin
         
         for (i = 0; i < NUM_COMMIT; i=i+1) begin
             if (IN_commitValid[i]) begin
-                rat[IN_commitIDs[i]].comTag <= IN_commitTags[i];
-                if (IN_mispredFlush || IN_mispred) begin
-                    rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
-                    //rat[IN_commitIDs[i]].avail <= 1;
+                if (IN_mispredFlush) begin
+                    if (!IN_mispred) begin
+                        rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
+                        rat[IN_commitIDs[i]].avail <= IN_commitAvail[i];
+                        for (j = 0; j < NUM_WB; j=j+1)
+                            if (IN_wbValid[j] && IN_wbTag[j] == IN_commitTags[i])
+                                rat[IN_commitIDs[i]].avail <= 1;
+                    end
+                end
+                else begin
+                    rat[IN_commitIDs[i]].comTag <= IN_commitTags[i];
+                    if (IN_mispred)
+                        rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
                 end
             end
         end

@@ -279,6 +279,7 @@ typedef struct packed
     bit branchTaken;
     bit predicted;
     bit taken;
+    bit indirect;
     
 } BranchProv;
 
