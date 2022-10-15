@@ -37,6 +37,7 @@ always_ff@(posedge clk) begin
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.storeSqN <= IN_uop.storeSqN;
             OUT_uop.loadSqN <= IN_uop.loadSqN;
+            OUT_uop.fetchID <= IN_uop.fetchID;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.valid <= 1;
             

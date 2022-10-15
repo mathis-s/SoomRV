@@ -1,6 +1,6 @@
 module BranchPredictionTable
 #(
-    parameter INDEX_LEN = 12,
+    parameter INDEX_LEN = 10,
     parameter NUM_COUNTERS = (1 << INDEX_LEN)
 )
 (

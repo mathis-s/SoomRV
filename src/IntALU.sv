@@ -179,6 +179,7 @@ always_ff@(posedge clk) begin
             OUT_branch.branchID <= IN_uop.branchID;
             OUT_branch.predicted <= IN_uop.predicted;
             OUT_branch.indirect <= IN_uop.opcode == INT_JALR || IN_uop.opcode == INT_V_RET;
+            OUT_branch.fetchID <= IN_uop.fetchID;
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.

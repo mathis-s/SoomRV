@@ -10,6 +10,7 @@ typedef struct packed
     bit isBranch;
     bit branchTaken;
     BrID branchID;
+    FetchID_t fetchID;
     bit compressed;
     bit predicted;
     bit valid;
@@ -25,7 +26,7 @@ module ROB
 
     parameter WIDTH = 3,
     parameter WIDTH_WB = 3
-)
+    )
 (
     input wire clk,
     input wire rst,
@@ -214,6 +215,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
+                OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
                 // Do not write back result, redirect to x0
                 OUT_comUOp[0].nmDst <= 0;
             end
@@ -225,6 +227,7 @@ always_ff@(posedge clk) begin
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
+                OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
                 
                 // Do not write back result, redirect to x0
                 if (entries[baseIndex[4:0]].flags == FLAGS_EXCEPT)
@@ -243,6 +246,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
+                OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
                 
                 OUT_fence <= 1;
             end
@@ -271,10 +275,9 @@ always_ff@(posedge clk) begin
                 entries[IN_uop[i].sqN[4:0]].tag <= IN_uop[i].tagDst;
                 entries[IN_uop[i].sqN[4:0]].name <= IN_uop[i].nmDst;
                 entries[IN_uop[i].sqN[4:0]].sqN <= IN_uop[i].sqN;
-                entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:1];
-                entries[IN_uop[i].sqN[4:0]].branchID <= IN_uop[i].branchID;
+                //entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:1];
                 entries[IN_uop[i].sqN[4:0]].compressed <= IN_uop[i].compressed;
-                entries[IN_uop[i].sqN[4:0]].predicted <= IN_uop[i].predicted;
+                entries[IN_uop[i].sqN[4:0]].fetchID <= IN_uop[i].fetchID;
                 entries[IN_uop[i].sqN[4:0]].executed <= 0;
             end
         end
@@ -285,7 +288,10 @@ always_ff@(posedge clk) begin
                 entries[IN_wbUOps[i].sqN[4:0]].executed <= 1;
                 entries[IN_wbUOps[i].sqN[4:0]].flags <= IN_wbUOps[i].flags;
                 entries[IN_wbUOps[i].sqN[4:0]].isBranch <= IN_wbUOps[i].isBranch;
+                entries[IN_wbUOps[i].sqN[4:0]].branchID <= IN_wbUOps[i].branchID;
+                entries[IN_wbUOps[i].sqN[4:0]].predicted <= IN_wbUOps[i].predicted;
                 entries[IN_wbUOps[i].sqN[4:0]].branchTaken <= IN_wbUOps[i].branchTaken;
+                entries[IN_wbUOps[i].sqN[4:0]].pc <= IN_wbUOps[i].pc[31:1];
             end
         end
         

@@ -2,7 +2,7 @@ module BranchPredictor
 #(
     parameter NUM_IN=2,
     parameter NUM_ENTRIES=32,
-    parameter ID_BITS=12
+    parameter ID_BITS=8
 )
 (
     input wire clk,
@@ -17,7 +17,8 @@ module BranchPredictor
     output wire OUT_isJump,
     output wire[31:0] OUT_branchSrc,
     output wire[31:0] OUT_branchDst,
-    output wire[ID_BITS-1:0] OUT_branchID,
+    output BHist_t OUT_branchHistory,
+    output BranchPredInfo OUT_branchInfo,
     output wire OUT_multipleBranches,
     output wire OUT_branchFound,
     output wire OUT_branchCompr,
@@ -48,9 +49,26 @@ always_comb begin
     end
 end
 
-wire[ID_BITS-1:0] hash = (OUT_branchCompr ? OUT_branchSrc[ID_BITS:1] : OUT_branchSrc[ID_BITS:1] - 1) ^ gHistory;
+wire[11:0] branchAddr = (OUT_branchCompr ? OUT_branchSrc[12:1] : OUT_branchSrc[12:1] - 1);
+reg[ID_BITS-1:0] branchAddrInv;
+always_comb
+    for (i = 0; i < ID_BITS; i=i+1)
+        branchAddrInv[ID_BITS - i - 1] = branchAddr[i];
+        
+wire useful = tagePred != initialPred;
+wire tageValid;
 
-assign OUT_branchID = gHistory;
+assign OUT_branchHistory = gHistory;
+assign OUT_branchInfo.branchPos = OUT_branchSrc[2:1];
+assign OUT_branchInfo.predicted = OUT_branchFound;
+assign OUT_branchInfo.taken = OUT_branchFound && (OUT_branchTaken || OUT_isJump);
+assign OUT_branchInfo.tageValid = tageValid;
+assign OUT_branchInfo.tageUseful = useful;
+
+
+wire initialPred;
+wire tagePred;
+assign OUT_branchTaken = tageValid ? tagePred : initialPred;
 
 assign OUT_branchDst[0] = 1'b0;
 assign OUT_branchSrc[0] = 1'b0;
@@ -74,14 +92,32 @@ BranchPredictionTable bpt
 (
     .clk(clk),
     .rst(rst),
-    .IN_readAddr(hash),
-    .OUT_taken(OUT_branchTaken),
+    .IN_readAddr(branchAddr[9:0]),
+    .OUT_taken(initialPred),
     .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted && !IN_mispredFlush),
-    .IN_writeAddr(IN_comUOp.branchID ^ IN_comUOp.pc[ID_BITS-1:0]),
+    .IN_writeAddr(IN_comUOp.pc[9:0]),
     .IN_writeTaken(IN_comUOp.branchTaken)
 );
 
-always@(posedge clk) begin
+
+TageTable tage
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_readAddr(branchAddr[7:0] ^ gHistory),
+    .IN_readTag(branchAddr[7:0]),
+    .OUT_readValid(tageValid),
+    .OUT_readTaken(tagePred),
+    
+    .IN_writeAddr(IN_comUOp.pc[ID_BITS-1:0] ^ IN_comUOp.branchID[7:0]),
+    .IN_writeTag(IN_comUOp.pc[ID_BITS-1:0][7:0]),
+    .IN_writeTaken(IN_comUOp.branchTaken),
+    .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted && !IN_mispredFlush),
+    .IN_writeNew(!IN_comUOp.branchID[8]),
+    .IN_writeUseful(IN_comUOp.branchID[8] ? (IN_comUOp.branchID[9] && IN_comUOp.branchTaken == IN_comUOp.branchID[10]) : (IN_comUOp.branchTaken != IN_comUOp.branchID[10]))
+);
+
+always_ff@(posedge clk) begin
 
     if (rst) begin
         gHistory <= 0;
@@ -101,9 +137,9 @@ always@(posedge clk) begin
     
     if (!rst && IN_branch.taken) begin
         if (IN_branch.predicted)
-            gHistory <= {IN_branch.branchID[ID_BITS-2:0], IN_branch.branchTaken};
+            gHistory <= {IN_branch.branchID[6:0], IN_branch.branchTaken};
         else
-            gHistory <= IN_branch.branchID;
+            gHistory <= IN_branch.branchID[7:0];
     end
 end
 

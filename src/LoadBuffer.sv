@@ -16,13 +16,7 @@ module LoadBuffer
     
     input wire[5:0] commitSqN,
     
-    input wire valid[NUM_PORTS-1:0],
-    input wire isLoad[NUM_PORTS-1:0],
-    input wire[31:0] pc[NUM_PORTS-1:0],
-    input wire[31:0] addr[NUM_PORTS-1:0],
-    input wire[5:0] sqN[NUM_PORTS-1:0],
-    input wire[5:0] loadSqN[NUM_PORTS-1:0],
-    input wire[5:0] storeSqN[NUM_PORTS-1:0],
+    input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input BranchProv IN_branch,
     output BranchProv OUT_branch,
@@ -75,33 +69,34 @@ always_ff@(posedge clk) begin
     
         // Insert new entries, check stores
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (valid[i] && (!IN_branch.taken || $signed(sqN[i] - IN_branch.sqN) <= 0)) begin
+            if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             
-                if (isLoad[i]) begin
-                    reg[$clog2(NUM_ENTRIES)-1:0] index = loadSqN[i][$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
-                    assert(loadSqN[i] < baseIndex + NUM_ENTRIES);
+                if (IN_uop[i].isLoad) begin
+                    reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
+                    assert(IN_uop[i].loadSqN < baseIndex + NUM_ENTRIES);
                     
                     //mispredict[i] <= 0;
 
-                    entries[index].sqN <= sqN[i];
-                    entries[index].addr <= addr[i][31:2];
+                    entries[index].sqN <= IN_uop[i].sqN;
+                    entries[index].addr <= IN_uop[i].addr[31:2];
                     entries[index].valid <= 1;
                 end
                 
                 else begin
                     reg temp = 0;
                     for (j = 0; j < NUM_ENTRIES; j=j+1) begin
-                        if (entries[j].valid && entries[j].addr == addr[i][31:2] && $signed(sqN[i] - entries[j].sqN) <= 0) begin
+                        if (entries[j].valid && entries[j].addr == IN_uop[i].addr[31:2] && $signed(IN_uop[i].sqN - entries[j].sqN) <= 0) begin
                             temp = 1;
                         end
                     end
                     
                     if (temp) begin
                         OUT_branch.taken <= 1;
-                        OUT_branch.dstPC <= pc[i];
-                        OUT_branch.sqN <= sqN[i];
-                        OUT_branch.loadSqN <= loadSqN[i];
-                        OUT_branch.storeSqN <= storeSqN[i];
+                        OUT_branch.dstPC <= IN_uop[i].pc;
+                        OUT_branch.sqN <= IN_uop[i].sqN;
+                        OUT_branch.loadSqN <= IN_uop[i].loadSqN;
+                        OUT_branch.storeSqN <= IN_uop[i].storeSqN;
+                        OUT_branch.fetchID <= IN_uop[i].fetchID;
                         OUT_branch.flush <= 0;
                     end
                     else 

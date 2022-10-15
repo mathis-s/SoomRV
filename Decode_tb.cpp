@@ -1,6 +1,5 @@
 #include "VTop.h"
 #include "VTop_Top.h"
-#include "VTop_Core.h"
 #include "VTop_MemoryControllerSim.h"
 #include "VTop___024root.h"
 #include <cstdio>
@@ -139,7 +138,7 @@ int main(int argc, char** argv)
     }
     
     // Run a few more cycles ...
-    for (int i = 0; i < 10; i=i+1)
+    for (int i = 0; i < 20; i=i+1)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model

@@ -196,6 +196,7 @@ module InstrDecoder
     
     output reg OUT_decBranch,
     output reg[30:0] OUT_decBranchDst,
+    output FetchID_t OUT_decBranchFetchID,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -247,9 +248,8 @@ always_comb begin
         invalidEnc = 1;
         uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
-        uop.branchID = IN_instrs[i].branchID;
-        uop.branchPred = IN_instrs[i].branchPred;
-        uop.predicted = IN_instrs[i].predicted;
+        uop.fetchID = IN_instrs[i].fetchID;
+        uop.fetchOffs = IN_instrs[i].pc[1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
         case (instr.opcode)
             `OPC_LUI,
@@ -1000,6 +1000,7 @@ always_comb begin
                             
                             OUT_decBranch = 1;
                             OUT_decBranchDst = RS_outData;
+                            OUT_decBranchFetchID = uop.fetchID;
                         end
                         invalidEnc = 0;
                     end

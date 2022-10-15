@@ -3,6 +3,9 @@ typedef logic[5:0] RegNm;
 typedef logic[6:0] Tag;
 typedef logic[5:0] SeqNum;
 typedef logic[11:0] BrID;
+typedef logic[5:0] FetchID_t;
+typedef logic[1:0] FetchOff_t;
+typedef logic[7:0] BHist_t;
 
 typedef enum logic[5:0]
 {
@@ -124,11 +127,25 @@ typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FE
 
 typedef struct packed
 {
+    bit[1:0] branchPos;
+    bit predicted;
+    bit taken;
+    bit tageValid;
+    bit tageUseful;
+} BranchPredInfo;
+
+typedef struct packed
+{
+    bit[30:0] pc;
+    BranchPredInfo bpi;
+    BHist_t hist;
+} PCFileEntry;
+
+typedef struct packed
+{
     logic[15:0] instr;
     logic[30:0] pc;
-    BrID branchID;
-    logic branchPred;
-    logic predicted;
+    FetchID_t fetchID;
     logic valid;
 } IF_Instr;
 
@@ -136,16 +153,14 @@ typedef struct packed
 {
     logic[31:0] instr;
     logic[30:0] pc;
-    BrID branchID;
-    logic branchPred;
-    logic predicted;
+    FetchID_t fetchID;
     logic valid;
 } PD_Instr;
 
 typedef struct packed
 {
-    logic[31:0] imm;
     logic[31:0] pc;
+    logic[31:0] imm;
     logic[4:0] rs0;
     logic rs0_fp;
     logic[4:0] rs1;
@@ -156,17 +171,16 @@ typedef struct packed
     logic rd_fp;
     logic[5:0] opcode;
     FuncUnit fu;
-    BrID branchID;
-    logic branchPred;
-    logic predicted;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
     logic compressed;
     logic valid;
 } D_UOp;
 
 typedef struct packed
 {
-    logic[31:0] imm;
     logic[31:0] pc;
+    logic[31:0] imm;
     logic availA;
     logic[6:0] tagA;
     logic tagA_fp;
@@ -179,9 +193,8 @@ typedef struct packed
     logic[6:0] tagDst;
     logic[5:0] nmDst;
     logic[5:0] opcode;
-    BrID branchID;
-    logic branchPred;
-    logic predicted;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     FuncUnit fu;
@@ -215,6 +228,7 @@ typedef struct packed
     logic[6:0] tagDst;
     logic[5:0] nmDst;
     logic[5:0] sqN;
+    FetchID_t fetchID;
     BrID branchID;
     logic branchPred;
     logic predicted;
@@ -276,6 +290,7 @@ typedef struct packed
     bit[5:0] loadSqN;
     bit flush;
     BrID branchID;
+    FetchID_t fetchID;
     bit branchTaken;
     bit predicted;
     bit taken;
@@ -308,6 +323,7 @@ typedef struct packed
     logic[5:0] sqN;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
+    FetchID_t fetchID;
     logic exception;
     logic compressed;
     logic valid;

@@ -111,13 +111,17 @@ wire BP_branchTaken;
 wire BP_isJump;
 wire[31:0] BP_branchSrc;
 wire[31:0] BP_branchDst;
-BrID BP_branchID;
+BHist_t BP_branchHistory;
+BranchPredInfo BP_info;
 wire BP_multipleBranches;
 wire BP_branchFound;
 wire BP_branchCompr;
 
 IF_Instr IF_instrs[3:0];
 
+FetchID_t PC_readAddress[3:0];
+PCFileEntry PC_readData[3:0];
+assign PC_readAddress[3] = 0;
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -126,16 +130,22 @@ ProgramCounter progCnt
     .rst(rst),
     .IN_pc(branch.taken ? branch.dstPC : {DEC_branchDst, 1'b0}),
     .IN_write(branch.taken || DEC_branch),
+    .IN_branchTaken(branch.taken),
+    .IN_fetchID(branch.taken ? branch.fetchID : DEC_branchFetchID),
     .IN_instr(instrRaw),
     
     .IN_BP_branchTaken(BP_branchTaken),
     .IN_BP_isJump(BP_isJump),
     .IN_BP_branchSrc(BP_branchSrc),
     .IN_BP_branchDst(BP_branchDst),
-    .IN_BP_branchID(BP_branchID),
+    .IN_BP_history(BP_branchHistory),
+    .IN_BP_info(BP_info),
     .IN_BP_multipleBranches(BP_multipleBranches),
     .IN_BP_branchFound(BP_branchFound),
     .IN_BP_branchCompr(BP_branchCompr),
+    
+    .IN_pcReadAddr(PC_readAddress),
+    .OUT_pcReadData(PC_readData),
     
     .OUT_pcRaw(PC_pc),
     .OUT_instrs(IF_instrs),
@@ -159,7 +169,8 @@ BranchPredictor bp
     .OUT_isJump(BP_isJump),
     .OUT_branchSrc(BP_branchSrc),
     .OUT_branchDst(BP_branchDst),
-    .OUT_branchID(BP_branchID),
+    .OUT_branchHistory(BP_branchHistory),
+    .OUT_branchInfo(BP_info),
     .OUT_multipleBranches(BP_multipleBranches),
     .OUT_branchFound(BP_branchFound),
     .OUT_branchCompr(BP_branchCompr),
@@ -206,6 +217,7 @@ D_UOp DE_uop[3:0];
 
 wire DEC_branch;
 wire[30:0] DEC_branchDst;
+FetchID_t DEC_branchFetchID;
 InstrDecoder idec
 (
     .clk(clk),
@@ -216,6 +228,7 @@ InstrDecoder idec
     
     .OUT_decBranch(DEC_branch),
     .OUT_decBranchDst(DEC_branchDst),
+    .OUT_decBranchFetchID(DEC_branchFetchID),
     
     .OUT_uop(DE_uop)
 );
@@ -278,34 +291,6 @@ wire stall[2:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire[4:0] RV_freeEntries;
-/*ReservationStation rv
-(
-    .clk(clk),
-    .rst(rst),
-    .frontEn(frontendEn),
-    
-    .IN_DIV_doNotIssue(DIV_doNotIssue),
-    .IN_MUL_doNotIssue(MUL_doNotIssue),
-
-    .IN_stall(stall),
-    .IN_uopValid(RN_uopValid),
-    .IN_uop(RN_uop),
-    
-    .IN_loadFwdUOp(CC_uop),
-    
-    .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp),
-
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
-    
-    .IN_nextCommitSqN(ROB_curSqN),
-
-    .OUT_valid(RV_uopValid),
-    .OUT_uop(RV_uop),
-    .OUT_free(RV_freeEntries)
-);*/
 wire IQ0_full;
 IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
 (
@@ -332,7 +317,7 @@ IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9) iq1
+IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -444,7 +429,10 @@ Load ld
     .IN_zcFwdResult(LD_zcFwdResult),
     .IN_zcFwdTag(LD_zcFwdTag),
     .IN_zcFwdValid(LD_zcFwdValid),
-
+    
+    .OUT_pcReadAddr(PC_readAddress[2:0]),
+    .IN_pcReadData(PC_readData[2:0]),
+    
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
     
@@ -557,13 +545,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .valid('{AGU_uop.valid}),
-    .isLoad('{AGU_uop.isLoad}),
-    .pc('{AGU_uop.pc}),
-    .addr('{AGU_uop.addr}),
-    .sqN('{AGU_uop.sqN}),
-    .loadSqN('{AGU_uop.loadSqN}),
-    .storeSqN('{AGU_uop.storeSqN}),
+    .IN_uop('{AGU_uop}),
     
     .IN_branch(branch),
     .OUT_branch(branchProvs[2]),

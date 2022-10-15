@@ -34,6 +34,7 @@ always_comb begin
             OUT_branch.loadSqN = IN_branches[i].loadSqN;
             OUT_branch.storeSqN = IN_branches[i].storeSqN;
             OUT_branch.flush = IN_branches[i].flush;
+            OUT_branch.fetchID = IN_branches[i].fetchID;
             
             if (i == 0 || i == 1) begin
                 OUT_branch.predicted = IN_branches[i].predicted;

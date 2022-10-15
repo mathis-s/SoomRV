@@ -237,16 +237,15 @@ always_ff@(posedge clk) begin
     else if (en && frontEn && !OUT_stall) begin
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+            OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
             OUT_uop[i].nmDst <= {IN_uop[i].rd_fp, IN_uop[i].rd};
-            OUT_uop[i].pc <= IN_uop[i].pc;
+            OUT_uop[i].fetchID <= IN_uop[i].fetchID;
+            OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
             OUT_uop[i].immB <= IN_uop[i].immB;
-            OUT_uop[i].branchID <= IN_uop[i].branchID;
-            OUT_uop[i].branchPred <= IN_uop[i].branchPred;
             OUT_uop[i].compressed <= IN_uop[i].compressed;
-            OUT_uop[i].predicted <= IN_uop[i].predicted;
         end
         
         // Set seqnum/tags for next instruction(s)

@@ -26,6 +26,10 @@ module Load
     input wire[6:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
     input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
     
+    // PC File read
+    output FetchID_t OUT_pcReadAddr[NUM_UOPS-1:0],
+    input PCFileEntry IN_pcReadData[NUM_UOPS-1:0],
+    
     // Register File read
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
     input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
@@ -42,10 +46,12 @@ integer j;
 
 always_comb begin
 
-    // All ports get to read from integer rf
+    // All ports get to read from integer rf and pc rf
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
+        
+        OUT_pcReadAddr[i] = IN_uop[i].fetchID;
     end
     
     // Port 2 has one read from fp rf
@@ -77,13 +83,30 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
-                OUT_uop[i].pc <= IN_uop[i].pc;
-                OUT_uop[i].branchID <= IN_uop[i].branchID;
-                OUT_uop[i].branchPred <= IN_uop[i].branchPred;
+                
+                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
+                assert(
+                    ({IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2)) ==
+                    IN_uop[i].pc
+                );
+                
+                OUT_uop[i].fetchID <= IN_uop[i].fetchID;
+                
+                if (!IN_pcReadData[i].bpi.predicted || IN_uop[i].fetchOffs <= IN_pcReadData[i].bpi.branchPos)
+                    OUT_uop[i].branchID <= {1'b0, IN_pcReadData[i].bpi.taken, IN_pcReadData[i].bpi.tageUseful, IN_pcReadData[i].bpi.tageValid, IN_pcReadData[i].hist};
+                else
+                    OUT_uop[i].branchID <= {1'b0, IN_pcReadData[i].bpi.taken, IN_pcReadData[i].bpi.tageUseful, IN_pcReadData[i].bpi.tageValid, IN_pcReadData[i].hist[6:0], IN_pcReadData[i].bpi.taken};
+                
+                
+                OUT_uop[i].branchPred <= IN_pcReadData[i].bpi.taken && 
+                    (IN_uop[i].fetchOffs == IN_pcReadData[i].bpi.branchPos);
+                    
+                OUT_uop[i].predicted <= IN_pcReadData[i].bpi.predicted && 
+                    (IN_uop[i].fetchOffs == IN_pcReadData[i].bpi.branchPos);
+                
                 OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
                 OUT_uop[i].compressed <= IN_uop[i].compressed;
-                OUT_uop[i].predicted <= IN_uop[i].predicted;
                 
                 OUT_funcUnit[i] <= IN_uop[i].fu;
                 

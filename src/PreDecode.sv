@@ -48,9 +48,7 @@ always_ff@(posedge clk) begin
                     if ((buffer[bufIndexOut].instr[1:0] == 2'b11) && ((bufIndexOut + 4'b1) != bufIndexIn)) begin
                         OUT_instrs[i].instr <= {buffer[bufIndexOut + 1].instr, buffer[bufIndexOut].instr};
                         OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
-                        OUT_instrs[i].branchID <= buffer[bufIndexOut + 1].branchID;
-                        OUT_instrs[i].branchPred <= buffer[bufIndexOut + 1].branchPred;
-                        OUT_instrs[i].predicted <= buffer[bufIndexOut + 1].predicted;
+                        OUT_instrs[i].fetchID <= buffer[bufIndexOut + 1].fetchID;
                         OUT_instrs[i].valid <= 1;
                         bufIndexOut = bufIndexOut + 2;
                         freeEntries = freeEntries + 2;
@@ -59,9 +57,7 @@ always_ff@(posedge clk) begin
                     else if (buffer[bufIndexOut].instr[1:0] != 2'b11) begin
                         OUT_instrs[i].instr <= {16'bx, buffer[bufIndexOut].instr};
                         OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
-                        OUT_instrs[i].branchID <= buffer[bufIndexOut].branchID;
-                        OUT_instrs[i].branchPred <= buffer[bufIndexOut].branchPred;
-                        OUT_instrs[i].predicted <= buffer[bufIndexOut].predicted;
+                        OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].valid <= 1;
                         bufIndexOut = bufIndexOut + 1;
                         freeEntries = freeEntries + 1;
