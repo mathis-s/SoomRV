@@ -123,9 +123,8 @@ always_comb begin
         OUT_uop[i].flags = i1[i].exception ? FLAGS_EXCEPT : FLAGS_NONE;
         OUT_uop[i].isBranch = 0;
         OUT_uop[i].branchTaken = 0;//i1[i].addr[19];
-        OUT_uop[i].branchID = 0;//i1[i].addr[18:11];
+        OUT_uop[i].bpi = 0;//i1[i].addr[18:11];
         OUT_uop[i].compressed = i1[i].compressed;//i1[i].addr[18:11];
-        OUT_uop[i].predicted = 0;//i1[i].addr[18:11];
     end
 end
 

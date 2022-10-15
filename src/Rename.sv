@@ -94,7 +94,7 @@ always_comb begin
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
-        RAT_commitAvail[i] = IN_comUOp[i].predicted;
+        RAT_commitAvail[i] = IN_comUOp[i].compressed;
         
         // Writeback
         RAT_wbIDs[i] = IN_wbUOp[i].nmDst;

@@ -175,15 +175,17 @@ always_ff@(posedge clk) begin
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
             OUT_branch.flush <= 0;
-            OUT_branch.branchTaken <= branchTaken;
-            OUT_branch.branchID <= IN_uop.branchID;
-            OUT_branch.predicted <= IN_uop.predicted;
-            OUT_branch.indirect <= IN_uop.opcode == INT_JALR || IN_uop.opcode == INT_V_RET;
+            
+            if (IN_uop.opcode == INT_JAL)
+                OUT_branch.history <= IN_uop.history[7:0];
+            else
+                OUT_branch.history <= {IN_uop.history[6:0], branchTaken};
+            
             OUT_branch.fetchID <= IN_uop.fetchID;
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
-                if (branchTaken && !IN_uop.predicted) begin
+                if (branchTaken && !IN_uop.bpi.predicted) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                     OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
@@ -210,7 +212,7 @@ always_ff@(posedge clk) begin
                     OUT_btUpdate.dst <= pcPlus4;
                 end
                 
-                if (branchTaken != IN_uop.branchPred)
+                if (branchTaken != IN_uop.bpi.taken)
                     OUT_branch.taken <= 1;
 
             end
@@ -232,8 +234,8 @@ always_ff@(posedge clk) begin
             
             OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
             OUT_uop.branchTaken <= branchTaken;
-            OUT_uop.branchID <= IN_uop.branchID;
-            OUT_uop.predicted <= IN_uop.predicted;
+            OUT_uop.history <= IN_uop.history;
+            OUT_uop.bpi <= IN_uop.bpi;
             
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.tagDst <= IN_uop.tagDst;

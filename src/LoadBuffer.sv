@@ -97,6 +97,7 @@ always_ff@(posedge clk) begin
                         OUT_branch.loadSqN <= IN_uop[i].loadSqN;
                         OUT_branch.storeSqN <= IN_uop[i].storeSqN;
                         OUT_branch.fetchID <= IN_uop[i].fetchID;
+                        OUT_branch.history <= IN_uop[i].history;
                         OUT_branch.flush <= 0;
                     end
                     else 

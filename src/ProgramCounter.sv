@@ -49,6 +49,8 @@ reg[30:0] pcLast;
 FetchID_t fetchIDlast;
 BHist_t histLast;
 BranchPredInfo infoLast;
+reg[1:0] branchPosLast;
+reg multipleLast;
 
 assign OUT_pcRaw = {pc, 1'b0};
 
@@ -64,6 +66,7 @@ PCFileEntry PCF_writeData;
 assign PCF_writeData.pc = pcLast;
 assign PCF_writeData.hist = histLast;
 assign PCF_writeData.bpi = infoLast;
+assign PCF_writeData.branchPos = branchPosLast;
 PCFile#($bits(PCFileEntry)) pcFile
 (
     .clk(clk),
@@ -85,7 +88,6 @@ always_ff@(posedge clk) begin
     end
     else if (IN_write) begin
         pc <= IN_pc[31:1];
-        //if (IN_branchTaken)
         fetchID <= IN_fetchID + 1;
     end
     else begin
@@ -93,7 +95,8 @@ always_ff@(posedge clk) begin
             for (i = 0; i < NUM_BLOCKS; i=i+1) begin
                 OUT_instrs[i].pc <= {{pcLast[30:2], 2'b00} + 31'd1 * i[30:0]};
                 OUT_instrs[i].valid <= (i[1:0] >= pcLast[1:0]) && 
-                    (!infoLast.predicted || !infoLast.taken || i[1:0] <= infoLast.branchPos);
+                    (!infoLast.taken || i[1:0] <= branchPosLast) &&
+                    (!multipleLast || i[1:0] <= branchPosLast);
                 OUT_instrs[i].fetchID <= fetchID;
             end
             fetchID <= fetchID + 1;
@@ -104,6 +107,8 @@ always_ff@(posedge clk) begin
             histLast <= IN_BP_history;
             infoLast <= IN_BP_info;
             pcLast <= pc;
+            branchPosLast <= IN_BP_branchSrc[2:1];
+            multipleLast <= IN_BP_multipleBranches;
             
             if (IN_BP_branchFound) begin
                 if (IN_BP_isJump || IN_BP_branchTaken) begin

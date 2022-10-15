@@ -188,8 +188,6 @@ wire[5:0] ROB_curSqN;
 always_ff@(posedge clk) begin
     if (rst)
         stateValid <= 3'b000;
-    // When a branch mispredict happens, we need to let the pipeline
-    // run entirely dry.
     else if (branch.taken || DEC_branch)
         stateValid <= 3'b000;
     else if (ifetchEn)

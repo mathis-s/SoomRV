@@ -109,7 +109,7 @@ always@(posedge clk) begin
         
         OUT_uop.isBranch <= 0;
         OUT_uop.branchTaken <= 0;
-        OUT_uop.branchID <= IN_uop.branchID;
+        OUT_uop.bpi <= IN_uop.bpi;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
@@ -117,7 +117,6 @@ always@(posedge clk) begin
         OUT_uop.valid <= 1;
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
-        OUT_uop.predicted <= 0;
             
         case (IN_uop.opcode)
             

@@ -9,10 +9,10 @@ typedef struct packed
     bit[5:0] name;
     bit isBranch;
     bit branchTaken;
-    BrID branchID;
+    BranchPredInfo bpi;
     FetchID_t fetchID;
+    BHist_t history;
     bit compressed;
-    bit predicted;
     bit valid;
     bit executed;
 } ROBEntry;
@@ -76,9 +76,9 @@ always_comb begin
             headValid = 0;
     end
     
-    if (entries[baseIndex[4:0]+1].predicted)
+    if (entries[baseIndex[4:0]+1].bpi.predicted)
         headValid = 0;
-    if (entries[baseIndex[4:0]+2].predicted)
+    if (entries[baseIndex[4:0]+2].bpi.predicted)
         headValid = 0;
 end
 
@@ -154,10 +154,10 @@ always_ff@(posedge clk) begin
                         OUT_comUOp[i].valid <= 1;
                         OUT_comUOp[i].nmDst <= entries[misprReplayIter[4:0]+i[4:0]].name;
                         OUT_comUOp[i].tagDst <= entries[misprReplayIter[4:0]+i[4:0]].tag;
-                        OUT_comUOp[i].predicted <= entries[misprReplayIter[4:0]+i[4:0]].executed;
+                        OUT_comUOp[i].compressed <= entries[misprReplayIter[4:0]+i[4:0]].executed;
                         for (j = 0; j < WIDTH_WB; j=j+1)
                             if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == entries[misprReplayIter[4:0]+i[4:0]].tag)
-                                OUT_comUOp[i].predicted <= 1;
+                                OUT_comUOp[i].compressed <= 1;
                     end
                     else begin
                         OUT_comUOp[i].valid <= 0;
@@ -177,11 +177,11 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].sqN <= baseIndex + i[5:0];
                 OUT_comUOp[i].isBranch <= entries[baseIndex[4:0]+i[4:0]].isBranch;
                 OUT_comUOp[i].branchTaken <= entries[baseIndex[4:0]+i[4:0]].branchTaken;
-                OUT_comUOp[i].branchID <= entries[baseIndex[4:0]+i[4:0]].branchID;
+                OUT_comUOp[i].bpi <= entries[baseIndex[4:0]+i[4:0]].bpi;
+                OUT_comUOp[i].history <= entries[baseIndex[4:0]+i[4:0]].history;
                 OUT_comUOp[i].valid <= 1;
                 OUT_comUOp[i].pc <= entries[baseIndex[4:0]+i[4:0]].pc;
                 OUT_comUOp[i].compressed <= entries[baseIndex[4:0]+i[4:0]].compressed;
-                OUT_comUOp[i].predicted <= entries[baseIndex[4:0]+i[4:0]].predicted;
                 entries[baseIndex[4:0]+i[4:0]].valid <= 0;
                 entries[baseIndex[4:0]+i[4:0]].executed <= 0;
             end
@@ -197,11 +197,11 @@ always_ff@(posedge clk) begin
             OUT_comUOp[0].sqN <= baseIndex;
             OUT_comUOp[0].isBranch <= entries[baseIndex[4:0]].isBranch;
             OUT_comUOp[0].branchTaken <= entries[baseIndex[4:0]].branchTaken;
-            OUT_comUOp[0].branchID <= entries[baseIndex[4:0]].branchID;
+            OUT_comUOp[0].bpi <= entries[baseIndex[4:0]].bpi;
+            OUT_comUOp[0].history <= entries[baseIndex[4:0]].history;
             OUT_comUOp[0].valid <= 1;
             OUT_comUOp[0].pc <= entries[baseIndex[4:0]].pc;
             OUT_comUOp[0].compressed <= entries[baseIndex[4:0]].compressed;
-            OUT_comUOp[0].predicted <= entries[baseIndex[4:0]].predicted;
             entries[baseIndex[4:0]].valid <= 0;
             entries[baseIndex[4:0]].executed <= 0;
             
@@ -216,6 +216,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
+                OUT_branch.history <= entries[baseIndex[4:0]].history;
                 // Do not write back result, redirect to x0
                 OUT_comUOp[0].nmDst <= 0;
             end
@@ -228,6 +229,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
+                OUT_branch.history <= entries[baseIndex[4:0]].history;
                 
                 // Do not write back result, redirect to x0
                 if (entries[baseIndex[4:0]].flags == FLAGS_EXCEPT)
@@ -247,6 +249,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
+                OUT_branch.history <= entries[baseIndex[4:0]].history;
                 
                 OUT_fence <= 1;
             end
@@ -288,10 +291,10 @@ always_ff@(posedge clk) begin
                 entries[IN_wbUOps[i].sqN[4:0]].executed <= 1;
                 entries[IN_wbUOps[i].sqN[4:0]].flags <= IN_wbUOps[i].flags;
                 entries[IN_wbUOps[i].sqN[4:0]].isBranch <= IN_wbUOps[i].isBranch;
-                entries[IN_wbUOps[i].sqN[4:0]].branchID <= IN_wbUOps[i].branchID;
-                entries[IN_wbUOps[i].sqN[4:0]].predicted <= IN_wbUOps[i].predicted;
                 entries[IN_wbUOps[i].sqN[4:0]].branchTaken <= IN_wbUOps[i].branchTaken;
                 entries[IN_wbUOps[i].sqN[4:0]].pc <= IN_wbUOps[i].pc[31:1];
+                entries[IN_wbUOps[i].sqN[4:0]].bpi <= IN_wbUOps[i].bpi;
+                entries[IN_wbUOps[i].sqN[4:0]].history <= IN_wbUOps[i].history;
             end
         end
         

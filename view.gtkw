@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Thu Oct 13 13:50:15 2022
+[*] Sat Oct 15 18:47:02 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Thu Oct 13 13:49:28 2022"
-[dumpfile_size] 2347629
+[dumpfile_mtime] "Sat Oct 15 18:46:18 2022"
+[dumpfile_size] 1607218203
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 20
+[timestart] 231927
 [size] 3840 2132
 [pos] -1 -1
-*-4.000000 169 74540 360384 360500 28123 19814 96 130 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-1.000000 231939 74540 360384 360500 28123 19814 96 130 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -44,6 +44,7 @@
 [treeopen] TOP.Top.core.iq2.queue[7].
 [treeopen] TOP.Top.core.lb.
 [treeopen] TOP.Top.core.ld.
+[treeopen] TOP.Top.core.ld.IN_pcReadData[1].
 [treeopen] TOP.Top.core.ld.IN_uop[0].
 [treeopen] TOP.Top.core.ld.IN_uop[1].
 [treeopen] TOP.Top.core.ld.IN_uop[2].
@@ -59,6 +60,7 @@
 [treeopen] TOP.Top.core.preDec.IN_instrs[0].
 [treeopen] TOP.Top.core.preDec.OUT_instrs[0].
 [treeopen] TOP.Top.core.preDec.OUT_instrs[1].
+[treeopen] TOP.Top.core.progCnt.
 [treeopen] TOP.Top.core.rn.
 [treeopen] TOP.Top.core.rn.OUT_uop[0].
 [treeopen] TOP.Top.core.rn.rt.
@@ -83,6 +85,10 @@ TOP.Top.core.branch.taken
 TOP.Top.core.branch.flush
 @22
 TOP.Top.core.branch.sqN[5:0]
+@28
+TOP.Top.core.DEC_branch
+@22
+TOP.Top.core.DEC_branchDst[30:0]
 TOP.Top.core.branch.dstPC[31:0]
 TOP.Top.core.OUT_MEM_addr[29:0]
 @820
@@ -104,21 +110,16 @@ TOP.Top.core.IQ1_full
 TOP.Top.core.IQ2_full
 TOP.Top.core.stateValid[2:0]
 @200
--Rename
-@28
-TOP.Top.core.rn.rt.rat[1].avail
+-PC
 @22
-TOP.Top.core.rn.rt.rat[1].comTag[6:0]
-TOP.Top.core.rn.rt.rat[1].specTag[6:0]
-@28
-TOP.Top.core.rn.tb.tags[34].committed
-TOP.Top.core.rn.tb.tags[34].used
-@22
-TOP.Top.core.rf.mem[34][31:0]
+TOP.Top.core.progCnt.pc[30:0]
+@40000023
+[fpshift_count] 1
+TOP.Top.core.progCnt.pcLast[30:0]
 @200
 -BP
 @28
-TOP.Top.core.bp.OUT_isJump
+TOP.Top.core.bp.OUT_branchFound
 TOP.Top.core.bp.OUT_branchTaken
 TOP.Top.core.bp.OUT_isJump
 @22
@@ -126,6 +127,8 @@ TOP.Top.core.bp.IN_pc[31:0]
 TOP.Top.core.bp.OUT_branchDst[31:0]
 TOP.Top.core.bp.OUT_branchSrc[31:0]
 @28
+TOP.Top.core.bp.gHistory[7:0]
+TOP.Top.core.bp.gHistoryCom[7:0]
 TOP.Top.core.bp.IN_pcValid
 @200
 -
@@ -135,21 +138,6 @@ TOP.Top.core.bp.btUpdate.valid
 TOP.Top.core.bp.btUpdate.src[31:0]
 TOP.Top.core.bp.btUpdate.dst[31:0]
 @200
--BTB
-@28
-TOP.Top.core.bp.btb.IN_btUpdate.valid
-TOP.Top.core.bp.btb.entries[0].compr
-@22
-TOP.Top.core.bp.btb.entries[0].dst[30:0]
-@28
-TOP.Top.core.bp.btb.entries[0].isJump
-@22
-TOP.Top.core.bp.btb.entries[0].src[30:0]
-@28
-TOP.Top.core.bp.btb.entries[0].used
-TOP.Top.core.bp.btb.entries[0].valid
-@200
--MC
 -CC
 @28
 TOP.Top.core.cc.OUT_stall
@@ -191,7 +179,6 @@ TOP.Top.core.rn.rt.IN_commitTags[2][6:0]
 @28
 #{TOP.Top.core.rn.OUT_uopValid[0:2]} TOP.Top.core.rn.OUT_uopValid[0] TOP.Top.core.rn.OUT_uopValid[1] TOP.Top.core.rn.OUT_uopValid[2]
 @22
-TOP.Top.core.RN_uop[0].pc[31:0]
 TOP.Top.core.RN_uop[0].imm[31:0]
 TOP.Top.core.RN_uop[0].sqN[5:0]
 @28
@@ -205,7 +192,6 @@ TOP.Top.core.rn.OUT_uop[0].nmDst[5:0]
 @200
 -RN_uop[1]
 @22
-TOP.Top.core.RN_uop[1].pc[31:0]
 TOP.Top.core.RN_uop[1].imm[31:0]
 TOP.Top.core.RN_uop[1].tagA[6:0]
 TOP.Top.core.RN_uop[1].tagB[6:0]
@@ -238,15 +224,31 @@ TOP.Top.core.RN_uop[2].availB
 TOP.Top.core.RN_uop[2].tagA[6:0]
 TOP.Top.core.RN_uop[2].tagB[6:0]
 TOP.Top.core.RN_uop[2].tagDst[6:0]
-TOP.Top.core.RN_uop[2].pc[31:0]
 @200
 -RV[0]
 -LD
+@22
+TOP.Top.core.progCnt.pcFile.mem[4][45:0]
+@28
+#{TOP.Top.core.ld.IN_uopValid[0:2]} TOP.Top.core.ld.IN_uopValid[0] TOP.Top.core.ld.IN_uopValid[1] TOP.Top.core.ld.IN_uopValid[2]
+@200
+-
+-
+@22
+TOP.Top.core.ld.IN_uop[0].pc[31:0]
+TOP.Top.core.ld.IN_uop[1].pc[31:0]
+TOP.Top.core.ld.IN_uop[2].pc[31:0]
+@200
+-
 @28
 #{TOP.Top.core.RV_uopValid[0:2]} TOP.Top.core.RV_uopValid[0] TOP.Top.core.RV_uopValid[1] TOP.Top.core.RV_uopValid[2]
 @22
 TOP.Top.core.ld.OUT_uop[0].sqN[5:0]
 TOP.Top.core.ld.OUT_uop[1].sqN[5:0]
+TOP.Top.core.ld.IN_pcReadData[1].pc[30:0]
+@28
+TOP.Top.core.ld.IN_uop[1].fetchOffs[1:0]
+@22
 TOP.Top.core.ld.OUT_uop[2].sqN[5:0]
 @28
 TOP.Top.core.ld.OUT_uop[1].valid
@@ -254,6 +256,7 @@ TOP.Top.core.ld.OUT_uop[1].valid
 -IALU0
 @28
 TOP.Top.core.ialu.isBranch
+TOP.Top.core.ialu.OUT_branch.taken
 @22
 TOP.Top.core.ialu.IN_uop.srcA[31:0]
 TOP.Top.core.ialu.IN_uop.srcB[31:0]
@@ -288,7 +291,6 @@ TOP.Top.core.agu.OUT_uop.wmask[3:0]
 @28
 TOP.Top.core.ialu1.OUT_branch.taken
 TOP.Top.core.ialu1.isBranch
-TOP.Top.core.ialu1.IN_uop.branchPred
 TOP.Top.core.ialu1.branchTaken
 TOP.Top.core.ialu1.IN_uop.valid
 @22

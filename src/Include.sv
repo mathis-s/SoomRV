@@ -127,16 +127,17 @@ typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FE
 
 typedef struct packed
 {
-    bit[1:0] branchPos;
     bit predicted;
     bit taken;
     bit tageValid;
     bit tageUseful;
+    bit isJump;
 } BranchPredInfo;
 
 typedef struct packed
 {
     bit[30:0] pc;
+    bit[1:0] branchPos;
     BranchPredInfo bpi;
     BHist_t hist;
 } PCFileEntry;
@@ -229,9 +230,8 @@ typedef struct packed
     logic[5:0] nmDst;
     logic[5:0] sqN;
     FetchID_t fetchID;
-    BrID branchID;
-    logic branchPred;
-    logic predicted;
+    BranchPredInfo bpi;
+    BHist_t history;
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     logic compressed;
@@ -264,10 +264,11 @@ typedef struct packed
     bit[31:0] pc;
     bit isBranch;
     bit branchTaken;
-    BrID branchID;
+    BranchPredInfo bpi;
+    BHist_t history;
+
     Flags flags;
     logic compressed;
-    logic predicted;
     bit valid;
 } RES_UOp;
 
@@ -289,13 +290,9 @@ typedef struct packed
     bit[5:0] storeSqN;
     bit[5:0] loadSqN;
     bit flush;
-    BrID branchID;
     FetchID_t fetchID;
-    bit branchTaken;
-    bit predicted;
+    BHist_t history;
     bit taken;
-    bit indirect;
-    
 } BranchProv;
 
 typedef struct packed
@@ -324,6 +321,7 @@ typedef struct packed
     logic[5:0] storeSqN;
     logic[5:0] loadSqN;
     FetchID_t fetchID;
+    BHist_t history;
     logic exception;
     logic compressed;
     logic valid;
@@ -337,9 +335,10 @@ typedef struct packed
     logic[5:0] sqN;
     logic isBranch;
     logic branchTaken;
-    BrID branchID;
+    BranchPredInfo bpi;
+    BHist_t history;
+
     logic[30:0] pc;
     logic compressed;
-    logic predicted;
     logic valid;
 } CommitUOp;

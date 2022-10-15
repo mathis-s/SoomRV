@@ -59,11 +59,11 @@ wire useful = tagePred != initialPred;
 wire tageValid;
 
 assign OUT_branchHistory = gHistory;
-assign OUT_branchInfo.branchPos = OUT_branchSrc[2:1];
 assign OUT_branchInfo.predicted = OUT_branchFound;
-assign OUT_branchInfo.taken = OUT_branchFound && (OUT_branchTaken || OUT_isJump);
+assign OUT_branchInfo.taken = OUT_branchFound && (OUT_isJump ? 1 : OUT_branchTaken);
 assign OUT_branchInfo.tageValid = tageValid;
 assign OUT_branchInfo.tageUseful = useful;
+assign OUT_branchInfo.isJump = OUT_isJump;
 
 
 wire initialPred;
@@ -94,7 +94,7 @@ BranchPredictionTable bpt
     .rst(rst),
     .IN_readAddr(branchAddr[9:0]),
     .OUT_taken(initialPred),
-    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted && !IN_mispredFlush),
+    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
     .IN_writeAddr(IN_comUOp.pc[9:0]),
     .IN_writeTaken(IN_comUOp.branchTaken)
 );
@@ -109,12 +109,12 @@ TageTable tage
     .OUT_readValid(tageValid),
     .OUT_readTaken(tagePred),
     
-    .IN_writeAddr(IN_comUOp.pc[ID_BITS-1:0] ^ IN_comUOp.branchID[7:0]),
+    .IN_writeAddr(IN_comUOp.pc[ID_BITS-1:0] ^ IN_comUOp.history[7:0]),
     .IN_writeTag(IN_comUOp.pc[ID_BITS-1:0][7:0]),
     .IN_writeTaken(IN_comUOp.branchTaken),
-    .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.predicted && !IN_mispredFlush),
-    .IN_writeNew(!IN_comUOp.branchID[8]),
-    .IN_writeUseful(IN_comUOp.branchID[8] ? (IN_comUOp.branchID[9] && IN_comUOp.branchTaken == IN_comUOp.branchID[10]) : (IN_comUOp.branchTaken != IN_comUOp.branchID[10]))
+    .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
+    .IN_writeNew(!IN_comUOp.bpi.tageValid),
+    .IN_writeUseful(IN_comUOp.bpi.tageUseful && IN_comUOp.branchTaken == IN_comUOp.bpi.taken)
 );
 
 always_ff@(posedge clk) begin
@@ -136,10 +136,10 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst && IN_branch.taken) begin
-        if (IN_branch.predicted)
-            gHistory <= {IN_branch.branchID[6:0], IN_branch.branchTaken};
-        else
-            gHistory <= IN_branch.branchID[7:0];
+        //if (IN_branch.bpi.predicted && !IN_branch.bpi.isJump)
+        //    gHistory <= {IN_branch.history[6:0], !IN_branch.bpi.taken};
+        //else
+        gHistory <= IN_branch.history;
     end
 end
 

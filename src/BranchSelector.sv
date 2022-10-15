@@ -35,25 +35,16 @@ always_comb begin
             OUT_branch.storeSqN = IN_branches[i].storeSqN;
             OUT_branch.flush = IN_branches[i].flush;
             OUT_branch.fetchID = IN_branches[i].fetchID;
-            
-            if (i == 0 || i == 1) begin
-                OUT_branch.predicted = IN_branches[i].predicted;
-                OUT_branch.branchID = IN_branches[i].branchID;
-                OUT_branch.branchTaken = IN_branches[i].branchTaken;
-                OUT_branch.indirect = IN_branches[i].indirect;
-            end
-            else OUT_branch.predicted = 0;
+            OUT_branch.history = IN_branches[i].history;
         end
     end
 end
 
-reg[31:0] indirect;
 always_ff@(posedge clk) begin
     
     if (rst) begin
         mispredFlushSqN <= 0;
         disableMispredFlush <= 0;
-        indirect <= 0;
         //OUT_mispredFlush <= 0;
     end
     else if (OUT_branch.taken) begin
@@ -66,9 +57,6 @@ always_ff@(posedge clk) begin
         if (disableMispredFlush)
             OUT_mispredFlush <= 0;
     end*/
-    
-    if (!rst && OUT_branch.taken && OUT_branch.indirect)
-        indirect <= indirect + 1;
 
 end
 

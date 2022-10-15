@@ -39,6 +39,7 @@ always_ff@(posedge clk) begin
             OUT_uop.loadSqN <= IN_uop.loadSqN;
             OUT_uop.fetchID <= IN_uop.fetchID;
             OUT_uop.compressed <= IN_uop.compressed;
+            OUT_uop.history <= IN_uop.history;
             OUT_uop.valid <= 1;
             
             // Exception fires on Null pointer or unaligned access
