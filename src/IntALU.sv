@@ -177,9 +177,9 @@ always_ff@(posedge clk) begin
             OUT_branch.flush <= 0;
             
             if (IN_uop.opcode == INT_JAL)
-                OUT_branch.history <= IN_uop.history[7:0];
+                OUT_branch.history <= IN_uop.history;
             else
-                OUT_branch.history <= {IN_uop.history[6:0], branchTaken};
+                OUT_branch.history <= {IN_uop.history[$bits(BHist_t)-2:0], branchTaken};
             
             OUT_branch.fetchID <= IN_uop.fetchID;
             

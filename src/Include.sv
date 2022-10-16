@@ -5,7 +5,7 @@ typedef logic[5:0] SeqNum;
 typedef logic[11:0] BrID;
 typedef logic[5:0] FetchID_t;
 typedef logic[1:0] FetchOff_t;
-typedef logic[7:0] BHist_t;
+typedef logic[55:0] BHist_t;
 
 typedef enum logic[5:0]
 {
@@ -129,8 +129,8 @@ typedef struct packed
 {
     bit predicted;
     bit taken;
-    bit tageValid;
-    bit tageUseful;
+    bit[2:0] tageID;
+    bit[4:0] tageUseful;
     bit isJump;
 } BranchPredInfo;
 

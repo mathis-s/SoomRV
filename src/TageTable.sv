@@ -1,13 +1,13 @@
-typedef logic[7:0] ID_t;
+typedef logic[6:0] ID_t;
 typedef logic[7:0] Tag_t;
 
 module TageTable
 #(
-    parameter SIZE=256,
+    parameter SIZE=128,
     parameter TAG_SIZE=8,
-    parameter USF_SIZE=3,
+    parameter USF_SIZE=2,
     parameter CNT_SIZE=2,
-    parameter INTERVAL=4
+    parameter INTERVAL=5
 )
 (
     input wire clk,
@@ -23,7 +23,10 @@ module TageTable
     input wire IN_writeTaken,
     input wire IN_writeValid,
     input wire IN_writeNew,
-    input wire IN_writeUseful
+    input wire IN_writeUseful,
+    input wire IN_writeUpdate,
+    output reg OUT_writeAlloc,
+    input wire IN_anyAlloc
 );
 integer i;
 
@@ -38,11 +41,15 @@ TageEntry entries[SIZE-1:0];
 
 
 always_comb begin
-    OUT_readValid = entries[IN_readAddr].tag == IN_readTag;// && entries[i].useful != 0;
+    OUT_readValid = entries[IN_readAddr].tag == IN_readTag;
     OUT_readTaken = entries[IN_readAddr].counter[CNT_SIZE-1];
 end
 
 reg[INTERVAL-1:0] decrCnt;
+
+always_comb begin
+    OUT_writeAlloc = IN_writeValid && !IN_writeUpdate && IN_writeNew && entries[IN_writeAddr].useful == 0;
+end
 
 always_ff@(posedge clk) begin
     
@@ -56,15 +63,7 @@ always_ff@(posedge clk) begin
         decrCnt <= 0;
     end
     else if (IN_writeValid) begin
-        if (IN_writeNew) begin
-            if (entries[IN_writeAddr].useful == 0) begin
-                entries[IN_writeAddr].tag <= IN_writeTag;
-                entries[IN_writeAddr].counter <= {IN_writeTaken, {(CNT_SIZE-1){1'b0}}};
-                entries[IN_writeAddr].useful <= {USF_SIZE{1'b1}};
-            end
-            else entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful - 1;
-        end
-        else begin
+        if (IN_writeUpdate) begin
             if (IN_writeTaken && entries[IN_writeAddr].counter != {CNT_SIZE{1'b1}})
                 entries[IN_writeAddr].counter <= entries[IN_writeAddr].counter + 1;
             else if (!IN_writeTaken && entries[IN_writeAddr].counter != {CNT_SIZE{1'b0}})
@@ -74,6 +73,14 @@ always_ff@(posedge clk) begin
                 entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful + 1;
             else if (!IN_writeUseful && entries[IN_writeAddr].useful != {USF_SIZE{1'b0}})
                 entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful - 1;
+        end
+        else if(IN_writeNew) begin
+            if (entries[IN_writeAddr].useful == 0) begin
+                entries[IN_writeAddr].tag <= IN_writeTag;
+                entries[IN_writeAddr].counter <= {IN_writeTaken, {(CNT_SIZE-1){1'b0}}};
+                entries[IN_writeAddr].useful <= 0;
+            end
+            else if(!IN_anyAlloc) entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful - 1;
         end
     end
     

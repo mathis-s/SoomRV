@@ -85,10 +85,6 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
                 
                 OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
-                if (
-                    ({IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2)) !=
-                    IN_uop[i].pc
-                ) $display("%x %x %x %x", {IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2), IN_uop[i].pc, IN_uop[i].fetchOffs, IN_uop[i].fetchID);
                 assert(
                     ({IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2)) ==
                     IN_uop[i].pc
@@ -99,7 +95,7 @@ always_ff@(posedge clk) begin
                 if (IN_pcReadData[i].bpi.isJump || !IN_pcReadData[i].bpi.predicted || IN_uop[i].fetchOffs <= IN_pcReadData[i].branchPos)
                     OUT_uop[i].history <= IN_pcReadData[i].hist;
                 else
-                    OUT_uop[i].history <= {IN_pcReadData[i].hist[6:0], IN_pcReadData[i].bpi.taken};
+                    OUT_uop[i].history <= {IN_pcReadData[i].hist[$bits(BHist_t)-2:0], IN_pcReadData[i].bpi.taken};
                 
                 if (IN_uop[i].fetchOffs == IN_pcReadData[i].branchPos)
                     OUT_uop[i].bpi <= IN_pcReadData[i].bpi;

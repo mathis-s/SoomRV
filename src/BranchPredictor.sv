@@ -2,7 +2,7 @@ module BranchPredictor
 #(
     parameter NUM_IN=2,
     parameter NUM_ENTRIES=32,
-    parameter ID_BITS=8
+    parameter ID_BITS=16
 )
 (
     input wire clk,
@@ -35,8 +35,8 @@ module BranchPredictor
 
 integer i;
 
-reg[ID_BITS-1:0] gHistory;
-reg[ID_BITS-1:0] gHistoryCom;
+BHist_t gHistory;
+BHist_t gHistoryCom;
 
 // Try to find valid branch target update
 BTUpdate btUpdate;
@@ -49,26 +49,14 @@ always_comb begin
     end
 end
 
-wire[11:0] branchAddr = (OUT_branchCompr ? OUT_branchSrc[12:1] : OUT_branchSrc[12:1] - 1);
-reg[ID_BITS-1:0] branchAddrInv;
-always_comb
-    for (i = 0; i < ID_BITS; i=i+1)
-        branchAddrInv[ID_BITS - i - 1] = branchAddr[i];
-        
-wire useful = tagePred != initialPred;
-wire tageValid;
+wire[30:0] branchAddr = (OUT_branchCompr ? OUT_branchSrc[31:1] : OUT_branchSrc[31:1] - 1);
 
 assign OUT_branchHistory = gHistory;
 assign OUT_branchInfo.predicted = OUT_branchFound;
-assign OUT_branchInfo.taken = OUT_branchFound && (OUT_isJump ? 1 : OUT_branchTaken);
-assign OUT_branchInfo.tageValid = tageValid;
-assign OUT_branchInfo.tageUseful = useful;
+assign OUT_branchInfo.taken = OUT_branchTaken;
 assign OUT_branchInfo.isJump = OUT_isJump;
 
-
-wire initialPred;
-wire tagePred;
-assign OUT_branchTaken = tageValid ? tagePred : initialPred;
+assign OUT_branchTaken = OUT_branchFound && (OUT_isJump ? 1 : tageTaken);
 
 assign OUT_branchDst[0] = 1'b0;
 assign OUT_branchSrc[0] = 1'b0;
@@ -88,34 +76,27 @@ BranchTargetBuffer btb
     .IN_btUpdate(btUpdate)
 );
 
-BranchPredictionTable bpt
+wire tageTaken;
+TagePredictor tagePredictor
 (
     .clk(clk),
     .rst(rst),
-    .IN_readAddr(branchAddr[9:0]),
-    .OUT_taken(initialPred),
-    .IN_writeEn(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
-    .IN_writeAddr(IN_comUOp.pc[9:0]),
-    .IN_writeTaken(IN_comUOp.branchTaken)
-);
-
-
-TageTable tage
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_readAddr(branchAddr[7:0] ^ gHistory),
-    .IN_readTag(branchAddr[7:0]),
-    .OUT_readValid(tageValid),
-    .OUT_readTaken(tagePred),
     
-    .IN_writeAddr(IN_comUOp.pc[ID_BITS-1:0] ^ IN_comUOp.history[7:0]),
-    .IN_writeTag(IN_comUOp.pc[ID_BITS-1:0][7:0]),
-    .IN_writeTaken(IN_comUOp.branchTaken),
+    .IN_predAddr(branchAddr),
+    .IN_predHistory(gHistory),
+    .OUT_predTageID(OUT_branchInfo.tageID),
+    .OUT_predUseful(OUT_branchInfo.tageUseful),
+    .OUT_predTaken(tageTaken),
+    
     .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
-    .IN_writeNew(!IN_comUOp.bpi.tageValid),
-    .IN_writeUseful(IN_comUOp.bpi.tageUseful && IN_comUOp.branchTaken == IN_comUOp.bpi.taken)
+    .IN_writeAddr(IN_comUOp.pc),
+    .IN_writeHistory(IN_comUOp.history),
+    .IN_writeTageID(IN_comUOp.bpi.tageID),
+    .IN_writeTaken(IN_comUOp.branchTaken),
+    .IN_writeUseful(IN_comUOp.bpi.tageUseful),
+    .IN_writePred(IN_comUOp.bpi.taken)
 );
+
 
 always_ff@(posedge clk) begin
 
@@ -126,10 +107,10 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (OUT_branchFound && !OUT_isJump)
-            gHistory <= {gHistory[ID_BITS-2:0], OUT_branchTaken};
+            gHistory <= {gHistory[$bits(BHist_t)-2:0], OUT_branchTaken};
         
         if (IN_comUOp.valid && IN_comUOp.isBranch && !IN_mispredFlush) begin
-            gHistoryCom <= {gHistoryCom[ID_BITS-2:0], IN_comUOp.branchTaken};
+            gHistoryCom <= {gHistoryCom[$bits(BHist_t)-2:0], IN_comUOp.branchTaken};
             OUT_CSR_branchCommitted <= 1;
         end
         else OUT_CSR_branchCommitted <= 0;
