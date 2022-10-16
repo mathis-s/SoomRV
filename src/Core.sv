@@ -121,7 +121,6 @@ IF_Instr IF_instrs[3:0];
 
 FetchID_t PC_readAddress[3:0];
 PCFileEntry PC_readData[3:0];
-assign PC_readAddress[3] = 0;
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -656,6 +655,9 @@ ROB rob
     .OUT_irqFlags(ROB_irqFlags),
     .OUT_irqSrc(ROB_irqSrc),
     .OUT_irqMemAddr(ROB_irqMemAddr),
+    
+    .OUT_pcReadAddr(PC_readAddress[3]),
+    .IN_pcReadData(PC_readData[3]),
     
     .OUT_fence(),
     

@@ -106,7 +106,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.pc <= pl[NUM_STAGES].pc;
                 OUT_uop.isBranch <= 0;
                 OUT_uop.branchTaken <= 0;
-                OUT_uop.branchID <= 0;
                 OUT_uop.flags <= FLAGS_NONE;
                 
                 result = (pl[NUM_STAGES].invert ? (-pl[NUM_STAGES].res) : pl[NUM_STAGES].res);

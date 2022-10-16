@@ -266,7 +266,6 @@ typedef struct packed
     bit branchTaken;
     BranchPredInfo bpi;
     BHist_t history;
-
     Flags flags;
     logic compressed;
     bit valid;

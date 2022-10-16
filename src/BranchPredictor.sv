@@ -117,9 +117,6 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst && IN_branch.taken) begin
-        //if (IN_branch.bpi.predicted && !IN_branch.bpi.isJump)
-        //    gHistory <= {IN_branch.history[6:0], !IN_branch.bpi.taken};
-        //else
         gHistory <= IN_branch.history;
     end
 end

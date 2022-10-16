@@ -3,15 +3,16 @@ typedef struct packed
 {
     Flags flags;
     bit[6:0] tag;
-    // for debugging
     bit[5:0] sqN;
-    bit[30:0] pc;
+    //bit[30:0] pc;
     bit[5:0] name;
     bit isBranch;
     bit branchTaken;
-    BranchPredInfo bpi;
+    bit predicted;
+    //BranchPredInfo bpi;
+    FetchOff_t fetchOffs;
     FetchID_t fetchID;
-    BHist_t history;
+    //BHist_t history;
     bit compressed;
     bit valid;
     bit executed;
@@ -49,12 +50,14 @@ module ROB
     output reg[31:0] OUT_irqSrc,
     output reg[31:0] OUT_irqMemAddr,
     
+    output FetchID_t OUT_pcReadAddr,
+    input PCFileEntry IN_pcReadData,
+    
     output reg OUT_fence,
     
     output BranchProv OUT_branch,
     
     output reg OUT_halt,
-    
     output reg OUT_mispredFlush
 );
 
@@ -76,22 +79,33 @@ always_comb begin
             headValid = 0;
     end
     
-    if (entries[baseIndex[4:0]+1].bpi.predicted)
+    if (entries[baseIndex[4:0]+1].predicted)
         headValid = 0;
-    if (entries[baseIndex[4:0]+2].bpi.predicted)
+    if (entries[baseIndex[4:0]+2].predicted)
         headValid = 0;
 end
 
 reg allowSingleDequeue;
 always_comb begin
     allowSingleDequeue = 1;
-    
-    //for (i = 1; i < LENGTH; i=i+1)
-    //    if (entries[i].valid)
-    //        allowSingleDequeue = 0;
-            
     if (!entries[baseIndex[4:0]].executed)
         allowSingleDequeue = 0;
+end
+
+assign OUT_pcReadAddr = entries[baseIndex[4:0]].fetchID;
+wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], entries[baseIndex[4:0]].fetchOffs} - (entries[baseIndex[4:0]].compressed ? 0 : 1);
+
+BHist_t baseIndexHist;
+BranchPredInfo baseIndexBPI;
+always_comb begin
+    if (IN_pcReadData.bpi.predicted && !IN_pcReadData.bpi.isJump && entries[baseIndex[4:0]].fetchOffs > IN_pcReadData.branchPos)
+        baseIndexHist = {IN_pcReadData.hist[$bits(BHist_t)-2:0], IN_pcReadData.bpi.taken};
+    else
+        baseIndexHist = IN_pcReadData.hist;
+        
+        baseIndexBPI = (entries[baseIndex[4:0]].fetchOffs == IN_pcReadData.branchPos) ?
+                                IN_pcReadData.bpi :
+                                0;
 end
 
 reg misprReplay;
@@ -177,10 +191,10 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].sqN <= baseIndex + i[5:0];
                 OUT_comUOp[i].isBranch <= entries[baseIndex[4:0]+i[4:0]].isBranch;
                 OUT_comUOp[i].branchTaken <= entries[baseIndex[4:0]+i[4:0]].branchTaken;
-                OUT_comUOp[i].bpi <= entries[baseIndex[4:0]+i[4:0]].bpi;
-                OUT_comUOp[i].history <= entries[baseIndex[4:0]+i[4:0]].history;
+                OUT_comUOp[i].bpi <= baseIndexBPI;
+                OUT_comUOp[i].history <= baseIndexHist;
                 OUT_comUOp[i].valid <= 1;
-                OUT_comUOp[i].pc <= entries[baseIndex[4:0]+i[4:0]].pc;
+                OUT_comUOp[i].pc <= baseIndexPC;
                 OUT_comUOp[i].compressed <= entries[baseIndex[4:0]+i[4:0]].compressed;
                 entries[baseIndex[4:0]+i[4:0]].valid <= 0;
                 entries[baseIndex[4:0]+i[4:0]].executed <= 0;
@@ -191,16 +205,17 @@ always_ff@(posedge clk) begin
         
         // One entry
         else if (allowSingleDequeue && !IN_invalidate) begin
-
+            
+            //assert(baseIndexPC == entries[baseIndex[4:0]].pc);
             OUT_comUOp[0].nmDst <= entries[baseIndex[4:0]].name;
             OUT_comUOp[0].tagDst <= entries[baseIndex[4:0]].tag;
             OUT_comUOp[0].sqN <= baseIndex;
             OUT_comUOp[0].isBranch <= entries[baseIndex[4:0]].isBranch;
             OUT_comUOp[0].branchTaken <= entries[baseIndex[4:0]].branchTaken;
-            OUT_comUOp[0].bpi <= entries[baseIndex[4:0]].bpi;
-            OUT_comUOp[0].history <= entries[baseIndex[4:0]].history;
+            OUT_comUOp[0].bpi <= baseIndexBPI;
+            OUT_comUOp[0].history <= baseIndexHist;
             OUT_comUOp[0].valid <= 1;
-            OUT_comUOp[0].pc <= entries[baseIndex[4:0]].pc;
+            OUT_comUOp[0].pc <= baseIndexPC;
             OUT_comUOp[0].compressed <= entries[baseIndex[4:0]].compressed;
             entries[baseIndex[4:0]].valid <= 0;
             entries[baseIndex[4:0]].executed <= 0;
@@ -210,13 +225,13 @@ always_ff@(posedge clk) begin
                 // this way the debugger can see the state right after ebreak exec'd.
                 OUT_halt <= 1;
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {entries[baseIndex[4:0]].pc + 31'h2, 1'b0};
+                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
                 OUT_branch.sqN <= baseIndex;
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
-                OUT_branch.history <= entries[baseIndex[4:0]].history;
+                OUT_branch.history <= baseIndexHist;
                 // Do not write back result, redirect to x0
                 OUT_comUOp[0].nmDst <= 0;
             end
@@ -229,14 +244,14 @@ always_ff@(posedge clk) begin
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
-                OUT_branch.history <= entries[baseIndex[4:0]].history;
+                OUT_branch.history <= baseIndexHist;
                 
                 // Do not write back result, redirect to x0
                 if (entries[baseIndex[4:0]].flags == FLAGS_EXCEPT)
                     OUT_comUOp[0].nmDst <= 0;
                 
                 OUT_irqFlags <= entries[baseIndex[4:0]].flags;
-                OUT_irqSrc <= {entries[baseIndex[4:0]].pc, 1'b0};
+                OUT_irqSrc <= {baseIndexPC, 1'b0};
                 // For exceptions, some fields are reused to get the segment of the violating address
                 //OUT_irqMemAddr <= {7'b0, entries[baseIndex[4:0]].name, entries[baseIndex[4:0]].branchTaken, entries[baseIndex[4:0]].branchID, 10'b0};
             end
@@ -244,12 +259,12 @@ always_ff@(posedge clk) begin
                 
                 // Jump to instruction after fence to invalidate all speculative state
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {entries[baseIndex[4:0]].pc + 31'h2, 1'b0};
+                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= entries[baseIndex[4:0]].fetchID;
-                OUT_branch.history <= entries[baseIndex[4:0]].history;
+                OUT_branch.history <= baseIndexHist;
                 
                 OUT_fence <= 1;
             end
@@ -269,16 +284,10 @@ always_ff@(posedge clk) begin
         // Enqueue ops directly from Rename
         for (i = 0; i < WIDTH; i=i+1) begin
             if (IN_uopValid[i] && (!IN_invalidate/* || $signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0*/)) begin
-                
-                //assert(!IN_invalidate || !entries[IN_uop[i].sqN[4:0]].valid);
-                //$display("insert %d", IN_uop[i].sqN);
-                
                 entries[IN_uop[i].sqN[4:0]].valid <= 1;
-                //entries[IN_uop[i].sqN[4:0]].flags <= IN_uop[i].flags;
                 entries[IN_uop[i].sqN[4:0]].tag <= IN_uop[i].tagDst;
                 entries[IN_uop[i].sqN[4:0]].name <= IN_uop[i].nmDst;
                 entries[IN_uop[i].sqN[4:0]].sqN <= IN_uop[i].sqN;
-                //entries[IN_uop[i].sqN[4:0]].pc <= IN_uop[i].pc[31:1];
                 entries[IN_uop[i].sqN[4:0]].compressed <= IN_uop[i].compressed;
                 entries[IN_uop[i].sqN[4:0]].fetchID <= IN_uop[i].fetchID;
                 entries[IN_uop[i].sqN[4:0]].executed <= 0;
@@ -292,9 +301,11 @@ always_ff@(posedge clk) begin
                 entries[IN_wbUOps[i].sqN[4:0]].flags <= IN_wbUOps[i].flags;
                 entries[IN_wbUOps[i].sqN[4:0]].isBranch <= IN_wbUOps[i].isBranch;
                 entries[IN_wbUOps[i].sqN[4:0]].branchTaken <= IN_wbUOps[i].branchTaken;
-                entries[IN_wbUOps[i].sqN[4:0]].pc <= IN_wbUOps[i].pc[31:1];
-                entries[IN_wbUOps[i].sqN[4:0]].bpi <= IN_wbUOps[i].bpi;
-                entries[IN_wbUOps[i].sqN[4:0]].history <= IN_wbUOps[i].history;
+                entries[IN_wbUOps[i].sqN[4:0]].fetchOffs <= IN_wbUOps[i].pc[2:1] + (IN_wbUOps[i].compressed ? 2'b0 : 2'b1);
+                //entries[IN_wbUOps[i].sqN[4:0]].pc <= IN_wbUOps[i].pc[31:1];
+                //entries[IN_wbUOps[i].sqN[4:0]].bpi <= IN_wbUOps[i].bpi;
+                //entries[IN_wbUOps[i].sqN[4:0]].history <= IN_wbUOps[i].history;
+                entries[IN_wbUOps[i].sqN[4:0]].predicted <= IN_wbUOps[i].bpi.predicted;
             end
         end
         
