@@ -2,10 +2,10 @@
 typedef struct packed 
 {
     Flags flags;
-    bit[6:0] tag;
-    bit[5:0] sqN;
+    Tag tag;
+    SqN sqN;
     //bit[30:0] pc;
-    bit[5:0] name;
+    RegNm name;
     bit isBranch;
     bit branchTaken;
     bit predicted;
@@ -38,10 +38,10 @@ module ROB
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
 
     input wire IN_invalidate,
-    input wire[5:0] IN_invalidateSqN,
+    input SqN IN_invalidateSqN,
 
-    output wire[5:0] OUT_maxSqN,
-    output wire[5:0] OUT_curSqN,
+    output SqN OUT_maxSqN,
+    output SqN OUT_curSqN,
 
     output CommitUOp OUT_comUOp[WIDTH-1:0],
     
@@ -200,7 +200,7 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].bpi <= baseIndexBPI;
                 OUT_comUOp[i].history <= baseIndexHist;
                 OUT_comUOp[i].valid <= 1;
-                OUT_comUOp[i].pc <= baseIndexPC;
+                OUT_comUOp[i].pc <= IN_pcReadData.pc;//baseIndexPC;
                 OUT_comUOp[i].compressed <= entries[baseIndex[4:0]+i[4:0]].compressed;
                 entries[baseIndex[4:0]+i[4:0]].valid <= 0;
                 entries[baseIndex[4:0]+i[4:0]].executed <= 0;
@@ -221,7 +221,7 @@ always_ff@(posedge clk) begin
             OUT_comUOp[0].bpi <= baseIndexBPI;
             OUT_comUOp[0].history <= baseIndexHist;
             OUT_comUOp[0].valid <= 1;
-            OUT_comUOp[0].pc <= baseIndexPC;
+            OUT_comUOp[0].pc <= IN_pcReadData.pc;//baseIndexPC;
             OUT_comUOp[0].compressed <= entries[baseIndex[4:0]].compressed;
             entries[baseIndex[4:0]].valid <= 0;
             entries[baseIndex[4:0]].executed <= 0;

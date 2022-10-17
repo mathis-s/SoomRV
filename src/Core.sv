@@ -186,8 +186,8 @@ BranchPredictor bp
     .OUT_CSR_branchCommitted(CSR_branchCommitted)
 );
 
-wire[5:0] RN_nextSqN;
-wire[5:0] ROB_curSqN;
+SqN RN_nextSqN;
+SqN ROB_curSqN;
 
 always_ff@(posedge clk) begin
     if (rst)
@@ -253,8 +253,8 @@ Fuse fuse
 
 R_UOp RN_uop[2:0];
 reg RN_uopValid[2:0];
-wire[5:0] RN_nextLoadSqN;
-wire[5:0] RN_nextStoreSqN;
+SqN RN_nextLoadSqN;
+SqN RN_nextStoreSqN;
 wire RN_stall;
 Rename rn 
 (
@@ -411,7 +411,7 @@ wire[4:0] enabledXUs[2:0];
 FuncUnit LD_fu[2:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
-wire[6:0] LD_zcFwdTag[1:0];
+Tag LD_zcFwdTag[1:0];
 wire LD_zcFwdValid[1:0];
 Load ld
 (
@@ -539,7 +539,7 @@ AGU agu
     .OUT_uop(AGU_uop)
 );
 
-wire[5:0] LB_maxLoadSqN;
+SqN LB_maxLoadSqN;
 LoadBuffer lb
 (
     .clk(clk),
@@ -554,7 +554,7 @@ LoadBuffer lb
     .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
 
-wire[5:0] SQ_maxStoreSqN;
+SqN SQ_maxStoreSqN;
 wire CSR_ce[0:0];
 wire[31:0] CSR_dataOut[0:0];
 

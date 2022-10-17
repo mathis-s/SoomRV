@@ -49,7 +49,7 @@ always_comb begin
     end
 end
 
-wire[30:0] branchAddr = (OUT_branchCompr ? OUT_branchSrc[31:1] : OUT_branchSrc[31:1] - 1);
+wire[30:0] branchAddr = IN_pc[31:1];//(OUT_branchCompr ? OUT_branchSrc[31:1] : OUT_branchSrc[31:1] - 1);
 
 assign OUT_branchHistory = gHistory;
 assign OUT_branchInfo.predicted = OUT_branchFound;
@@ -89,7 +89,7 @@ TagePredictor tagePredictor
     .OUT_predTaken(tageTaken),
     
     .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
-    .IN_writeAddr(IN_comUOp.pc),
+    .IN_writeAddr(IN_comUOp.pc[30:0]),
     .IN_writeHistory(IN_comUOp.history),
     .IN_writeTageID(IN_comUOp.bpi.tageID),
     .IN_writeTaken(IN_comUOp.branchTaken),

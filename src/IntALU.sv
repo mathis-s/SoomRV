@@ -7,7 +7,7 @@ module IntALU
     input wire IN_wbStall,
     input EX_UOp IN_uop,
     input IN_invalidate,
-    input[5:0] IN_invalidateSqN,
+    input SqN IN_invalidateSqN,
     
     output wire OUT_wbReq,
 
@@ -15,7 +15,7 @@ module IntALU
     output BTUpdate OUT_btUpdate,
     
     output wire[31:0] OUT_zcFwdResult,
-    output wire[6:0] OUT_zcFwdTag,
+    output Tag OUT_zcFwdTag,
     output wire OUT_zcFwdValid,
 
     output RES_UOp OUT_uop

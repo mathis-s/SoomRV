@@ -62,7 +62,7 @@ reg[6:0] RAT_wbTags[WIDTH_UOPS-1:0];
 reg TB_issueValid[WIDTH_UOPS-1:0];
 reg TB_issueValid_fp[WIDTH_UOPS-1:0];
 
-reg[5:0] nextCounterSqN;
+SqN nextCounterSqN;
 always_comb begin
     
     nextCounterSqN = counterSqN;

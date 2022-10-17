@@ -28,9 +28,9 @@ typedef struct packed
     bit invert;
     bit high;
     
-    bit[5:0] tagDst;
-    bit[4:0] nmDst;
-    bit[5:0] sqN;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
     bit[31:0] pc;
     bit valid;
 } MulPS;

@@ -1,7 +1,7 @@
 typedef struct packed
 {
     bit valid;
-    bit[5:0] sqN;
+    SqN sqN;
     bit[29:0] addr;
 } LBEntry;
 
@@ -14,14 +14,14 @@ module LoadBuffer
     input wire clk,
     input wire rst,
     
-    input wire[5:0] commitSqN,
+    input SqN commitSqN,
     
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input BranchProv IN_branch,
     output BranchProv OUT_branch,
     
-    output reg[5:0] OUT_maxLoadSqN
+    output SqN OUT_maxLoadSqN
 );
 
 integer i;

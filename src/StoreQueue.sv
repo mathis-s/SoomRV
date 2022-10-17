@@ -2,7 +2,7 @@ typedef struct packed
 {
     bit valid;
     bit ready;
-    bit[5:0] sqN;
+    SqN sqN;
     bit[29:0] addr;
     bit[31:0] data;
     bit[3:0] wmask;

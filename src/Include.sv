@@ -1,7 +1,7 @@
 
 typedef logic[5:0] RegNm;
 typedef logic[6:0] Tag;
-typedef logic[5:0] SeqNum;
+typedef logic[5:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[1:0] FetchOff_t;
@@ -183,41 +183,24 @@ typedef struct packed
     logic[31:0] pc;
     logic[31:0] imm;
     logic availA;
-    logic[6:0] tagA;
+    Tag tagA;
     logic tagA_fp;
     logic availB;
-    logic[6:0] tagB;
+    Tag tagB;
     logic tagB_fp;
     logic immB;
-    logic[6:0] tagC;
-    logic[5:0] sqN;
-    logic[6:0] tagDst;
-    logic[5:0] nmDst;
+    Tag tagC;
+    SqN sqN;
+    Tag tagDst;
+    RegNm nmDst;
     logic[5:0] opcode;
     FetchID_t fetchID;
     FetchOff_t fetchOffs;
-    logic[5:0] storeSqN;
-    logic[5:0] loadSqN;
+    SqN storeSqN;
+    SqN loadSqN;
     FuncUnit fu;
     logic compressed;
 } R_UOp;
-
-
-typedef struct packed
-{
-    logic[31:0] imm;
-    logic[31:0] srcA;
-    logic availA;
-    logic[6:0] tagA;
-    logic[31:0] srcB;
-    logic availB;
-    logic[6:0] tagB;
-    logic[5:0] sqN;
-    logic[6:0] tagDst;
-    logic[5:0] nmDst;
-    logic[5:0] opcode;
-    logic valid;
-} UOp;
 
 typedef struct packed
 {
@@ -226,41 +209,24 @@ typedef struct packed
     logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;
-    logic[6:0] tagDst;
-    logic[5:0] nmDst;
-    logic[5:0] sqN;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
     FetchID_t fetchID;
     BranchPredInfo bpi;
     BHist_t history;
-    logic[5:0] storeSqN;
-    logic[5:0] loadSqN;
+    SqN storeSqN;
+    SqN loadSqN;
     logic compressed;
     logic valid;
 } EX_UOp;
 
 typedef struct packed
 {
-    logic[32:0] srcA;
-    logic[32:0] srcB;
-    logic[31:0] pc;
-    logic[32:0] srcC;
-    logic[5:0] opcode;
-    logic[6:0] tagDst;
-    logic[5:0] nmDst;
-    logic[5:0] sqN;
-    logic[2:0] rm;
-    logic[5:0] storeSqN;
-    logic[5:0] loadSqN;
-    logic compressed;
-    logic valid;
-} FPU_EX_UOp;
-
-typedef struct packed
-{
     bit[31:0] result;
-    bit[6:0] tagDst;
-    bit[5:0] nmDst;
-    bit[5:0] sqN;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
     bit[31:0] pc;
     bit isBranch;
     bit branchTaken;
@@ -273,21 +239,10 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit[32:0] result;
-    bit[6:0] tagDst;
-    bit[5:0] nmDst;
-    bit[5:0] sqN;
-    bit[31:0] pc;
-    bit valid;
-} FPU_RES_UOp;
-
-
-typedef struct packed
-{
     bit[31:0] dstPC;
-    bit[5:0] sqN;
-    bit[5:0] storeSqN;
-    bit[5:0] loadSqN;
+    SqN sqN;
+    SqN storeSqN;
+    SqN loadSqN;
     bit flush;
     FetchID_t fetchID;
     BHist_t history;
@@ -314,11 +269,11 @@ typedef struct packed
     logic[1:0] size;
     logic isLoad;
     logic[31:0] pc;
-    logic[6:0] tagDst;
-    logic[5:0] nmDst;
-    logic[5:0] sqN;
-    logic[5:0] storeSqN;
-    logic[5:0] loadSqN;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
+    SqN storeSqN;
+    SqN loadSqN;
     FetchID_t fetchID;
     BHist_t history;
     logic exception;
@@ -329,9 +284,9 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[5:0] nmDst;
-    logic[6:0] tagDst;
-    logic[5:0] sqN;
+    RegNm nmDst;
+    Tag tagDst;
+    SqN sqN;
     logic isBranch;
     logic branchTaken;
     BranchPredInfo bpi;

@@ -17,13 +17,13 @@ module Load
     input RES_UOp IN_wbUOp[NUM_WBS-1:0],
     
     input wire IN_invalidate,
-    input wire[5:0] IN_invalidateSqN,
+    input SqN IN_invalidateSqN,
     
     input wire IN_stall[NUM_UOPS-1:0],
     
     // Zero cycle forward inputs
     input wire[31:0] IN_zcFwdResult[NUM_ZC_FWDS-1:0],
-    input wire[6:0] IN_zcFwdTag[NUM_ZC_FWDS-1:0],
+    input Tag IN_zcFwdTag[NUM_ZC_FWDS-1:0],
     input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
     
     // PC File read
