@@ -30,6 +30,8 @@ module ProgramCounter
     
     input FetchID_t IN_pcReadAddr[3:0],
     output PCFileEntry OUT_pcReadData[3:0],
+    
+    input FetchID_t IN_ROB_curFetchID,
 
     output reg[31:0] OUT_pcRaw,
     
@@ -37,7 +39,9 @@ module ProgramCounter
     
     input wire[31:0] IN_instrMappingBase,
     input wire IN_instrMappingHalfSize,
-    output wire OUT_instrMappingMiss
+    output wire OUT_instrMappingMiss,
+    
+    output wire OUT_stall
 );
 
 integer i;
@@ -80,6 +84,8 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr2(IN_pcReadAddr[2]), .rdata2(OUT_pcReadData[2]),
     .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3])
 );
+
+assign OUT_stall = (IN_ROB_curFetchID == fetchID);
 
 always_ff@(posedge clk) begin
     if (rst) begin

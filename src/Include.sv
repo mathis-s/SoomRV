@@ -3,7 +3,7 @@ typedef logic[5:0] RegNm;
 typedef logic[6:0] Tag;
 typedef logic[5:0] SeqNum;
 typedef logic[11:0] BrID;
-typedef logic[5:0] FetchID_t;
+typedef logic[4:0] FetchID_t;
 typedef logic[1:0] FetchOff_t;
 typedef logic[55:0] BHist_t;
 

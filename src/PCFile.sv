@@ -1,7 +1,7 @@
 module PCFile
 #(
     parameter WORD_SIZE=31,
-    parameter ADDR_SIZE=6
+    parameter ADDR_SIZE=5
 )
 (
     input wire clk,

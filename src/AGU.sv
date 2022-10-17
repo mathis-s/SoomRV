@@ -27,10 +27,6 @@ always_ff@(posedge clk) begin
             
 
             OUT_uop.addr <= addr;
-            
-            //OUT_uop.wmask <= IN_uop.wmask;
-            //OUT_uop.signExtend <= IN_uop.signExtend;
-            //OUT_uop.shamt <= IN_uop.shamt;
             OUT_uop.pc <= IN_uop.pc;
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;

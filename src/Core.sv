@@ -121,6 +121,7 @@ IF_Instr IF_instrs[3:0];
 
 FetchID_t PC_readAddress[3:0];
 PCFileEntry PC_readData[3:0];
+wire PC_stall;
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -146,12 +147,16 @@ ProgramCounter progCnt
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
     
+    .IN_ROB_curFetchID(ROB_curFetchID),
+    
     .OUT_pcRaw(PC_pc),
     .OUT_instrs(IF_instrs),
     
     .IN_instrMappingBase(IN_instrMappingBase),
     .IN_instrMappingHalfSize(IN_instrMappingHalfSize),
-    .OUT_instrMappingMiss(OUT_instrMappingMiss)
+    .OUT_instrMappingMiss(OUT_instrMappingMiss),
+    
+    .OUT_stall(PC_stall)
 );
 
 BTUpdate BP_btUpdates[1:0];
@@ -208,7 +213,7 @@ PreDecode preDec
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
-assign ifetchEn = !PD_full;
+assign ifetchEn = !PD_full && !PC_stall;
 
 D_UOp DE_uop[3:0];
 
@@ -498,7 +503,6 @@ FPU fpu
 );
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
-//assign wbStall[0] = DIV_busy;
 
 AGU_UOp CC_uop;
 CacheController cc
@@ -626,7 +630,6 @@ MultiplySmall mul
 );
 
 assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
-//assign wbStall[1] = enabledXUs[1][0] && MUL_wbReq && LD_uop[1].valid;
 
 wire[5:0] ROB_maxSqN;
 
@@ -634,6 +637,8 @@ wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
 wire[31:0] ROB_irqMemAddr;
+
+FetchID_t ROB_curFetchID;
 ROB rob
 (
     .clk(clk),
@@ -662,6 +667,8 @@ ROB rob
     .OUT_fence(),
     
     .OUT_branch(branchProvs[3]),
+    
+    .OUT_curFetchID(ROB_curFetchID),
     
     .OUT_halt(OUT_halt),
     .OUT_mispredFlush(mispredFlush)

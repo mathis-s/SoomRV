@@ -57,6 +57,8 @@ module ROB
     
     output BranchProv OUT_branch,
     
+    output FetchID_t OUT_curFetchID,
+    
     output reg OUT_halt,
     output reg OUT_mispredFlush
 );
@@ -133,6 +135,7 @@ always_ff@(posedge clk) begin
         OUT_branch.taken <= 0;
         misprReplay <= 0;
         OUT_mispredFlush <= 0;
+        OUT_curFetchID <= -1;
     end
     else if (IN_invalidate) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -150,6 +153,9 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst) begin
+        
+        if (entries[baseIndex[4:0]].valid)
+            OUT_curFetchID <= entries[baseIndex[4:0]].fetchID;
         
         // After mispredict, we replay all ops from last committed to the branch
         // without actually committing them, to roll back the Rename Map.

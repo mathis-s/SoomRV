@@ -487,10 +487,10 @@ main:
 	andi	a5,a5,0xff
 	bgtu	a5,a1,.L148
 .L33:
-	beq	a5,s4,.L83
 	li	a4,0
+	beq	a5,s4,.L149
 	bne	a3,a4,.L29
-.L151:
+.L152:
 	lw	a6,20(s1)
 	lw	a0,24(s1)
 	lhu	a3,28(s1)
@@ -521,7 +521,7 @@ main:
 	lw	a5,0(sp)
 	sw	a5,%lo(Int_Glob)(s5)
 	lui	a5,%hi(Ch_1_Glob)
-	beq	t4,zero,.L149
+	beq	t4,zero,.L150
 .L35:
 	sb	s4,%lo(Ch_1_Glob)(a5)
 	li	a1,67
@@ -542,16 +542,16 @@ main:
 .L37:
 	addi	s3,s3,1
 	li	a4,201
-	beq	s3,a4,.L150
+	beq	s3,a4,.L151
 	mv	s0,a2
 	j	.L38
-.L23:
-	j	.L23
-.L83:
+.L149:
 	li	a4,1
 	li	t4,1
 	bne	a3,a4,.L29
-	j	.L151
+	j	.L152
+.L23:
+	j	.L23
 .L146:
 	lw	a4,8(s0)
 	li	a3,6
@@ -588,7 +588,7 @@ main:
 	sw	a5,0(sp)
 	lui	a5,%hi(Ch_1_Glob)
 	bne	t4,zero,.L35
-.L149:
+.L150:
 	lbu	a1,%lo(Ch_1_Glob)(a5)
 	j	.L36
 .L25:
@@ -598,7 +598,7 @@ main:
 .L26:
 	sw	a1,8(a5)
 	j	.L27
-.L150:
+.L151:
 	li	a4,-16777216
 	lw	a2,128(a4)
 	lui	s1,%hi(End_Time)
@@ -1166,7 +1166,7 @@ Proc_1:
 	addi	a3,a1,12
 	sw	a3,12(a4)
 	lw	a3,4(a5)
-	beq	a3,zero,.L161
+	beq	a3,zero,.L162
 	lw	a5,0(a0)
 	lw	t6,0(a5)
 	lw	t5,4(a5)
@@ -1193,36 +1193,36 @@ Proc_1:
 	sw	a4,40(a0)
 	sw	a5,44(a0)
 	ret
-.L161:
+.L162:
 	lw	a3,8(a0)
 	li	a2,6
 	sw	a2,12(a5)
 	li	a0,2
-	beq	a3,a0,.L154
+	beq	a3,a0,.L155
 	li	a2,3
 	sw	a2,8(a5)
 	li	a2,1
-	beq	a3,a2,.L155
-	bleu	a3,a2,.L160
+	beq	a3,a2,.L156
+	bleu	a3,a2,.L161
 	li	a2,4
-	bne	a3,a2,.L158
+	bne	a3,a2,.L159
 	sw	a0,8(a5)
-.L158:
+.L159:
 	lw	a4,0(a4)
 	li	a3,18
 	sw	a3,12(a5)
 	sw	a4,0(a5)
 	ret
-.L155:
+.L156:
 	li	a3,100
-	ble	a1,a3,.L158
-.L160:
+	ble	a1,a3,.L159
+.L161:
 	sw	zero,8(a5)
-	j	.L158
-.L154:
+	j	.L159
+.L155:
 	li	a3,1
 	sw	a3,8(a5)
-	j	.L158
+	j	.L159
 	.size	Proc_1, .-Proc_1
 	.align	1
 	.globl	Proc_2
@@ -1231,9 +1231,9 @@ Proc_2:
 	lui	a5,%hi(Ch_1_Glob)
 	lbu	a4,%lo(Ch_1_Glob)(a5)
 	li	a5,65
-	beq	a4,a5,.L164
+	beq	a4,a5,.L165
 	ret
-.L164:
+.L165:
 	lw	a5,0(a0)
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
@@ -1248,11 +1248,11 @@ Proc_2:
 Proc_3:
 	lui	a4,%hi(Ptr_Glob)
 	lw	a5,%lo(Ptr_Glob)(a4)
-	beq	a5,zero,.L166
+	beq	a5,zero,.L167
 	lw	a5,0(a5)
 	sw	a5,0(a0)
 	lw	a5,%lo(Ptr_Glob)(a4)
-.L166:
+.L167:
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
 	addi	a4,a4,12
@@ -1292,28 +1292,28 @@ Proc_5:
 	.type	Proc_6, @function
 Proc_6:
 	li	a4,2
-	beq	a0,a4,.L173
+	beq	a0,a4,.L174
 	li	a5,3
 	sw	a5,0(a1)
 	li	a5,1
-	beq	a0,a5,.L174
-	bleu	a0,a5,.L178
+	beq	a0,a5,.L175
+	bleu	a0,a5,.L179
 	li	a5,4
-	bne	a0,a5,.L179
+	bne	a0,a5,.L180
 	sw	a4,0(a1)
-.L177:
+.L178:
 	ret
-.L174:
+.L175:
 	lui	a5,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a5)
 	li	a5,100
-	ble	a4,a5,.L177
-.L178:
+	ble	a4,a5,.L178
+.L179:
 	sw	zero,0(a1)
 	ret
-.L179:
+.L180:
 	ret
-.L173:
+.L174:
 	li	a5,1
 	sw	a5,0(a1)
 	ret
@@ -1364,10 +1364,10 @@ Proc_8:
 Func_1:
 	andi	a0,a0,0xff
 	andi	a1,a1,0xff
-	beq	a0,a1,.L185
+	beq	a0,a1,.L186
 	li	a0,0
 	ret
-.L185:
+.L186:
 	lui	a5,%hi(Ch_1_Glob)
 	sb	a0,%lo(Ch_1_Glob)(a5)
 	li	a0,1
@@ -1379,25 +1379,23 @@ Func_1:
 Func_2:
 	lbu	a4,2(a0)
 	lbu	a5,3(a1)
-	beq	a4,a5,.L188
+	beq	a4,a5,.L189
 	addi	sp,sp,-16
 	sw	ra,12(sp)
 	call	strcmp
-	ble	a0,zero,.L190
-	lw	ra,12(sp)
+	li	a5,0
+	ble	a0,zero,.L187
 	lui	a5,%hi(Int_Glob)
 	li	a4,10
 	sw	a4,%lo(Int_Glob)(a5)
-	li	a0,1
-	addi	sp,sp,16
-	jr	ra
-.L188:
-	j	.L188
-.L190:
+	li	a5,1
+.L187:
 	lw	ra,12(sp)
-	li	a0,0
+	mv	a0,a5
 	addi	sp,sp,16
 	jr	ra
+.L189:
+	j	.L189
 	.size	Func_2, .-Func_2
 	.align	1
 	.globl	Func_3
