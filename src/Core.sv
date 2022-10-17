@@ -298,7 +298,7 @@ IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn),
+    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
     
     .IN_stall(stall[0]),
     .IN_doNotIssueFU1(DIV_doNotIssue),
@@ -323,7 +323,7 @@ IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn),
+    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
     
     .IN_stall(stall[1]),
     .IN_doNotIssueFU1(MUL_doNotIssue),
@@ -348,7 +348,7 @@ IssueQueue#(16,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn),
+    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
     
     .IN_stall(stall[2]),
     .IN_doNotIssueFU1(1'b0),
@@ -631,7 +631,7 @@ MultiplySmall mul
 
 assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
 
-wire[5:0] ROB_maxSqN;
+SqN ROB_maxSqN;
 
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
@@ -648,8 +648,7 @@ ROB rob
     
     .IN_wbUOps(wbUOp),
 
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
+    .IN_branch(branch),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),

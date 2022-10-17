@@ -10,15 +10,15 @@ module BranchSelector
     input BranchProv IN_branches[NUM_BRANCHES-1:0],
     output BranchProv OUT_branch,
     
-    input wire[5:0] IN_ROB_curSqN,
-    input wire[5:0] IN_RN_nextSqN,
+    input SqN IN_ROB_curSqN,
+    input SqN IN_RN_nextSqN,
     input wire IN_mispredFlush
     //output reg OUT_mispredFlush
 );
 
 integer i;
 
-reg[5:0] mispredFlushSqN;
+SqN mispredFlushSqN;
 reg disableMispredFlush;
 
 always_comb begin

@@ -21,7 +21,7 @@ module StoreQueue
     
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
-    input wire[5:0] IN_curSqN,
+    input SqN IN_curSqN,
     
     input BranchProv IN_branch,
     
@@ -38,7 +38,7 @@ module StoreQueue
     
     output RES_UOp OUT_uop[NUM_PORTS-1:0],
     
-    output reg[5:0] OUT_maxStoreSqN,
+    output SqN OUT_maxStoreSqN,
     input wire IN_IO_busy
     
 );
@@ -48,7 +48,7 @@ integer j;
 
 SQEntry entries[NUM_ENTRIES-1:0];
 
-reg[5:0] baseIndex;
+SqN baseIndex;
 
 reg doingDequeue;
 reg isCsrRead[NUM_PORTS-1:0];
@@ -57,7 +57,7 @@ reg isCsrWrite[NUM_PORTS-1:0];
 
 // intermediate 
 reg[29:0] iAddr[NUM_PORTS-1:0];
-reg[5:0] iSqN[NUM_PORTS-1:0];
+SqN iSqN[NUM_PORTS-1:0];
 reg[3:0] iMask[NUM_PORTS-1:0];
 reg[31:0] iData[NUM_PORTS-1:0];
 

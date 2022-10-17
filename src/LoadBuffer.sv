@@ -8,7 +8,7 @@ typedef struct packed
 module LoadBuffer
 #(
     parameter NUM_PORTS=1,
-    parameter NUM_ENTRIES=16
+    parameter NUM_ENTRIES=24
 )
 (
     input wire clk,
@@ -29,8 +29,8 @@ integer j;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
-reg[5:0] baseIndex;
-reg[5:0] indexIn;
+SqN baseIndex;
+SqN indexIn;
 
 reg mispredict[NUM_PORTS-1:0];
 
@@ -53,6 +53,7 @@ always_ff@(posedge clk) begin
             end
             //if ($signed(baseIndex - IN_branch.loadSqN) > 0)
             //    baseIndex = IN_branch.loadSqN;
+            
             if (IN_branch.flush)
                 baseIndex = IN_branch.loadSqN;
         end

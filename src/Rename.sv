@@ -24,16 +24,16 @@ module Rename
     // Taken branch
     input wire IN_branchTaken,
     input wire IN_branchFlush,
-    input wire[5:0] IN_branchSqN,
-    input wire[5:0] IN_branchLoadSqN,
-    input wire[5:0] IN_branchStoreSqN,
+    input SqN IN_branchSqN,
+    input SqN IN_branchLoadSqN,
+    input SqN IN_branchStoreSqN,
     input wire IN_mispredFlush,
     
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
     output R_UOp OUT_uop[WIDTH_UOPS-1:0],
-    output wire[5:0] OUT_nextSqN,
-    output reg[5:0] OUT_nextLoadSqN,
-    output reg[5:0] OUT_nextStoreSqN
+    output SqN OUT_nextSqN,
+    output SqN OUT_nextLoadSqN,
+    output SqN OUT_nextStoreSqN
 );
 
 integer i;
@@ -45,7 +45,7 @@ reg[5:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
 
 reg[5:0] RAT_issueIDs[WIDTH_UOPS-1:0];
 reg RAT_issueValid[WIDTH_UOPS-1:0];
-reg[5:0] RAT_issueSqNs[WIDTH_UOPS-1:0];
+SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
 
 reg commitValid[WIDTH_UOPS-1:0];
 reg commitValid_int[WIDTH_UOPS-1:0];
@@ -190,9 +190,9 @@ always_comb begin
 end
 
 
-bit[5:0] counterSqN;
-bit[5:0] counterStoreSqN;
-bit[5:0] counterLoadSqN;
+SqN counterSqN;
+SqN counterStoreSqN;
+SqN counterLoadSqN;
 assign OUT_nextSqN = counterSqN;
 
 reg isNewestCommit[WIDTH_UOPS-1:0];
@@ -212,14 +212,14 @@ always_ff@(posedge clk) begin
     if (rst) begin
         
         counterSqN <= 0;
-        counterStoreSqN = 63;
+        counterStoreSqN = -1;
         // TODO: check if load sqn is correctly handled
         counterLoadSqN = 0;
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
     
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].sqN <= i[5:0];
+            OUT_uop[i].sqN <= i[$bits(SqN)-1:0];
             OUT_uopValid[i] <= 0;
         end
     end
@@ -293,7 +293,7 @@ always_ff@(posedge clk) begin
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (en && !frontEn && IN_wbHasResult[i]) begin
+            if (en && (!frontEn || OUT_stall) && IN_wbHasResult[i]) begin
                 for (j = 0; j < WIDTH_UOPS; j=j+1) begin
                     if (OUT_uopValid[j]) begin
                         if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)

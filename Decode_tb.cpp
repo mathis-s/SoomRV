@@ -138,7 +138,7 @@ int main(int argc, char** argv)
     }
     
     // Run a few more cycles ...
-    for (int i = 0; i < 20; i=i+1)
+    for (int i = 0; i < 30; i=i+1)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model
