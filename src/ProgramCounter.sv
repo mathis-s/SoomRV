@@ -28,8 +28,8 @@ module ProgramCounter
     input wire IN_BP_multipleBranches,
     input wire IN_BP_branchCompr,
     
-    input FetchID_t IN_pcReadAddr[3:0],
-    output PCFileEntry OUT_pcReadData[3:0],
+    input FetchID_t IN_pcReadAddr[4:0],
+    output PCFileEntry OUT_pcReadData[4:0],
     
     input FetchID_t IN_ROB_curFetchID,
 
@@ -82,7 +82,8 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr0(IN_pcReadAddr[0]), .rdata0(OUT_pcReadData[0]),
     .raddr1(IN_pcReadAddr[1]), .rdata1(OUT_pcReadData[1]),
     .raddr2(IN_pcReadAddr[2]), .rdata2(OUT_pcReadData[2]),
-    .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3])
+    .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3]),
+    .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
 
 assign OUT_stall = (IN_ROB_curFetchID == fetchID);

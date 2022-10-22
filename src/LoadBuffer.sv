@@ -7,7 +7,7 @@ typedef struct packed
 
 module LoadBuffer
 #(
-    parameter NUM_PORTS=1,
+    parameter NUM_PORTS=2,
     parameter NUM_ENTRIES=24
 )
 (
@@ -72,7 +72,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_PORTS; i=i+1) begin
             if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             
-                if (IN_uop[i].isLoad) begin
+                if (i == 0) begin
                     reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
                     assert(IN_uop[i].loadSqN < baseIndex + NUM_ENTRIES);
                     

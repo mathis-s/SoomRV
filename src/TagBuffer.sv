@@ -7,7 +7,7 @@ typedef struct packed
 module TagBuffer
 #
 (
-    parameter NUM_UOPS=3
+    parameter NUM_UOPS=4
 )
 (
     input wire clk,
@@ -37,7 +37,9 @@ always_comb begin
         for (j = 0; j < 64; j=j+1) begin
             if (!tags[j].used && 
                 (i <= 0 || OUT_issueTags[0] != j[5:0]) &&
-                (i <= 1 || OUT_issueTags[1] != j[5:0])) begin
+                (i <= 1 || OUT_issueTags[1] != j[5:0]) &&
+                (i <= 2 || OUT_issueTags[2] != j[5:0])
+                ) begin
                 OUT_issueTags[i] = j[5:0];
                 OUT_issueTagsValid[i] = 1;
             end

@@ -1,7 +1,7 @@
 module Fuse
 #(
     parameter NUM_UOPS_IN=4,
-    parameter NUM_UOPS_OUT=3,
+    parameter NUM_UOPS_OUT=4,
     parameter BUF_SIZE=8
 )
 (

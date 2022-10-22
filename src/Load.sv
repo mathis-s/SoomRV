@@ -1,8 +1,8 @@
 module Load
 #(
-    parameter NUM_UOPS=3,
-    parameter NUM_WBS=3,
-    parameter NUM_XUS=5,
+    parameter NUM_UOPS=4,
+    parameter NUM_WBS=4,
+    parameter NUM_XUS=6,
     parameter NUM_ZC_FWDS=2
 )
 (
@@ -177,11 +177,12 @@ always_ff@(posedge clk) begin
                 end
                 // Try to get from current WB
                 case (IN_uop[i].fu)
-                    FU_INT:  OUT_enableXU[i] <= 5'b00001;
-                    FU_LSU:  OUT_enableXU[i] <= 5'b00010;
-                    FU_MUL:  OUT_enableXU[i] <= 5'b00100;
-                    FU_DIV:  OUT_enableXU[i] <= 5'b01000;
-                    FU_FPU: OUT_enableXU[i] <= 5'b10000;
+                    FU_INT:  OUT_enableXU[i] <= 6'b000001;
+                    FU_LSU:  OUT_enableXU[i] <= 6'b000010;
+                    FU_ST:  OUT_enableXU[i] <=  6'b000100;
+                    FU_MUL:  OUT_enableXU[i] <= 6'b001000;
+                    FU_DIV:  OUT_enableXU[i] <= 6'b010000;
+                    FU_FPU: OUT_enableXU[i] <=  6'b100000;
                     default: begin end
                 endcase
                 outFU[i] <= IN_uop[i].fu;

@@ -1,7 +1,7 @@
 module Core
 #(
     parameter NUM_UOPS=2,
-    parameter NUM_WBS=3
+    parameter NUM_WBS=4
 )
 (
     input wire clk,
@@ -49,19 +49,21 @@ wire wbHasResult_fp[NUM_WBS-1:0];
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
+assign wbHasResult[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
 
 assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0 && !wbUOp[0].nmDst[5];
 assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0 && !wbUOp[1].nmDst[5];
 assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0 && !wbUOp[2].nmDst[5];
+assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0 && !wbUOp[3].nmDst[5];
 
 assign wbHasResult_fp[0] = wbUOp[0].valid && wbUOp[0].nmDst[5];
 assign wbHasResult_fp[1] = wbUOp[1].valid && wbUOp[1].nmDst[5];
 assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
+assign wbHasResult_fp[3] = wbUOp[3].valid && wbUOp[3].nmDst[5];
 
 
-CommitUOp comUOps[2:0];
-
-wire comValid[2:0];
+CommitUOp comUOps[3:0];
+wire comValid[3:0];
 
 wire frontendEn;
 
@@ -119,8 +121,8 @@ wire BP_branchCompr;
 
 IF_Instr IF_instrs[3:0];
 
-FetchID_t PC_readAddress[3:0];
-PCFileEntry PC_readData[3:0];
+FetchID_t PC_readAddress[4:0];
+PCFileEntry PC_readData[4:0];
 wire PC_stall;
 ProgramCounter progCnt
 (
@@ -236,7 +238,7 @@ InstrDecoder idec
 );
 
 wire FUSE_full;
-D_UOp FUSE_uop[2:0];
+D_UOp FUSE_uop[3:0];
 Fuse fuse
 (
     .clk(clk),
@@ -251,8 +253,8 @@ Fuse fuse
 );
 
 
-R_UOp RN_uop[2:0];
-reg RN_uopValid[2:0];
+R_UOp RN_uop[3:0];
+reg RN_uopValid[3:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall;
@@ -286,15 +288,17 @@ Rename rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-wire RV_uopValid[2:0];
-R_UOp RV_uop[2:0];
+wire RV_uopValid[3:0];
+R_UOp RV_uop[3:0];
 
-wire stall[2:0];
+/* verilator lint_off UNOPT */
+wire stall[3:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
+assign stall[3] = stall[2];
 
 wire IQ0_full;
-IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
+IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -319,7 +323,7 @@ IssueQueue#(8,3,3,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
+IssueQueue#(8,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -344,7 +348,7 @@ IssueQueue#(8,3,3,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
-IssueQueue#(16,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
+IssueQueue#(12,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -368,10 +372,34 @@ IssueQueue#(16,3,3,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     .OUT_uop(RV_uop[2]),
     .OUT_full(IQ2_full)
 );
+wire IQ3_full;
+IssueQueue#(8,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
+(
+    .clk(clk),
+    .rst(rst),
+    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
+    
+    .IN_stall(stall[2]),
+    .IN_doNotIssueFU1(1'b0),
+    
+    .IN_uopValid(RN_uopValid),
+    .IN_uop(RN_uop),
+    
+    .IN_resultValid(wbHasResult),
+    .IN_resultUOp(wbUOp),
+    
+    .IN_branch(branch),
+    
+    .IN_issueValid(RV_uopValid),
+    .IN_issueUOps(RV_uop),
+    
+    .OUT_valid(RV_uopValid[3]),
+    .OUT_uop(RV_uop[3]),
+    .OUT_full(IQ3_full)
+);
 
-
-wire[5:0] RF_readAddress[5:0];
-wire[31:0] RF_readData[5:0];
+wire[5:0] RF_readAddress[7:0];
+wire[31:0] RF_readData[7:0];
 
 RF rf
 (
@@ -388,8 +416,8 @@ RF rf
     .raddr3(RF_readAddress[3]), .rdata3(RF_readData[3]),
     .raddr4(RF_readAddress[4]), .rdata4(RF_readData[4]),
     .raddr5(RF_readAddress[5]), .rdata5(RF_readData[5]),
-    .raddr6(6'b0), .rdata6(),
-    .raddr7(6'b0), .rdata7()
+    .raddr6(RF_readAddress[6]), .rdata6(RF_readData[6]),
+    .raddr7(RF_readAddress[7]), .rdata7(RF_readData[7])
 );
 
 wire[5:0] RF_FP_readAddress[3:0];
@@ -406,9 +434,9 @@ RF_FP rf_fp
     .raddr3(RF_FP_readAddress[3]), .rdata3(RF_FP_readData[3])
 );
 
-EX_UOp LD_uop[2:0];
-wire[4:0] enabledXUs[2:0];
-FuncUnit LD_fu[2:0];
+EX_UOp LD_uop[3:0];
+wire[5:0] enabledXUs[3:0];
+FuncUnit LD_fu[3:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
 Tag LD_zcFwdTag[1:0];
@@ -426,14 +454,14 @@ Load ld
     
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
-    .IN_stall(stall),
+    .IN_stall('{stall[2], stall[2], stall[1], stall[0]}),
     
     .IN_zcFwdResult(LD_zcFwdResult),
     .IN_zcFwdTag(LD_zcFwdTag),
     .IN_zcFwdValid(LD_zcFwdValid),
     
-    .OUT_pcReadAddr(PC_readAddress[2:0]),
-    .IN_pcReadData(PC_readData[2:0]),
+    .OUT_pcReadAddr(PC_readAddress[3:0]),
+    .IN_pcReadData(PC_readData[3:0]),
     
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
@@ -475,12 +503,12 @@ IntALU ialu
 
 wire DIV_busy;
 RES_UOp DIV_uop;
-wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && enabledXUs[0][3]) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
+wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && enabledXUs[0][4]) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
 Divide div
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[0][3]),
+    .en(enabledXUs[0][4]),
     
     .OUT_busy(DIV_busy),
     
@@ -495,7 +523,7 @@ FPU fpu
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[0][4]),
+    .en(enabledXUs[0][5]),
     
     .IN_branch(branch),
     .IN_uop(LD_uop[0]),
@@ -504,7 +532,7 @@ FPU fpu
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
 
-AGU_UOp CC_uop;
+AGU_UOp CC_uop[1:0];
 CacheController cc
 (
     .clk(clk),
@@ -514,8 +542,8 @@ CacheController cc
     .IN_SQ_empty(SQ_empty),
     .OUT_stall(stall[2]),
     
-    .IN_uop('{AGU_uop}),
-    .OUT_uop('{CC_uop}),
+    .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
+    .OUT_uop(CC_uop),
     
     .OUT_MC_ce(OUT_MC_ce),
     .OUT_MC_we(OUT_MC_we),
@@ -525,8 +553,8 @@ CacheController cc
     .IN_MC_busy(IN_MC_busy)
 );
 
-AGU_UOp AGU_uop;
-AGU agu
+AGU_UOp AGU_LD_uop;
+AGU aguLD
 (
     .clk(clk),
     .rst(rst),
@@ -536,8 +564,23 @@ AGU agu
     .IN_branch(branch),
 
     .IN_uop(LD_uop[2]),
-    .OUT_uop(AGU_uop)
+    .OUT_uop(AGU_LD_uop)
 );
+
+AGU_UOp AGU_ST_uop;
+AGU aguST
+(
+    .clk(clk),
+    .rst(rst),
+    .en(enabledXUs[3][2]),
+    .stall(stall[2]),
+    
+    .IN_branch(branch),
+
+    .IN_uop(LD_uop[3]),
+    .OUT_uop(AGU_ST_uop)
+);
+
 
 SqN LB_maxLoadSqN;
 LoadBuffer lb
@@ -546,7 +589,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_uop('{AGU_uop}),
+    .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
     
     .IN_branch(branch),
     .OUT_branch(branchProvs[2]),
@@ -566,7 +609,7 @@ StoreQueue sq
     .IN_disable(IN_MC_busy || OUT_MC_ce),
     .OUT_empty(SQ_empty),
     
-    .IN_uop('{CC_uop}),
+    .IN_uop(CC_uop),
     
     .IN_curSqN(ROB_curSqN),
     
@@ -587,6 +630,19 @@ StoreQueue sq
     
     .IN_IO_busy(IO_busy)
 );
+
+always_comb begin
+    wbUOp[3].result = 32'bx;
+    wbUOp[3].tagDst = CC_uop[1].tagDst;
+    wbUOp[3].nmDst = CC_uop[1].nmDst;
+    wbUOp[3].sqN = CC_uop[1].sqN;
+    wbUOp[3].pc = CC_uop[1].pc;
+    wbUOp[3].flags = CC_uop[1].exception ? FLAGS_EXCEPT : FLAGS_NONE;
+    wbUOp[3].compressed = CC_uop[1].compressed;
+    wbUOp[3].isBranch = 0;
+    wbUOp[3].bpi = 0;
+    wbUOp[3].valid = CC_uop[1].valid;
+end
 
 RES_UOp INT1_uop;
 IntALU ialu1
@@ -615,12 +671,12 @@ IntALU ialu1
 RES_UOp MUL_uop;
 wire MUL_wbReq;
 wire MUL_busy;
-wire MUL_doNotIssue = MUL_busy || (LD_uop[1].valid && enabledXUs[1][2]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
+wire MUL_doNotIssue = MUL_busy || (LD_uop[1].valid && enabledXUs[1][3]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
 MultiplySmall mul
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[1][2]),
+    .en(enabledXUs[1][3]),
     
     .OUT_busy(MUL_busy),
     
@@ -660,8 +716,8 @@ ROB rob
     .OUT_irqSrc(ROB_irqSrc),
     .OUT_irqMemAddr(ROB_irqMemAddr),
     
-    .OUT_pcReadAddr(PC_readAddress[3]),
-    .IN_pcReadData(PC_readData[3]),
+    .OUT_pcReadAddr(PC_readAddress[4]),
+    .IN_pcReadData(PC_readData[4]),
     
     .OUT_fence(),
     
@@ -687,10 +743,10 @@ ControlRegs cr
     .IN_data(OUT_MEM_writeData),
     .OUT_data(CSR_dataOut[0]),
 
-    .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid}),
+    .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid, comUOps[3].valid}),
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
-    .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid}),
-    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid, DE_uop[2].valid}),
+    .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
+    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid, DE_uop[2].valid, DE_uop[3].valid}),
     .IN_comBranch(CSR_branchCommitted),
     
     .OUT_irqAddr(CR_irqAddr),
@@ -710,10 +766,10 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && 
-    ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -NUM_UOPS) && 
-    ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -NUM_UOPS) && 
-    ($signed(RN_nextSqN - ROB_maxSqN) <= -NUM_UOPS) && 
+assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
+    ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -4) && 
+    ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -4) && 
+    ($signed(RN_nextSqN - ROB_maxSqN) <= -4) && 
     !branch.taken &&
     en &&
     !OUT_instrMappingMiss &&

@@ -11,7 +11,7 @@ typedef struct packed
 module CacheController
 #(
     parameter SIZE=64,
-    parameter NUM_UOPS=1,
+    parameter NUM_UOPS=2,
     parameter QUEUE_SIZE=4
 )
 (
@@ -45,8 +45,8 @@ reg loading;
 reg[$clog2(SIZE)-1:0] freeEntryID;
 reg[$clog2(SIZE)-1:0] lruPointer;
 
-reg cacheMiss;
-assign OUT_stall = cacheMiss || loading || evicting || waitCycle;
+//reg cacheMiss;
+assign OUT_stall = cmissUOp[0].valid || cmissUOp[1].valid || loading || evicting || waitCycle;
 
 // Cache Table Lookups
 reg cacheTableEntryFound[NUM_UOPS-1:0];
@@ -65,7 +65,8 @@ always_comb begin
     end
 end
 
-AGU_UOp cmissUOp;
+AGU_UOp cmissUOp[NUM_UOPS-1:0];
+reg[0:0] loadID;
 reg waitCycle;
 
 reg outHistory;
@@ -87,8 +88,8 @@ always_ff@(posedge clk) begin
         evicting <= 0;
         loading <= 0;
         
-        cacheMiss <= 0;
-        cmissUOp.valid <= 0;
+        cmissUOp[0].valid <= 0;
+        cmissUOp[1].valid <= 0;
         
         waitCycle <= 0;
         
@@ -146,12 +147,13 @@ always_ff@(posedge clk) begin
         
         // Invalidate queued entry
         if (IN_branch.taken) begin
-            if ($signed(cmissUOp.sqN - IN_branch.sqN) > 0)
-                cmissUOp.valid <= 0;
+            for (i = 0; i < NUM_UOPS; i=i+1)
+                if ($signed(cmissUOp[i].sqN - IN_branch.sqN) > 0)
+                    cmissUOp[i].valid <= 0;
         end
         
         // Pass through uops that hit cache, enqueue uops that don't
-        if (!cacheMiss) begin
+        if (!cmissUOp[0].valid && !cmissUOp[1].valid) begin
             for (i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 
@@ -164,9 +166,9 @@ always_ff@(posedge clk) begin
                     end
                     // Cache miss
                     else begin
-                        cmissUOp <= IN_uop[i];
+                        cmissUOp[i] <= IN_uop[i];
                         OUT_uop[i].valid <= 0;
-                        cacheMiss <= 1;
+                        //cacheMiss <= 1;
                     end
                 end
                 else OUT_uop[i].valid <= 0;
@@ -177,29 +179,39 @@ always_ff@(posedge clk) begin
         if (loading && !waitCycle) begin
             OUT_MC_ce <= 0;
             if (!IN_MC_busy) begin
-                if (cmissUOp.valid && (!IN_branch.taken || $signed(cmissUOp.sqN - IN_branch.sqN) <= 0)) begin
-                    OUT_uop[0] <= cmissUOp;
-                    OUT_uop[0].addr <= {20'b0, freeEntryID, cmissUOp.addr[5:0]};
-                end
+                
+                for (i = 0; i < NUM_UOPS; i=i+1)
+                    if (cmissUOp[i].valid && 
+                        cmissUOp[i].addr[31:6] == OUT_MC_extAddr[29:4] && 
+                        (!IN_branch.taken || $signed(cmissUOp[i].sqN - IN_branch.sqN) <= 0)) begin
+                        OUT_uop[i] <= cmissUOp[i];
+                        OUT_uop[i].addr <= {20'b0, freeEntryID, cmissUOp[i].addr[5:0]};
+                        cmissUOp[i].valid <= 0;
+                    end
                     
                 loading <= 0;
-                cacheMiss <= 0;
-                cmissUOp.valid <= 0;
                 ctable[freeEntryID].valid <= 1;
                 ctable[freeEntryID].used <= 1;
             end
         end
-        else if (cacheMiss && freeEntryAvail && !IN_branch.taken) begin
-            OUT_MC_ce <= 1;
-            OUT_MC_we <= 0;
-            OUT_MC_sramAddr <= {freeEntryID, 4'b0};
-            OUT_MC_extAddr <= {2'b0, cmissUOp.addr[31:6], 4'b0};
-            
-            ctable[freeEntryID].used <= 1;
-            ctable[freeEntryID].addr <= cmissUOp.addr[31:6];
-            loading <= 1;
-            freeEntryAvail <= 0;
-            waitCycle <= 1;
+        else if (freeEntryAvail && !IN_branch.taken) begin
+            reg temp = 0;
+            for (i = 0; i < NUM_UOPS; i=i+1) begin
+                if (!temp && cmissUOp[i].valid) begin
+                    OUT_MC_ce <= 1;
+                    OUT_MC_we <= 0;
+                    OUT_MC_sramAddr <= {freeEntryID, 4'b0};
+                    OUT_MC_extAddr <= {2'b0, cmissUOp[i].addr[31:6], 4'b0};
+                    
+                    ctable[freeEntryID].used <= 1;
+                    ctable[freeEntryID].addr <= cmissUOp[i].addr[31:6];
+                    loading <= 1;
+                    loadID <= i[0:0];
+                    freeEntryAvail <= 0;
+                    waitCycle <= 1;
+                    temp = 1;
+                end
+            end
         end
     end
 

@@ -1,7 +1,7 @@
 module Rename
 #(
-    parameter WIDTH_UOPS = 3,
-    parameter WIDTH_WR = 3
+    parameter WIDTH_UOPS = 4,
+    parameter WIDTH_WR = 4
 )
 (
     input wire clk,
@@ -256,14 +256,10 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 
-                if (IN_uop[i].fu == FU_LSU) begin
-                    if (IN_uop[i].opcode == LSU_SB ||
-                        IN_uop[i].opcode == LSU_SH ||
-                        IN_uop[i].opcode == LSU_SW)
-                        counterStoreSqN = counterStoreSqN + 1;
-                    else
-                        counterLoadSqN = counterLoadSqN + 1;
-                end
+                if (IN_uop[i].fu == FU_ST)
+                    counterStoreSqN = counterStoreSqN + 1;
+                else if (IN_uop[i].fu == FU_LSU)
+                    counterLoadSqN = counterLoadSqN + 1;
                 
                 OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;

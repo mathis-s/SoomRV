@@ -25,8 +25,8 @@ module ROB
     // speculatively execute?
     parameter LENGTH = 64,
 
-    parameter WIDTH = 3,
-    parameter WIDTH_WB = 3
+    parameter WIDTH = 4,
+    parameter WIDTH_WB = 4
     )
 (
     input wire clk,
@@ -84,6 +84,8 @@ always_comb begin
     if (entries[baseIndex[ID_LEN-1:0]+1].predicted)
         headValid = 0;
     if (entries[baseIndex[ID_LEN-1:0]+2].predicted)
+        headValid = 0;
+    if (entries[baseIndex[ID_LEN-1:0]+3].predicted)
         headValid = 0;
 end
 

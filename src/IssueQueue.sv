@@ -1,8 +1,8 @@
 module IssueQueue
 #(
     parameter SIZE = 8,
-    parameter NUM_UOPS = 3,
-    parameter RESULT_BUS_COUNT = 3,
+    parameter NUM_UOPS = 4,
+    parameter RESULT_BUS_COUNT = 4,
     parameter FU0 = FU_LSU,
     parameter FU1 = FU_LSU,
     parameter FU2 = FU_LSU,

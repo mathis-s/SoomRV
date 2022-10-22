@@ -10,8 +10,9 @@ typedef struct packed
 
 module StoreQueue
 #(
-    parameter NUM_PORTS=1,
-    parameter NUM_ENTRIES=24
+    parameter NUM_PORTS=2,
+    parameter NUM_PORTS_LD=1,
+    parameter NUM_ENTRIES=28
 )
 (
     input wire clk,
@@ -19,24 +20,25 @@ module StoreQueue
     input wire IN_disable,
     output reg OUT_empty,
     
+    // 0->LD, 1->ST
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input SqN IN_curSqN,
     
     input BranchProv IN_branch,
     
-    input wire[31:0] IN_MEM_data[NUM_PORTS-1:0],
-    output reg[29:0] OUT_MEM_addr[NUM_PORTS-1:0],
-    output reg[31:0] OUT_MEM_data[NUM_PORTS-1:0],
-    output reg OUT_MEM_we[NUM_PORTS-1:0],
-    output reg OUT_MEM_ce[NUM_PORTS-1:0],
-    output reg[3:0] OUT_MEM_wm[NUM_PORTS-1:0],
+    input wire[31:0] IN_MEM_data[NUM_PORTS_LD-1:0],
+    output reg[29:0] OUT_MEM_addr[NUM_PORTS_LD-1:0],
+    output reg[31:0] OUT_MEM_data[NUM_PORTS_LD-1:0],
+    output reg OUT_MEM_we[NUM_PORTS_LD-1:0],
+    output reg OUT_MEM_ce[NUM_PORTS_LD-1:0],
+    output reg[3:0] OUT_MEM_wm[NUM_PORTS_LD-1:0],
     
     // CSRs can share most ports with regular memory except these
-    input wire[31:0] IN_CSR_data[NUM_PORTS-1:0],
-    output reg OUT_CSR_ce[NUM_PORTS-1:0],
+    input wire[31:0] IN_CSR_data[NUM_PORTS_LD-1:0],
+    output reg OUT_CSR_ce[NUM_PORTS_LD-1:0],
     
-    output RES_UOp OUT_uop[NUM_PORTS-1:0],
+    output RES_UOp OUT_uop[NUM_PORTS_LD-1:0],
     
     output SqN OUT_maxStoreSqN,
     input wire IN_IO_busy
@@ -51,29 +53,29 @@ SQEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
 
 reg doingDequeue;
-reg isCsrRead[NUM_PORTS-1:0];
+reg isCsrRead[NUM_PORTS_LD-1:0];
 reg isCsrWrite[NUM_PORTS-1:0];
 
 
 // intermediate 
-reg[29:0] iAddr[NUM_PORTS-1:0];
-SqN iSqN[NUM_PORTS-1:0];
-reg[3:0] iMask[NUM_PORTS-1:0];
-reg[31:0] iData[NUM_PORTS-1:0];
+reg[29:0] iAddr[NUM_PORTS_LD-1:0];
+SqN iSqN[NUM_PORTS_LD-1:0];
+reg[3:0] iMask[NUM_PORTS_LD-1:0];
+reg[31:0] iData[NUM_PORTS_LD-1:0];
 
-AGU_UOp i0[NUM_PORTS-1:0];
-AGU_UOp i1[NUM_PORTS-1:0];
+AGU_UOp i0[NUM_PORTS_LD-1:0];
+AGU_UOp i1[NUM_PORTS_LD-1:0];
 
-reg i0_isCsrRead[NUM_PORTS-1:0];
-reg i1_isCsrRead[NUM_PORTS-1:0];
+reg i0_isCsrRead[NUM_PORTS_LD-1:0];
+reg i1_isCsrRead[NUM_PORTS_LD-1:0];
 
-reg[31:0] queueLookupData[NUM_PORTS-1:0];
-reg[3:0] queueLookupMask[NUM_PORTS-1:0];
+reg[31:0] queueLookupData[NUM_PORTS_LD-1:0];
+reg[3:0] queueLookupMask[NUM_PORTS_LD-1:0];
 
 reg didCSRwrite;
 
 always_comb begin
-    for (i = 0; i < NUM_PORTS; i=i+1) begin
+    for (i = 0; i < NUM_PORTS_LD; i=i+1) begin
         
         reg[31:0] result = 32'bx;
         
@@ -141,59 +143,57 @@ end
 always_comb begin
     doingDequeue = 0;
     
-    for (i = 0; i < NUM_PORTS; i=i+1) begin
         
-        isCsrRead[i] = 0;
-        isCsrWrite[i] = 0;
-        if (!rst && IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
-            OUT_MEM_data[i] = 32'bx;
-            OUT_MEM_addr[i] = IN_uop[i].addr[31:2];
-            OUT_MEM_we[i] = 1;
-            OUT_MEM_wm[i] = 4'bx;
-            if (IN_uop[i].addr[31:24] == 8'hff) begin
-                OUT_MEM_ce[i] = 1;
-                OUT_CSR_ce[i] = 0;
-                isCsrRead[i] = 1;
-            end
-            else begin
-                OUT_MEM_ce[i] = 0;
-                OUT_CSR_ce[i] = 1;
-            end
+    isCsrRead[0] = 0;
+    isCsrWrite[0] = 0;
+    if (!rst && IN_uop[0].valid && IN_uop[0].isLoad && (!IN_branch.taken || $signed(IN_uop[0].sqN - IN_branch.sqN) <= 0)) begin
+        OUT_MEM_data[0] = 32'bx;
+        OUT_MEM_addr[0] = IN_uop[0].addr[31:2];
+        OUT_MEM_we[0] = 1;
+        OUT_MEM_wm[0] = 4'bx;
+        if (IN_uop[0].addr[31:24] == 8'hff) begin
+            OUT_MEM_ce[0] = 1;
+            OUT_CSR_ce[0] = 0;
+            isCsrRead[0] = 1;
         end
-        
-        // Port 0 handles stores as well
-        else if (!IN_disable && !rst && i == 0 && entries[0].valid && !IN_branch.taken && entries[0].ready &&
-            // Don't issue Memory Mapped IO ops while IO is not ready
-            (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff)) begin
-            doingDequeue = 1;
-            OUT_MEM_data[i] = entries[0].data;
-            OUT_MEM_addr[i] = entries[0].addr;
-            OUT_MEM_we[i] = 0;
-            OUT_MEM_wm[i] = entries[0].wmask;
-            
-            if (entries[0].addr[29:22] == 8'hff) begin
-                OUT_MEM_ce[i] = 1;
-                OUT_CSR_ce[i] = 0;
-                isCsrWrite[i] = 1;
-            end
-            else begin
-                OUT_MEM_ce[i] = 0;
-                OUT_CSR_ce[i] = 1;
-            end
-        end
-        
         else begin
-            OUT_MEM_data[i] = 32'bx;
-            OUT_MEM_addr[i] = 30'bx;
-            OUT_MEM_we[i] = 1'b1;
-            OUT_MEM_ce[i] = 1'b1;
-            OUT_MEM_wm[i] = 4'bx;
-            OUT_CSR_ce[i] = 1'b1;
+            OUT_MEM_ce[0] = 0;
+            OUT_CSR_ce[0] = 1;
         end
     end
     
+    // Port 0 handles stores as well
+    else if (!IN_disable && !rst && entries[0].valid && !IN_branch.taken && entries[0].ready &&
+        // Don't issue Memory Mapped IO ops while IO is not ready
+        (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff)) begin
+        doingDequeue = 1;
+        OUT_MEM_data[0] = entries[0].data;
+        OUT_MEM_addr[0] = entries[0].addr;
+        OUT_MEM_we[0] = 0;
+        OUT_MEM_wm[0] = entries[0].wmask;
+        
+        if (entries[0].addr[29:22] == 8'hff) begin
+            OUT_MEM_ce[0] = 1;
+            OUT_CSR_ce[0] = 0;
+            isCsrWrite[0] = 1;
+        end
+        else begin
+            OUT_MEM_ce[0] = 0;
+            OUT_CSR_ce[0] = 1;
+        end
+    end
+    
+    else begin
+        OUT_MEM_data[0] = 32'bx;
+        OUT_MEM_addr[0] = 30'bx;
+        OUT_MEM_we[0] = 1'b1;
+        OUT_MEM_ce[0] = 1'b1;
+        OUT_MEM_wm[0] = 4'bx;
+        OUT_CSR_ce[0] = 1'b1;
+    end
+    
     // Store queue lookup
-    for (j = 0; j < NUM_PORTS; j=j+1) begin
+    for (j = 0; j < NUM_PORTS_LD; j=j+1) begin
         iMask[j] = 0;
         iData[j] = 32'bx;
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -229,13 +229,13 @@ always_ff@(posedge clk) begin
             i1[i].valid <= 0;
         end
         baseIndex = 0;
-        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
+        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
         OUT_empty <= 1;
     end
     
     else begin
         
-        // Set entries of commited instructions to ready
+        // Set entries of committed instructions to ready
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             if ($signed(IN_curSqN - entries[i].sqN) > 0)
                 entries[i].ready <= 1;
@@ -263,21 +263,20 @@ always_ff@(posedge clk) begin
         end
     
         // Enqueue
-        for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) && !IN_uop[i].exception) begin
-                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
-                assert(IN_uop[i].storeSqN <= baseIndex + NUM_ENTRIES[5:0] - 1);
-                entries[index].valid <= 1;
-                entries[index].ready <= 0;
-                entries[index].sqN <= IN_uop[i].sqN;
-                entries[index].addr <= IN_uop[i].addr[31:2];
-                entries[index].data <= IN_uop[i].data;
-                entries[index].wmask <= IN_uop[i].wmask;
-                doingEnqueue = 1;
-            end
+        if (IN_uop[1].valid && (!IN_branch.taken || $signed(IN_uop[1].sqN - IN_branch.sqN) <= 0) && !IN_uop[1].exception) begin
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[1].storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
+            assert(IN_uop[1].storeSqN <= baseIndex + NUM_ENTRIES[5:0] - 1);
+            entries[index].valid <= 1;
+            entries[index].ready <= 0;
+            entries[index].sqN <= IN_uop[1].sqN;
+            entries[index].addr <= IN_uop[1].addr[31:2];
+            entries[index].data <= IN_uop[1].data;
+            entries[index].wmask <= IN_uop[1].wmask;
+            doingEnqueue = 1;
         end
+
         
-        for (i = 0; i < NUM_PORTS; i=i+1) begin
+        for (i = 0; i < NUM_PORTS_LD; i=i+1) begin
             if (!IN_disable && IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 i0[i] <= IN_uop[i];
                 i0_isCsrRead[i] <= isCsrRead[i];
@@ -298,7 +297,7 @@ always_ff@(posedge clk) begin
         end
         
         OUT_empty <= empty && !doingEnqueue;
-        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
+        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
     end
     
 end

@@ -7,10 +7,10 @@ typedef struct packed
 
 module RenameTable
 #(
-    parameter NUM_LOOKUP=6,
-    parameter NUM_ISSUE=3,
-    parameter NUM_COMMIT=3,
-    parameter NUM_WB=3,
+    parameter NUM_LOOKUP=8,
+    parameter NUM_ISSUE=4,
+    parameter NUM_COMMIT=4,
+    parameter NUM_WB=4,
     parameter NUM_REGS=64,
     parameter ID_SIZE=$clog2(NUM_REGS),
     parameter TAG_SIZE=7

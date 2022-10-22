@@ -2,8 +2,8 @@
 module ControlRegs
 #
 (
-    parameter NUM_UOPS=3,
-    parameter NUM_WBS=3
+    parameter NUM_UOPS=4,
+    parameter NUM_WBS=4
 )
 (
     input wire clk,

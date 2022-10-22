@@ -13,7 +13,8 @@ module PCFile
     input wire[ADDR_SIZE-1:0] raddr0, output reg[WORD_SIZE-1:0] rdata0,
     input wire[ADDR_SIZE-1:0] raddr1, output reg[WORD_SIZE-1:0] rdata1,
     input wire[ADDR_SIZE-1:0] raddr2, output reg[WORD_SIZE-1:0] rdata2,
-    input wire[ADDR_SIZE-1:0] raddr3, output reg[WORD_SIZE-1:0] rdata3
+    input wire[ADDR_SIZE-1:0] raddr3, output reg[WORD_SIZE-1:0] rdata3,
+    input wire[ADDR_SIZE-1:0] raddr4, output reg[WORD_SIZE-1:0] rdata4
 );
 
 reg[WORD_SIZE-1:0] mem[(1<<ADDR_SIZE)-1:0];
@@ -23,6 +24,7 @@ always_comb begin
     rdata1 = mem[raddr1];
     rdata2 = mem[raddr2];
     rdata3 = mem[raddr3];
+    rdata4 = mem[raddr4];
 end
 
 always_ff@(posedge clk) begin

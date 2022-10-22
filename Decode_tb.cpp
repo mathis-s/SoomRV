@@ -131,7 +131,7 @@ int main(int argc, char** argv)
 
         top->clk = !top->clk;
         top->eval();              // Evaluate model
-        tfp->dump(main_time);
+        //tfp->dump(main_time);
         main_time++;              // Time passes...
         
         //if (!(main_time & 0xffff)) printf("pc %.8x\n", instrAddrReg);

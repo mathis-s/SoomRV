@@ -348,7 +348,7 @@ always_comb begin
                         uop.immB = 0;
                         uop.rd = 0;
 
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_ST;
                         case (instr.funct3)
                             0: uop.opcode = LSU_SB;
                             1: uop.opcode = LSU_SH;
@@ -633,7 +633,7 @@ always_comb begin
                     end
                     `OPC_FSW: begin
                         if (i32.fsw.width == 3'b010) begin
-                            uop.fu = FU_LSU;
+                            uop.fu = FU_ST;
                             uop.opcode = LSU_FSW;
                             uop.rs0 = i32.fsw.rs1;
                             uop.rs1 = i32.fsw.rs2;
@@ -815,7 +815,7 @@ always_comb begin
                     // c.sw
                     else if (i16.cs.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_ST;
                         uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
                         uop.rs0 = {2'b01, i16.cs.rd_rs1};
                         uop.rs1 = {2'b01, i16.cs.rs2};
@@ -979,7 +979,7 @@ always_comb begin
                     // c.swsp
                     else if (i16.css.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_ST;
                         uop.imm = {24'b0, i16.css.imm[1:0], i16.css.imm[5:2], 2'b00};
                         uop.rs0 = 2; // sp
                         uop.rs1 = i16.css.rs2;
