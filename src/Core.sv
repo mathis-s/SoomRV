@@ -9,12 +9,14 @@ module Core
     input wire en,
     input wire[63:0] IN_instrRaw,
 
-    input wire[31:0] IN_MEM_readData,
-    output wire[29:0] OUT_MEM_addr,
+    output wire[29:0] OUT_MEM_writeAddr,
     output wire[31:0] OUT_MEM_writeData,
     output wire OUT_MEM_writeEnable,
-    output wire OUT_MEM_readEnable,
     output wire[3:0] OUT_MEM_writeMask,
+    
+    output wire OUT_MEM_readEnable,
+    output wire[29:0] OUT_MEM_readAddr,
+    input wire[31:0] IN_MEM_readData,
     
     output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
@@ -598,7 +600,7 @@ LoadBuffer lb
 );
 
 SqN SQ_maxStoreSqN;
-wire CSR_ce[0:0];
+wire CSR_we[0:0];
 wire[31:0] CSR_dataOut[0:0];
 
 wire SQ_empty;
@@ -615,15 +617,17 @@ StoreQueue sq
     
     .IN_branch(branch),
     
-    .IN_MEM_data('{IN_MEM_readData}),
-    .OUT_MEM_addr('{OUT_MEM_addr}),
-    .OUT_MEM_data('{OUT_MEM_writeData}),
+    .OUT_MEM_re('{OUT_MEM_readEnable}),
+    .OUT_MEM_readAddr('{OUT_MEM_readAddr}),
+    .IN_MEM_readData('{IN_MEM_readData}),
+    
     .OUT_MEM_we('{OUT_MEM_writeEnable}),
-    .OUT_MEM_ce('{OUT_MEM_readEnable}),
+    .OUT_MEM_writeAddr('{OUT_MEM_writeAddr}),
+    .OUT_MEM_writeData('{OUT_MEM_writeData}),
     .OUT_MEM_wm('{OUT_MEM_writeMask}),
     
     .IN_CSR_data(CSR_dataOut),
-    .OUT_CSR_ce(CSR_ce),
+    .OUT_CSR_we(CSR_we),
     
     .OUT_uop('{wbUOp[2]}),
     .OUT_maxStoreSqN(SQ_maxStoreSqN),
@@ -736,11 +740,14 @@ ControlRegs cr
     .clk(clk),
     .rst(rst),
     .IN_mispredFlush(mispredFlush),
-    .IN_ce(CSR_ce[0]),
-    .IN_we(OUT_MEM_writeEnable),
+    
+    .IN_we(CSR_we[0]),
     .IN_wm(OUT_MEM_writeMask),
-    .IN_addr(OUT_MEM_addr[6:0]),
+    .IN_writeAddr(OUT_MEM_writeAddr[6:0]),
     .IN_data(OUT_MEM_writeData),
+    
+    .IN_re(OUT_MEM_readEnable),
+    .IN_readAddr(OUT_MEM_readAddr[6:0]),
     .OUT_data(CSR_dataOut[0]),
 
     .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid, comUOps[3].valid}),

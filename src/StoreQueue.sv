@@ -27,16 +27,18 @@ module StoreQueue
     
     input BranchProv IN_branch,
     
-    input wire[31:0] IN_MEM_data[NUM_PORTS_LD-1:0],
-    output reg[29:0] OUT_MEM_addr[NUM_PORTS_LD-1:0],
-    output reg[31:0] OUT_MEM_data[NUM_PORTS_LD-1:0],
+    output reg OUT_MEM_re[NUM_PORTS_LD-1:0],
+    output reg[29:0] OUT_MEM_readAddr[NUM_PORTS_LD-1:0],
+    input wire[31:0] IN_MEM_readData[NUM_PORTS_LD-1:0],
+    
     output reg OUT_MEM_we[NUM_PORTS_LD-1:0],
-    output reg OUT_MEM_ce[NUM_PORTS_LD-1:0],
+    output reg[29:0] OUT_MEM_writeAddr[NUM_PORTS_LD-1:0],
+    output reg[31:0] OUT_MEM_writeData[NUM_PORTS_LD-1:0],
     output reg[3:0] OUT_MEM_wm[NUM_PORTS_LD-1:0],
     
     // CSRs can share most ports with regular memory except these
     input wire[31:0] IN_CSR_data[NUM_PORTS_LD-1:0],
-    output reg OUT_CSR_ce[NUM_PORTS_LD-1:0],
+    output reg OUT_CSR_we[NUM_PORTS_LD-1:0],
     
     output RES_UOp OUT_uop[NUM_PORTS_LD-1:0],
     
@@ -82,13 +84,13 @@ always_comb begin
         if (i1[i].isLoad) begin
             reg[31:0] data;
             data[31:24] = queueLookupMask[i][3] ? queueLookupData[i][31:24] : 
-                (i1_isCsrRead[i] ?  IN_CSR_data[i][31:24] : IN_MEM_data[i][31:24]);
+                (i1_isCsrRead[i] ?  IN_CSR_data[i][31:24] : IN_MEM_readData[i][31:24]);
             data[23:16] = queueLookupMask[i][2] ? queueLookupData[i][23:16] : 
-                (i1_isCsrRead[i] ? IN_CSR_data[i][23:16] : IN_MEM_data[i][23:16]);
+                (i1_isCsrRead[i] ? IN_CSR_data[i][23:16] : IN_MEM_readData[i][23:16]);
             data[15:8] = queueLookupMask[i][1] ? queueLookupData[i][15:8] : 
-                (i1_isCsrRead[i] ? IN_CSR_data[i][15:8] : IN_MEM_data[i][15:8]);
+                (i1_isCsrRead[i] ? IN_CSR_data[i][15:8] : IN_MEM_readData[i][15:8]);
             data[7:0] = queueLookupMask[i][0] ? queueLookupData[i][7:0] : 
-                (i1_isCsrRead[i] ? IN_CSR_data[i][7:0] : IN_MEM_data[i][7:0]);
+                (i1_isCsrRead[i] ? IN_CSR_data[i][7:0] : IN_MEM_readData[i][7:0]);
             
             case (i1[i].size)
                 
@@ -141,55 +143,56 @@ end
 
 // Handle Loads combinatorially (SRAM input is registered)
 always_comb begin
+    reg load = 0;
     doingDequeue = 0;
     
         
     isCsrRead[0] = 0;
     isCsrWrite[0] = 0;
     if (!rst && IN_uop[0].valid && IN_uop[0].isLoad && (!IN_branch.taken || $signed(IN_uop[0].sqN - IN_branch.sqN) <= 0)) begin
-        OUT_MEM_data[0] = 32'bx;
-        OUT_MEM_addr[0] = IN_uop[0].addr[31:2];
-        OUT_MEM_we[0] = 1;
-        OUT_MEM_wm[0] = 4'bx;
-        if (IN_uop[0].addr[31:24] == 8'hff) begin
-            OUT_MEM_ce[0] = 1;
-            OUT_CSR_ce[0] = 0;
+        //OUT_MEM_data[0] = 32'bx;
+        OUT_MEM_readAddr[0] = IN_uop[0].addr[31:2];
+        OUT_MEM_re[0] = 0;
+        isCsrRead[0] = (IN_uop[0].addr[31:24] == 8'hff);
+        load = 1;
+        /*if (IN_uop[0].addr[31:24] == 8'hff) begin
+            OUT_MEM_re[0] = 1;
+            //OUT_CSR_re[0] = 0;
             isCsrRead[0] = 1;
         end
         else begin
-            OUT_MEM_ce[0] = 0;
-            OUT_CSR_ce[0] = 1;
-        end
+            OUT_MEM_re[0] = 0;
+            OUT_CSR_re[0] = 1;
+        end*/
+    end
+    else begin
+        OUT_MEM_re[0] = 1;
     end
     
     // Port 0 handles stores as well
-    else if (!IN_disable && !rst && entries[0].valid && !IN_branch.taken && entries[0].ready &&
+    if (!IN_disable && !rst && entries[0].valid && !IN_branch.taken && entries[0].ready &&
         // Don't issue Memory Mapped IO ops while IO is not ready
-        (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff)) begin
+        (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hff) &&
+        // Don't issue load&store at the same address in the same cycle
+        (!load || OUT_MEM_readAddr[0] != entries[0].addr)
+        ) begin
         doingDequeue = 1;
-        OUT_MEM_data[0] = entries[0].data;
-        OUT_MEM_addr[0] = entries[0].addr;
-        OUT_MEM_we[0] = 0;
+        OUT_MEM_writeData[0] = entries[0].data;
+        OUT_MEM_writeAddr[0] = entries[0].addr;
         OUT_MEM_wm[0] = entries[0].wmask;
         
         if (entries[0].addr[29:22] == 8'hff) begin
-            OUT_MEM_ce[0] = 1;
-            OUT_CSR_ce[0] = 0;
-            isCsrWrite[0] = 1;
+            OUT_MEM_we[0] = 1;
+            OUT_CSR_we[0] = 0;
         end
         else begin
-            OUT_MEM_ce[0] = 0;
-            OUT_CSR_ce[0] = 1;
+            OUT_MEM_we[0] = 0;
+            OUT_CSR_we[0] = 1;
         end
     end
     
     else begin
-        OUT_MEM_data[0] = 32'bx;
-        OUT_MEM_addr[0] = 30'bx;
-        OUT_MEM_we[0] = 1'b1;
-        OUT_MEM_ce[0] = 1'b1;
-        OUT_MEM_wm[0] = 4'bx;
-        OUT_CSR_ce[0] = 1'b1;
+        OUT_MEM_we[0] = 1;
     end
     
     // Store queue lookup

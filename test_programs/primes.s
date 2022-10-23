@@ -58,13 +58,12 @@ main:
 	srli	a5,a4,5
 	bgtu	a5,t4,.L9
 .L8:
-	slli	a5,a5,2
-	add	a5,a6,a5
-	lw	a7,0(a5)
+	sh2add a5, a5, a6
 	sll	a2,t1,a4
-	add	a4,a4,a3
+	lw	a7,0(a5)
 	or	a2,a2,a7
 	sw	a2,0(a5)
+	add	a4,a4,a3
 	srli	a5,a4,5
 	bleu	a5,t4,.L8
 .L9:

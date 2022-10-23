@@ -10,12 +10,13 @@ module ControlRegs
     input wire rst,
     input wire IN_mispredFlush,
     
-    input wire IN_ce,
     input wire IN_we,
     input wire[3:0] IN_wm,
-    input wire[6:0] IN_addr,
+    input wire[6:0] IN_writeAddr,
     input wire[31:0] IN_data,
     
+    input wire IN_re,
+    input wire[6:0] IN_readAddr,
     output reg[31:0] OUT_data,
     
     
@@ -47,10 +48,11 @@ module ControlRegs
 integer i;
 
 // Registered Inputs
-reg ceReg;
+reg reReg;
 reg weReg;
 reg[3:0] wmReg;
-reg[6:0] addrReg;
+reg[6:0] writeAddrReg;
+reg[6:0] readAddrReg;
 reg[31:0] dataReg;
 
 
@@ -99,7 +101,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         gpioCnt <= 0;
-        ceReg <= 1;
+        weReg <= 1;
         for (i = 0; i < 6; i=i+1)
             cRegs64[i] <= 0;
             
@@ -125,63 +127,64 @@ always_ff@(posedge clk) begin
             cRegs[4] <= {cRegs[4][30:0], IN_SPI_miso};
         end
         
-        if (!ceReg) begin
-            if (!weReg) begin
-                // 64-bit
-                if (addrReg[5]) begin
-                    
-                    // No need to have perf counters writeable for now
-                    
-                    // Upper
-                    /*if (addrReg[0]) begin
-                        if (wmReg[0]) cRegs64[addrReg[3:1]][39:32] <= dataReg[7:0];
-                        if (wmReg[1]) cRegs64[addrReg[3:1]][47:40] <= dataReg[15:8];
-                        if (wmReg[2]) cRegs64[addrReg[3:1]][55:48] <= dataReg[23:16];
-                        if (wmReg[3]) cRegs64[addrReg[3:1]][63:56] <= dataReg[31:24];
-                    end
-                    // Lower
-                    else begin
-                        if (wmReg[0]) cRegs64[addrReg[3:1]][7:0] <= dataReg[7:0];
-                        if (wmReg[1]) cRegs64[addrReg[3:1]][15:8] <= dataReg[15:8];
-                        if (wmReg[2]) cRegs64[addrReg[3:1]][23:16] <= dataReg[23:16];
-                        if (wmReg[3]) cRegs64[addrReg[3:1]][31:24] <= dataReg[31:24];
-                    end*/
+
+        if (!weReg) begin
+            // 64-bit
+            if (writeAddrReg[5]) begin
+                
+                // No need to have perf counters writeable for now
+                
+                // Upper
+                /*if (addrReg[0]) begin
+                    if (wmReg[0]) cRegs64[addrReg[3:1]][39:32] <= dataReg[7:0];
+                    if (wmReg[1]) cRegs64[addrReg[3:1]][47:40] <= dataReg[15:8];
+                    if (wmReg[2]) cRegs64[addrReg[3:1]][55:48] <= dataReg[23:16];
+                    if (wmReg[3]) cRegs64[addrReg[3:1]][63:56] <= dataReg[31:24];
                 end
+                // Lower
                 else begin
-                    if (wmReg[0]) cRegs[addrReg[4:0]][7:0] <= dataReg[7:0];
-                    if (wmReg[1]) cRegs[addrReg[4:0]][15:8] <= dataReg[15:8];
-                    if (wmReg[2]) cRegs[addrReg[4:0]][23:16] <= dataReg[23:16];
-                    if (wmReg[3]) cRegs[addrReg[4:0]][31:24] <= dataReg[31:24];
-                    
-                    if (addrReg[4:0] == 5'd5)
-                        gpioCnt <= cRegs[6][7:0];
-                        
-                    if (addrReg[4:0] == 5'd4) begin
-                        case (wmReg)
-                            4'b1111: spiCnt <= 32;
-                            4'b1100: spiCnt <= 16;
-                            4'b1000: spiCnt <= 8;
-                            default: begin end
-                        endcase
-                        OUT_SPI_mosi <= dataReg[31];
-                    end
-                end
+                    if (wmReg[0]) cRegs64[addrReg[3:1]][7:0] <= dataReg[7:0];
+                    if (wmReg[1]) cRegs64[addrReg[3:1]][15:8] <= dataReg[15:8];
+                    if (wmReg[2]) cRegs64[addrReg[3:1]][23:16] <= dataReg[23:16];
+                    if (wmReg[3]) cRegs64[addrReg[3:1]][31:24] <= dataReg[31:24];
+                end*/
             end
             else begin
-                if (addrReg[5]) begin
-                    if (addrReg[0])
-                        OUT_data <= cRegs64[addrReg[3:1]][63:32];
-                    else
-                        OUT_data <= cRegs64[addrReg[3:1]][31:0];
-                end
-                else begin
-                    if (addrReg[4:0] == 5'd7)
-                        OUT_data <= {16'bx, IN_GPIO};
-                    else
-                        OUT_data <= cRegs[addrReg[4:0]];
+                if (wmReg[0]) cRegs[writeAddrReg[4:0]][7:0] <= dataReg[7:0];
+                if (wmReg[1]) cRegs[writeAddrReg[4:0]][15:8] <= dataReg[15:8];
+                if (wmReg[2]) cRegs[writeAddrReg[4:0]][23:16] <= dataReg[23:16];
+                if (wmReg[3]) cRegs[writeAddrReg[4:0]][31:24] <= dataReg[31:24];
+                
+                if (writeAddrReg[4:0] == 5'd5)
+                    gpioCnt <= cRegs[6][7:0];
+                    
+                if (writeAddrReg[4:0] == 5'd4) begin
+                    case (wmReg)
+                        4'b1111: spiCnt <= 32;
+                        4'b1100: spiCnt <= 16;
+                        4'b1000: spiCnt <= 8;
+                        default: begin end
+                    endcase
+                    OUT_SPI_mosi <= dataReg[31];
                 end
             end
         end
+        
+        if (!reReg) begin
+            if (readAddrReg[5]) begin
+                if (readAddrReg[0])
+                    OUT_data <= cRegs64[readAddrReg[3:1]][63:32];
+                else
+                    OUT_data <= cRegs64[readAddrReg[3:1]][31:0];
+            end
+            else begin
+                if (readAddrReg[4:0] == 5'd7)
+                    OUT_data <= {16'bx, IN_GPIO};
+                else
+                    OUT_data <= cRegs[readAddrReg[4:0]];
+            end
+        end
+
         
         
         if (gpioCnt == 0) begin
@@ -196,10 +199,11 @@ always_ff@(posedge clk) begin
             cRegs[2] <= {IN_irqMemAddr[31:2], IN_irqFlags[1:0]};
         end
         
-        ceReg <= IN_ce;
+        reReg <= IN_re;
         weReg <= IN_we;
         wmReg <= IN_wm;
-        addrReg <= IN_addr;
+        readAddrReg <= IN_readAddr;
+        writeAddrReg <= IN_writeAddr;
         dataReg <= IN_data;
         
         // Update Perf Counters
