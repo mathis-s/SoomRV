@@ -51,6 +51,22 @@ MemoryControllerSim memc
 assign MC_DC_if.addr[29:10] = 0;
 
 CacheIF CORE_DC_if;
+always_comb begin
+    CORE_DC_if.ce = CORE_writeEnable;
+    CORE_DC_if.we = CORE_writeEnable;
+    CORE_DC_if.wm = CORE_writeMask;
+    CORE_DC_if.addr = CORE_writeAddr;
+    CORE_DC_if.data = CORE_writeData;
+end
+
+wire CORE_writeEnable;
+wire[31:0] CORE_writeData;
+wire[29:0] CORE_writeAddr;
+wire[3:0] CORE_writeMask;
+
+wire CORE_readEnable;
+wire[29:0] CORE_readAddr;
+wire[31:0] CORE_readData;
 Core core
 (
     .clk(clk),
@@ -59,12 +75,14 @@ Core core
     
     .IN_instrRaw(IN_instrRaw),
     
-    .IN_MEM_readData(DC_dataOut),
-    .OUT_MEM_addr(CORE_DC_if.addr),
-    .OUT_MEM_writeData(CORE_DC_if.data),
-    .OUT_MEM_writeEnable(CORE_DC_if.we),
-    .OUT_MEM_readEnable(CORE_DC_if.ce),
-    .OUT_MEM_writeMask(CORE_DC_if.wm),
+    .OUT_MEM_writeAddr(CORE_writeAddr),
+    .OUT_MEM_writeData(CORE_writeData),
+    .OUT_MEM_writeEnable(CORE_writeEnable),
+    .OUT_MEM_writeMask(CORE_writeMask),
+    
+    .OUT_MEM_readEnable(CORE_readEnable),
+    .OUT_MEM_readAddr(CORE_readAddr),
+    .IN_MEM_readData(CORE_readData),
     
     .OUT_instrAddr(OUT_instrAddr),
     .OUT_instrReadEnable(OUT_instrReadEnable),
@@ -90,9 +108,9 @@ Core core
 );
 
 wire[31:0] DC_dataOut;
+
 CacheIF DC_if;
 assign DC_if = MC_DC_used ? MC_DC_if : CORE_DC_if;
-
 MemRTL dcache
 (
     .clk(clk),
@@ -101,7 +119,11 @@ MemRTL dcache
     .IN_addr(DC_if.addr[15:0]),
     .IN_data(DC_if.data),
     .IN_wm(DC_if.wm),
-    .OUT_data(DC_dataOut)
+    .OUT_data(DC_dataOut),
+    
+    .IN_nce1(CORE_readEnable),
+    .IN_addr1(CORE_readAddr[15:0]),
+    .OUT_data1(CORE_readData)
 );
 
 always@(posedge clk) begin

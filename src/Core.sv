@@ -9,12 +9,14 @@ module Core
     input wire en,
     input wire[63:0] IN_instrRaw,
 
-    input wire[31:0] IN_MEM_readData,
-    output wire[29:0] OUT_MEM_addr,
+    output wire[29:0] OUT_MEM_writeAddr,
     output wire[31:0] OUT_MEM_writeData,
     output wire OUT_MEM_writeEnable,
-    output wire OUT_MEM_readEnable,
     output wire[3:0] OUT_MEM_writeMask,
+    
+    output wire OUT_MEM_readEnable,
+    output wire[29:0] OUT_MEM_readAddr,
+    input wire[31:0] IN_MEM_readData,
     
     output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
@@ -298,7 +300,7 @@ assign stall[1] = 0;
 assign stall[3] = stall[2];
 
 wire IQ0_full;
-IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
+IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -323,7 +325,7 @@ IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(8,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
+IssueQueue#(12,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -373,7 +375,7 @@ IssueQueue#(12,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(8,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
+IssueQueue#(12,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
 (
     .clk(clk),
     .rst(rst),
@@ -598,7 +600,7 @@ LoadBuffer lb
 );
 
 SqN SQ_maxStoreSqN;
-wire CSR_ce[0:0];
+wire CSR_we[0:0];
 wire[31:0] CSR_dataOut[0:0];
 
 wire SQ_empty;
@@ -615,15 +617,17 @@ StoreQueue sq
     
     .IN_branch(branch),
     
-    .IN_MEM_data('{IN_MEM_readData}),
-    .OUT_MEM_addr('{OUT_MEM_addr}),
-    .OUT_MEM_data('{OUT_MEM_writeData}),
+    .OUT_MEM_re('{OUT_MEM_readEnable}),
+    .OUT_MEM_readAddr('{OUT_MEM_readAddr}),
+    .IN_MEM_readData('{IN_MEM_readData}),
+    
     .OUT_MEM_we('{OUT_MEM_writeEnable}),
-    .OUT_MEM_ce('{OUT_MEM_readEnable}),
+    .OUT_MEM_writeAddr('{OUT_MEM_writeAddr}),
+    .OUT_MEM_writeData('{OUT_MEM_writeData}),
     .OUT_MEM_wm('{OUT_MEM_writeMask}),
     
     .IN_CSR_data(CSR_dataOut),
-    .OUT_CSR_ce(CSR_ce),
+    .OUT_CSR_we(CSR_we),
     
     .OUT_uop('{wbUOp[2]}),
     .OUT_maxStoreSqN(SQ_maxStoreSqN),
@@ -736,17 +740,20 @@ ControlRegs cr
     .clk(clk),
     .rst(rst),
     .IN_mispredFlush(mispredFlush),
-    .IN_ce(CSR_ce[0]),
-    .IN_we(OUT_MEM_writeEnable),
+    
+    .IN_we(CSR_we[0]),
     .IN_wm(OUT_MEM_writeMask),
-    .IN_addr(OUT_MEM_addr[6:0]),
+    .IN_writeAddr(OUT_MEM_writeAddr[6:0]),
     .IN_data(OUT_MEM_writeData),
+    
+    .IN_re(OUT_MEM_readEnable),
+    .IN_readAddr(OUT_MEM_readAddr[6:0]),
     .OUT_data(CSR_dataOut[0]),
 
     .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid, comUOps[3].valid}),
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
-    .IN_ifValid('{DE_uop[0].valid, DE_uop[1].valid, DE_uop[2].valid, DE_uop[3].valid}),
+    .IN_ifValid('{DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
     .IN_comBranch(CSR_branchCommitted),
     
     .OUT_irqAddr(CR_irqAddr),

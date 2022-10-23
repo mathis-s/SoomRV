@@ -69,7 +69,7 @@ strcmp:
         addi a0, a0, 4
         addi a1, a1, 4
         j .loop_strcmp
-        
+    
     .final_strcmp:
         lb t0, 0(a0)
         lb t1, 0(a1)

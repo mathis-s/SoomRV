@@ -91,6 +91,10 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
+                    //if (IN_uop[0].valid && $signed(IN_uop[1].sqN - IN_uop[0].sqN) <= 0
+                    //    && IN_uop[0].addr[31:2] == IN_uop[1].addr[31:2])
+                    //    temp = 1;
+                    
                     if (temp) begin
                         OUT_branch.taken <= 1;
                         OUT_branch.dstPC <= IN_uop[i].pc;
