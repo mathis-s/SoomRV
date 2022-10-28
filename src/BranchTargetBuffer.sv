@@ -10,7 +10,7 @@ typedef struct packed
 
 module BranchTargetBuffer
 #(
-    parameter NUM_ENTRIES=64
+    parameter NUM_ENTRIES=32
 )
 (
     input wire clk,

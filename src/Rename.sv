@@ -41,26 +41,26 @@ integer j;
 
 wire RAT_lookupAvail[2*WIDTH_UOPS-1:0];
 wire[6:0] RAT_lookupSpecTag[2*WIDTH_UOPS-1:0];
-reg[5:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
+reg[4:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
 
-reg[5:0] RAT_issueIDs[WIDTH_UOPS-1:0];
+reg[4:0] RAT_issueIDs[WIDTH_UOPS-1:0];
 reg RAT_issueValid[WIDTH_UOPS-1:0];
 SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
 
 reg commitValid[WIDTH_UOPS-1:0];
 reg commitValid_int[WIDTH_UOPS-1:0];
-reg commitValid_fp[WIDTH_UOPS-1:0];
+//reg commitValid_fp[WIDTH_UOPS-1:0];
 
-reg[5:0] RAT_commitIDs[WIDTH_UOPS-1:0];
+reg[4:0] RAT_commitIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_commitTags[WIDTH_UOPS-1:0];
 wire[6:0] RAT_commitPrevTags[WIDTH_UOPS-1:0];
 reg RAT_commitAvail[WIDTH_UOPS-1:0];
 
-reg[5:0] RAT_wbIDs[WIDTH_UOPS-1:0];
+reg[4:0] RAT_wbIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_wbTags[WIDTH_UOPS-1:0];
 
 reg TB_issueValid[WIDTH_UOPS-1:0];
-reg TB_issueValid_fp[WIDTH_UOPS-1:0];
+//reg TB_issueValid_fp[WIDTH_UOPS-1:0];
 
 SqN nextCounterSqN;
 always_comb begin
@@ -68,17 +68,17 @@ always_comb begin
     nextCounterSqN = counterSqN;
     
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        RAT_lookupIDs[2*i+0] = {IN_uop[i].rs0_fp, IN_uop[i].rs0};
-        RAT_lookupIDs[2*i+1] = {IN_uop[i].rs1_fp, IN_uop[i].rs1};
+        RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;//{IN_uop[i].rs0_fp, IN_uop[i].rs0};
+        RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;//{IN_uop[i].rs1_fp, IN_uop[i].rs1};
     end
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         // Issue/Lookup
-        RAT_issueIDs[i] = {IN_uop[i].rd_fp, IN_uop[i].rd};
+        RAT_issueIDs[i] = IN_uop[i].rd;//{IN_uop[i].rd_fp, IN_uop[i].rd};
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
         // Only need new tag if instruction writes to a register
         TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && !IN_uop[i].rd_fp;
-        TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
+        //TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
         
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
@@ -87,9 +87,9 @@ always_comb begin
         commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0) && 
             (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         
-        commitValid_int[i] = commitValid[i] && !IN_comUOp[i].nmDst[5];
-        commitValid_fp[i] = (IN_comUOp[i].valid && IN_comUOp[i].nmDst[5] && 
-            (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
+        commitValid_int[i] = commitValid[i];// && !IN_comUOp[i].nmDst[5];
+        //commitValid_fp[i] = (IN_comUOp[i].valid && IN_comUOp[i].nmDst[5] && 
+        //    (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
@@ -130,18 +130,18 @@ RenameTable rt
 
 reg[5:0] TB_tags[WIDTH_UOPS-1:0];
 reg[6:0] newTags[WIDTH_UOPS-1:0];
-reg[5:0] TB_FP_tags[WIDTH_UOPS-1:0];
+//reg[5:0] TB_FP_tags[WIDTH_UOPS-1:0];
 reg[5:0] TB_RAT_commitPrevTags[WIDTH_UOPS-1:0];
 reg[5:0] TB_RAT_commitTags[WIDTH_UOPS-1:0];
 reg TB_tagsValid[WIDTH_UOPS-1:0];
-reg TB_FP_tagsValid[WIDTH_UOPS-1:0];
+//reg TB_FP_tagsValid[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         if (TB_issueValid[i])
             newTags[i] = {1'b0, TB_tags[i]};
-        else if (TB_issueValid_fp[i])
-            newTags[i] = {1'b1, TB_FP_tags[i]};
-        else newTags[i] = 7'b0;
+        //else if (TB_issueValid_fp[i])
+        //    newTags[i] = {1'b1, TB_FP_tags[i]};
+        else newTags[i] = 0;
         
         TB_RAT_commitPrevTags[i] = RAT_commitPrevTags[i][5:0];
         TB_RAT_commitTags[i] = RAT_commitTags[i][5:0];
@@ -163,7 +163,7 @@ TagBuffer tb
     .IN_RAT_commitPrevTags(TB_RAT_commitPrevTags),
     .IN_commitTagDst(TB_RAT_commitTags)
 );
-TagBuffer tb_fp
+/*TagBuffer tb_fp
 (
     .clk(clk),
     .rst(rst),
@@ -178,12 +178,12 @@ TagBuffer tb_fp
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(TB_RAT_commitPrevTags),
     .IN_commitTagDst(TB_RAT_commitTags)
-);
+);*/
 
 always_comb begin
     OUT_stall = 0;
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        if ((!TB_tagsValid[i] || !TB_FP_tagsValid[i]) && IN_uop[i].valid)
+        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid)
             OUT_stall = 1;
     end
         
@@ -237,11 +237,11 @@ always_ff@(posedge clk) begin
     else if (en && frontEn && !OUT_stall) begin
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].pc <= IN_uop[i].pc;
+            //OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
-            OUT_uop[i].nmDst <= {IN_uop[i].rd_fp, IN_uop[i].rd};
+            OUT_uop[i].nmDst <= IN_uop[i].rd;//{IN_uop[i].rd_fp, IN_uop[i].rd};
             OUT_uop[i].fetchID <= IN_uop[i].fetchID;
             OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
             OUT_uop[i].immB <= IN_uop[i].immB;

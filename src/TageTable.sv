@@ -1,9 +1,9 @@
-typedef logic[6:0] ID_t;
+typedef logic[5:0] ID_t;
 typedef logic[7:0] Tag_t;
 
 module TageTable
 #(
-    parameter SIZE=128,
+    parameter SIZE=64,
     parameter TAG_SIZE=8,
     parameter USF_SIZE=2,
     parameter CNT_SIZE=2,

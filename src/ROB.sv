@@ -81,12 +81,14 @@ always_comb begin
             headValid = 0;
     end
     
+    //if ($time() < 6000) begin
     if (entries[baseIndex[ID_LEN-1:0]+1].predicted)
         headValid = 0;
     if (entries[baseIndex[ID_LEN-1:0]+2].predicted)
         headValid = 0;
     if (entries[baseIndex[ID_LEN-1:0]+3].predicted)
         headValid = 0;
+    //end
 end
 
 reg allowSingleDequeue;

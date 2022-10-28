@@ -105,7 +105,7 @@ always_comb begin
             fusedUOps[i+0].immB = 0;
             
             // We need the branches values for correct prediction
-            fusedUOps[i+0].pc = fusionWindow[i+1].pc;
+            //fusedUOps[i+0].pc = fusionWindow[i+1].pc;
             fusedUOps[i+0].fetchID = fusionWindow[i+1].fetchID;
             fusedUOps[i+0].fetchOffs = fusionWindow[i+1].fetchOffs;
             fusedUOps[i+0].compressed = fusionWindow[i+1].compressed;

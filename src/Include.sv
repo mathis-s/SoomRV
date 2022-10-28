@@ -1,5 +1,5 @@
 
-typedef logic[5:0] RegNm;
+typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
 typedef logic[6:0] SqN;
 typedef logic[11:0] BrID;
@@ -148,6 +148,7 @@ typedef struct packed
     logic[15:0] instr;
     logic[30:0] pc;
     FetchID_t fetchID;
+    logic predTaken;
     logic valid;
 } IF_Instr;
 
@@ -156,12 +157,13 @@ typedef struct packed
     logic[31:0] instr;
     logic[30:0] pc;
     FetchID_t fetchID;
+    logic predTaken;
     logic valid;
 } PD_Instr;
 
 typedef struct packed
 {
-    logic[31:0] pc;
+    //logic[31:0] pc;
     logic[31:0] imm;
     logic[4:0] rs0;
     logic rs0_fp;
@@ -181,7 +183,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[31:0] pc;
+    //logic[31:0] pc;
     logic[31:0] imm;
     logic availA;
     Tag tagA;

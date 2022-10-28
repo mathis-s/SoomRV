@@ -105,6 +105,7 @@ always_ff@(posedge clk) begin
                     (!infoLast.taken || i[1:0] <= branchPosLast) &&
                     (!multipleLast || i[1:0] <= branchPosLast);
                 OUT_instrs[i].fetchID <= fetchID;
+                OUT_instrs[i].predTaken <= (infoLast.taken && i[1:0] == branchPosLast);
             end
             fetchID <= fetchID + 1;
         end

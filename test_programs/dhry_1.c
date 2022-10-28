@@ -163,7 +163,7 @@ int main ()
   /* Start timer */
   /***************/
 
-
+  uint32_t decBegin = *(volatile uint32_t*)0xff000088;
   Begin_Time = time();
   uint32_t execdBegin = *(volatile uint32_t*)0xff000098;
   for (Run_Index = 1; Run_Index <= Number_Of_Runs; ++Run_Index)
@@ -219,6 +219,7 @@ int main ()
 
   End_Time = time();
   uint32_t execdEnd = *(volatile uint32_t*)0xff000098;
+  uint32_t decEnd = *(volatile uint32_t*)0xff000088;
 
 
   printf ("Execution ends\n");
@@ -275,9 +276,11 @@ int main ()
   
   uint32_t instrs = execdEnd - execdBegin;
   uint32_t cycles = End_Time - Begin_Time;
+  uint32_t decoded = decEnd - decBegin;
   printf("\n\nRESULTS\n");
   printf("Runtime (cycles) "); printdecu(cycles);
   printf("Executed (instrs) "); printdecu(instrs);
+  printf("Decoded (instrs) "); printdecu(decoded);
   uint32_t ipc = (instrs * 1000) / cycles;
   printf("mIPC "); printdecu(ipc);
   

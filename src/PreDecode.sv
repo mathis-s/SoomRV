@@ -49,6 +49,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].instr <= {buffer[bufIndexOut + 1].instr, buffer[bufIndexOut].instr};
                         OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut + 1].fetchID;
+                        OUT_instrs[i].predTaken <= buffer[bufIndexOut + 1].predTaken;
                         OUT_instrs[i].valid <= 1;
                         bufIndexOut = bufIndexOut + 2;
                         freeEntries = freeEntries + 2;
@@ -58,6 +59,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].instr <= {16'bx, buffer[bufIndexOut].instr};
                         OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
+                        OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken;
                         OUT_instrs[i].valid <= 1;
                         bufIndexOut = bufIndexOut + 1;
                         freeEntries = freeEntries + 1;

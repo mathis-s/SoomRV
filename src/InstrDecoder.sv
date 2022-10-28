@@ -246,7 +246,7 @@ always_comb begin
         
         uop = 0;
         invalidEnc = 1;
-        uop.pc = {IN_instrs[i].pc, 1'b0};
+        //uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
@@ -266,6 +266,7 @@ always_comb begin
         endcase
         
         if (IN_instrs[i].valid && en && !OUT_decBranch) begin
+            reg isJumpBranch = 0;
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)

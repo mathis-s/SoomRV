@@ -11,7 +11,7 @@ module RenameTable
     parameter NUM_ISSUE=4,
     parameter NUM_COMMIT=4,
     parameter NUM_WB=4,
-    parameter NUM_REGS=64,
+    parameter NUM_REGS=32,
     parameter ID_SIZE=$clog2(NUM_REGS),
     parameter TAG_SIZE=7
 )

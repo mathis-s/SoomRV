@@ -2,7 +2,7 @@
 module MultiplySmall
 #
 (
-    parameter NUM_STAGES=1,
+    parameter NUM_STAGES=4,
     parameter TP=2,
     parameter NUM_REGS = NUM_STAGES/TP,
     parameter BITS=(32/NUM_STAGES)

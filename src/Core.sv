@@ -47,21 +47,21 @@ integer i;
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
 wire wbHasResult_int[NUM_WBS-1:0];
-wire wbHasResult_fp[NUM_WBS-1:0];
+//wire wbHasResult_fp[NUM_WBS-1:0];
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 assign wbHasResult[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
 
-assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0 && !wbUOp[0].nmDst[5];
-assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0 && !wbUOp[1].nmDst[5];
-assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0 && !wbUOp[2].nmDst[5];
-assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0 && !wbUOp[3].nmDst[5];
+assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;// && !wbUOp[0].nmDst[5];
+assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;// && !wbUOp[1].nmDst[5];
+assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;// && !wbUOp[2].nmDst[5];
+assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;// && !wbUOp[3].nmDst[5];
 
-assign wbHasResult_fp[0] = wbUOp[0].valid && wbUOp[0].nmDst[5];
-assign wbHasResult_fp[1] = wbUOp[1].valid && wbUOp[1].nmDst[5];
-assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
-assign wbHasResult_fp[3] = wbUOp[3].valid && wbUOp[3].nmDst[5];
+//assign wbHasResult_fp[0] = wbUOp[0].valid && wbUOp[0].nmDst[5];
+//assign wbHasResult_fp[1] = wbUOp[1].valid && wbUOp[1].nmDst[5];
+//assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
+//assign wbHasResult_fp[3] = wbUOp[3].valid && wbUOp[3].nmDst[5];
 
 
 CommitUOp comUOps[3:0];
@@ -238,8 +238,8 @@ InstrDecoder idec
     
     .OUT_uop(DE_uop)
 );
-
-wire FUSE_full;
+wire FUSE_full = !frontendEn || RN_stall;
+/*wire FUSE_full;
 D_UOp FUSE_uop[3:0];
 Fuse fuse
 (
@@ -252,7 +252,7 @@ Fuse fuse
     
     .IN_uop(DE_uop),
     .OUT_uop(FUSE_uop)
-);
+);*/
 
 
 R_UOp RN_uop[3:0];
@@ -269,7 +269,7 @@ Rename rn
     
     .OUT_stall(RN_stall),
 
-    .IN_uop(FUSE_uop),
+    .IN_uop(DE_uop),
 
     .IN_comUOp(comUOps),
 
@@ -325,7 +325,7 @@ IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(12,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-7) iq1
+IssueQueue#(12,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -421,7 +421,7 @@ RF rf
     .raddr6(RF_readAddress[6]), .rdata6(RF_readData[6]),
     .raddr7(RF_readAddress[7]), .rdata7(RF_readData[7])
 );
-
+/*
 wire[5:0] RF_FP_readAddress[3:0];
 wire[31:0] RF_FP_readData[3:0];
 RF_FP rf_fp
@@ -434,7 +434,7 @@ RF_FP rf_fp
     .raddr1(RF_FP_readAddress[1]), .rdata1(RF_FP_readData[1]),
     .raddr2(RF_FP_readAddress[2]), .rdata2(RF_FP_readData[2]),
     .raddr3(RF_FP_readAddress[3]), .rdata3(RF_FP_readData[3])
-);
+);*/
 
 EX_UOp LD_uop[3:0];
 wire[5:0] enabledXUs[3:0];
@@ -468,8 +468,8 @@ Load ld
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
     
-    .OUT_rfReadAddr_fp(RF_FP_readAddress),
-    .IN_rfReadData_fp(RF_FP_readData),
+    //.OUT_rfReadAddr_fp(RF_FP_readAddress),
+    //.IN_rfReadData_fp(RF_FP_readData),
     
     .OUT_enableXU(enabledXUs),
     .OUT_funcUnit(LD_fu),

@@ -3,7 +3,7 @@ module TagePredictor
     parameter NUM_STAGES=5,
     parameter L_0=4,
     parameter FACTOR=2,
-    parameter TABLE_SIZE=128,
+    parameter TABLE_SIZE=64,
     parameter TAG_SIZE=8
 )
 (
