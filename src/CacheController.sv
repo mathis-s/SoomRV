@@ -2,7 +2,7 @@
 
 typedef struct packed
 {
-    logic[25:0] addr;
+    logic[23:0] addr;
     logic valid;
     logic dirty;
     logic used;
@@ -10,7 +10,7 @@ typedef struct packed
 
 module CacheController
 #(
-    parameter SIZE=64,
+    parameter SIZE=16,
     parameter NUM_UOPS=2,
     parameter QUEUE_SIZE=4
 )
@@ -54,10 +54,10 @@ reg[$clog2(SIZE)-1:0] cacheTableEntry[NUM_UOPS-1:0];
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         cacheTableEntryFound[i] = 0;
-        cacheTableEntry[i] = 6'bx;
+        cacheTableEntry[i] = 4'bx;
         
         for (j = 0; j < SIZE; j=j+1) begin
-            if (ctable[j].valid && ctable[j].addr == IN_uop[i].addr[31:6]) begin
+            if (ctable[j].valid && ctable[j].addr == IN_uop[i].addr[31:8]) begin
                 cacheTableEntryFound[i] = 1;
                 cacheTableEntry[i] = j[$clog2(SIZE)-1:0];
             end
@@ -132,8 +132,8 @@ always_ff@(posedge clk) begin
                     OUT_MC_ce <= 1;
                     OUT_MC_we <= 1;
                     
-                    OUT_MC_sramAddr <= {lruPointer, 4'b0};
-                    OUT_MC_extAddr <= {2'b0, ctable[lruPointer].addr, 4'b0};
+                    OUT_MC_sramAddr <= {lruPointer, 6'b0};
+                    OUT_MC_extAddr <= {2'b0, ctable[lruPointer].addr, 6'b0};
                     
                     ctable[lruPointer].valid <= 0;
                     ctable[lruPointer].used <= 0;
@@ -161,7 +161,7 @@ always_ff@(posedge clk) begin
                     if (IN_uop[i].exception || cacheTableEntryFound[i] || IN_uop[i].addr[31:24] >= 8'hfe) begin
                         OUT_uop[i] <= IN_uop[i];
                         if (IN_uop[i].addr[31:24] < 8'hfe)
-                            OUT_uop[i].addr <= {20'b0, cacheTableEntry[i], IN_uop[i].addr[5:0]};
+                            OUT_uop[i].addr <= {20'b0, cacheTableEntry[i], IN_uop[i].addr[7:0]};
                         ctable[cacheTableEntry[i]].used <= 1;
                     end
                     // Cache miss
@@ -182,10 +182,10 @@ always_ff@(posedge clk) begin
                 
                 for (i = 0; i < NUM_UOPS; i=i+1)
                     if (cmissUOp[i].valid && 
-                        cmissUOp[i].addr[31:6] == OUT_MC_extAddr[29:4] && 
+                        cmissUOp[i].addr[31:8] == OUT_MC_extAddr[29:6] && 
                         (!IN_branch.taken || $signed(cmissUOp[i].sqN - IN_branch.sqN) <= 0)) begin
                         OUT_uop[i] <= cmissUOp[i];
-                        OUT_uop[i].addr <= {20'b0, freeEntryID, cmissUOp[i].addr[5:0]};
+                        OUT_uop[i].addr <= {20'b0, freeEntryID, cmissUOp[i].addr[7:0]};
                         cmissUOp[i].valid <= 0;
                     end
                     
@@ -200,11 +200,11 @@ always_ff@(posedge clk) begin
                 if (!temp && cmissUOp[i].valid) begin
                     OUT_MC_ce <= 1;
                     OUT_MC_we <= 0;
-                    OUT_MC_sramAddr <= {freeEntryID, 4'b0};
-                    OUT_MC_extAddr <= {2'b0, cmissUOp[i].addr[31:6], 4'b0};
+                    OUT_MC_sramAddr <= {freeEntryID, 6'b0};
+                    OUT_MC_extAddr <= {2'b0, cmissUOp[i].addr[31:8], 6'b0};
                     
                     ctable[freeEntryID].used <= 1;
-                    ctable[freeEntryID].addr <= cmissUOp[i].addr[31:6];
+                    ctable[freeEntryID].addr <= cmissUOp[i].addr[31:8];
                     loading <= 1;
                     loadID <= i[0:0];
                     freeEntryAvail <= 0;

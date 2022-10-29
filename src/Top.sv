@@ -28,7 +28,7 @@ wire[9:0] MC_sramAddr;
 wire[31:0] MC_extAddr;
 wire[9:0] MC_progress;
 wire MC_busy;
-MemoryControllerSim memc
+MemoryController memc
 (
     .clk(clk),
     .rst(rst),
@@ -46,9 +46,26 @@ MemoryControllerSim memc
     .OUT_CACHE_wm(MC_DC_if.wm),
     .OUT_CACHE_addr(MC_DC_if.addr[9:0]),
     .OUT_CACHE_data(MC_DC_if.data),
-    .IN_CACHE_data(DC_dataOut)
+    .IN_CACHE_data(DC_dataOut),
+    
+    .OUT_EXT_oen(EXTMEM_oen),
+    .OUT_EXT_en(EXTMEM_en),
+    .OUT_EXT_bus(EXTMEM_busOut),
+    .IN_EXT_bus(EXTMEM_bus)
 );
 assign MC_DC_if.addr[29:10] = 0;
+
+
+wire EXTMEM_oen;
+wire[31:0] EXTMEM_busOut;
+wire[31:0] EXTMEM_bus = EXTMEM_oen ? EXTMEM_busOut : 32'bz;
+wire EXTMEM_en;
+ExternalMemorySim extMem
+(
+    .clk(clk),
+    .en(EXTMEM_en),
+    .bus(EXTMEM_bus)
+);
 
 CacheIF CORE_DC_if;
 always_comb begin

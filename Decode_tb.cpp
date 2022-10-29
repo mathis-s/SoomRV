@@ -1,6 +1,6 @@
 #include "VTop.h"
 #include "VTop_Top.h"
-#include "VTop_MemoryControllerSim.h"
+#include "VTop_ExternalMemorySim.h"
 #include "VTop___024root.h"
 #include <cstdio>
 #include <iostream>    // Need std::cout
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
     for (size_t i = 0; i < 0x10000; i++)
     {
         //if (ram[i] != 0) printf("%.8zx: %.8x\n", i, ram[i]);
-        top->rootp->Top->memc->extRAM[i] = ram[i];
+        top->rootp->Top->extMem->mem[i] = ram[i];
     }
 
     VerilatedVcdC* tfp = new VerilatedVcdC;

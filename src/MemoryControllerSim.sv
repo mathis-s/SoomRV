@@ -19,7 +19,7 @@ module MemoryControllerSim
     input wire[31:0] IN_CACHE_data
 );
 
-localparam LEN=16;
+localparam LEN=64;
 
 reg[3:0] state;
 

@@ -5,7 +5,7 @@ typedef logic[6:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[1:0] FetchOff_t;
-typedef logic[55:0] BHist_t;
+typedef logic[15:0] BHist_t;
 
 typedef enum logic[5:0]
 {

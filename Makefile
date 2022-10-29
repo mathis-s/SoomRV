@@ -28,7 +28,8 @@ decoder_tb:
 	src/CacheController.sv \
 	src/MemRTL.sv \
 	src/Top.sv \
-	src/MemoryControllerSim.sv \
+	src/MemoryController.sv \
+	src/ExternalMemorySim.sv \
 	src/RenameTable.sv \
 	src/TagBuffer.sv \
 	src/RF_FP.sv \
