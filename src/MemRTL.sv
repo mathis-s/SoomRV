@@ -1,7 +1,7 @@
 module MemRTL
 #(
     parameter WORD_SIZE=32,
-    parameter NUM_WORDS=65536
+    parameter NUM_WORDS=1024
 )
 (
     input wire clk,
@@ -43,7 +43,7 @@ always@(posedge clk) begin
         if (!we_reg) begin
             for (i = 0; i < WORD_SIZE/8; i=i+1) begin
                 if (wm_reg[i])
-                    mem[addr_reg][(8*i)+:8] <= data_reg[(8*i)+:8];
+                    mem[addr_reg][(8*i)+:8] = data_reg[(8*i)+:8];
             end
             //$display("write %x to %x (%b)", data_reg, addr_reg, wm_reg);
             OUT_data <= 'bx;
@@ -56,6 +56,9 @@ always@(posedge clk) begin
     if (!ce1_reg) begin
         OUT_data1 <= mem[addr1_reg];
     end
+    
+    //if (!ce1_reg && !ce_reg && addr1_reg == addr_reg)
+    //    $display("Warning: Multiple cache accesses at same address");
 end
 
 endmodule

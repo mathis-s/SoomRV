@@ -293,11 +293,9 @@ Rename rn
 wire RV_uopValid[3:0];
 R_UOp RV_uop[3:0];
 
-/* verilator lint_off UNOPT */
 wire stall[3:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
-assign stall[3] = stall[2];
 
 wire IQ0_full;
 IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
@@ -381,7 +379,7 @@ IssueQueue#(12,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
     .rst(rst),
     .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
     
-    .IN_stall(stall[2]),
+    .IN_stall(stall[3]),
     .IN_doNotIssueFU1(1'b0),
     
     .IN_uopValid(RN_uopValid),
@@ -456,7 +454,7 @@ Load ld
     
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
-    .IN_stall('{stall[2], stall[2], stall[1], stall[0]}),
+    .IN_stall(stall),
     
     .IN_zcFwdResult(LD_zcFwdResult),
     .IN_zcFwdTag(LD_zcFwdTag),
@@ -524,7 +522,7 @@ RES_UOp FPU_uop;
 FPU fpu
 (
     .clk(clk),
-    .rst(rst),
+    .rst(rst), 
     .en(enabledXUs[0][5]),
     
     .IN_branch(branch),
@@ -534,7 +532,8 @@ FPU fpu
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
 
-AGU_UOp CC_uop[1:0];
+AGU_UOp CC_uopLd;
+ST_UOp CC_uopSt;
 CacheController cc
 (
     .clk(clk),
@@ -542,10 +541,13 @@ CacheController cc
     
     .IN_branch(branch),
     .IN_SQ_empty(SQ_empty),
-    .OUT_stall(stall[2]),
+    .OUT_stall('{stall[3], stall[2]}),
     
-    .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
-    .OUT_uop(CC_uop),
+    .IN_uopLd(AGU_LD_uop),
+    .OUT_uopLd(CC_uopLd),
+    
+    .IN_uopSt(SQ_uop),
+    .OUT_uopSt(CC_uopSt),
     
     .OUT_MC_ce(OUT_MC_ce),
     .OUT_MC_we(OUT_MC_we),
@@ -575,7 +577,7 @@ AGU aguST
     .clk(clk),
     .rst(rst),
     .en(enabledXUs[3][2]),
-    .stall(stall[2]),
+    .stall(0),
     
     .IN_branch(branch),
 
@@ -600,52 +602,76 @@ LoadBuffer lb
 );
 
 SqN SQ_maxStoreSqN;
-wire CSR_we[0:0];
-wire[31:0] CSR_dataOut[0:0];
+wire CSR_we;
+wire[31:0] CSR_dataOut;
 
 wire SQ_empty;
+ST_UOp SQ_uop;
+wire[3:0] SQ_lookupMask;
+wire[31:0] SQ_lookupData;
 StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
-    .IN_disable(IN_MC_busy || OUT_MC_ce),
+    .IN_disable(stall[3]),
+    .IN_stallLd(stall[2]),
     .OUT_empty(SQ_empty),
     
-    .IN_uop(CC_uop),
+    .IN_uopSt(AGU_ST_uop),
+    .IN_uopLd(AGU_LD_uop),
     
     .IN_curSqN(ROB_curSqN),
     
     .IN_branch(branch),
     
-    .OUT_MEM_re('{OUT_MEM_readEnable}),
-    .OUT_MEM_readAddr('{OUT_MEM_readAddr}),
-    .IN_MEM_readData('{IN_MEM_readData}),
+    .OUT_uopSt(SQ_uop),
     
-    .OUT_MEM_we('{OUT_MEM_writeEnable}),
-    .OUT_MEM_writeAddr('{OUT_MEM_writeAddr}),
-    .OUT_MEM_writeData('{OUT_MEM_writeData}),
-    .OUT_MEM_wm('{OUT_MEM_writeMask}),
+    .OUT_lookupData(SQ_lookupData),
+    .OUT_lookupMask(SQ_lookupMask),
+    
+    .OUT_maxStoreSqN(SQ_maxStoreSqN),
+    .IN_IO_busy(IO_busy)
+);
+
+LoadStoreUnit lsu
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_branch(branch),
+    
+    .IN_uopLd(CC_uopLd),
+    .IN_uopSt(CC_uopSt),
+    
+    .OUT_MEM_re(OUT_MEM_readEnable),
+    .OUT_MEM_readAddr(OUT_MEM_readAddr),
+    .IN_MEM_readData(IN_MEM_readData),
+    
+    .OUT_MEM_we(OUT_MEM_writeEnable),
+    .OUT_MEM_writeAddr(OUT_MEM_writeAddr),
+    .OUT_MEM_writeData(OUT_MEM_writeData),
+    .OUT_MEM_wm(OUT_MEM_writeMask),
+    
+    .IN_SQ_lookupMask(SQ_lookupMask),
+    .IN_SQ_lookupData(SQ_lookupData),
     
     .IN_CSR_data(CSR_dataOut),
     .OUT_CSR_we(CSR_we),
     
-    .OUT_uop('{wbUOp[2]}),
-    .OUT_maxStoreSqN(SQ_maxStoreSqN),
-    
-    .IN_IO_busy(IO_busy)
+    .OUT_uopLd(wbUOp[2])
 );
 
 always_comb begin
     wbUOp[3].result = 32'bx;
-    wbUOp[3].tagDst = CC_uop[1].tagDst;
-    wbUOp[3].nmDst = CC_uop[1].nmDst;
-    wbUOp[3].sqN = CC_uop[1].sqN;
-    wbUOp[3].pc = CC_uop[1].pc;
-    wbUOp[3].flags = CC_uop[1].exception ? FLAGS_EXCEPT : FLAGS_NONE;
-    wbUOp[3].compressed = CC_uop[1].compressed;
+    wbUOp[3].tagDst = AGU_ST_uop.tagDst;
+    wbUOp[3].nmDst = AGU_ST_uop.nmDst;
+    wbUOp[3].sqN = AGU_ST_uop.sqN;
+    wbUOp[3].pc = AGU_ST_uop.pc;
+    wbUOp[3].flags = AGU_ST_uop.exception ? FLAGS_EXCEPT : FLAGS_NONE;
+    wbUOp[3].compressed = AGU_ST_uop.compressed;
     wbUOp[3].isBranch = 0;
     wbUOp[3].bpi = 0;
-    wbUOp[3].valid = CC_uop[1].valid;
+    wbUOp[3].valid = AGU_ST_uop.valid;
 end
 
 RES_UOp INT1_uop;
@@ -741,14 +767,14 @@ ControlRegs cr
     .rst(rst),
     .IN_mispredFlush(mispredFlush),
     
-    .IN_we(CSR_we[0]),
+    .IN_we(CSR_we),
     .IN_wm(OUT_MEM_writeMask),
     .IN_writeAddr(OUT_MEM_writeAddr[6:0]),
     .IN_data(OUT_MEM_writeData),
     
     .IN_re(OUT_MEM_readEnable),
     .IN_readAddr(OUT_MEM_readAddr[6:0]),
-    .OUT_data(CSR_dataOut[0]),
+    .OUT_data(CSR_dataOut),
 
     .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid, comUOps[3].valid}),
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
@@ -787,3 +813,4 @@ assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
 `endif
 
 endmodule
+

@@ -28,3 +28,5 @@ main:
     
     lw ra, -4(sp)
     ret
+
+# 33102 cycles

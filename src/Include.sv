@@ -284,6 +284,14 @@ typedef struct packed
     logic valid;
 } AGU_UOp;
 
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic[31:0] data;
+    logic[3:0] wmask;
+    logic valid;
+} ST_UOp;
+
 
 typedef struct packed
 {

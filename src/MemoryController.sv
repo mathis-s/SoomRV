@@ -46,6 +46,7 @@ always_ff@(posedge clk) begin
         OUT_CACHE_ce <= 1;
         OUT_busy <= 0;
         OUT_EXT_oen <= 1;
+        OUT_progress <= 0;
     end
     else begin
         
@@ -78,18 +79,18 @@ always_ff@(posedge clk) begin
                     
                     // Interface
                     OUT_busy <= 1;
-                    OUT_CACHE_used <= 1;
                     OUT_progress <= 0;
                 end
                 else begin
-                    OUT_CACHE_used <= 0;
                     OUT_CACHE_we <= 1;
                     OUT_CACHE_ce <= 1;
                     OUT_busy <= 0;
                     OUT_EXT_en <= 0;
+                    OUT_progress <= 0;
                 end
                 
                 OUT_EXT_oen <= 1;
+                OUT_CACHE_used <= 0;
             end
             
             
@@ -101,6 +102,7 @@ always_ff@(posedge clk) begin
                         state <= 3;
                         OUT_EXT_oen <= 0;
                     end
+                    OUT_CACHE_used <= 1;
                 end
                 waitCycles <= waitCycles - 1;
             end
@@ -135,12 +137,14 @@ always_ff@(posedge clk) begin
                     OUT_CACHE_addr <= sramAddr;
                     sramAddr <= sramAddr + 1;
                     OUT_CACHE_data <= IN_EXT_bus;
+                    OUT_progress <= OUT_progress + 1;
                 end
                 else begin
                     OUT_CACHE_ce <= 1;
                     OUT_CACHE_we <= 1;
                     OUT_CACHE_used <= 0;
                     OUT_busy <= 0;
+                    OUT_progress <= 0;
                     state <= 0;
                     OUT_EXT_en <= 0;
                 end

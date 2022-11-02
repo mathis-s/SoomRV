@@ -133,13 +133,13 @@ MemRTL dcache
     .clk(clk),
     .IN_nce(!(!DC_if.ce && DC_if.addr < 1024)),
     .IN_nwe(DC_if.we),
-    .IN_addr(DC_if.addr[15:0]),
+    .IN_addr(DC_if.addr[9:0]),
     .IN_data(DC_if.data),
     .IN_wm(DC_if.wm),
     .OUT_data(DC_dataOut),
     
-    .IN_nce1(CORE_readEnable),
-    .IN_addr1(CORE_readAddr[15:0]),
+    .IN_nce1(!(!CORE_readEnable && CORE_readAddr < 1024)),
+    .IN_addr1(CORE_readAddr[9:0]),
     .OUT_data1(CORE_readData)
 );
 

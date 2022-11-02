@@ -7,7 +7,7 @@ _start:
     li a1, 0xff000000
     sw a0, 0(a1)
     
-    li sp, 0x10000
+    li sp, 0x20000
     call main
     ebreak
     
