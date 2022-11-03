@@ -296,6 +296,7 @@ R_UOp RV_uop[3:0];
 wire stall[3:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
+assign stall[3] = 0;
 
 wire IQ0_full;
 IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
@@ -534,6 +535,7 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop
 
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
+wire CC_storeStall;
 CacheController cc
 (
     .clk(clk),
@@ -541,7 +543,7 @@ CacheController cc
     
     .IN_branch(branch),
     .IN_SQ_empty(SQ_empty),
-    .OUT_stall('{stall[3], stall[2]}),
+    .OUT_stall('{CC_storeStall, stall[2]}),
     
     .IN_uopLd(AGU_LD_uop),
     .OUT_uopLd(CC_uopLd),
@@ -577,7 +579,7 @@ AGU aguST
     .clk(clk),
     .rst(rst),
     .en(enabledXUs[3][2]),
-    .stall(0),
+    .stall(stall[3]),
     
     .IN_branch(branch),
 
@@ -613,7 +615,7 @@ StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
-    .IN_disable(stall[3]),
+    .IN_disable(CC_storeStall),
     .IN_stallLd(stall[2]),
     .OUT_empty(SQ_empty),
     
