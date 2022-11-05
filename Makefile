@@ -41,6 +41,7 @@ decoder_tb:
 	src/PCFile.sv \
 	src/TagePredictor.sv \
 	src/LoadStoreUnit.sv \
+	src/ICacheTable.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

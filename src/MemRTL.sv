@@ -46,7 +46,7 @@ always@(posedge clk) begin
                     mem[addr_reg][(8*i)+:8] = data_reg[(8*i)+:8];
             end
             //$display("write %x to %x (%b)", data_reg, addr_reg, wm_reg);
-            OUT_data <= 'bx;
+            OUT_data <= 0;
         end
         else begin
             OUT_data <= mem[addr_reg];

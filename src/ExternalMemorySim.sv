@@ -60,4 +60,6 @@ always@(posedge clk) begin
     endcase
 end
 
+wire[31:0] retAddr = mem[20'h3ffff];
+
 endmodule

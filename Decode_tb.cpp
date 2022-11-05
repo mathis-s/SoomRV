@@ -40,6 +40,7 @@ int main(int argc, char** argv)
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
     
     size_t numInstrBytes = 0;
+    size_t dataStart;
     {
         FILE* f = fopen("text.bin", "rb");
         uint8_t* pramBytes = (uint8_t*)pram;
@@ -58,7 +59,7 @@ int main(int argc, char** argv)
         
         
         size_t dataIndex = numInstrBytes;
-        size_t dataStart = dataIndex;
+        dataStart = dataIndex;
         uint8_t* ramBytes = (uint8_t*)ram;
         f = fopen("data.bin", "rb");
         while (dataIndex < 65536 * 4)
@@ -74,9 +75,14 @@ int main(int argc, char** argv)
         fclose(f);
     }
     
-    for (size_t i = 0; i < 0x10000; i++)
+    
+    for (size_t i = 0; i < dataStart/4; i++)
     {
-        //if (ram[i] != 0) printf("%.8zx: %.8x\n", i, ram[i]);
+        top->rootp->Top->extMem->mem[i] = pram[i];
+    }
+    for (size_t i = dataStart/4; i < 0x10000; i++)
+    {
+        if (ram[i] != 0) printf("%.8zx: %.8x\n", i, ram[i]);
         top->rootp->Top->extMem->mem[i] = ram[i];
         //top->rootp->Top->dcache->mem[i] = ram[i];
     }
@@ -98,10 +104,6 @@ int main(int argc, char** argv)
 
     // Run
     top->en = 1;
-
-    // address is registered
-    uint32_t instrAddrReg = 0;
-    bool instrCeReg = true;
     
     while (!Verilated::gotFinish())
     {
@@ -110,30 +112,10 @@ int main(int argc, char** argv)
             top->en = 0;
             break;
         }
-    
-        // zero right now, going to be one, so rising edge
-        if (top->clk == 0)
-        {
-            size_t index;
-
-            {
-                top->en = 1;
-                if (!instrCeReg)
-                {
-                    index = (instrAddrReg * 2) & 0xFFFF;
-                    //if (index >= 8192)
-                    //    index = 0;
-                    top->IN_instrRaw = ((uint64_t)pram[index] | (((uint64_t)pram[index + 1]) << 32));
-                }
-            }
-            
-            instrCeReg = top->OUT_instrReadEnable;
-            instrAddrReg = top->OUT_instrAddr;
-        }
 
         top->clk = !top->clk;
         top->eval();              // Evaluate model
-        //tfp->dump(main_time);
+        tfp->dump(main_time);
         main_time++;              // Time passes...
         
         //if (!(main_time & 0xffff)) printf("pc %.8x\n", instrAddrReg);

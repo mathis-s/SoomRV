@@ -1,3 +1,6 @@
+
+
+
 module ProgramCounter
 #(
     parameter NUM_UOPS=3,
@@ -34,6 +37,7 @@ module ProgramCounter
     input FetchID_t IN_ROB_curFetchID,
 
     output reg[31:0] OUT_pcRaw,
+    output reg[28:0] OUT_instrAddr,
     
     output IF_Instr OUT_instrs[NUM_BLOCKS-1:0],
     
@@ -41,7 +45,12 @@ module ProgramCounter
     input wire IN_instrMappingHalfSize,
     output wire OUT_instrMappingMiss,
     
-    output wire OUT_stall
+    output wire OUT_stall,
+    
+    output IF_MemoryController OUT_MC_if,
+    input wire[0:0] IN_MC_cacheID,
+    input wire[9:0] IN_MC_progress,
+    input wire IN_MC_busy
 );
 
 integer i;
@@ -86,7 +95,24 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
 
-assign OUT_stall = (IN_ROB_curFetchID == fetchID);
+wire icacheStall;
+ICacheTable ict
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_lookupValid(en0),
+    .IN_lookupPC(pc),
+    
+    .OUT_lookupAddress(OUT_instrAddr),
+    .OUT_stall(icacheStall),
+    
+    .OUT_MC_if(OUT_MC_if),
+    .IN_MC_cacheID(IN_MC_cacheID),
+    .IN_MC_progress(IN_MC_progress),
+    .IN_MC_busy(IN_MC_busy)
+);
+
+assign OUT_stall = (IN_ROB_curFetchID == fetchID) || icacheStall;
 
 always_ff@(posedge clk) begin
     if (rst) begin

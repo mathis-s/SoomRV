@@ -30,10 +30,11 @@ module Core
     output wire OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
-    output wire OUT_MC_ce,
-    output wire OUT_MC_we,
-    output wire[9:0] OUT_MC_sramAddr,
-    output wire[31:0] OUT_MC_extAddr,
+    output reg OUT_MC_ce,
+    output reg OUT_MC_we,
+    output reg[0:0] OUT_MC_cacheID,
+    output reg[9:0] OUT_MC_sramAddr,
+    output reg[29:0] OUT_MC_extAddr,
     input wire[9:0] IN_MC_progress,
     input wire IN_MC_busy,
     
@@ -41,6 +42,25 @@ module Core
     input wire[31:0] IN_instrMappingBase,
     input wire IN_instrMappingHalfSize
 );
+
+
+always_comb begin
+    
+    if (PC_MC_if.ce) begin
+        OUT_MC_ce = PC_MC_if.ce;
+        OUT_MC_we = PC_MC_if.we;
+        OUT_MC_sramAddr = PC_MC_if.sramAddr;
+        OUT_MC_extAddr = PC_MC_if.extAddr;
+        OUT_MC_cacheID = 1;
+    end
+    else begin
+        OUT_MC_ce = CC_MC_if.ce;
+        OUT_MC_we = CC_MC_if.we;
+        OUT_MC_sramAddr = CC_MC_if.sramAddr;
+        OUT_MC_extAddr = CC_MC_if.extAddr;
+        OUT_MC_cacheID = 0;
+    end
+end
 
 integer i;
 
@@ -109,7 +129,6 @@ BranchSelector bsel
 );
 
 wire[31:0] PC_pc;
-assign OUT_instrAddr = PC_pc[31:3];
 
 wire BP_branchTaken;
 wire BP_isJump;
@@ -126,6 +145,8 @@ IF_Instr IF_instrs[3:0];
 FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
 wire PC_stall;
+
+IF_MemoryController PC_MC_if;
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -154,13 +175,19 @@ ProgramCounter progCnt
     .IN_ROB_curFetchID(ROB_curFetchID),
     
     .OUT_pcRaw(PC_pc),
+    .OUT_instrAddr(OUT_instrAddr),
     .OUT_instrs(IF_instrs),
     
     .IN_instrMappingBase(IN_instrMappingBase),
     .IN_instrMappingHalfSize(IN_instrMappingHalfSize),
     .OUT_instrMappingMiss(OUT_instrMappingMiss),
     
-    .OUT_stall(PC_stall)
+    .OUT_stall(PC_stall),
+    
+    .OUT_MC_if(PC_MC_if),
+    .IN_MC_cacheID(OUT_MC_cacheID),
+    .IN_MC_progress(IN_MC_progress),
+    .IN_MC_busy(IN_MC_busy || CC_MC_if.ce)
 );
 
 BTUpdate BP_btUpdates[1:0];
@@ -536,6 +563,7 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
+IF_MemoryController CC_MC_if;
 CacheController cc
 (
     .clk(clk),
@@ -551,12 +579,13 @@ CacheController cc
     .IN_uopSt(SQ_uop),
     .OUT_uopSt(CC_uopSt),
     
-    .OUT_MC_ce(OUT_MC_ce),
-    .OUT_MC_we(OUT_MC_we),
-    .OUT_MC_sramAddr(OUT_MC_sramAddr),
-    .OUT_MC_extAddr(OUT_MC_extAddr),
+    .OUT_MC_ce(CC_MC_if.ce),
+    .OUT_MC_we(CC_MC_if.we),
+    .OUT_MC_sramAddr(CC_MC_if.sramAddr),
+    .OUT_MC_extAddr(CC_MC_if.extAddr),
     .IN_MC_progress(IN_MC_progress),
-    .IN_MC_busy(IN_MC_busy)
+    .IN_MC_cacheID(OUT_MC_cacheID),
+    .IN_MC_busy(IN_MC_busy || PC_MC_if.ce)
 );
 
 AGU_UOp AGU_LD_uop;

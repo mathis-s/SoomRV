@@ -12,20 +12,17 @@ module Top
     input wire clk,
     input wire rst,
     input wire en,
-    input wire[63:0] IN_instrRaw,
-
-    output wire[28:0] OUT_instrAddr,
-    output wire OUT_instrReadEnable,
     output wire OUT_halt
 );
 
-wire MC_DC_used;
-CacheIF MC_DC_if;
+wire[1:0] MC_DC_used;
+CacheIF MC_DC_if[1:0];
 
 wire MC_ce;
 wire MC_we;
+wire[0:0] MC_cacheID;
 wire[9:0] MC_sramAddr;
-wire[31:0] MC_extAddr;
+wire[29:0] MC_extAddr;
 wire[9:0] MC_progress;
 wire MC_busy;
 MemoryController memc
@@ -35,25 +32,26 @@ MemoryController memc
     
     .IN_ce(MC_ce),
     .IN_we(MC_we),
+    .IN_cacheID(MC_cacheID),
     .IN_sramAddr(MC_sramAddr),
     .IN_extAddr(MC_extAddr),
     .OUT_progress(MC_progress),
     .OUT_busy(MC_busy),
     
     .OUT_CACHE_used(MC_DC_used),
-    .OUT_CACHE_we(MC_DC_if.we),
-    .OUT_CACHE_ce(MC_DC_if.ce),
-    .OUT_CACHE_wm(MC_DC_if.wm),
-    .OUT_CACHE_addr(MC_DC_if.addr[9:0]),
-    .OUT_CACHE_data(MC_DC_if.data),
-    .IN_CACHE_data(DC_dataOut),
+    .OUT_CACHE_we('{MC_DC_if[1].we, MC_DC_if[0].we}),
+    .OUT_CACHE_ce('{MC_DC_if[1].ce, MC_DC_if[0].ce}),
+    .OUT_CACHE_wm('{MC_DC_if[1].wm, MC_DC_if[0].wm}),
+    .OUT_CACHE_addr('{MC_DC_if[1].addr[9:0], MC_DC_if[0].addr[9:0]}),
+    .OUT_CACHE_data('{MC_DC_if[1].data, MC_DC_if[0].data}),
+    .IN_CACHE_data('{32'bx, DC_dataOut}),
     
     .OUT_EXT_oen(EXTMEM_oen),
     .OUT_EXT_en(EXTMEM_en),
     .OUT_EXT_bus(EXTMEM_busOut),
     .IN_EXT_bus(EXTMEM_bus)
 );
-assign MC_DC_if.addr[29:10] = 0;
+assign MC_DC_if[0].addr[29:10] = 0;
 
 
 wire EXTMEM_oen;
@@ -84,13 +82,17 @@ wire[3:0] CORE_writeMask;
 wire CORE_readEnable;
 wire[29:0] CORE_readAddr;
 wire[31:0] CORE_readData;
+
+wire CORE_instrReadEnable;
+wire[28:0] CORE_instrReadAddress;
+wire[63:0] CORE_instrReadData;
 Core core
 (
     .clk(clk),
     .rst(rst),
     .en(en),
     
-    .IN_instrRaw(IN_instrRaw),
+    .IN_instrRaw(CORE_instrReadData),
     
     .OUT_MEM_writeAddr(CORE_writeAddr),
     .OUT_MEM_writeData(CORE_writeData),
@@ -101,8 +103,8 @@ Core core
     .OUT_MEM_readAddr(CORE_readAddr),
     .IN_MEM_readData(CORE_readData),
     
-    .OUT_instrAddr(OUT_instrAddr),
-    .OUT_instrReadEnable(OUT_instrReadEnable),
+    .OUT_instrAddr(CORE_instrReadAddress),
+    .OUT_instrReadEnable(CORE_instrReadEnable),
     .OUT_halt(OUT_halt),
     
     .OUT_GPIO_oe(),
@@ -114,6 +116,7 @@ Core core
     
     .OUT_MC_ce(MC_ce),
     .OUT_MC_we(MC_we),
+    .OUT_MC_cacheID(MC_cacheID),
     .OUT_MC_sramAddr(MC_sramAddr),
     .OUT_MC_extAddr(MC_extAddr),
     .IN_MC_progress(MC_progress),
@@ -127,7 +130,7 @@ Core core
 wire[31:0] DC_dataOut;
 
 CacheIF DC_if;
-assign DC_if = MC_DC_used ? MC_DC_if : CORE_DC_if;
+assign DC_if = MC_DC_used[0] ? MC_DC_if[0] : CORE_DC_if;
 MemRTL dcache
 (
     .clk(clk),
@@ -141,6 +144,22 @@ MemRTL dcache
     .IN_nce1(!(!CORE_readEnable && CORE_readAddr < 1024)),
     .IN_addr1(CORE_readAddr[9:0]),
     .OUT_data1(CORE_readData)
+);
+
+//wire[31:0] IC_dataOut;
+MemRTL#(64, 512) icache
+(
+    .clk(clk),
+    .IN_nce(MC_DC_if[1].ce),
+    .IN_nwe(MC_DC_if[1].we),
+    .IN_addr(MC_DC_if[1].addr[9:1]),
+    .IN_data({MC_DC_if[1].data, MC_DC_if[1].data}),
+    .IN_wm({{4{MC_DC_if[1].addr[0]}}, {4{~MC_DC_if[1].addr[0]}}}),
+    .OUT_data(),
+    
+    .IN_nce1(CORE_instrReadEnable),
+    .IN_addr1(CORE_instrReadAddress[8:0]),
+    .OUT_data1(CORE_instrReadData)
 );
 
 always@(posedge clk) begin

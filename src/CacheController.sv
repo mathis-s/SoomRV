@@ -32,8 +32,9 @@ module CacheController
     output reg OUT_MC_ce,
     output reg OUT_MC_we,
     output reg[9:0] OUT_MC_sramAddr,
-    output reg[31:0] OUT_MC_extAddr,
+    output reg[29:0] OUT_MC_extAddr,
     input wire[9:0] IN_MC_progress,
+    input wire[0:0] IN_MC_cacheID,
     input wire IN_MC_busy
 );
 
@@ -117,6 +118,7 @@ always_ff@(posedge clk) begin
         OUT_uopSt.valid <= 0;
     end
     else begin
+        OUT_MC_ce <= 0;
         waitCycle <= 0;
         
         if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
@@ -127,7 +129,12 @@ always_ff@(posedge clk) begin
         
         // Entry Eviction logic
         if (!loading) begin
-            if (evicting && !waitCycle) begin
+            if (evicting && IN_MC_cacheID != 0) begin
+                evicting <= 0;
+                freeEntryAvail <= 0;
+                ctable[lruPointer].valid <= 1;
+            end
+            else if (evicting && !waitCycle) begin
                 OUT_MC_ce <= 0;
                 OUT_MC_we <= 0;
                 
@@ -136,7 +143,7 @@ always_ff@(posedge clk) begin
                     evicting <= 0;
                 end
             end
-            else if (!freeEntryAvail && !evicting) begin
+            else if (!freeEntryAvail && !evicting && !IN_MC_busy) begin
             
                 if (!ctable[lruPointer].valid) begin
                     freeEntryAvail <= 1;
@@ -155,7 +162,7 @@ always_ff@(posedge clk) begin
                         OUT_MC_we <= 1;
                         
                         OUT_MC_sramAddr <= {lruPointer, 6'b0};
-                        OUT_MC_extAddr <= {2'b0, ctable[lruPointer].addr, 6'b0};
+                        OUT_MC_extAddr <= {ctable[lruPointer].addr, 6'b0};
                         
                         evicting <= 1;
                         waitCycle <= 1;
@@ -232,24 +239,28 @@ always_ff@(posedge clk) begin
         end
         else OUT_uopSt.valid <= 0;
         
-        
         // Handle cache misses
-        if (loading && !waitCycle) begin
-            OUT_MC_ce <= 0;
+        if (loading && IN_MC_cacheID != 0) begin
+            // Check if our request is the one being handled by the memory controller, otherwise abort
+            loading <= 0;
+            ctable[freeEntryID].used <= 0;
+            freeEntryAvail <= 1;
+        end
+        else if (loading && !waitCycle) begin
+            
             if (!IN_MC_busy) begin
-                    
                 loading <= 0;
                 ctable[freeEntryID].valid <= 1;
                 ctable[freeEntryID].used <= 1;
                 ctable[freeEntryID].dirty <= setDirty;
             end
         end
-        else if (!loading && freeEntryAvail && !IN_branch.taken) begin
+        else if (!loading && freeEntryAvail && !IN_branch.taken && !IN_MC_busy) begin
             if (cmissUOpLd.valid) begin
                 OUT_MC_ce <= 1;
                 OUT_MC_we <= 0;
                 OUT_MC_sramAddr <= {freeEntryID, 6'b0};
-                OUT_MC_extAddr <= {2'b0, cmissUOpLd.addr[31:8], 6'b0};
+                OUT_MC_extAddr <= {cmissUOpLd.addr[31:8], 6'b0};
                 
                 ctable[freeEntryID].used <= 1;
                 ctable[freeEntryID].addr <= cmissUOpLd.addr[31:8];
@@ -262,7 +273,7 @@ always_ff@(posedge clk) begin
                 OUT_MC_ce <= 1;
                 OUT_MC_we <= 0;
                 OUT_MC_sramAddr <= {freeEntryID, 6'b0};
-                OUT_MC_extAddr <= {2'b0, cmissUOpSt.addr[31:8], 6'b0};
+                OUT_MC_extAddr <= {cmissUOpSt.addr[31:8], 6'b0};
                 
                 ctable[freeEntryID].used <= 1;
                 ctable[freeEntryID].addr <= cmissUOpSt.addr[31:8];

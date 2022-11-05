@@ -1,3 +1,10 @@
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[9:0] sramAddr;
+    logic[29:0] extAddr;
+} IF_MemoryController;
 
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
