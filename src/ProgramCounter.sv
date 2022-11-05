@@ -94,6 +94,8 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3]),
     .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
+//assign OUT_pcReadData[2] = 0;
+//assign OUT_pcReadData[3] = 0;
 
 wire icacheStall;
 ICacheTable ict

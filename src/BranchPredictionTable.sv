@@ -24,9 +24,11 @@ always@(posedge clk) begin
     
     if (rst) begin
         // NOTE: Reset state for easier debugging + perf analysis, remove this before synthesis.
+        `ifdef __ICARUS__
         for (i = 0; i < NUM_COUNTERS; i=i+1) begin
             counters[i] <= 2'b10;
         end
+        `endif
     end
     else begin
         if (IN_writeEn) begin

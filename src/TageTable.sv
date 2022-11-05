@@ -61,6 +61,10 @@ always_ff@(posedge clk) begin
      
     if (rst) begin
         decrCnt <= 0;
+`ifdef __ICARUS__
+        for (i = 0; i < SIZE; i=i+1)
+            entries[i] <= 0;
+`endif
     end
     else if (IN_writeValid) begin
         if (IN_writeUpdate) begin

@@ -22,7 +22,6 @@ decoder_tb:
 	src/ControlRegs.sv \
 	src/LZCnt.sv \
 	src/PopCnt.sv \
-	src/Fuse.sv \
 	src/BranchSelector.sv \
 	src/PreDecode.sv \
 	src/CacheController.sv \
@@ -32,7 +31,6 @@ decoder_tb:
 	src/ExternalMemorySim.sv \
 	src/RenameTable.sv \
 	src/TagBuffer.sv \
-	src/RF_FP.sv \
 	src/FPU.sv \
 	src/BranchTargetBuffer.sv \
 	src/BranchPredictionTable.sv \

@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     top = new VTop;
     top->clk = 0;
     
-    if (argc != 1)
+    if (argc != 1 && argv[1][0] != '+')
     {
         system((std::string("riscv32-unknown-elf-as -mabi=ilp32 -march=rv32imczba_zbb -o temp.o ") + std::string(argv[1])).c_str());
         system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
     
     size_t numInstrBytes = 0;
-    size_t dataStart;
+    size_t dataStart, dataIndex;
     {
         FILE* f = fopen("text.bin", "rb");
         uint8_t* pramBytes = (uint8_t*)pram;
@@ -58,7 +58,7 @@ int main(int argc, char** argv)
             numInstrBytes = (numInstrBytes & -4) + 4;
         
         
-        size_t dataIndex = numInstrBytes;
+        dataIndex = numInstrBytes;
         dataStart = dataIndex;
         uint8_t* ramBytes = (uint8_t*)ram;
         f = fopen("data.bin", "rb");
@@ -74,22 +74,22 @@ int main(int argc, char** argv)
         printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
         fclose(f);
     }
-    
-    
-    for (size_t i = 0; i < dataStart/4; i++)
-    {
-        top->rootp->Top->extMem->mem[i] = pram[i];
-    }
-    for (size_t i = dataStart/4; i < 0x10000; i++)
-    {
-        if (ram[i] != 0) printf("%.8zx: %.8x\n", i, ram[i]);
-        top->rootp->Top->extMem->mem[i] = ram[i];
-        //top->rootp->Top->dcache->mem[i] = ram[i];
-    }
 
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
+    
+    for (size_t i = 0; i < dataStart/4; i++)
+    {
+        printf("%.8x\n", pram[i]);
+        top->rootp->Top->extMem->mem[i] = pram[i];
+    }
+    for (size_t i = dataStart/4; i < dataIndex; i++)
+    {
+        /*if (ram[i] != 0) */printf("%.8x\n", ram[i]);
+        top->rootp->Top->extMem->mem[i] = ram[i];
+        //top->rootp->Top->dcache->mem[i] = ram[i];
+    }
 
     // Reset
     top->rst = 1;
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 
         top->clk = !top->clk;
         top->eval();              // Evaluate model
-        tfp->dump(main_time);
+        //tfp->dump(main_time);
         main_time++;              // Time passes...
         
         //if (!(main_time & 0xffff)) printf("pc %.8x\n", instrAddrReg);

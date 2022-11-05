@@ -14,7 +14,7 @@ module MemoryController#(parameter NUM_CACHES=2)
     output reg[NUM_CACHES-1:0] OUT_CACHE_used,
     output reg OUT_CACHE_we[NUM_CACHES-1:0],
     output reg OUT_CACHE_ce[NUM_CACHES-1:0],
-    output wire[3:0] OUT_CACHE_wm[NUM_CACHES-1:0],
+    output reg[3:0] OUT_CACHE_wm[NUM_CACHES-1:0],
     output reg[9:0] OUT_CACHE_addr[NUM_CACHES-1:0],
     output reg[31:0] OUT_CACHE_data[NUM_CACHES-1:0],
     input wire[31:0] IN_CACHE_data[NUM_CACHES-1:0],
@@ -38,10 +38,10 @@ reg[$clog2(NUM_CACHES)-1:0] cacheID;
 
 reg[2:0] waitCycles;
 
-always_comb begin
-for (i = 0 ; i < NUM_CACHES; i=i+1)
-    OUT_CACHE_wm[i] = 4'b1111;
-end
+
+assign OUT_CACHE_wm[0] = 4'b1111;
+assign OUT_CACHE_wm[1] = 4'b1111;
+
 
 always_ff@(posedge clk) begin
     
@@ -56,6 +56,7 @@ always_ff@(posedge clk) begin
         OUT_EXT_oen <= 1;
         OUT_progress <= 0;
         len <= 0;
+        OUT_EXT_bus <= 0;
     end
     else begin
         
@@ -102,6 +103,7 @@ always_ff@(posedge clk) begin
                     OUT_busy <= 0;
                     OUT_EXT_en <= 0;
                     OUT_progress <= 0;
+                    OUT_EXT_bus <= 0;
                 end
                 
                 OUT_EXT_oen <= 1;

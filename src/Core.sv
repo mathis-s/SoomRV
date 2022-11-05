@@ -545,7 +545,7 @@ Divide div
     .OUT_uop(DIV_uop)
 
 );
-
+/*
 RES_UOp FPU_uop;
 FPU fpu
 (
@@ -558,7 +558,8 @@ FPU fpu
     .OUT_uop(FPU_uop)
 );
 
-assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);*/
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
 
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;

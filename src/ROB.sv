@@ -208,7 +208,7 @@ always_ff@(posedge clk) begin
                 entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].valid <= 0;
                 entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].executed <= 0;
             end
-            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0] + WIDTH - 1].fetchID;
+            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0] + WIDTH[ID_LEN-1:0] - 6'b1].fetchID;
             // Blocking for proper insertion
             baseIndex = baseIndex + WIDTH;
         end

@@ -962,6 +962,8 @@ always_comb begin
                     end
                     // c.nop
                     else if (i16.ci.funct3 == 3'b000 && i16.ci.imm2 == 1'b0 && i16.ci.rd_rs1 == 5'b0 && i16.ci.imm == 5'b0) begin
+                        // don't execute nops
+                        uop.valid = 0;
                         uop.opcode = INT_ADD;
                         uop.fu = FU_INT;
                         invalidEnc = 0;

@@ -7,7 +7,9 @@ module ExternalMemorySim#(parameter SIZE=1048576)
     inout wire[31:0] bus
 );
 
-reg oen;
+integer i;
+
+reg oen = 0;
 reg[31:0] outBus;
 assign bus = oen ? outBus : 32'bz;
 
@@ -26,8 +28,8 @@ always@(posedge clk) begin
                 addr <= bus;
                 waitCycles <= 3;
                 state <= 1;
-                oen <= 0;
             end
+            oen <= 0;
         end
         
         // wait cycles

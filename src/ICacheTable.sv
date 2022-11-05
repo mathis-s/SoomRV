@@ -39,6 +39,12 @@ always_comb begin
             cacheEntryIndex = i[$clog2(NUM_ICACHE_LINES)-1:0];
         end
     end
+    
+    if (loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && lastProgress > IN_lookupPC[7:1]) begin
+        cacheEntryFound = 1;
+        cacheEntryIndex = lruPointer;
+        OUT_lookupAddress = {20'b0, lruPointer, IN_lookupPC[7:2]};
+    end
 end
 
 assign OUT_stall = !cacheEntryFound;
@@ -47,10 +53,12 @@ reg[$clog2(NUM_ICACHE_LINES)-1:0] lruPointer;
 reg[30:0] loadAddr;
 reg loading;
 reg waitCycle;
+reg[6:0] lastProgress;
 
 always_ff@(posedge clk) begin
     
     waitCycle <= 0;
+    lastProgress <= IN_MC_progress[6:0];
     
     if (rst) begin
         for (i = 0; i < NUM_ICACHE_LINES; i=i+1)

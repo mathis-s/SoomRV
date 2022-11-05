@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
-[*] Sat Nov  5 12:21:12 2022
+[*] Sat Nov  5 12:53:27 2022
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Sat Nov  5 12:10:32 2022"
-[dumpfile_size] 5390077852
+[dumpfile_mtime] "Sat Nov  5 12:49:40 2022"
+[dumpfile_size] 13456579
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 3020
+[timestart] 0
 [size] 3840 2132
 [pos] -1 -1
-*-11.000000 11466 5840 516 16310 16330 364680 364524 10988 11126 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-3.000000 45 5840 516 16310 16330 364680 364524 10988 11126 29770 -1 12986 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -65,6 +65,7 @@
 [treeopen] TOP.Top.core.lsu.
 [treeopen] TOP.Top.core.mul.
 [treeopen] TOP.Top.core.mul.OUT_uop.
+[treeopen] TOP.Top.core.PC_MC_if.
 [treeopen] TOP.Top.core.preDec.
 [treeopen] TOP.Top.core.preDec.buffer[0].
 [treeopen] TOP.Top.core.preDec.buffer[10].
@@ -95,7 +96,7 @@
 [treeopen] TOP.Top.MC_DC_if[1].
 [treeopen] TOP.Top.memc.
 [sst_width] 314
-[signals_width] 611
+[signals_width] 675
 [sst_expanded] 1
 [sst_vpaned_height] 1426
 @28
@@ -187,6 +188,7 @@ TOP.Top.memc.IN_EXT_bus[31:0]
 -
 @22
 TOP.Top.memc.OUT_CACHE_data[1][31:0]
+TOP.Top.memc.OUT_progress[9:0]
 TOP.Top.core.rf.mem[63][31:0]
 @200
 -dcache
@@ -207,10 +209,13 @@ TOP.Top.extMem.bus[31:0]
 TOP.Top.extMem.en
 TOP.Top.extMem.waitCycles[2:0]
 TOP.Top.extMem.state[1:0]
-@201
+@200
 -PC
 @22
 TOP.Top.core.progCnt.pc[30:0]
+@28
+TOP.Top.core.progCnt.icacheStall
+@22
 TOP.Top.core.progCnt.fetchID[4:0]
 TOP.Top.core.progCnt.IN_ROB_curFetchID[4:0]
 @40000022
@@ -224,6 +229,7 @@ TOP.Top.core.progCnt.OUT_instrs[1].instr[15:0]
 TOP.Top.core.progCnt.OUT_instrs[2].instr[15:0]
 TOP.Top.core.progCnt.OUT_instrs[3].instr[15:0]
 TOP.Top.CORE_instrReadData[63:0]
+@23
 TOP.Top.CORE_instrReadAddress[28:0]
 @28
 TOP.Top.CORE_instrReadEnable
@@ -397,6 +403,14 @@ TOP.Top.core.sq.entries[0].sqN[6:0]
 @200
 -CC
 @28
+TOP.Top.core.CC_MC_if.ce
+TOP.Top.core.PC_MC_if.ce
+TOP.Top.core.OUT_MC_cacheID[0]
+TOP.Top.MC_busy
+TOP.Top.core.cc.IN_MC_busy
+@22
+TOP.Top.extMem.retAddr[31:0]
+@28
 TOP.Top.core.cc.loading
 @22
 TOP.Top.core.cc.OUT_MC_extAddr[29:0]
@@ -415,6 +429,14 @@ TOP.Top.core.cc.ctable[0].addr[23:0]
 TOP.Top.core.cc.ctable[0].dirty
 TOP.Top.core.cc.ctable[0].used
 TOP.Top.core.cc.ctable[0].valid
+@200
+-
+@22
+TOP.Top.core.cc.ctable[2].addr[23:0]
+@28
+TOP.Top.core.cc.ctable[2].dirty
+TOP.Top.core.cc.ctable[2].used
+TOP.Top.core.cc.ctable[2].valid
 @200
 -LSU
 @22
