@@ -44,6 +44,8 @@ module ROB
 
     output CommitUOp OUT_comUOp[WIDTH-1:0],
     
+    output BPUpdate OUT_bpUpdate,
+    
     input wire[31:0] IN_irqAddr,
     output Flags OUT_irqFlags,
     output reg[31:0] OUT_irqSrc,
@@ -65,7 +67,6 @@ localparam ID_LEN = $clog2(LENGTH);
 
 ROBEntry entries[LENGTH-1:0];
 SqN baseIndex;
-reg[31:0] committedInstrs;
 
 assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
@@ -75,20 +76,17 @@ integer j;
 
 reg headValid;
 always_comb begin
+    reg pred = 0;
     headValid = 1;
     for (i = 0; i < WIDTH; i=i+1) begin
         if (!entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].executed || entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].flags != FLAGS_NONE)
             headValid = 0;
+        
+        if (entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].predicted) begin
+            if (pred) headValid = 0;
+            else pred = 1;
+        end
     end
-    
-    //if ($time() < 6000) begin
-    if (entries[baseIndex[ID_LEN-1:0]+1].predicted)
-        headValid = 0;
-    if (entries[baseIndex[ID_LEN-1:0]+2].predicted)
-        headValid = 0;
-    if (entries[baseIndex[ID_LEN-1:0]+3].predicted)
-        headValid = 0;
-    //end
 end
 
 reg allowSingleDequeue;
@@ -98,28 +96,31 @@ always_comb begin
         allowSingleDequeue = 0;
 end
 
-assign OUT_pcReadAddr = entries[baseIndex[ID_LEN-1:0]].fetchID;
-wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], entries[baseIndex[ID_LEN-1:0]].fetchOffs} - (entries[baseIndex[ID_LEN-1:0]].compressed ? 0 : 1);
 
+ROBEntry pcLookupEntry;
+assign OUT_pcReadAddr = pcLookupEntry.fetchID;
+wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
 BHist_t baseIndexHist;
 BranchPredInfo baseIndexBPI;
 always_comb begin
-    if (IN_pcReadData.bpi.predicted && !IN_pcReadData.bpi.isJump && entries[baseIndex[ID_LEN-1:0]].fetchOffs > IN_pcReadData.branchPos)
+    if (IN_pcReadData.bpi.predicted && !IN_pcReadData.bpi.isJump && pcLookupEntry.fetchOffs > IN_pcReadData.branchPos)
         baseIndexHist = {IN_pcReadData.hist[$bits(BHist_t)-2:0], IN_pcReadData.bpi.taken};
     else
         baseIndexHist = IN_pcReadData.hist;
         
-        baseIndexBPI = (entries[baseIndex[ID_LEN-1:0]].fetchOffs == IN_pcReadData.branchPos) ?
-                                IN_pcReadData.bpi :
-                                0;
+        baseIndexBPI = (pcLookupEntry.fetchOffs == IN_pcReadData.branchPos) ?
+            IN_pcReadData.bpi :
+            0;
 end
+
+reg stop;
 
 reg misprReplay;
 reg misprReplayEnd;
 SqN misprReplayIter;
 SqN misprReplayEndSqN;
 
-wire doDequeue = headValid; // placeholder
+wire doDequeue = headValid;
 always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
@@ -135,11 +136,13 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH; i=i+1) begin
             OUT_comUOp[i].valid <= 0;
         end
-        committedInstrs <= 0;
         OUT_branch.taken <= 0;
         misprReplay <= 0;
         OUT_mispredFlush <= 0;
         OUT_curFetchID <= -1;
+        OUT_bpUpdate.valid <= 0;
+        pcLookupEntry.valid <= 0;
+        stop <= 0;
     end
     else if (IN_branch.taken) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -156,9 +159,55 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst) begin
+    
+        OUT_bpUpdate.valid <= 0;
+        pcLookupEntry.valid <= 0;
         
-        //if (entries[baseIndex[ID_LEN-1:0]].valid)
-            
+        // Exception and branch prediction update handling
+        if (pcLookupEntry.valid) begin
+            if (pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_FENCE) begin
+                
+                if (pcLookupEntry.flags == FLAGS_BRK)
+                    OUT_halt <= 1;
+                else
+                    OUT_fence <= 1;
+                
+                OUT_branch.taken <= 1;
+                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
+                OUT_branch.sqN <= pcLookupEntry.sqN;
+                OUT_branch.flush <= 1;
+                OUT_branch.storeSqN <= 0;
+                OUT_branch.loadSqN <= 0;
+                OUT_branch.fetchID <= pcLookupEntry.fetchID;
+                OUT_branch.history <= baseIndexHist;
+                stop <= 0;
+            end
+            else if (pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_EXCEPT) begin
+                
+                OUT_branch.taken <= 1;
+                OUT_branch.dstPC <= IN_irqAddr;
+                OUT_branch.sqN <= pcLookupEntry.sqN;
+                OUT_branch.flush <= 1;
+                // These don't matter, the entire pipeline will be flushed
+                OUT_branch.storeSqN <= 0;
+                OUT_branch.loadSqN <= 0;
+                OUT_branch.fetchID <= pcLookupEntry.fetchID;
+                OUT_branch.history <= baseIndexHist;
+                
+                OUT_irqSrc <= {baseIndexPC, 1'b0};
+                OUT_irqFlags <= pcLookupEntry.flags;
+                
+                stop <= 0;
+            end
+            else if (pcLookupEntry.predicted) begin
+                OUT_bpUpdate.valid <= 1;
+                OUT_bpUpdate.pc <= IN_pcReadData.pc;
+                OUT_bpUpdate.compressed <= pcLookupEntry.compressed;
+                OUT_bpUpdate.history <= IN_pcReadData.hist;
+                OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
+                OUT_bpUpdate.branchTaken <= pcLookupEntry.branchTaken;
+            end
+        end
         
         // After mispredict, we replay all ops from last committed to the branch
         // without actually committing them, to roll back the Rename Map.
@@ -191,8 +240,7 @@ always_ff@(posedge clk) begin
             end
         end
         // Two Entries
-        else if (doDequeue && !IN_branch.taken) begin
-            committedInstrs <= committedInstrs + 3;
+        else if (!stop && doDequeue && !IN_branch.taken) begin
 
             for (i = 0; i < WIDTH; i=i+1) begin
                 OUT_comUOp[i].nmDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].name;
@@ -200,13 +248,13 @@ always_ff@(posedge clk) begin
                 OUT_comUOp[i].sqN <= baseIndex + i[5:0];
                 OUT_comUOp[i].isBranch <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].isBranch;
                 OUT_comUOp[i].branchTaken <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].branchTaken;
-                OUT_comUOp[i].bpi <= baseIndexBPI;
-                OUT_comUOp[i].history <= baseIndexHist;
                 OUT_comUOp[i].valid <= 1;
-                OUT_comUOp[i].pc <= IN_pcReadData.pc;//baseIndexPC;
                 OUT_comUOp[i].compressed <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].compressed;
                 entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].valid <= 0;
                 entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].executed <= 0;
+                
+                if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].predicted || entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != 0)
+                    pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
             end
             OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0] + WIDTH[ID_LEN-1:0] - 6'b1].fetchID;
             // Blocking for proper insertion
@@ -214,7 +262,7 @@ always_ff@(posedge clk) begin
         end
         
         // One entry
-        else if (allowSingleDequeue && !IN_branch.taken) begin
+        else if (!stop && allowSingleDequeue && !IN_branch.taken) begin
             
             //assert(baseIndexPC == entries[baseIndex[ID_LEN-1:0]].pc);
             OUT_comUOp[0].nmDst <= entries[baseIndex[ID_LEN-1:0]].name;
@@ -222,69 +270,28 @@ always_ff@(posedge clk) begin
             OUT_comUOp[0].sqN <= baseIndex;
             OUT_comUOp[0].isBranch <= entries[baseIndex[ID_LEN-1:0]].isBranch;
             OUT_comUOp[0].branchTaken <= entries[baseIndex[ID_LEN-1:0]].branchTaken;
-            OUT_comUOp[0].bpi <= baseIndexBPI;
-            OUT_comUOp[0].history <= baseIndexHist;
             OUT_comUOp[0].valid <= 1;
-            OUT_comUOp[0].pc <= IN_pcReadData.pc;//baseIndexPC;
             OUT_comUOp[0].compressed <= entries[baseIndex[ID_LEN-1:0]].compressed;
             entries[baseIndex[ID_LEN-1:0]].valid <= 0;
             entries[baseIndex[ID_LEN-1:0]].executed <= 0;
             
-            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
-            
-            if (entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_BRK) begin
-                // ebreak does a jump to the instruction after itself,
-                // this way the debugger can see the state right after ebreak exec'd.
-                OUT_halt <= 1;
-                OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
-                OUT_branch.sqN <= baseIndex;
-                OUT_branch.flush <= 1;
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
-                OUT_branch.history <= baseIndexHist;
-                // Do not write back result, redirect to x0
-                OUT_comUOp[0].nmDst <= 0;
-            end
-            else if (entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_TRAP || entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_EXCEPT) begin
-                OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= IN_irqAddr;
-                OUT_branch.sqN <= baseIndex;
-                OUT_branch.flush <= 1;
-                // These don't matter, the entire pipeline will be flushed
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
-                OUT_branch.history <= baseIndexHist;
+            if (entries[baseIndex[ID_LEN-1:0]].predicted || entries[baseIndex[ID_LEN-1:0]].flags != 0)
+                pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]];
                 
-                // Do not write back result, redirect to x0
+            if (entries[baseIndex[ID_LEN-1:0]].flags != 0) begin
+                
+                // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
                 if (entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_EXCEPT)
                     OUT_comUOp[0].nmDst <= 0;
                 
-                OUT_irqFlags <= entries[baseIndex[ID_LEN-1:0]].flags;
-                OUT_irqSrc <= {baseIndexPC, 1'b0};
-                // For exceptions, some fields are reused to get the segment of the violating address
-                //OUT_irqMemAddr <= {7'b0, entries[baseIndex[ID_LEN-1:0]].name, entries[baseIndex[ID_LEN-1:0]].branchTaken, entries[baseIndex[ID_LEN-1:0]].branchID, 10'b0};
+                stop <= 1;
             end
-            else if (entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_FENCE) begin
-                
-                // Jump to instruction after fence to invalidate all speculative state
-                OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
-                OUT_branch.flush <= 1;
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
-                OUT_branch.history <= baseIndexHist;
-                
-                OUT_fence <= 1;
-            end
+            
+            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
 
             for (i = 1; i < WIDTH; i=i+1) begin
                 OUT_comUOp[i].valid <= 0;
             end
-            committedInstrs <= committedInstrs + 1;
             // Blocking for proper insertion
             baseIndex = baseIndex + 1;
         end
@@ -314,9 +321,6 @@ always_ff@(posedge clk) begin
                 entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].isBranch <= IN_wbUOps[i].isBranch;
                 entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].branchTaken <= IN_wbUOps[i].branchTaken;
                 entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].fetchOffs <= IN_wbUOps[i].pc[2:1] + (IN_wbUOps[i].compressed ? 2'b0 : 2'b1);
-                //entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].pc <= IN_wbUOps[i].pc[31:1];
-                //entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].bpi <= IN_wbUOps[i].bpi;
-                //entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].history <= IN_wbUOps[i].history;
                 entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].predicted <= IN_wbUOps[i].bpi.predicted;
             end
         end

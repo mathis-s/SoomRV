@@ -307,10 +307,16 @@ typedef struct packed
     SqN sqN;
     logic isBranch;
     logic branchTaken;
-    BranchPredInfo bpi;
-    BHist_t history;
-
-    logic[30:0] pc;
     logic compressed;
     logic valid;
 } CommitUOp;
+
+typedef struct packed
+{
+    logic[30:0] pc;
+    logic compressed;
+    BranchPredInfo bpi;
+    BHist_t history;
+    logic branchTaken;
+    logic valid;
+} BPUpdate;

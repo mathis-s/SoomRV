@@ -11,7 +11,18 @@ irq_handler:
     li a1, 0xff000004
     lw a1, 0(a1)
     # skip over exception
-    jalr zero, a1, 4
+    # load first byte of instruction
+    lb a2, 0(a1)
+    # mask off length specifier
+    andi a2, a2, 3
+    
+    
+    sltiu a2, a2, 3
+    xori a2, a2, 1
+    add a2, a2, a2
+    add a1, a1, a2
+    
+    jalr zero, a1, 2
 
 main:
     
@@ -26,7 +37,8 @@ main:
     call printhex
     
     # not implemented, fires exception
-    fadd.d f1, f1, f1
+    unimp
+    # unimp
     
 	# null pointer read
     lw a0, 0(zero)

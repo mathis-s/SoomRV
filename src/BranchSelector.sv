@@ -33,7 +33,8 @@ always_comb begin
             OUT_branch.sqN = IN_branches[i].sqN;
             OUT_branch.loadSqN = IN_branches[i].loadSqN;
             OUT_branch.storeSqN = IN_branches[i].storeSqN;
-            OUT_branch.flush = IN_branches[i].flush;
+            if (i == 3)
+                OUT_branch.flush = IN_branches[i].flush;
             OUT_branch.fetchID = IN_branches[i].fetchID;
             OUT_branch.history = IN_branches[i].history;
         end

@@ -51,7 +51,7 @@ always_comb begin
     // Store
     if (IN_uopSt.valid) begin
         
-        if (IN_uopSt.addr[29:22] == 8'hFF) begin
+        if (IN_uopSt.addr[31:24] == 8'hFF) begin
             OUT_MEM_we = 1;
             OUT_CSR_we = 0;
         end

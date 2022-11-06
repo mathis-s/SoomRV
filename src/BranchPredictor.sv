@@ -28,7 +28,7 @@ module BranchPredictor
     
     
     // Branch ROB Interface
-    input CommitUOp IN_comUOp,
+    input BPUpdate IN_bpUpdate,
     
     output reg OUT_CSR_branchCommitted
 );
@@ -88,13 +88,13 @@ TagePredictor tagePredictor
     .OUT_predUseful(OUT_branchInfo.tageUseful),
     .OUT_predTaken(tageTaken),
     
-    .IN_writeValid(IN_comUOp.valid && IN_comUOp.isBranch && IN_comUOp.bpi.predicted && !IN_mispredFlush),
-    .IN_writeAddr(IN_comUOp.pc[30:0]),
-    .IN_writeHistory(IN_comUOp.history),
-    .IN_writeTageID(IN_comUOp.bpi.tageID),
-    .IN_writeTaken(IN_comUOp.branchTaken),
-    .IN_writeUseful(IN_comUOp.bpi.tageUseful),
-    .IN_writePred(IN_comUOp.bpi.taken)
+    .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush),
+    .IN_writeAddr(IN_bpUpdate.pc[30:0]),
+    .IN_writeHistory(IN_bpUpdate.history),
+    .IN_writeTageID(IN_bpUpdate.bpi.tageID),
+    .IN_writeTaken(IN_bpUpdate.branchTaken),
+    .IN_writeUseful(IN_bpUpdate.bpi.tageUseful),
+    .IN_writePred(IN_bpUpdate.bpi.taken)
 );
 
 
@@ -109,8 +109,8 @@ always_ff@(posedge clk) begin
         if (OUT_branchFound && !OUT_isJump)
             gHistory <= {gHistory[$bits(BHist_t)-2:0], OUT_branchTaken};
         
-        if (IN_comUOp.valid && IN_comUOp.isBranch && !IN_mispredFlush) begin
-            gHistoryCom <= {gHistoryCom[$bits(BHist_t)-2:0], IN_comUOp.branchTaken};
+        if (IN_bpUpdate.valid && !IN_mispredFlush) begin
+            gHistoryCom <= {gHistoryCom[$bits(BHist_t)-2:0], IN_bpUpdate.branchTaken};
             OUT_CSR_branchCommitted <= 1;
         end
         else OUT_CSR_branchCommitted <= 0;

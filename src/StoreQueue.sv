@@ -34,6 +34,7 @@ module StoreQueue
     output reg[31:0] OUT_lookupData,
     output reg[3:0] OUT_lookupMask,
     
+    output wire OUT_flush,
     output SqN OUT_maxStoreSqN,
     input wire IN_IO_busy
     
@@ -97,6 +98,8 @@ always_comb begin
     end
 end
 
+reg flushing;
+assign OUT_flush = flushing;
 reg doingEnqueue;
 always_ff@(posedge clk) begin
     
@@ -116,6 +119,7 @@ always_ff@(posedge clk) begin
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
         OUT_empty <= 1;
         OUT_uopSt.valid <= 0;
+        flushing <= 0;
     end
     
     else begin
@@ -135,16 +139,21 @@ always_ff@(posedge clk) begin
             ) begin
                 
             entries[NUM_ENTRIES-1].valid <= 0;
-            didCSRwrite <= entries[0].addr[29:22] == 8'hFF; 
-            baseIndex = baseIndex + 1;
+            
+            didCSRwrite <= entries[0].addr[29:22] == 8'hFF;
+            if (!flushing)
+                baseIndex = baseIndex + 1;
             
             OUT_uopSt.valid <= 1;
             OUT_uopSt.addr <= {entries[0].addr, 2'b0};
             OUT_uopSt.data <= entries[0].data;
             OUT_uopSt.wmask <= entries[0].wmask;
             
-            for (i = 0; i < NUM_ENTRIES-1; i=i+1)
-                entries[i] <= entries[i+1];
+            for (i = 1; i < NUM_ENTRIES; i=i+1) begin
+                entries[i-1] <= entries[i];
+                if ($signed(IN_curSqN - entries[i].sqN) > 0)
+                    entries[i-1].ready <= 1;
+            end
                 
             evicted[2] <= entries[0];
             evicted[1] <= evicted[2];
@@ -161,6 +170,8 @@ always_ff@(posedge clk) begin
             
             if (IN_branch.flush)
                 baseIndex = IN_branch.storeSqN + 1;
+                
+            flushing <= IN_branch.flush;
         end
     
         // Enqueue
@@ -177,6 +188,7 @@ always_ff@(posedge clk) begin
         end
 
         OUT_empty <= empty && !doingEnqueue;
+        if (OUT_empty) flushing <= 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
         
         if (!IN_stallLd) begin

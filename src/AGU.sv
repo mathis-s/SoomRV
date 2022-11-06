@@ -54,7 +54,7 @@ always_ff@(posedge clk) begin
                 
                 default: begin end
             endcase
-            OUT_uop.exception <= 0;
+            //OUT_uop.exception <= 0;
             
             
             case (IN_uop.opcode)

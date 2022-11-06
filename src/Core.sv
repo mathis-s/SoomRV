@@ -212,7 +212,7 @@ BranchPredictor bp
     
     .IN_btUpdates(BP_btUpdates),
     
-    .IN_comUOp(comUOps[0]),
+    .IN_bpUpdate(ROB_bpUpdate),
     
     .OUT_CSR_branchCommitted(CSR_branchCommitted)
 );
@@ -654,6 +654,7 @@ wire[3:0] SQ_lookupMask;
 wire[31:0] SQ_lookupData;
 SqN SQ_maxStoreSqN;
 assign stall[3] = 1'b0;
+wire SQ_flush;
 StoreQueue sq
 (
     .clk(clk),
@@ -674,6 +675,7 @@ StoreQueue sq
     .OUT_lookupData(SQ_lookupData),
     .OUT_lookupMask(SQ_lookupMask),
     
+    .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN),
     .IN_IO_busy(IO_busy)
 );
@@ -770,6 +772,8 @@ wire[31:0] ROB_irqSrc;
 wire[31:0] ROB_irqMemAddr;
 
 FetchID_t ROB_curFetchID;
+
+BPUpdate ROB_bpUpdate;
 ROB rob
 (
     .clk(clk),
@@ -785,6 +789,7 @@ ROB rob
     .OUT_curSqN(ROB_curSqN),
     
     .OUT_comUOp(comUOps),
+    .OUT_bpUpdate(ROB_bpUpdate),
     
     .IN_irqAddr(CR_irqAddr),
     .OUT_irqFlags(ROB_irqFlags),
@@ -851,7 +856,8 @@ assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
     !branch.taken &&
     en &&
     !OUT_instrMappingMiss &&
-    !mispredFlush;
+    !mispredFlush &&
+    !SQ_flush;
 
 `ifdef IVERILOG_DEBUG
 `include "src/Debug.svi"
