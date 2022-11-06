@@ -110,7 +110,7 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].valid <= 1;
                 
-                if (IN_uop[i].tagA == 0) begin
+                if (IN_uop[i].tagA == 7'h7f) begin
                     OUT_uop[i].srcA <= 0;
                 end
                 else begin 
@@ -145,7 +145,7 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].immB) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
-                else if (IN_uop[i].tagB == 0) begin
+                else if (IN_uop[i].tagB == 7'h7f) begin
                     OUT_uop[i].srcB <= 0;
                 end
                 else begin

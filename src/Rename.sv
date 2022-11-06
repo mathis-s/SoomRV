@@ -77,7 +77,7 @@ always_comb begin
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
         // Only need new tag if instruction writes to a register
-        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && !IN_uop[i].rd_fp;
+        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0;
         //TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
         
         if (RAT_issueValid[i])
@@ -143,7 +143,6 @@ always_comb begin
         //    newTags[i] = {1'b1, TB_FP_tags[i]};
         else newTags[i] = 0;
         
-        TB_RAT_commitPrevTags[i] = RAT_commitPrevTags[i][5:0];
         TB_RAT_commitTags[i] = RAT_commitTags[i][5:0];
     end
 end
@@ -160,7 +159,7 @@ TagBuffer tb
     
     .IN_commitValid(commitValid_int),
     .IN_commitNewest(isNewestCommit),
-    .IN_RAT_commitPrevTags(TB_RAT_commitPrevTags),
+    .IN_RAT_commitPrevTags(RAT_commitPrevTags),
     .IN_commitTagDst(TB_RAT_commitTags)
 );
 /*TagBuffer tb_fp
@@ -183,7 +182,7 @@ TagBuffer tb
 always_comb begin
     OUT_stall = 0;
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid)
+        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid && IN_uop[i].rd != 0)
             OUT_stall = 1;
     end
         
@@ -269,7 +268,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
                 OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
 
-                if ({IN_uop[i].rd_fp, IN_uop[i].rd} != 0) begin
+                if (IN_uop[i].rd != 0) begin
                     OUT_uop[i].tagDst <= newTags[i];
                 end
             end

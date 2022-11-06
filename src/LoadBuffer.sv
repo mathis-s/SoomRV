@@ -8,7 +8,7 @@ typedef struct packed
 module LoadBuffer
 #(
     parameter NUM_PORTS=2,
-    parameter NUM_ENTRIES=24
+    parameter NUM_ENTRIES=16
 )
 (
     input wire clk,
@@ -16,6 +16,7 @@ module LoadBuffer
     
     input SqN commitSqN,
     
+    input wire IN_stall[1:0],
     input AGU_UOp IN_uop[NUM_PORTS-1:0],
     
     input BranchProv IN_branch,
@@ -45,14 +46,14 @@ always_ff@(posedge clk) begin
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
     end
     else begin
+    
+        OUT_branch.taken <= 0;
         
         if (IN_branch.taken) begin
             for (i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) > 0)
                     entries[i].valid <= 0;
             end
-            //if ($signed(baseIndex - IN_branch.loadSqN) > 0)
-            //    baseIndex = IN_branch.loadSqN;
             
             if (IN_branch.flush)
                 baseIndex = IN_branch.loadSqN;
@@ -70,7 +71,7 @@ always_ff@(posedge clk) begin
     
         // Insert new entries, check stores
         for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             
                 if (i == 0) begin
                     reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
@@ -92,7 +93,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     // TODO: Delay SQ lookup by one cycle instead of this.
-                    if (IN_uop[0].valid && $signed(IN_uop[1].sqN - IN_uop[0].sqN) <= 0
+                    if (IN_uop[0].valid && !IN_stall[0] && $signed(IN_uop[1].sqN - IN_uop[0].sqN) <= 0
                         && IN_uop[0].addr[31:2] == IN_uop[1].addr[31:2])
                         temp = 1;
                     
@@ -106,12 +107,8 @@ always_ff@(posedge clk) begin
                         OUT_branch.history <= IN_uop[i].history;
                         OUT_branch.flush <= 0;
                     end
-                    else 
-                        OUT_branch.taken <= 0;
                 end
             end
-            else 
-                OUT_branch.taken <= 0;
         end
         
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;

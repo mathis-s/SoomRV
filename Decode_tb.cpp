@@ -81,12 +81,12 @@ int main(int argc, char** argv)
     
     for (size_t i = 0; i < dataStart/4; i++)
     {
-        printf("%.8x\n", pram[i]);
+        //printf("%.8x\n", pram[i]);
         top->rootp->Top->extMem->mem[i] = pram[i];
     }
     for (size_t i = dataStart/4; i < dataIndex; i++)
     {
-        /*if (ram[i] != 0) */printf("%.8x\n", ram[i]);
+        /*if (ram[i] != 0) *///printf("%.8x\n", ram[i]);
         top->rootp->Top->extMem->mem[i] = ram[i];
         //top->rootp->Top->dcache->mem[i] = ram[i];
     }
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
     }
     
     // Run a few more cycles ...
-    for (int i = 0; i < 30; i=i+1)
+    for (int i = 0; i < 40; i=i+1)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model

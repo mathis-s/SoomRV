@@ -71,23 +71,29 @@ end
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        // Registers initialized with tags 0..31
+        // Registers initialized with 0
         for (i = 0; i < NUM_REGS; i=i+1) begin
             rat[i].avail <= 1;
-            rat[i].comTag <= i[TAG_SIZE-1:0];
-            rat[i].specTag <= i[TAG_SIZE-1:0];
+            rat[i].comTag <= 7'h7f;
+            rat[i].specTag <= 7'h7f;
         end
+        
+        /*for (i = 1; i < 32; i=i+1) begin
+            rat[i].avail <= 1;
+            rat[i].comTag <= i[6:0];
+            rat[i].specTag <= i[6:0];
+        end*/
     end
     else begin
         // Written back values are speculatively available
         for (i = 0; i < NUM_WB; i=i+1) begin
-            if (IN_wbValid[i] && rat[IN_wbID[i]].specTag == IN_wbTag[i]) begin
+            if (IN_wbValid[i] && rat[IN_wbID[i]].specTag == IN_wbTag[i] && IN_wbID[i] != 0) begin
                 rat[IN_wbID[i]].avail <= 1;
             end
         end
         
         if (IN_mispred) begin
-            for (i = 0; i < NUM_REGS; i=i+1) begin
+            for (i = 1; i < NUM_REGS; i=i+1) begin
                 rat[i].avail <= 1;
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
                 // We can't keep such a history for every register though. As such, we flush the pipeline
@@ -105,7 +111,7 @@ always_ff@(posedge clk) begin
         end
         
         for (i = 0; i < NUM_COMMIT; i=i+1) begin
-            if (IN_commitValid[i]) begin
+            if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
                 if (IN_mispredFlush) begin
                     if (!IN_mispred) begin
                         rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];

@@ -1,11 +1,11 @@
 module IssueQueue
 #(
-    parameter SIZE = 8,
+    parameter SIZE = 12,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
-    parameter FU0 = FU_LSU,
-    parameter FU1 = FU_LSU,
-    parameter FU2 = FU_LSU,
+    parameter FU0 = FU_ST,
+    parameter FU1 = FU_ST,
+    parameter FU2 = FU_ST,
     parameter FU0_SPLIT=0,
     parameter FU0_ORDER=0,
     parameter FU1_DLY=0
@@ -31,10 +31,13 @@ module IssueQueue
     input wire IN_issueValid[NUM_UOPS-1:0],
     input R_UOp IN_issueUOps[NUM_UOPS-1:0],
     
+    input SqN IN_maxStoreSqN,
+    input SqN IN_maxLoadSqN,
+    
     output reg OUT_valid,
     output R_UOp OUT_uop,
     
-    output wire OUT_full
+    output reg OUT_full
 );
 
 localparam ID_LEN = $clog2(SIZE);
@@ -48,7 +51,7 @@ reg valid[SIZE-1:0];
 reg[$clog2(SIZE):0] insertIndex;
 reg[32:0] reservedWBs;
 
-assign OUT_full = insertIndex > (SIZE-NUM_UOPS);
+//assign OUT_full = insertIndex > (SIZE-NUM_UOPS);
 
 reg newAvailA[SIZE-1:0];
 reg newAvailB[SIZE-1:0];
@@ -70,6 +73,18 @@ always_comb begin
             end
         end
     end
+end
+
+always_comb begin
+    reg[$clog2(SIZE):0] count = 0;
+    for (i = 0; i < NUM_UOPS; i=i+1) begin
+        if (IN_uopValid[i] && 
+            ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uop[i].sqN[0] == FU0_ORDER)) || 
+                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
+            count = count + 1;
+        end
+    end
+    OUT_full = insertIndex > (SIZE[$clog2(SIZE):0] - count);
 end
 
 always_ff@(posedge clk) begin
@@ -110,7 +125,15 @@ always_ff@(posedge clk) begin
                 if (i < insertIndex && !issued) begin
                     if ((queue[i].availA || newAvailA[i]) && (queue[i].availB || newAvailB[i]) && 
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
-                        !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU) && reservedWBs[0])) begin
+                        !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU) && reservedWBs[0]) && 
+                        
+                        // Only issue loads that fit into load order buffer
+                        ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST) || 
+                            queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
+                        
+                        // Only issue stores that fit into store queue
+                        ((FU0 != FU_LSU && FU1 != FU_LSU && FU2 != FU_LSU) || 
+                            queue[i].fu != FU_LSU || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         
                         issued = 1;
                         OUT_valid <= 1;

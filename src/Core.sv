@@ -323,10 +323,9 @@ R_UOp RV_uop[3:0];
 wire stall[3:0];
 assign stall[0] = 0;
 assign stall[1] = 0;
-assign stall[3] = 0;
 
 wire IQ0_full;
-IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
+IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -346,12 +345,15 @@ IssueQueue#(12,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .IN_issueValid(RV_uopValid),
     .IN_issueUOps(RV_uop),
     
+    .IN_maxStoreSqN(SQ_maxStoreSqN),
+    .IN_maxLoadSqN(LB_maxLoadSqN),
+    
     .OUT_valid(RV_uopValid[0]),
     .OUT_uop(RV_uop[0]),
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(12,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
+IssueQueue#(8,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -371,12 +373,15 @@ IssueQueue#(12,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
     .IN_issueValid(RV_uopValid),
     .IN_issueUOps(RV_uop),
     
+    .IN_maxStoreSqN(SQ_maxStoreSqN),
+    .IN_maxLoadSqN(LB_maxLoadSqN),
+    
     .OUT_valid(RV_uopValid[1]),
     .OUT_uop(RV_uop[1]),
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
-IssueQueue#(12,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
+IssueQueue#(8,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -396,12 +401,15 @@ IssueQueue#(12,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     .IN_issueValid(RV_uopValid),
     .IN_issueUOps(RV_uop),
     
+    .IN_maxStoreSqN(SQ_maxStoreSqN),
+    .IN_maxLoadSqN(LB_maxLoadSqN),
+    
     .OUT_valid(RV_uopValid[2]),
     .OUT_uop(RV_uop[2]),
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(12,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
+IssueQueue#(10,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
 (
     .clk(clk),
     .rst(rst),
@@ -420,6 +428,9 @@ IssueQueue#(12,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
     
     .IN_issueValid(RV_uopValid),
     .IN_issueUOps(RV_uop),
+    
+    .IN_maxStoreSqN(SQ_maxStoreSqN),
+    .IN_maxLoadSqN(LB_maxLoadSqN),
     
     .OUT_valid(RV_uopValid[3]),
     .OUT_uop(RV_uop[3]),
@@ -625,6 +636,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
+    .IN_stall(stall[3:2]),
     .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
     
     .IN_branch(branch),
@@ -633,7 +645,6 @@ LoadBuffer lb
     .OUT_maxLoadSqN(LB_maxLoadSqN)
 );
 
-SqN SQ_maxStoreSqN;
 wire CSR_we;
 wire[31:0] CSR_dataOut;
 
@@ -641,6 +652,8 @@ wire SQ_empty;
 ST_UOp SQ_uop;
 wire[3:0] SQ_lookupMask;
 wire[31:0] SQ_lookupData;
+SqN SQ_maxStoreSqN;
+assign stall[3] = 1'b0;
 StoreQueue sq
 (
     .clk(clk),
@@ -832,8 +845,8 @@ ControlRegs cr
 );
 
 assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
-    ($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -4) && 
-    ($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -4) && 
+    //($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -4) && 
+    //($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -4) && 
     ($signed(RN_nextSqN - ROB_maxSqN) <= -4) && 
     !branch.taken &&
     en &&

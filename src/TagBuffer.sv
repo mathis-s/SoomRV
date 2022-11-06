@@ -22,7 +22,7 @@ module TagBuffer
     
     input wire IN_commitValid[NUM_UOPS-1:0],
     input wire IN_commitNewest[NUM_UOPS-1:0],
-    input wire[5:0] IN_RAT_commitPrevTags[NUM_UOPS-1:0],
+    input wire[6:0] IN_RAT_commitPrevTags[NUM_UOPS-1:0],
     input wire[5:0] IN_commitTagDst[NUM_UOPS-1:0]
 );
 integer i;
@@ -47,16 +47,40 @@ always_comb begin
     end
 end
 
+reg[63:0] dbgUsed;
+always_comb begin
+    for (i = 0; i < 64; i=i+1)
+        dbgUsed[i] = tags[i].used;
+end
+
+/*
+RESULTS
+Runtime (cycles) 24008
+Executed (instrs) 38427
+Decoded (instrs) 38895
+mIPC 1600
+mDMIPS/MHz 4761
+36648 cycles
+*/
 always_ff@(posedge clk) begin
     if (rst) begin
-        for (i = 0; i < 32; i=i+1) begin
+    
+        /*tags[0].used <= 1'b0;
+        tags[0].committed <= 1'b0;
+        
+        for (i = 1; i < 32; i=i+1) begin
             tags[i].used <= 1'b1;
             tags[i].committed <= 1'b1;
-        end
-        for (i = 32; i < 64; i=i+1) begin
+        end*/
+        for (i = 0; i < 64; i=i+1) begin
             tags[i].used <= 1'b0;
             tags[i].committed <= 1'b0;
         end
+        
+        /*for (i = 1; i < 32; i=i+1) begin
+            tags[i].used <= 1'b1;
+            tags[i].committed <= 1'b1;
+        end*/
     end
     else begin
         if (IN_mispr) begin
@@ -85,8 +109,10 @@ always_ff@(posedge clk) begin
                 end
                 else begin
                     if (IN_commitNewest[i]) begin
-                        tags[IN_RAT_commitPrevTags[i]].committed <= 0;
-                        tags[IN_RAT_commitPrevTags[i]].used <= 0;
+                        if (!IN_RAT_commitPrevTags[i][6]) begin
+                            tags[IN_RAT_commitPrevTags[i][5:0]].committed <= 0;
+                            tags[IN_RAT_commitPrevTags[i][5:0]].used <= 0;
+                        end
                         
                         tags[IN_commitTagDst[i]].committed <= 1;
                         tags[IN_commitTagDst[i]].used <= 1;
