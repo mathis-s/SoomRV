@@ -41,10 +41,6 @@ module ProgramCounter
     
     output IF_Instr OUT_instrs[NUM_BLOCKS-1:0],
     
-    input wire[31:0] IN_instrMappingBase,
-    input wire IN_instrMappingHalfSize,
-    output wire OUT_instrMappingMiss,
-    
     output wire OUT_stall,
     
     output IF_MemoryController OUT_MC_if,
@@ -71,9 +67,6 @@ always_comb begin
     for (i = 0; i < NUM_BLOCKS; i=i+1)
         OUT_instrs[i].instr = IN_instr[(16*i)+:16];
 end
-
-assign OUT_instrMappingMiss = 0;//(pc[30:13] != IN_instrMappingBase[31:14]) ||
-    //(IN_instrMappingHalfSize && pc[12] != IN_instrMappingBase[13]);
     
 PCFileEntry PCF_writeData;
 assign PCF_writeData.pc = pcLast;

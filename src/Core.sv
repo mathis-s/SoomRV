@@ -36,11 +36,7 @@ module Core
     output reg[9:0] OUT_MC_sramAddr,
     output reg[29:0] OUT_MC_extAddr,
     input wire[9:0] IN_MC_progress,
-    input wire IN_MC_busy,
-    
-    output wire OUT_instrMappingMiss,
-    input wire[31:0] IN_instrMappingBase,
-    input wire IN_instrMappingHalfSize
+    input wire IN_MC_busy
 );
 
 
@@ -177,10 +173,6 @@ ProgramCounter progCnt
     .OUT_pcRaw(PC_pc),
     .OUT_instrAddr(OUT_instrAddr),
     .OUT_instrs(IF_instrs),
-    
-    .IN_instrMappingBase(IN_instrMappingBase),
-    .IN_instrMappingHalfSize(IN_instrMappingHalfSize),
-    .OUT_instrMappingMiss(OUT_instrMappingMiss),
     
     .OUT_stall(PC_stall),
     
@@ -855,7 +847,6 @@ assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
     ($signed(RN_nextSqN - ROB_maxSqN) <= -4) && 
     !branch.taken &&
     en &&
-    !OUT_instrMappingMiss &&
     !mispredFlush &&
     !SQ_flush;
 

@@ -5,6 +5,7 @@ typedef struct packed
     SqN sqN;
     bit[29:0] addr;
     bit[31:0] data;
+    // wmask == 0 is escape sequence for special operations
     bit[3:0] wmask;
 } SQEntry;
 

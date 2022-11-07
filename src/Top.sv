@@ -120,11 +120,7 @@ Core core
     .OUT_MC_sramAddr(MC_sramAddr),
     .OUT_MC_extAddr(MC_extAddr),
     .IN_MC_progress(MC_progress),
-    .IN_MC_busy(MC_busy),
-    
-    .OUT_instrMappingMiss(),
-    .IN_instrMappingBase(32'b0),
-    .IN_instrMappingHalfSize(1'b0)
+    .IN_MC_busy(MC_busy)
 );
 
 wire[31:0] DC_dataOut;

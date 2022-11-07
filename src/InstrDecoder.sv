@@ -272,6 +272,7 @@ always_comb begin
                 case (instr.opcode)
                     `OPC_ENV: begin
                         if (uop.imm == 0 || uop.imm == 1) begin
+                            if (uop.imm == 0) uop.imm[2:0] = FLAGS_TRAP;
                             uop.fu = FU_INT;
                             uop.rs0 = 0;
                             uop.rs1 = 0;
@@ -382,6 +383,20 @@ always_comb begin
                             uop.fu = FU_INT;
                             uop.opcode = INT_SYS;
                             uop.imm = {29'bx, 3'h4};
+                        end
+                        // all previous stores on the entire block need to have run through.
+                        // check upper address in load order buffer?
+                        // cbo.inval -> runs as store op, invalidates to instruction after itself
+                        else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
+                        
+                        end
+                        // cbo.clean -> runs as store op
+                        else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
+                            
+                        end
+                        // cbo.flush -> runs as store op, invalidates to instruction after itself
+                        else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
+                        
                         end
                     end
                     `OPC_REG_IMM: begin

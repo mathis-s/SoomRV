@@ -74,29 +74,6 @@ assign OUT_curSqN = baseIndex;
 integer i;
 integer j;
 
-reg headValid;
-always_comb begin
-    reg pred = 0;
-    headValid = 1;
-    for (i = 0; i < WIDTH; i=i+1) begin
-        if (!entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].executed || entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].flags != FLAGS_NONE)
-            headValid = 0;
-        
-        if (entries[baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0]].predicted) begin
-            if (pred) headValid = 0;
-            else pred = 1;
-        end
-    end
-end
-
-reg allowSingleDequeue;
-always_comb begin
-    allowSingleDequeue = 1;
-    if (!entries[baseIndex[ID_LEN-1:0]].executed)
-        allowSingleDequeue = 0;
-end
-
-
 ROBEntry pcLookupEntry;
 assign OUT_pcReadAddr = pcLookupEntry.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
@@ -120,7 +97,6 @@ reg misprReplayEnd;
 SqN misprReplayIter;
 SqN misprReplayEndSqN;
 
-wire doDequeue = headValid;
 always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
@@ -239,66 +215,56 @@ always_ff@(posedge clk) begin
                 misprReplayIter <= misprReplayIter + WIDTH;
             end
         end
-        // Two Entries
-        else if (!stop && doDequeue && !IN_branch.taken) begin
-
+        else if (!stop && !IN_branch.taken) begin
+            
+            reg temp = 0;
+            reg pred = 0;
+            reg[ID_LEN-1:0] cnt = 0;
+            
             for (i = 0; i < WIDTH; i=i+1) begin
-                OUT_comUOp[i].nmDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].name;
-                OUT_comUOp[i].tagDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].tag;
-                OUT_comUOp[i].sqN <= baseIndex + i[5:0];
-                OUT_comUOp[i].isBranch <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].isBranch;
-                OUT_comUOp[i].branchTaken <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].branchTaken;
-                OUT_comUOp[i].valid <= 1;
-                OUT_comUOp[i].compressed <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].compressed;
-                entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].valid <= 0;
-                entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].executed <= 0;
                 
-                if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].predicted || entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != 0)
-                    pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
+                ROBEntry cur = entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
+                
+                if (!temp && cur.executed && (!pred || (!cur.predicted && cur.flags == FLAGS_NONE))) begin
+                    OUT_comUOp[i].nmDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].name;
+                    OUT_comUOp[i].tagDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].tag;
+                    OUT_comUOp[i].sqN <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].sqN;
+                    OUT_comUOp[i].isBranch <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].isBranch;
+                    OUT_comUOp[i].branchTaken <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].branchTaken;
+                    OUT_comUOp[i].valid <= 1;
+                    OUT_comUOp[i].compressed <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].compressed;
+                    OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].fetchID;
+                    
+                    entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].valid <= 0;
+                    entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].executed <= 0;
+                    
+                    if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].predicted || 
+                        entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != 0) begin
+                        pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
+                        pred = 1;
+                    end
+                        
+                    if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != FLAGS_NONE) begin
+                        // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
+                        if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags == FLAGS_EXCEPT)
+                            OUT_comUOp[i].nmDst <= 0;
+                        stop <= 1;
+                        temp = 1;
+                    end
+                    
+                    cnt = cnt + 1;
+                end
+                else begin
+                    temp = 1;
+                    OUT_comUOp[i].valid <= 0;
+                end
             end
-            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0] + WIDTH[ID_LEN-1:0] - 6'b1].fetchID;
-            // Blocking for proper insertion
-            baseIndex = baseIndex + WIDTH;
+            
+            baseIndex = baseIndex + cnt;
         end
-        
-        // One entry
-        else if (!stop && allowSingleDequeue && !IN_branch.taken) begin
-            
-            //assert(baseIndexPC == entries[baseIndex[ID_LEN-1:0]].pc);
-            OUT_comUOp[0].nmDst <= entries[baseIndex[ID_LEN-1:0]].name;
-            OUT_comUOp[0].tagDst <= entries[baseIndex[ID_LEN-1:0]].tag;
-            OUT_comUOp[0].sqN <= baseIndex;
-            OUT_comUOp[0].isBranch <= entries[baseIndex[ID_LEN-1:0]].isBranch;
-            OUT_comUOp[0].branchTaken <= entries[baseIndex[ID_LEN-1:0]].branchTaken;
-            OUT_comUOp[0].valid <= 1;
-            OUT_comUOp[0].compressed <= entries[baseIndex[ID_LEN-1:0]].compressed;
-            entries[baseIndex[ID_LEN-1:0]].valid <= 0;
-            entries[baseIndex[ID_LEN-1:0]].executed <= 0;
-            
-            if (entries[baseIndex[ID_LEN-1:0]].predicted || entries[baseIndex[ID_LEN-1:0]].flags != 0)
-                pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]];
-                
-            if (entries[baseIndex[ID_LEN-1:0]].flags != 0) begin
-                
-                // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
-                if (entries[baseIndex[ID_LEN-1:0]].flags == FLAGS_EXCEPT)
-                    OUT_comUOp[0].nmDst <= 0;
-                
-                stop <= 1;
-            end
-            
-            OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0]].fetchID;
-
-            for (i = 1; i < WIDTH; i=i+1) begin
-                OUT_comUOp[i].valid <= 0;
-            end
-            // Blocking for proper insertion
-            baseIndex = baseIndex + 1;
-        end
-        else begin
+        else
             for (i = 0; i < WIDTH; i=i+1)
                 OUT_comUOp[i].valid <= 0;
-        end
 
         // Enqueue ops directly from Rename
         for (i = 0; i < WIDTH; i=i+1) begin

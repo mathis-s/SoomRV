@@ -38,7 +38,7 @@ main:
     
     # not implemented, fires exception
     unimp
-    # unimp
+    unimp
     
 	# null pointer read
     lw a0, 0(zero)
