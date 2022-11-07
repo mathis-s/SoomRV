@@ -139,7 +139,6 @@ typedef struct packed
     bit[2:0] tageID;
     bit[4:0] tageUseful;
     bit isJump;
-    bit saturated;
 } BranchPredInfo;
 
 typedef struct packed

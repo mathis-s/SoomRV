@@ -36,8 +36,8 @@ module ProgramCounter
     
     input FetchID_t IN_ROB_curFetchID,
 
-    output reg[31:0] OUT_pcRaw,
-    output reg[28:0] OUT_instrAddr,
+    output wire[31:0] OUT_pcRaw,
+    output wire[28:0] OUT_instrAddr,
     
     output IF_Instr OUT_instrs[NUM_BLOCKS-1:0],
     

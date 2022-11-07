@@ -212,7 +212,7 @@ always_ff@(posedge clk) begin
                     OUT_btUpdate.dst <= pcPlus4;
                 end
                 
-                if (branchTaken != IN_uop.bpi.taken)
+                if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL)
                     OUT_branch.taken <= 1;
 
             end
