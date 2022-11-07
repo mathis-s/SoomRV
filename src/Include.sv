@@ -129,7 +129,7 @@ typedef enum logic[5:0]
     FPU_FMVWX
 } OPCode_FPU;
 
-typedef enum logic[2:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU} FuncUnit;
+typedef enum logic[2:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_RN} FuncUnit;
 typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FENCE} Flags;
 
 typedef struct packed

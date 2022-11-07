@@ -497,6 +497,11 @@ always_comb begin
                             end
                         end
                         
+                        // li rd, 0 is eliminated during rename
+                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs0 == 0 && uop.imm == 0) begin
+                            if (uop.rd == 0) uop.valid = 0;
+                            else uop.fu = FU_RN;
+                        end
                     end
                     `OPC_REG_REG: begin
                         uop.rs0 = instr.rs0;
@@ -925,6 +930,12 @@ always_comb begin
                         uop.imm = {{26{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm};
                         uop.immB = 1;
                         uop.rd = i16.ci.rd_rs1;
+                        
+                        // li rd, 0 is eliminated during rename
+                        if (uop.imm == 0) begin
+                            uop.fu = FU_RN;
+                        end
+                        
                         invalidEnc = 0;
                     end
                     // c.lui / c.addi16sp
@@ -954,6 +965,7 @@ always_comb begin
                         uop.immB = 1;
                         uop.rs0 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
+                        
                         invalidEnc = 0;
                     end
                     // c.srli

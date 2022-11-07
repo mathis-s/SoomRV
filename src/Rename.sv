@@ -48,6 +48,7 @@ reg[4:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
 
 reg[4:0] RAT_issueIDs[WIDTH_UOPS-1:0];
 reg RAT_issueValid[WIDTH_UOPS-1:0];
+reg RAT_issueAvail[WIDTH_UOPS-1:0];
 SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
 
 reg commitValid[WIDTH_UOPS-1:0];
@@ -79,8 +80,9 @@ always_comb begin
         RAT_issueIDs[i] = IN_uop[i].rd;//{IN_uop[i].rd_fp, IN_uop[i].rd};
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
+        RAT_issueAvail[i] = IN_uop[i].fu == FU_RN;
         // Only need new tag if instruction writes to a register
-        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0;
+        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN;
         //TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
         
         if (RAT_issueValid[i])
@@ -119,6 +121,7 @@ RenameTable rt
     .IN_issueValid(RAT_issueValid),
     .IN_issueIDs(RAT_issueIDs),
     .IN_issueTags(newTags),
+    .IN_issueAvail(RAT_issueAvail),
     
     .IN_commitValid(commitValid),
     .IN_commitIDs(RAT_commitIDs),
@@ -134,8 +137,6 @@ RenameTable rt
 reg[5:0] TB_tags[WIDTH_UOPS-1:0];
 reg[6:0] newTags[WIDTH_UOPS-1:0];
 //reg[5:0] TB_FP_tags[WIDTH_UOPS-1:0];
-reg[5:0] TB_RAT_commitPrevTags[WIDTH_UOPS-1:0];
-reg[5:0] TB_RAT_commitTags[WIDTH_UOPS-1:0];
 reg TB_tagsValid[WIDTH_UOPS-1:0];
 //reg TB_FP_tagsValid[WIDTH_UOPS-1:0];
 always_comb begin
@@ -144,9 +145,7 @@ always_comb begin
             newTags[i] = {1'b0, TB_tags[i]};
         //else if (TB_issueValid_fp[i])
         //    newTags[i] = {1'b1, TB_FP_tags[i]};
-        else newTags[i] = 0;
-        
-        TB_RAT_commitTags[i] = RAT_commitTags[i][5:0];
+        else newTags[i] = 7'h7f;
     end
 end
 TagBuffer tb
@@ -163,7 +162,7 @@ TagBuffer tb
     .IN_commitValid(commitValid_int),
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
-    .IN_commitTagDst(TB_RAT_commitTags)
+    .IN_commitTagDst(RAT_commitTags)
 );
 /*TagBuffer tb_fp
 (
@@ -260,13 +259,15 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
                 
-                if (IN_uop[i].fu == FU_INT)
-                    intOrder = !intOrder;
+                case (IN_uop[i].fu)
+                    FU_INT: intOrder = !intOrder;
+                    FU_DIV, FU_FPU: intOrder = 1;
+                    FU_MUL: intOrder = 0;
                     
-                if (IN_uop[i].fu == FU_ST)
-                    counterStoreSqN = counterStoreSqN + 1;
-                else if (IN_uop[i].fu == FU_LSU)
-                    counterLoadSqN = counterLoadSqN + 1;
+                    FU_ST: counterStoreSqN = counterStoreSqN + 1;
+                    FU_LSU: counterLoadSqN = counterLoadSqN + 1;
+                    default: begin end
+                endcase
                 
                 OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;

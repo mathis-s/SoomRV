@@ -149,7 +149,7 @@ always_ff@(posedge clk) begin
                     OUT_fence <= 1;
                 
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + 31'h2, 1'b0};
+                OUT_branch.dstPC <= {baseIndexPC + (pcLookupEntry.compressed ? 31'd2 : 31'd4), 1'b0};
                 OUT_branch.sqN <= pcLookupEntry.sqN;
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
@@ -275,7 +275,9 @@ always_ff@(posedge clk) begin
                 entries[IN_uop[i].sqN[ID_LEN-1:0]].sqN <= IN_uop[i].sqN;
                 entries[IN_uop[i].sqN[ID_LEN-1:0]].compressed <= IN_uop[i].compressed;
                 entries[IN_uop[i].sqN[ID_LEN-1:0]].fetchID <= IN_uop[i].fetchID;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].executed <= 0;
+                entries[IN_uop[i].sqN[ID_LEN-1:0]].executed <= IN_uop[i].fu == FU_RN;
+                entries[IN_uop[i].sqN[ID_LEN-1:0]].predicted <= 0;
+                entries[IN_uop[i].sqN[ID_LEN-1:0]].flags <= 0;
             end
         end
         

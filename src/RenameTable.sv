@@ -28,6 +28,7 @@ module RenameTable
     input wire IN_issueValid[NUM_ISSUE-1:0],
     input wire[ID_SIZE-1:0] IN_issueIDs[NUM_ISSUE-1:0],
     input wire[TAG_SIZE-1:0] IN_issueTags[NUM_ISSUE-1:0],
+    input wire IN_issueAvail[NUM_ISSUE-1:0],
     
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire[ID_SIZE-1:0] IN_commitIDs[NUM_COMMIT-1:0],
@@ -57,7 +58,7 @@ always_comb begin
         // Later lookups are affected by previous ops, even in the same cycle
         for (j = 0; j < (i / 2); j=j+1) begin
             if (IN_issueValid[j] && IN_issueIDs[j] == IN_lookupIDs[i] && IN_issueIDs[j] != 0) begin
-                OUT_lookupAvail[i] = 0;
+                OUT_lookupAvail[i] = IN_issueAvail[j];
                 OUT_lookupSpecTag[i] = IN_issueTags[j];
             end
         end
@@ -77,12 +78,6 @@ always_ff@(posedge clk) begin
             rat[i].comTag <= 7'h7f;
             rat[i].specTag <= 7'h7f;
         end
-        
-        /*for (i = 1; i < 32; i=i+1) begin
-            rat[i].avail <= 1;
-            rat[i].comTag <= i[6:0];
-            rat[i].specTag <= i[6:0];
-        end*/
     end
     else begin
         // Written back values are speculatively available
@@ -104,7 +99,7 @@ always_ff@(posedge clk) begin
         else begin
             for (i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
-                    rat[IN_issueIDs[i]].avail <= 0;
+                    rat[IN_issueIDs[i]].avail <= IN_issueAvail[i];
                     rat[IN_issueIDs[i]].specTag <= IN_issueTags[i];
                 end
             end

@@ -23,7 +23,7 @@ module TagBuffer
     input wire IN_commitValid[NUM_UOPS-1:0],
     input wire IN_commitNewest[NUM_UOPS-1:0],
     input wire[6:0] IN_RAT_commitPrevTags[NUM_UOPS-1:0],
-    input wire[5:0] IN_commitTagDst[NUM_UOPS-1:0]
+    input wire[6:0] IN_commitTagDst[NUM_UOPS-1:0]
 );
 integer i;
 integer j;
@@ -105,7 +105,7 @@ always_ff@(posedge clk) begin
             if (IN_commitValid[i]) begin
                 
                 if (IN_mispredFlush) begin
-                    if (!IN_mispr) tags[IN_commitTagDst[i]].used <= 1;
+                    if (!IN_mispr && !IN_commitTagDst[i][6]) tags[IN_commitTagDst[i][5:0]].used <= 1;
                 end
                 else begin
                     if (IN_commitNewest[i]) begin
@@ -114,12 +114,14 @@ always_ff@(posedge clk) begin
                             tags[IN_RAT_commitPrevTags[i][5:0]].used <= 0;
                         end
                         
-                        tags[IN_commitTagDst[i]].committed <= 1;
-                        tags[IN_commitTagDst[i]].used <= 1;
+                        if (!IN_commitTagDst[i][6]) begin
+                            tags[IN_commitTagDst[i][5:0]].committed <= 1;
+                            tags[IN_commitTagDst[i][5:0]].used <= 1;
+                        end
                     end
-                    else begin
-                        tags[IN_commitTagDst[i]].committed <= 0;
-                        tags[IN_commitTagDst[i]].used <= 0;
+                    else if (!IN_commitTagDst[i][6]) begin
+                        tags[IN_commitTagDst[i][5:0]].committed <= 0;
+                        tags[IN_commitTagDst[i][5:0]].used <= 0;
                     end
                 end
             end
