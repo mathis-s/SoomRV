@@ -31,6 +31,9 @@ module Rename
     
     output reg OUT_uopValid[WIDTH_UOPS-1:0],
     output R_UOp OUT_uop[WIDTH_UOPS-1:0],
+    // This is just an alternating bit that switches with each regular int op,
+    // for assignment to issue queues.
+    output reg OUT_uopOrdering[WIDTH_UOPS-1:0],
     output SqN OUT_nextSqN,
     output SqN OUT_nextLoadSqN,
     output SqN OUT_nextStoreSqN
@@ -188,7 +191,7 @@ always_comb begin
         
 end
 
-
+reg intOrder;
 SqN counterSqN;
 SqN counterStoreSqN;
 SqN counterLoadSqN;
@@ -216,6 +219,7 @@ always_ff@(posedge clk) begin
         counterLoadSqN = 0;
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
+        intOrder = 0;
     
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             OUT_uop[i].sqN <= i[$bits(SqN)-1:0];
@@ -254,7 +258,11 @@ always_ff@(posedge clk) begin
                 OUT_uopValid[i] <= 1;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
+                OUT_uopOrdering[i] <= intOrder;
                 
+                if (IN_uop[i].fu == FU_INT)
+                    intOrder = !intOrder;
+                    
                 if (IN_uop[i].fu == FU_ST)
                     counterStoreSqN = counterStoreSqN + 1;
                 else if (IN_uop[i].fu == FU_LSU)

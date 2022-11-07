@@ -20,6 +20,7 @@ module IssueQueue
     
     input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
+    input wire IN_uopOrdering[NUM_UOPS-1:0],
     
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
@@ -79,7 +80,7 @@ always_comb begin
     reg[$clog2(SIZE):0] count = 0;
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         if (IN_uopValid[i] && 
-            ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uop[i].sqN[0] == FU0_ORDER)) || 
+            ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
             count = count + 1;
         end
@@ -159,7 +160,7 @@ always_ff@(posedge clk) begin
         if (frontEn) begin
             for (i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_uopValid[i] && 
-                    ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uop[i].sqN[0] == FU0_ORDER)) || 
+                    ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                         IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
                     
                     R_UOp temp = IN_uop[i];

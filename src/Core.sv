@@ -275,10 +275,11 @@ Fuse fuse
 
 
 R_UOp RN_uop[3:0];
-reg RN_uopValid[3:0];
+wire RN_uopValid[3:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall;
+wire RN_uopOrdering[3:0];
 Rename rn 
 (
     .clk(clk),
@@ -304,6 +305,7 @@ Rename rn
 
     .OUT_uopValid(RN_uopValid),
     .OUT_uop(RN_uop),
+    .OUT_uopOrdering(RN_uopOrdering),
     .OUT_nextSqN(RN_nextSqN),
     .OUT_nextLoadSqN(RN_nextLoadSqN),
     .OUT_nextStoreSqN(RN_nextStoreSqN)
@@ -328,6 +330,7 @@ IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
+    .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
@@ -356,6 +359,7 @@ IssueQueue#(8,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
     
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
+    .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
@@ -384,6 +388,7 @@ IssueQueue#(8,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
+    .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
@@ -412,6 +417,7 @@ IssueQueue#(10,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
     
     .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
+    .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
