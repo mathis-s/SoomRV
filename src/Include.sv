@@ -98,7 +98,10 @@ typedef enum logic[5:0]
     LSU_SH,
     LSU_SW,
     LSU_FLW,
-    LSU_FSW
+    LSU_FSW,
+    LSU_CBO_CLEAN,
+    LSU_CBO_INVAL,
+    LSU_CBO_FLUSH
 } OPCode_LSU;
 
 typedef enum logic[5:0]
@@ -130,7 +133,7 @@ typedef enum logic[5:0]
 } OPCode_FPU;
 
 typedef enum logic[2:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_RN} FuncUnit;
-typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FENCE} Flags;
+typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRK, FLAGS_TRAP, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING, FLAGS_BPRED} Flags;
 
 typedef struct packed
 {

@@ -236,7 +236,7 @@ PreDecode preDec
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
-assign ifetchEn = !PD_full && !PC_stall;
+assign ifetchEn = !PD_full && !PC_stall && !ROB_disableIFetch;
 
 D_UOp DE_uop[3:0];
 
@@ -613,7 +613,7 @@ AGU aguLD
 );
 
 AGU_UOp AGU_ST_uop;
-AGU aguST
+StoreAGU aguST
 (
     .clk(clk),
     .rst(rst),
@@ -623,7 +623,8 @@ AGU aguST
     .IN_branch(branch),
 
     .IN_uop(LD_uop[3]),
-    .OUT_uop(AGU_ST_uop)
+    .OUT_aguOp(AGU_ST_uop),
+    .OUT_uop(wbUOp[3])
 );
 
 
@@ -706,19 +707,6 @@ LoadStoreUnit lsu
     .OUT_uopLd(wbUOp[2])
 );
 
-always_comb begin
-    wbUOp[3].result = 32'bx;
-    wbUOp[3].tagDst = AGU_ST_uop.tagDst;
-    wbUOp[3].nmDst = AGU_ST_uop.nmDst;
-    wbUOp[3].sqN = AGU_ST_uop.sqN;
-    wbUOp[3].pc = AGU_ST_uop.pc;
-    wbUOp[3].flags = AGU_ST_uop.exception ? FLAGS_EXCEPT : FLAGS_NONE;
-    wbUOp[3].compressed = AGU_ST_uop.compressed;
-    wbUOp[3].isBranch = 0;
-    wbUOp[3].bpi = 0;
-    wbUOp[3].valid = AGU_ST_uop.valid;
-end
-
 RES_UOp INT1_uop;
 IntALU ialu1
 (
@@ -768,10 +756,12 @@ wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
 wire[31:0] ROB_irqMemAddr;
+wire ROB_disableIFetch;
 
 FetchID_t ROB_curFetchID;
 
 BPUpdate ROB_bpUpdate;
+wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid;
 ROB rob
 (
     .clk(clk),
@@ -782,6 +772,8 @@ ROB rob
     .IN_wbUOps(wbUOp),
 
     .IN_branch(branch),
+    
+    .IN_MEM_busy(MEMSUB_busy),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
@@ -803,6 +795,7 @@ ROB rob
     
     .OUT_curFetchID(ROB_curFetchID),
     
+    .OUT_disableIFetch(ROB_disableIFetch),
     .OUT_halt(OUT_halt),
     .OUT_mispredFlush(mispredFlush)
 );

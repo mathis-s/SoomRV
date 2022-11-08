@@ -48,9 +48,10 @@ reg evicting;
 reg loading;
 reg[$clog2(SIZE)-1:0] freeEntryID;
 reg[$clog2(SIZE)-1:0] lruPointer;
+reg[$clog2(SIZE)-1:0] evictingID;
 
 assign OUT_stall[0] = cmissUOpLd.valid || waitCycle;
-assign OUT_stall[1] = cmissUOpSt.valid || loading || evicting || waitCycle;
+assign OUT_stall[1] = cmissUOpSt.valid || loading || evicting || waitCycle || evictionRq != EV_RQ_NONE;
 
 // Cache Table Lookups
 reg cacheTableEntryFound[NUM_UOPS-1:0];
@@ -80,15 +81,10 @@ ST_UOp cmissUOpSt;
 reg waitCycle;
 reg setDirty;
 
-always_comb begin
-    reg duplicate = 0;
-    for (i = 0; i < SIZE; i=i+1)
-        for (j = 0; j < SIZE; j=j+1)
-            if (i != j)
-                if (ctable[i].valid && ctable[j].valid && ctable[i].addr == ctable[j].addr)
-                    duplicate = 1;
-    assert(!duplicate);
-end
+enum logic[1:0] {EV_RQ_NONE, EV_RQ_CLEAN, EV_RQ_FLUSH, EV_RQ_INVAL} evictionRq;
+reg[$clog2(SIZE)-1:0] evictionRqID;
+reg evictionRqActive;
+
 
 reg outHistory;
 always_ff@(posedge clk) begin
@@ -116,9 +112,12 @@ always_ff@(posedge clk) begin
         
         OUT_uopLd.valid <= 0;
         OUT_uopSt.valid <= 0;
+        
+        evictionRq <= EV_RQ_NONE;
     end
     else begin
         OUT_MC_ce <= 0;
+        OUT_MC_we <= 0;
         waitCycle <= 0;
         
         if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
@@ -129,21 +128,60 @@ always_ff@(posedge clk) begin
         
         // Entry Eviction logic
         if (!loading) begin
+            // Abort eviction if memory controller chose another request
             if (evicting && IN_MC_cacheID != 0) begin
                 evicting <= 0;
-                freeEntryAvail <= 0;
-                ctable[lruPointer].valid <= 1;
+                //freeEntryAvail <= 0;
+                ctable[evictingID].valid <= 1;
             end
-            else if (evicting && !waitCycle) begin
-                OUT_MC_ce <= 0;
-                OUT_MC_we <= 0;
-                
-                if (!IN_MC_busy) begin
+            // Finalize eviction
+            else if (evicting && !waitCycle && !IN_MC_busy) begin
+        
+                if (evictionRqActive) begin
+                    // ...
+                    evictionRq <= EV_RQ_NONE;
+                end
+                else
                     freeEntryAvail <= 1;
-                    evicting <= 0;
+                    
+                evicting <= 0;
+            end
+            // Requested eviction
+            else if (!evicting && !IN_MC_busy && !waitCycle && evictionRq != EV_RQ_NONE) begin
+                
+                if (!ctable[evictionRqID].valid) begin
+                    evictionRq <= EV_RQ_NONE;
+                end
+                else if ((!IN_uopLd.valid || OUT_stall[0]) && !OUT_uopLd.valid && 
+                    (!IN_uopSt.valid || OUT_stall[1]) && !OUT_uopSt.valid) begin
+                    
+                    // Clean only pushes new contents of entry back to memory
+                    if (evictionRq != EV_RQ_CLEAN) begin
+                        ctable[evictionRqID].valid <= 0;
+                        ctable[evictionRqID].used <= 0;
+                    end
+                    else ctable[evictionRqID].dirty <= 0;
+                    
+                    if (ctable[evictionRqID].dirty && evictionRq != EV_RQ_INVAL) begin
+                        OUT_MC_ce <= 1;
+                        OUT_MC_we <= 1;
+                        
+                        OUT_MC_sramAddr <= {evictionRqID, 6'b0};
+                        OUT_MC_extAddr <= {ctable[evictionRqID].addr, 6'b0};
+                        
+                        evicting <= 1;
+                        waitCycle <= 1;
+                        evictionRqActive <= 1;
+                        evictingID <= evictionRqID;
+                    end
+                    // If not dirty, we're already done
+                    else begin
+                        evictionRq <= EV_RQ_NONE;
+                    end
                 end
             end
-            else if (!freeEntryAvail && !evicting && !IN_MC_busy) begin
+            // Regular eviction
+            else if (!freeEntryAvail && !evicting && !IN_MC_busy && !waitCycle) begin
             
                 if (!ctable[lruPointer].valid) begin
                     freeEntryAvail <= 1;
@@ -166,6 +204,8 @@ always_ff@(posedge clk) begin
                         
                         evicting <= 1;
                         waitCycle <= 1;
+                        evictionRqActive <= 0;
+                        evictingID <= lruPointer;
                     end
                     else freeEntryAvail <= 1;
                 end
@@ -181,9 +221,10 @@ always_ff@(posedge clk) begin
             // Cache hit
             if (IN_uopLd.exception || cacheTableEntryFound[0] || IN_uopLd.addr[31:24] >= 8'hfe) begin
                 OUT_uopLd <= IN_uopLd;
-                if (IN_uopLd.addr[31:24] < 8'hfe && !IN_uopLd.exception)
+                if (IN_uopLd.addr[31:24] < 8'hfe && !IN_uopLd.exception) begin
                     OUT_uopLd.addr <= {20'b0, cacheTableEntry[0], IN_uopLd.addr[7:0]};
-                ctable[cacheTableEntry[0]].used <= 1;
+                    ctable[cacheTableEntry[0]].used <= 1;
+                end
             end
             // Cache hit, section currently being loaded
             else if (loading && (!waitCycle) && IN_uopLd.addr[31:8] == OUT_MC_extAddr[29:6] &&
@@ -213,13 +254,30 @@ always_ff@(posedge clk) begin
         
         // Store Pipeline
         if (!OUT_stall[1] && IN_uopSt.valid) begin
+            
+            // Cache management operations
+            if (IN_uopSt.wmask == 0) begin
+                assert(evictionRq == EV_RQ_NONE);
+                if (cacheTableEntryFound[1]) begin
+                    evictionRqID <= cacheTableEntry[1];
+                    case (IN_uopSt.data[1:0])
+                        0: evictionRq <= EV_RQ_CLEAN;
+                        1: evictionRq <= EV_RQ_INVAL;
+                        2: evictionRq <= EV_RQ_FLUSH;
+                        default: begin end
+                    endcase
+                end
+                
+                OUT_uopSt.valid <= 0;
+            end
             // Cache hit
-            if (cacheTableEntryFound[1] || IN_uopSt.addr[31:24] >= 8'hfe) begin
+            else if (cacheTableEntryFound[1] || IN_uopSt.addr[31:24] >= 8'hfe) begin
                 OUT_uopSt <= IN_uopSt;
-                if (IN_uopSt.addr[31:24] < 8'hfe)
+                if (IN_uopSt.addr[31:24] < 8'hfe) begin
                     OUT_uopSt.addr <= {20'b0, cacheTableEntry[1], IN_uopSt.addr[7:0]};
-                ctable[cacheTableEntry[1]].used <= 1;
-                ctable[cacheTableEntry[1]].dirty <= 1;
+                    ctable[cacheTableEntry[1]].used <= 1;
+                    ctable[cacheTableEntry[1]].dirty <= 1;
+                end
             end
             // Cache miss
             else begin
@@ -255,7 +313,7 @@ always_ff@(posedge clk) begin
                 ctable[freeEntryID].dirty <= setDirty;
             end
         end
-        else if (!loading && freeEntryAvail && !IN_branch.taken && !IN_MC_busy) begin
+        else if (!loading && freeEntryAvail && !IN_branch.taken && !IN_MC_busy && evictionRq == EV_RQ_NONE) begin
             if (cmissUOpLd.valid) begin
                 OUT_MC_ce <= 1;
                 OUT_MC_we <= 0;

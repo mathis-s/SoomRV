@@ -394,19 +394,26 @@ always_comb begin
                             uop.opcode = INT_SYS;
                             uop.imm = {29'bx, 3'h4};
                         end
-                        // all previous stores on the entire block need to have run through.
-                        // check upper address in load order buffer?
                         // cbo.inval -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
-                        
+                            invalidEnc = 0;
+                            uop.opcode = LSU_CBO_INVAL;
+                            uop.fu = FU_ST;
+                            uop.rs0 = instr.rs0;
                         end
                         // cbo.clean -> runs as store op
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
-                            
+                            invalidEnc = 0;
+                            uop.opcode = LSU_CBO_CLEAN;
+                            uop.fu = FU_ST;
+                            uop.rs0 = instr.rs0;
                         end
                         // cbo.flush -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
-                        
+                            invalidEnc = 0;
+                            uop.opcode = LSU_CBO_FLUSH;
+                            uop.fu = FU_ST;
+                            uop.rs0 = instr.rs0;
                         end
                     end
                     `OPC_REG_IMM: begin

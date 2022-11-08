@@ -187,6 +187,10 @@ always_ff@(posedge clk) begin
             entries[index].wmask <= IN_uopSt.wmask;
             doingEnqueue = 1;
         end
+        
+        if (flushing)
+            for (i = 0; i < 3; i=i+1)
+                evicted[i].valid <= 0;
 
         OUT_empty <= empty && !doingEnqueue;
         if (OUT_empty) flushing <= 0;

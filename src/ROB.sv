@@ -38,6 +38,8 @@ module ROB
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
     input BranchProv IN_branch,
+    
+    input wire IN_MEM_busy,
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
@@ -57,9 +59,9 @@ module ROB
     output reg OUT_fence,
     
     output BranchProv OUT_branch,
-    
     output FetchID_t OUT_curFetchID,
     
+    output wire OUT_disableIFetch,
     output reg OUT_halt,
     output reg OUT_mispredFlush
 );
@@ -91,6 +93,10 @@ always_comb begin
 end
 
 reg stop;
+reg memoryWait;
+reg memoryFence;
+
+assign OUT_disableIFetch = memoryWait;
 
 reg misprReplay;
 reg misprReplayEnd;
@@ -119,6 +125,7 @@ always_ff@(posedge clk) begin
         OUT_bpUpdate.valid <= 0;
         pcLookupEntry.valid <= 0;
         stop <= 0;
+        memoryWait <= 0;
     end
     else if (IN_branch.taken) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -137,19 +144,34 @@ always_ff@(posedge clk) begin
     if (!rst) begin
     
         OUT_bpUpdate.valid <= 0;
-        pcLookupEntry.valid <= 0;
+        
+        if (memoryWait && !IN_MEM_busy) begin
+            if (memoryFence) begin
+                OUT_fence <= 1;
+                memoryFence <= 0;
+            end
+            else begin
+                memoryWait <= 0;
+            end
+        end
         
         // Exception and branch prediction update handling
+        pcLookupEntry.valid <= 0;
         if (pcLookupEntry.valid) begin
-            if (pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_FENCE) begin
+            if (pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
                 
                 if (pcLookupEntry.flags == FLAGS_BRK)
                     OUT_halt <= 1;
-                else
-                    OUT_fence <= 1;
+                else if (pcLookupEntry.flags == FLAGS_ORDERING) begin
+                    memoryWait <= 1;
+                end
+                else if (pcLookupEntry.flags == FLAGS_FENCE) begin
+                    memoryFence <= 1;
+                    memoryWait <= 1;
+                end
                 
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + (pcLookupEntry.compressed ? 31'd2 : 31'd4), 1'b0};
+                OUT_branch.dstPC <= {baseIndexPC + (pcLookupEntry.compressed ? 31'd1 : 31'd2), 1'b0};
                 OUT_branch.sqN <= pcLookupEntry.sqN;
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;

@@ -84,7 +84,7 @@ always_ff@(posedge clk) begin
                     entries[index].valid <= 1;
                 end
                 
-                else begin
+                else if (i == 1 && IN_uop[1].wmask != 0) begin
                     reg temp = 0;
                     for (j = 0; j < NUM_ENTRIES; j=j+1) begin
                         if (entries[j].valid && entries[j].addr == IN_uop[i].addr[31:2] && $signed(IN_uop[i].sqN - entries[j].sqN) <= 0) begin
