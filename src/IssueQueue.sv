@@ -1,6 +1,6 @@
 module IssueQueue
 #(
-    parameter SIZE = 12,
+    parameter SIZE = 8,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
     parameter FU0 = FU_ST,
@@ -67,7 +67,7 @@ always_comb begin
             if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
         end
         
-        for (j = 0; j < NUM_UOPS; j=j+1) begin
+        for (j = 0; j < 2; j=j+1) begin
             if (IN_issueValid[j] && IN_issueUOps[j].fu == FU_INT && IN_issueUOps[j].nmDst != 0) begin
                 if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
                 if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;

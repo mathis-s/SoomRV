@@ -274,7 +274,10 @@ always_comb begin
                 case (instr.opcode)
                     `OPC_ENV: begin
                         if (uop.imm == 0 || uop.imm == 1) begin
-                            if (uop.imm == 0) uop.imm[2:0] = FLAGS_TRAP;
+                            case (uop.imm)
+                                0: uop.imm[2:0] = FLAGS_EXCEPT;
+                                1: uop.imm[2:0] = FLAGS_BRK;
+                            endcase
                             uop.fu = FU_INT;
                             uop.rs0 = 0;
                             uop.rs1 = 0;
@@ -392,7 +395,7 @@ always_comb begin
                         if (instr.funct3 == 0) begin
                             uop.fu = FU_INT;
                             uop.opcode = INT_SYS;
-                            uop.imm = {29'bx, 3'h4};
+                            uop.imm = {29'bx, FLAGS_FENCE};
                         end
                         // cbo.inval -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
@@ -1106,7 +1109,7 @@ always_comb begin
                         uop.opcode = INT_SYS;
                         uop.fu = FU_INT;
                         uop.immB = 1;
-                        uop.imm = 1;
+                        uop.imm[2:0] = FLAGS_BRK;
                         invalidEnc = 0;
                     end
                 end

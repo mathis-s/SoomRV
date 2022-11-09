@@ -3,12 +3,12 @@ typedef struct packed
 {
     Flags flags;
     Tag tag;
-    SqN sqN;
+    bit sqN_msb;
     //bit[30:0] pc;
     RegNm name;
-    bit isBranch;
-    bit branchTaken;
-    bit predicted;
+    //bit isBranch;
+    //bit branchTaken;
+    //bit predicted;
     //BranchPredInfo bpi;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
@@ -65,7 +65,28 @@ module ROB
     output reg OUT_halt,
     output reg OUT_mispredFlush
 );
+
+integer i;
+integer j;
+
 localparam ID_LEN = $clog2(LENGTH);
+
+R_UOp rnUOpSorted[WIDTH-1:0];
+reg rnUOpValidSorted[WIDTH-1:0];
+always_comb begin
+    for (i = 0; i < WIDTH; i=i+1) begin
+        rnUOpValidSorted[i] = 0;
+        rnUOpSorted[i] = 108'bx;
+        
+        for (j = 0; j < WIDTH; j=j+1) begin
+            // This could be one-hot...
+            if (IN_uopValid[j] && IN_uop[j].sqN[1:0] == i[1:0]) begin
+                rnUOpValidSorted[i] = 1;
+                rnUOpSorted[i] = IN_uop[j];
+            end
+        end
+    end
+end
 
 ROBEntry entries[LENGTH-1:0];
 SqN baseIndex;
@@ -73,9 +94,7 @@ SqN baseIndex;
 assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
 
-integer i;
-integer j;
-
+SqN pcLookupEntrySqN;
 ROBEntry pcLookupEntry;
 assign OUT_pcReadAddr = pcLookupEntry.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
@@ -129,7 +148,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branch.taken) begin
         for (i = 0; i < LENGTH; i=i+1) begin
-            if ($signed(entries[i].sqN - IN_branch.sqN) > 0) begin
+            if ($signed(({entries[i].sqN_msb, i[5:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
                 entries[i].executed <= 0;
             end
@@ -172,7 +191,7 @@ always_ff@(posedge clk) begin
                 
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= {baseIndexPC + (pcLookupEntry.compressed ? 31'd1 : 31'd2), 1'b0};
-                OUT_branch.sqN <= pcLookupEntry.sqN;
+                OUT_branch.sqN <= pcLookupEntrySqN;
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
@@ -180,11 +199,11 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if (pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_EXCEPT) begin
+            else if (pcLookupEntry.flags == FLAGS_EXCEPT) begin
                 
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= IN_irqAddr;
-                OUT_branch.sqN <= pcLookupEntry.sqN;
+                OUT_branch.sqN <= pcLookupEntrySqN;
                 OUT_branch.flush <= 1;
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
@@ -197,13 +216,13 @@ always_ff@(posedge clk) begin
                 
                 stop <= 0;
             end
-            else if (pcLookupEntry.predicted) begin
+            else begin
                 OUT_bpUpdate.valid <= 1;
                 OUT_bpUpdate.pc <= IN_pcReadData.pc;
                 OUT_bpUpdate.compressed <= pcLookupEntry.compressed;
                 OUT_bpUpdate.history <= IN_pcReadData.hist;
                 OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
-                OUT_bpUpdate.branchTaken <= pcLookupEntry.branchTaken;
+                OUT_bpUpdate.branchTaken <= pcLookupEntry.flags == FLAGS_PRED_TAKEN;
             end
         end
         
@@ -221,12 +240,15 @@ always_ff@(posedge clk) begin
                 OUT_mispredFlush <= 1;
                 for (i = 0; i < WIDTH; i=i+1) begin
                     if ($signed((misprReplayIter + i[$bits(SqN)-1:0]) - misprReplayEndSqN) <= 0) begin
+                        
+                        reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
+                        
                         OUT_comUOp[i].valid <= 1;
-                        OUT_comUOp[i].nmDst <= entries[misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0]].name;
-                        OUT_comUOp[i].tagDst <= entries[misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0]].tag;
-                        OUT_comUOp[i].compressed <= entries[misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0]].executed;
+                        OUT_comUOp[i].nmDst <= entries[id].name;
+                        OUT_comUOp[i].tagDst <= entries[id].tag;
+                        OUT_comUOp[i].compressed <= entries[id].executed;
                         for (j = 0; j < WIDTH_WB; j=j+1)
-                            if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == entries[misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0]].tag)
+                            if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == entries[id].tag)
                                 OUT_comUOp[i].compressed <= 1;
                     end
                     else begin
@@ -247,28 +269,30 @@ always_ff@(posedge clk) begin
                 
                 ROBEntry cur = entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
                 
-                if (!temp && cur.executed && (!pred || (!cur.predicted && cur.flags == FLAGS_NONE))) begin
-                    OUT_comUOp[i].nmDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].name;
-                    OUT_comUOp[i].tagDst <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].tag;
-                    OUT_comUOp[i].sqN <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].sqN;
-                    OUT_comUOp[i].isBranch <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].isBranch;
-                    OUT_comUOp[i].branchTaken <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].branchTaken;
+                reg[$clog2(LENGTH)-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
+                
+                if (!temp && cur.executed && (!pred || (cur.flags == FLAGS_NONE))) begin
+                    OUT_comUOp[i].nmDst <= entries[id].name;
+                    OUT_comUOp[i].tagDst <= entries[id].tag;
+                    OUT_comUOp[i].sqN <= {entries[id].sqN_msb, id[5:0]};
+                    OUT_comUOp[i].isBranch <= entries[id].flags == FLAGS_BRANCH || 
+                        entries[id].flags == FLAGS_PRED_TAKEN || entries[id].flags == FLAGS_PRED_NTAKEN;
+                    OUT_comUOp[i].compressed <= entries[id].compressed;
                     OUT_comUOp[i].valid <= 1;
-                    OUT_comUOp[i].compressed <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].compressed;
-                    OUT_curFetchID <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].fetchID;
+                    OUT_curFetchID <= entries[id].fetchID;
                     
-                    entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].valid <= 0;
-                    entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].executed <= 0;
+                    entries[id].valid <= 0;
+                    entries[id].executed <= 0;
                     
-                    if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].predicted || 
-                        entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != 0) begin
-                        pcLookupEntry <= entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]];
+                    if (|entries[id].flags[2:1]) begin
+                        pcLookupEntry <= entries[id];
+                        pcLookupEntrySqN <= {entries[id].sqN_msb, id[5:0]};
                         pred = 1;
                     end
                         
-                    if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags != FLAGS_NONE) begin
+                    if (entries[id].flags[2]) begin
                         // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
-                        if (entries[baseIndex[ID_LEN-1:0]+i[ID_LEN-1:0]].flags == FLAGS_EXCEPT)
+                        if (entries[id].flags == FLAGS_EXCEPT)
                             OUT_comUOp[i].nmDst <= 0;
                         stop <= 1;
                         temp = 1;
@@ -290,28 +314,29 @@ always_ff@(posedge clk) begin
 
         // Enqueue ops directly from Rename
         for (i = 0; i < WIDTH; i=i+1) begin
-            if (IN_uopValid[i] && (!IN_branch.taken/* || $signed(IN_uop[i].sqN - IN_branch.takenSqN) <= 0*/)) begin
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].valid <= 1;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].tag <= IN_uop[i].tagDst;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].name <= IN_uop[i].nmDst;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].sqN <= IN_uop[i].sqN;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].compressed <= IN_uop[i].compressed;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].fetchID <= IN_uop[i].fetchID;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].executed <= IN_uop[i].fu == FU_RN;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].predicted <= 0;
-                entries[IN_uop[i].sqN[ID_LEN-1:0]].flags <= 0;
+            if (rnUOpValidSorted[i] && (!IN_branch.taken)) begin
+                
+                reg[5:0] id = {rnUOpSorted[i].sqN[5:2], i[1:0]};
+                
+                entries[id].valid <= 1;
+                entries[id].tag <= rnUOpSorted[i].tagDst;
+                entries[id].name <= rnUOpSorted[i].nmDst;
+                entries[id].sqN_msb <= rnUOpSorted[i].sqN[6];
+                entries[id].compressed <= rnUOpSorted[i].compressed;
+                entries[id].fetchID <= rnUOpSorted[i].fetchID;
+                entries[id].executed <= rnUOpSorted[i].fu == FU_RN;
+                entries[id].flags <= 0;
             end
         end
         
         // Mark committed ops as valid and set flags
         for (i = 0; i < WIDTH_WB; i=i+1) begin
             if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0)) begin
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].executed <= 1;
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].flags <= IN_wbUOps[i].flags;
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].isBranch <= IN_wbUOps[i].isBranch;
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].branchTaken <= IN_wbUOps[i].branchTaken;
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].fetchOffs <= IN_wbUOps[i].pc[2:1] + (IN_wbUOps[i].compressed ? 2'b0 : 2'b1);
-                entries[IN_wbUOps[i].sqN[ID_LEN-1:0]].predicted <= IN_wbUOps[i].bpi.predicted;
+            
+                reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
+                entries[id].executed <= 1;
+                entries[id].flags <= IN_wbUOps[i].flags;
+                entries[id].fetchOffs <= IN_wbUOps[i].pc[2:1] + (IN_wbUOps[i].compressed ? 2'b0 : 2'b1);
             end
         end
         

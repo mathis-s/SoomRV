@@ -49,7 +49,7 @@ always_comb begin
     end
 end
 
-wire[30:0] branchAddr = IN_pc[31:1];//(OUT_branchCompr ? OUT_branchSrc[31:1] : OUT_branchSrc[31:1] - 1);
+wire[30:0] branchAddr = IN_pc[31:1];
 
 assign OUT_branchHistory = gHistory;
 assign OUT_branchInfo.predicted = OUT_branchFound;
