@@ -11,13 +11,15 @@ module ProgramCounter
     input wire en0,
     input wire en1,
     input wire rst,
-
+    
     input wire[31:0] IN_pc,
     input wire IN_write,
     input wire IN_branchTaken,
     input FetchID_t IN_fetchID,
 
     input wire[63:0] IN_instr,
+    
+    input wire IN_clearICache,
     
     input wire IN_BP_branchFound,
     input wire IN_BP_branchTaken,
@@ -94,7 +96,7 @@ wire icacheStall;
 ICacheTable ict
 (
     .clk(clk),
-    .rst(rst),
+    .rst(rst || IN_clearICache),
     .IN_lookupValid(en0),
     .IN_lookupPC(pc),
     

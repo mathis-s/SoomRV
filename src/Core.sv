@@ -155,6 +155,8 @@ ProgramCounter progCnt
     .IN_fetchID(branch.taken ? branch.fetchID : DEC_branchFetchID),
     .IN_instr(instrRaw),
     
+    .IN_clearICache(ROB_clearICache),
+    
     .IN_BP_branchTaken(BP_branchTaken),
     .IN_BP_isJump(BP_isJump),
     .IN_BP_branchSrc(BP_branchSrc),
@@ -187,6 +189,9 @@ BranchPredictor bp
 (
     .clk(clk),
     .rst(rst),
+    
+    .IN_clearICache(ROB_clearICache),
+    
     .IN_mispredFlush(mispredFlush),
     .IN_branch(branch),
     
@@ -574,6 +579,9 @@ AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
 IF_MemoryController CC_MC_if;
+
+wire CC_fenceBusy;
+
 CacheController cc
 (
     .clk(clk),
@@ -595,7 +603,10 @@ CacheController cc
     .OUT_MC_extAddr(CC_MC_if.extAddr),
     .IN_MC_progress(IN_MC_progress),
     .IN_MC_cacheID(OUT_MC_cacheID),
-    .IN_MC_busy(IN_MC_busy || PC_MC_if.ce)
+    .IN_MC_busy(IN_MC_busy || PC_MC_if.ce),
+    
+    .IN_fence(ROB_startFence),
+    .OUT_fenceBusy(CC_fenceBusy)
 );
 
 AGU_UOp AGU_LD_uop;
@@ -752,6 +763,7 @@ assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
 
 SqN ROB_maxSqN;
 
+wire ROB_startFence;
 wire[31:0] CR_irqAddr;
 Flags ROB_irqFlags;
 wire[31:0] ROB_irqSrc;
@@ -759,9 +771,10 @@ wire[31:0] ROB_irqMemAddr;
 wire ROB_disableIFetch;
 
 FetchID_t ROB_curFetchID;
+wire ROB_clearICache;
 
 BPUpdate ROB_bpUpdate;
-wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid;
+wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
 ROB rob
 (
     .clk(clk),
@@ -772,8 +785,6 @@ ROB rob
     .IN_wbUOps(wbUOp),
 
     .IN_branch(branch),
-    
-    .IN_MEM_busy(MEMSUB_busy),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
@@ -789,12 +800,13 @@ ROB rob
     .OUT_pcReadAddr(PC_readAddress[4]),
     .IN_pcReadData(PC_readData[4]),
     
-    .OUT_fence(),
-    
     .OUT_branch(branchProvs[3]),
-    
     .OUT_curFetchID(ROB_curFetchID),
     
+    .IN_MEM_busy(MEMSUB_busy),
+    
+    .OUT_fence(ROB_startFence),
+    .OUT_clearICache(ROB_clearICache),
     .OUT_disableIFetch(ROB_disableIFetch),
     .OUT_halt(OUT_halt),
     .OUT_mispredFlush(mispredFlush)

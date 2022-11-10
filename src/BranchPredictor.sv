@@ -7,6 +7,9 @@ module BranchPredictor
 (
     input wire clk,
     input wire rst,
+    
+    input wire IN_clearICache,
+    
     input wire IN_mispredFlush,
     input BranchProv IN_branch,
     
@@ -63,7 +66,7 @@ assign OUT_branchSrc[0] = 1'b0;
 BranchTargetBuffer btb
 (
     .clk(clk),
-    .rst(rst),
+    .rst(rst || IN_clearICache),
     .IN_pcValid(IN_pcValid),
     .IN_pc(IN_pc[31:1]),
     .OUT_branchFound(OUT_branchFound),

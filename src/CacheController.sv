@@ -35,7 +35,10 @@ module CacheController
     output reg[29:0] OUT_MC_extAddr,
     input wire[9:0] IN_MC_progress,
     input wire[0:0] IN_MC_cacheID,
-    input wire IN_MC_busy
+    input wire IN_MC_busy,
+    
+    input wire IN_fence,
+    output wire OUT_fenceBusy
 );
 
 integer i;
@@ -74,6 +77,17 @@ always_comb begin
             cacheTableEntry[1] = j[$clog2(SIZE)-1:0];
         end
     end
+end
+
+reg fenceScheduled;
+reg fenceActive;
+assign OUT_fenceBusy = fenceScheduled || fenceActive || evicting;
+
+reg empty;
+always_comb begin
+    empty = 1;
+    for (i = 0; i < SIZE; i=i+1)
+        if (ctable[i].valid) empty = 0;
 end
 
 AGU_UOp cmissUOpLd;
@@ -120,10 +134,17 @@ always_ff@(posedge clk) begin
         OUT_MC_we <= 0;
         waitCycle <= 0;
         
-        if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
-            if (ctable[lruPointer].valid)
-                ctable[lruPointer].used <= 0;
-            lruPointer <= lruPointer + 1;
+        if (fenceActive) begin
+            // During fence, we search for used entries using lruPointer to evict them
+            if (!ctable[lruPointer].valid)
+                lruPointer <= lruPointer + 1;
+        end
+        else begin
+            if (ctable[lruPointer].valid && ctable[lruPointer].used) begin
+                if (ctable[lruPointer].valid)
+                    ctable[lruPointer].used <= 0;
+                lruPointer <= lruPointer + 1;
+            end
         end
         
         // Entry Eviction logic
@@ -131,7 +152,6 @@ always_ff@(posedge clk) begin
             // Abort eviction if memory controller chose another request
             if (evicting && IN_MC_cacheID != 0) begin
                 evicting <= 0;
-                //freeEntryAvail <= 0;
                 ctable[evictingID].valid <= 1;
             end
             // Finalize eviction
@@ -180,15 +200,15 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-            // Regular eviction
-            else if (!freeEntryAvail && !evicting && !IN_MC_busy && !waitCycle) begin
+            // Regular eviction or fence
+            else if ((!freeEntryAvail || fenceActive) && !evicting && !IN_MC_busy && !waitCycle) begin
             
                 if (!ctable[lruPointer].valid) begin
                     freeEntryAvail <= 1;
                     freeEntryID <= lruPointer;
                 end
 
-                else if (!ctable[lruPointer].used && (!IN_uopLd.valid || OUT_stall[0]) && !OUT_uopLd.valid
+                else if ((!ctable[lruPointer].used || fenceActive) && (!IN_uopLd.valid || OUT_stall[0]) && !OUT_uopLd.valid
                 && (!IN_uopSt.valid || OUT_stall[1]) && !OUT_uopSt.valid) begin
                     
                     ctable[lruPointer].valid <= 0;
@@ -339,6 +359,19 @@ always_ff@(posedge clk) begin
                 waitCycle <= 1;
                 setDirty = 0;
             end
+        end
+        
+        if (fenceActive && empty) begin
+            fenceActive <= 0;
+        end
+        else if (fenceScheduled && IN_SQ_empty && 
+            (!IN_uopLd.valid && !IN_uopSt.valid && !OUT_uopLd.valid && !OUT_uopSt.valid) && 
+            !loading && !evicting && evictionRq == EV_RQ_NONE) begin
+            fenceActive <= 1;
+            fenceScheduled <= 0;
+        end
+        else if (IN_fence) begin
+            fenceScheduled <= 1;
         end
     end
 

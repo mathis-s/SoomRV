@@ -56,11 +56,12 @@ module ROB
     output FetchID_t OUT_pcReadAddr,
     input PCFileEntry IN_pcReadData,
     
-    output reg OUT_fence,
     
     output BranchProv OUT_branch,
     output FetchID_t OUT_curFetchID,
     
+    output reg OUT_fence,
+    output reg OUT_clearICache,
     output wire OUT_disableIFetch,
     output reg OUT_halt,
     output reg OUT_mispredFlush
@@ -113,7 +114,7 @@ end
 
 reg stop;
 reg memoryWait;
-reg memoryFence;
+reg instrFence;
 
 assign OUT_disableIFetch = memoryWait;
 
@@ -127,6 +128,7 @@ always_ff@(posedge clk) begin
     OUT_branch.taken <= 0;
     OUT_halt <= 0;
     OUT_fence <= 0;
+    OUT_clearICache <= 0;
     
     if (rst) begin
         baseIndex = 0;
@@ -165,9 +167,9 @@ always_ff@(posedge clk) begin
         OUT_bpUpdate.valid <= 0;
         
         if (memoryWait && !IN_MEM_busy) begin
-            if (memoryFence) begin
-                OUT_fence <= 1;
-                memoryFence <= 0;
+            if (instrFence) begin
+                instrFence <= 0;
+                OUT_clearICache <= 1;
             end
             else begin
                 memoryWait <= 0;
@@ -185,8 +187,9 @@ always_ff@(posedge clk) begin
                     memoryWait <= 1;
                 end
                 else if (pcLookupEntry.flags == FLAGS_FENCE) begin
-                    memoryFence <= 1;
+                    instrFence <= 1;
                     memoryWait <= 1;
+                    OUT_fence <= 1;
                 end
                 
                 OUT_branch.taken <= 1;

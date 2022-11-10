@@ -174,4 +174,46 @@ main:
     div a0, a0, a0
     div a0, a0, a0
     div a0, a0, a0
+    
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    fence iorw, iorw
+    
     ebreak

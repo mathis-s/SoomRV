@@ -71,7 +71,7 @@ int main(int argc, char** argv)
             
             dataIndex++;
         }
-        printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
+        // printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
         fclose(f);
     }
 
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
     }
     
     // Run a few more cycles ...
-    for (int i = 0; i < 40; i=i+1)
+    for (int i = 0; i < 200; i=i+1)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model
