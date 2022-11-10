@@ -396,6 +396,13 @@ always_comb begin
                             uop.fu = FU_INT;
                             uop.opcode = INT_SYS;
                             uop.imm = {29'bx, FLAGS_FENCE};
+                            invalidEnc = 0;
+                        end
+                        else if (instr.funct3 == 1) begin
+                            uop.fu = FU_INT;
+                            uop.opcode = INT_SYS;
+                            uop.imm = {29'bx, FLAGS_FENCE};
+                            invalidEnc = 0;
                         end
                         // cbo.inval -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin

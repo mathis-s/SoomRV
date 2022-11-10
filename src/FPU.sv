@@ -107,9 +107,6 @@ always@(posedge clk) begin
     end
     else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         
-        OUT_uop.isBranch <= 0;
-        OUT_uop.branchTaken <= 0;
-        OUT_uop.bpi <= IN_uop.bpi;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;

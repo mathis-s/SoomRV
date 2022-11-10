@@ -84,9 +84,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.tagDst <= uop.tagDst;
                 OUT_uop.nmDst <= uop.nmDst;
                 OUT_uop.pc <= uop.pc;
-                OUT_uop.isBranch <= 0;
-                OUT_uop.branchTaken <= 0;
-                OUT_uop.bpi <= 0;
                 OUT_uop.compressed <= 0;
                 
                 OUT_uop.flags <= FLAGS_NONE;

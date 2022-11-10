@@ -88,7 +88,7 @@ always_ff@(posedge clk) begin
                     
                     // External RAM
                     OUT_EXT_en <= 1;
-                    OUT_EXT_bus <= {IN_we, 1'b0, IN_extAddr[29:0]};
+                    OUT_EXT_bus <= {IN_we, IN_cacheID[0], IN_extAddr[29:0]};
                     OUT_EXT_oen <= 1;
                     
                     // Interface

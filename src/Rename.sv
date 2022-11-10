@@ -200,7 +200,7 @@ reg isNewestCommit[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         
-        isNewestCommit[i] = IN_comUOp[i].valid;
+        isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].nmDst != 0;
         if (IN_comUOp[i].valid)
             for (j = i + 1; j < WIDTH_UOPS; j=j+1)
                 if (IN_comUOp[j].valid && (IN_comUOp[j].nmDst == IN_comUOp[i].nmDst))

@@ -263,8 +263,7 @@ always_ff@(posedge clk) begin
                     case (IN_uopSt.data[1:0])
                         0: evictionRq <= EV_RQ_CLEAN;
                         1: evictionRq <= EV_RQ_INVAL;
-                        2: evictionRq <= EV_RQ_FLUSH;
-                        default: begin end
+                        default: evictionRq <= EV_RQ_FLUSH;
                     endcase
                 end
                 

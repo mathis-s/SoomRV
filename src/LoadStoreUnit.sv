@@ -110,9 +110,6 @@ always_comb begin
     OUT_uopLd.pc = uopLd_1.pc;
     OUT_uopLd.valid = uopLd_1.valid;
     OUT_uopLd.flags = uopLd_1.exception ? FLAGS_EXCEPT : FLAGS_NONE;
-    OUT_uopLd.isBranch = 0;
-    OUT_uopLd.branchTaken = 0;//uopLd_1.addr[19];
-    OUT_uopLd.bpi = 0;//uopLd_1.addr[18:11];
     OUT_uopLd.compressed = uopLd_1.compressed;//uopLd_1.addr[18:11];
 end
 

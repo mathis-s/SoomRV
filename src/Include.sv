@@ -240,10 +240,6 @@ typedef struct packed
     RegNm nmDst;
     SqN sqN;
     bit[31:0] pc;
-    bit isBranch;
-    bit branchTaken;
-    BranchPredInfo bpi;
-    BHist_t history;
     Flags flags;
     logic compressed;
     bit valid;

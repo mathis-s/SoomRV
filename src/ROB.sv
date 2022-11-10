@@ -325,7 +325,7 @@ always_ff@(posedge clk) begin
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;
                 entries[id].executed <= rnUOpSorted[i].fu == FU_RN;
-                entries[id].flags <= 0;
+                entries[id].flags <= FLAGS_NONE;
             end
         end
         

@@ -232,10 +232,10 @@ always_ff@(posedge clk) begin
                 //else $display("Ret correct");
             end
             
-            OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
-            OUT_uop.branchTaken <= branchTaken;
-            OUT_uop.history <= IN_uop.history;
-            OUT_uop.bpi <= IN_uop.bpi;
+            //OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
+            //OUT_uop.branchTaken <= branchTaken;
+            //OUT_uop.history <= IN_uop.history;
+            //OUT_uop.bpi <= IN_uop.bpi;
             
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.tagDst <= IN_uop.tagDst;
