@@ -58,7 +58,7 @@ always_comb begin
     end
 end
 
-SQEntry evicted[2:0];
+SQEntry evicted[1:0];
 
 reg[3:0] lookupMask;
 reg[31:0] lookupData;
@@ -67,7 +67,7 @@ always_comb begin
     lookupMask = 0;
     lookupData = 32'bx;
     
-    for (i = 1; i < 3; i=i+1) begin
+    for (i = 0; i < 2; i=i+1) begin
         if (IN_uopLd.isLoad && evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2]) begin
             if (evicted[i].wmask[0])
                 lookupData[7:0] = evicted[i].data[7:0];
@@ -114,7 +114,6 @@ always_ff@(posedge clk) begin
         
         evicted[0].valid <= 0;
         evicted[1].valid <= 0;
-        evicted[2].valid <= 0;
         
         baseIndex = 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
@@ -156,8 +155,7 @@ always_ff@(posedge clk) begin
                     entries[i-1].ready <= 1;
             end
                 
-            evicted[2] <= entries[0];
-            evicted[1] <= evicted[2];
+            evicted[1] <= entries[0];
             evicted[0] <= evicted[1];
         end
         else if (!IN_disable) OUT_uopSt.valid <= 0;

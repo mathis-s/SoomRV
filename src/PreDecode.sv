@@ -1,9 +1,21 @@
 
+typedef struct packed
+{
+    logic[28:0] pc;
+    FetchID_t fetchID;
+    logic[1:0] firstValid;
+    logic[1:0] lastValid;
+    logic[1:0] predPos;
+    logic predTaken;
+    
+    logic[3:0][15:0] instr;
+} PDEntry;
+
 module PreDecode
 #(
     parameter NUM_INSTRS_IN=4,
     parameter NUM_INSTRS_OUT=4,
-    parameter BUF_SIZE=16
+    parameter BUF_SIZE=8
 )
 (
     input wire clk,
@@ -21,10 +33,11 @@ module PreDecode
 
 integer i;
 
-IF_Instr buffer[BUF_SIZE-1:0];
+PDEntry buffer[BUF_SIZE-1:0];
 
 reg[$clog2(BUF_SIZE)-1:0] bufIndexIn;
 reg[$clog2(BUF_SIZE)-1:0] bufIndexOut;
+reg[$clog2(NUM_INSTRS_IN)-1:0] subIndexOut;
 
 // TODO: Make this based on bufIndexIn/bufIndexOut
 reg[$clog2(BUF_SIZE):0] freeEntries;
@@ -42,27 +55,52 @@ always_ff@(posedge clk) begin
 
         if (outEn) begin
             for (i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
-            
-                if (bufIndexIn != bufIndexOut) begin
-                    // 32-bit Instruction
-                    if ((buffer[bufIndexOut].instr[1:0] == 2'b11) && ((bufIndexOut + 4'b1) != bufIndexIn)) begin
-                        OUT_instrs[i].instr <= {buffer[bufIndexOut + 1].instr, buffer[bufIndexOut].instr};
-                        OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
-                        OUT_instrs[i].fetchID <= buffer[bufIndexOut + 1].fetchID;
-                        OUT_instrs[i].predTaken <= buffer[bufIndexOut + 1].predTaken;
+                
+                if (bufIndexOut != bufIndexIn) begin
+                    
+                    PDEntry cur = buffer[bufIndexOut];
+                    reg[15:0] instr = cur.instr[subIndexOut];
+                    assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
+                    
+                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 3'b1) != bufIndexIn) || subIndexOut != cur.lastValid)) begin
+                        
+                        OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
                         OUT_instrs[i].valid <= 1;
-                        bufIndexOut = bufIndexOut + 2;
-                        freeEntries = freeEntries + 2;
-                    end
-                    // 16-bit Instruction
-                    else if (buffer[bufIndexOut].instr[1:0] != 2'b11) begin
-                        OUT_instrs[i].instr <= {16'bx, buffer[bufIndexOut].instr};
-                        OUT_instrs[i].pc <= buffer[bufIndexOut].pc;
+                        
+                        if (subIndexOut == cur.lastValid) begin
+                            bufIndexOut = bufIndexOut + 1;
+                            freeEntries = freeEntries + 1;
+                            subIndexOut = buffer[bufIndexOut].firstValid;
+                        end
+                        else subIndexOut = subIndexOut + 1;
+                        
+                        OUT_instrs[i].instr <= {buffer[bufIndexOut].instr[subIndexOut], instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
-                        OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken;
+                        OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
+                        
+                        if (subIndexOut == buffer[bufIndexOut].lastValid) begin
+                            bufIndexOut = bufIndexOut + 1;
+                            freeEntries = freeEntries + 1;
+                            subIndexOut = buffer[bufIndexOut].firstValid;
+                        end
+                        else subIndexOut = subIndexOut + 1;
+                        
+                    end
+                    else if (instr[1:0] != 2'b11) begin
+                        OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
+                        OUT_instrs[i].instr <= {16'bx, instr};
+                        OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
+                        OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
                         OUT_instrs[i].valid <= 1;
-                        bufIndexOut = bufIndexOut + 1;
-                        freeEntries = freeEntries + 1;
+                        
+                        
+                        if (subIndexOut == cur.lastValid) begin
+                            bufIndexOut = bufIndexOut + 1;
+                            freeEntries = freeEntries + 1;
+                            subIndexOut = buffer[bufIndexOut].firstValid;
+                        end
+                        else subIndexOut = subIndexOut + 1;
+                        
                     end
                     else OUT_instrs[i].valid <= 0;
                 end
@@ -70,14 +108,36 @@ always_ff@(posedge clk) begin
             end
         end
         
-        for (i = 0; i < NUM_INSTRS_IN; i=i+1) begin
-            if (ifetchValid && IN_instrs[i].valid) begin
-                buffer[bufIndexIn] <= IN_instrs[i];
-                bufIndexIn = bufIndexIn + 1;
-                freeEntries = freeEntries - 1;
-                assert(bufIndexIn != bufIndexOut);
+        if (ifetchValid && (IN_instrs[0].valid||IN_instrs[1].valid||IN_instrs[2].valid||IN_instrs[3].valid)) begin
+            
+            buffer[bufIndexIn].predTaken <= 0;
+            
+            for (i = 0; i < NUM_INSTRS_IN; i=i+1) begin
+                if (IN_instrs[i].valid) begin
+                    buffer[bufIndexIn].instr[i] <= IN_instrs[i].instr;
+                    buffer[bufIndexIn].lastValid <= i[1:0];
+                    
+                    if (IN_instrs[i].predTaken) begin
+                        buffer[bufIndexIn].predTaken <= 1;
+                        buffer[bufIndexIn].predPos <= i[1:0];
+                    end
+                end
             end
+            
+            for (i = NUM_INSTRS_IN-1; i >= 0; i=i-1)
+                if (IN_instrs[i].valid) begin
+                    buffer[bufIndexIn].firstValid <= i[1:0];
+                    if (bufIndexIn == bufIndexOut) subIndexOut = i[1:0];
+                end
+            
+            buffer[bufIndexIn].pc <= IN_instrs[0].pc[30:2];
+            buffer[bufIndexIn].fetchID <= IN_instrs[0].fetchID;
+            
+            bufIndexIn = bufIndexIn + 1;
+            assert(bufIndexIn != bufIndexOut);
+            freeEntries = freeEntries - 1;
         end
+
 
     end
     else begin
@@ -88,7 +148,7 @@ always_ff@(posedge clk) begin
         freeEntries = BUF_SIZE;
     end
     
-    OUT_full <= (freeEntries < 5);
+    OUT_full <= (freeEntries < 2);
 end
 
 endmodule

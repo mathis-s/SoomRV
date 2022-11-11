@@ -39,7 +39,6 @@ module ROB
     
     input BranchProv IN_branch,
     
-    input wire IN_MEM_busy,
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
@@ -59,6 +58,8 @@ module ROB
     
     output BranchProv OUT_branch,
     output FetchID_t OUT_curFetchID,
+    
+    input wire IN_MEM_busy,
     
     output reg OUT_fence,
     output reg OUT_clearICache,
