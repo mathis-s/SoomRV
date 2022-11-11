@@ -13,6 +13,7 @@ module IntALU
 
     output BranchProv OUT_branch,
     output BTUpdate OUT_btUpdate,
+    output IndirBranchInfo OUT_ibInfo,
     
     output wire[31:0] OUT_zcFwdResult,
     output Tag OUT_zcFwdTag,
@@ -165,6 +166,7 @@ always_ff@(posedge clk) begin
         OUT_uop.valid <= 0;
         OUT_branch.taken <= 0;
         OUT_btUpdate.valid <= 0;
+        OUT_ibInfo.valid <= 0;
     end
     else begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
@@ -175,6 +177,7 @@ always_ff@(posedge clk) begin
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
             OUT_branch.flush <= 0;
+            OUT_ibInfo.valid <= 0;
             
             if (IN_uop.opcode == INT_JAL)
                 OUT_branch.history <= IN_uop.history;
@@ -223,11 +226,17 @@ always_ff@(posedge clk) begin
                 OUT_branch.taken <= 1;
             end
             // Check speculated return address
-            else if (IN_uop.opcode == INT_V_RET) begin
+            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JR) begin
                 if (srcA != srcB) begin
                     //$display("Ret misspeculation %x %x", srcA, srcB);
                     OUT_branch.dstPC <= srcA;
                     OUT_branch.taken <= 1;
+                end
+                
+                if (IN_uop.opcode == INT_V_JR) begin
+                    OUT_ibInfo.src <= IN_uop.pc[31:1];
+                    OUT_ibInfo.dst <= srcA[31:1];
+                    OUT_ibInfo.valid <= 1;
                 end
                 //else $display("Ret correct");
             end

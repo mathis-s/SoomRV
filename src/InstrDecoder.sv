@@ -194,6 +194,8 @@ module InstrDecoder
     input wire IN_invalidate,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
     
+    input wire[30:0] IN_indirBranchTarget,
+    
     output reg OUT_decBranch,
     output reg[30:0] OUT_decBranchDst,
     output FetchID_t OUT_decBranchFetchID,
@@ -1059,10 +1061,10 @@ always_comb begin
                     end
                     // c.jr
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
-                        uop.opcode = INT_JALR;
                         uop.fu = FU_INT;
-                        //uop.immB = 1;
+                        uop.opcode = INT_JALR;
                         uop.rs0 = i16.cr.rd_rs1;
+                        
                         // jr ra
                         if (i16.cr.rd_rs1 == 1 && RS_outValid) begin
                             RS_inPop = 1;
@@ -1072,6 +1074,16 @@ always_comb begin
                             
                             OUT_decBranch = 1;
                             OUT_decBranchDst = RS_outData;
+                            OUT_decBranchFetchID = uop.fetchID;
+                        end
+                        // 4837 cycles
+                        else begin
+                            uop.opcode = INT_V_JR;
+                            uop.imm = {IN_indirBranchTarget, 1'b0};
+                            uop.immB = 1;
+                            
+                            OUT_decBranch = 1;
+                            OUT_decBranchDst = IN_indirBranchTarget;
                             OUT_decBranchFetchID = uop.fetchID;
                         end
                         invalidEnc = 0;

@@ -79,7 +79,6 @@ assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;// && !wbUOp[3
 //assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
 //assign wbHasResult_fp[3] = wbUOp[3].valid && wbUOp[3].nmDst[5];
 
-
 CommitUOp comUOps[3:0];
 wire comValid[3:0];
 
@@ -209,9 +208,19 @@ BranchPredictor bp
     
     .IN_btUpdates(BP_btUpdates),
     
-    .IN_bpUpdate(ROB_bpUpdate),
+    .IN_bpUpdate(ROB_bpUpdate)
+);
+
+IndirBranchInfo IBP_updates[1:0];
+wire[30:0] IBP_predDst;
+IndirectBranchPredictor ibp
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_clearICache(ROB_clearICache),
     
-    .OUT_CSR_branchCommitted(CSR_branchCommitted)
+    .IN_ibUpdates(IBP_updates),
+    .OUT_predDst(IBP_predDst)
 );
 
 SqN RN_nextSqN;
@@ -255,6 +264,8 @@ InstrDecoder idec
     .IN_invalidate(branch.taken),
     .en(!FUSE_full),
     .IN_instrs(PD_instrs),
+    
+    .IN_indirBranchTarget(IBP_predDst),
     
     .OUT_decBranch(DEC_branch),
     .OUT_decBranchDst(DEC_branchDst),
@@ -534,6 +545,7 @@ IntALU ialu
     
     .OUT_branch(branchProvs[0]),
     .OUT_btUpdate(BP_btUpdates[0]),
+    .OUT_ibInfo(IBP_updates[0]),
     
     .OUT_zcFwdResult(LD_zcFwdResult[0]),
     .OUT_zcFwdTag(LD_zcFwdTag[0]),
@@ -734,6 +746,7 @@ IntALU ialu1
 
     .OUT_branch(branchProvs[1]),
     .OUT_btUpdate(BP_btUpdates[1]),
+    .OUT_ibInfo(IBP_updates[1]),
     
     .OUT_zcFwdResult(LD_zcFwdResult[1]),
     .OUT_zcFwdTag(LD_zcFwdTag[1]),
@@ -813,7 +826,6 @@ ROB rob
 );
 
 wire IO_busy;
-wire CSR_branchCommitted;
 ControlRegs cr
 (
     .clk(clk),
@@ -833,7 +845,7 @@ ControlRegs cr
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
     .IN_ifValid('{DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
-    .IN_comBranch(CSR_branchCommitted),
+    .IN_comBranch((comUOps[0].valid&&comUOps[0].isBranch)||(comUOps[1].valid&&comUOps[1].isBranch)||(comUOps[2].valid&&comUOps[2].isBranch)||(comUOps[3].valid&&comUOps[3].isBranch)),
     
     .OUT_irqAddr(CR_irqAddr),
     .IN_irqTaken(branchProvs[3].taken),
@@ -853,9 +865,7 @@ ControlRegs cr
 );
 
 assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
-    //($signed(RN_nextLoadSqN - LB_maxLoadSqN) <= -4) && 
-    //($signed(RN_nextStoreSqN - SQ_maxStoreSqN) <= -4) && 
-    ($signed(RN_nextSqN - ROB_maxSqN) <= -4) && 
+    ($signed(RN_nextSqN - ROB_maxSqN) <= -3) && 
     !branch.taken &&
     en &&
     !mispredFlush &&

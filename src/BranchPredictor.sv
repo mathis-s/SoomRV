@@ -31,9 +31,7 @@ module BranchPredictor
     
     
     // Branch ROB Interface
-    input BPUpdate IN_bpUpdate,
-    
-    output reg OUT_CSR_branchCommitted
+    input BPUpdate IN_bpUpdate
 );
 
 integer i;
@@ -106,7 +104,6 @@ always_ff@(posedge clk) begin
     if (rst) begin
         gHistory <= 0;
         gHistoryCom <= 0;
-        OUT_CSR_branchCommitted <= 0;
     end
     else begin
         if (OUT_branchFound && !OUT_isJump)
@@ -114,9 +111,7 @@ always_ff@(posedge clk) begin
         
         if (IN_bpUpdate.valid && !IN_mispredFlush) begin
             gHistoryCom <= {gHistoryCom[$bits(BHist_t)-2:0], IN_bpUpdate.branchTaken};
-            OUT_CSR_branchCommitted <= 1;
         end
-        else OUT_CSR_branchCommitted <= 0;
     end
     
     if (!rst && IN_branch.taken) begin

@@ -15,6 +15,7 @@ decoder_tb:
 	src/ROB.sv \
 	src/AGU.sv \
 	src/BranchPredictor.sv \
+	src/IndirectBranchPredictor.sv \
 	src/LoadBuffer.sv \
 	src/StoreQueue.sv \
 	src/MultiplySmall.sv \
