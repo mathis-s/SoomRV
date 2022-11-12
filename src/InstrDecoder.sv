@@ -1062,7 +1062,7 @@ always_comb begin
                     // c.jr
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
                         uop.fu = FU_INT;
-                        uop.opcode = INT_JALR;
+                        //uop.opcode = INT_JALR;
                         uop.rs0 = i16.cr.rd_rs1;
                         
                         // jr ra
@@ -1076,7 +1076,6 @@ always_comb begin
                             OUT_decBranchDst = RS_outData;
                             OUT_decBranchFetchID = uop.fetchID;
                         end
-                        // 4837 cycles
                         else begin
                             uop.opcode = INT_V_JR;
                             uop.imm = {IN_indirBranchTarget, 1'b0};

@@ -58,7 +58,7 @@ always@(posedge clk) begin
     end
     
     //if (!ce1_reg && !ce_reg && addr1_reg == addr_reg)
-    //    $display("Warning: Multiple cache accesses at same address");
+    //    $display("Warning: Multiple %m accesses at same address %x", addr_reg);
 end
 
 endmodule

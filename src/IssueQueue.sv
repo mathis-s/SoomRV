@@ -25,6 +25,9 @@ module IssueQueue
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
     
+    input wire IN_loadForwardValid,
+    input Tag IN_loadForwardTag,
+    
     input BranchProv IN_branch,
     
     // All ops that are being issued (including OUT_uop)
@@ -73,6 +76,9 @@ always_comb begin
                 if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
             end
         end
+        
+        if (IN_loadForwardValid && queue[i].tagA == IN_loadForwardTag) newAvailA[i] = 1;
+        if (IN_loadForwardValid && queue[i].tagB == IN_loadForwardTag) newAvailB[i] = 1;
     end
 end
 

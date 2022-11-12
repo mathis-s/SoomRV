@@ -317,7 +317,7 @@ Rename rn
     .IN_branchSqN(branch.sqN),
     .IN_branchLoadSqN(branch.loadSqN),
     .IN_branchStoreSqN(branch.storeSqN),
-    .IN_mispredFlush(mispredFlush),   
+    .IN_mispredFlush(mispredFlush),
 
     .OUT_uopValid(RN_uopValid),
     .OUT_uop(RN_uop),
@@ -350,6 +350,8 @@ IssueQueue#(8,4,4,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
+    .IN_loadForwardValid(LSU_loadFwdValid),
+    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -379,6 +381,8 @@ IssueQueue#(8,4,4,FU_INT,FU_MUL,FU_MUL,1,1,9-4) iq1
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
+    .IN_loadForwardValid(LSU_loadFwdValid),
+    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -408,7 +412,9 @@ IssueQueue#(8,4,4,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
-    
+    .IN_loadForwardValid(LSU_loadFwdValid),
+    .IN_loadForwardTag(LSU_loadFwdTag),  
+
     .IN_branch(branch),
     
     .IN_issueValid(RV_uopValid),
@@ -437,6 +443,8 @@ IssueQueue#(10,4,4,FU_ST,FU_ST,FU_ST,0,0,0) iq3
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp),
+    .IN_loadForwardValid(LSU_loadFwdValid),
+    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -702,6 +710,8 @@ StoreQueue sq
     .IN_IO_busy(IO_busy)
 );
 
+wire LSU_loadFwdValid;
+Tag LSU_loadFwdTag;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -727,7 +737,10 @@ LoadStoreUnit lsu
     .IN_CSR_data(CSR_dataOut),
     .OUT_CSR_we(CSR_we),
     
-    .OUT_uopLd(wbUOp[2])
+    .OUT_uopLd(wbUOp[2]),
+    
+    .OUT_loadFwdValid(LSU_loadFwdValid),
+    .OUT_loadFwdTag(LSU_loadFwdTag)
 );
 
 RES_UOp INT1_uop;

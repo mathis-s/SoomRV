@@ -40,7 +40,7 @@ always_comb begin
         end
     end
     
-    if (loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && lastProgress > IN_lookupPC[7:1]) begin
+    if (loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && {lastProgress, 1'b0} > {IN_lookupPC[7:2], 2'b11}) begin
         cacheEntryFound = 1;
         cacheEntryIndex = lruPointer;
         OUT_lookupAddress = {20'b0, lruPointer, IN_lookupPC[7:2]};

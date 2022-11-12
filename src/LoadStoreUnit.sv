@@ -25,7 +25,10 @@ module LoadStoreUnit
     input wire[31:0] IN_CSR_data,
     output reg OUT_CSR_we,
     
-    output RES_UOp OUT_uopLd
+    output RES_UOp OUT_uopLd,
+    
+    output wire OUT_loadFwdValid,
+    output Tag OUT_loadFwdTag
 );
 
 integer i;
@@ -33,6 +36,10 @@ integer j;
 
 AGU_UOp uopLd_0;
 AGU_UOp uopLd_1;
+
+assign OUT_loadFwdValid = uopLd_0.valid || (IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111);
+assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
+
 reg isCSRread_1;
 
 always_comb begin
@@ -43,7 +50,7 @@ always_comb begin
     OUT_MEM_wm = IN_uopSt.wmask;
         
     // Load
-    if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
+    if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111) begin
         OUT_MEM_re = 0;
     end
     else OUT_MEM_re = 1;
@@ -120,18 +127,28 @@ always_ff@(posedge clk) begin
         uopLd_1.valid <= 0;
     end
     else begin
-        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
-            uopLd_0 <= IN_uopLd;
-            uopLd_0.wmask <= IN_SQ_lookupMask;
-            uopLd_0.data <= IN_SQ_lookupData;
-        end
-        else uopLd_0.valid <= 0;
+        uopLd_0.valid <= 0;
+        uopLd_1.valid <= 0;
         
         if (uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) begin
             uopLd_1 <= uopLd_0;
             isCSRread_1 <= uopLd_0.addr[31:24] == 8'hFF;
         end
-        else uopLd_1.valid <= 0;
+        
+        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
+            
+            // Loads that are entirely forwarded from the store queue can be written back one cycle earlier.
+            if (IN_SQ_lookupMask == 4'b1111 && !(uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0))) begin
+                uopLd_1 <= IN_uopLd;
+                uopLd_1.wmask <= IN_SQ_lookupMask;
+                uopLd_1.data <= IN_SQ_lookupData;
+            end
+            else begin
+                uopLd_0 <= IN_uopLd;
+                uopLd_0.wmask <= IN_SQ_lookupMask;
+                uopLd_0.data <= IN_SQ_lookupData;
+            end
+        end
     end
 
 end

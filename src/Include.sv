@@ -200,16 +200,13 @@ typedef struct packed
 
 typedef struct packed
 {
-    //logic[31:0] pc;
+    //logic[31:0] pc; 10044
     logic[31:0] imm;
     logic availA;
     Tag tagA;
-    logic tagA_fp;
     logic availB;
     Tag tagB;
-    logic tagB_fp;
     logic immB;
-    Tag tagC;
     SqN sqN;
     Tag tagDst;
     RegNm nmDst;
