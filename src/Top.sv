@@ -107,9 +107,6 @@ Core core
     .OUT_instrReadEnable(CORE_instrReadEnable),
     .OUT_halt(OUT_halt),
     
-    .OUT_GPIO_oe(),
-    .OUT_GPIO(),
-    .IN_GPIO(16'b0),
     .OUT_SPI_clk(),
     .OUT_SPI_mosi(),
     .IN_SPI_miso(1'b0),

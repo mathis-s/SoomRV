@@ -34,14 +34,11 @@ module ControlRegs
     input Flags IN_irqFlags,
     input wire[31:0] IN_irqMemAddr,
     
-    output reg[15:0] OUT_GPIO_oe,
-    output reg[15:0] OUT_GPIO,
-    input wire[15:0] IN_GPIO,
-    
     output reg OUT_SPI_clk,
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
+    output reg OUT_tmrIRQ,
     output wire OUT_IO_busy
 );
 
@@ -70,47 +67,32 @@ reg[63:0] cRegs64[5:0];
 //  0 IRQ handler,
 //  1 IRQ src
 //  2 IRQ addr|flags
-//  3 STATUS
+//  3 unused | TIMER IRQ count
 //  4 SPI out/in
-//  5 GPIO oe | out
-//  6 GPIO aen | ade | acnt | ...
-//  7 GPIO in
-//  8 RAM map 0
-//  9 RAM map 1
-// 10 RAM map 2
-// 11 RAM map 3
-// 12 RAM map 4
-// 13 RAM map 5
-// 14 RAM map 6
-// 15 RAM map 7
+//  5 unused
+//  6 unused
+//  7 unused
 
-reg[7:0] gpioCnt;
-reg[31:0] cRegs[23:0];
-always_comb begin
-    OUT_GPIO_oe = cRegs[5][15:0];
-    OUT_GPIO = cRegs[5][31:16];
-end
+reg[31:0] cRegs[15:0];
 assign OUT_irqAddr = cRegs[0];
 
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
+reg[25:0] tmrCnt;
 
-assign OUT_IO_busy = (spiCnt != 0) || (gpioCnt != 0);
+assign OUT_IO_busy = (spiCnt != 0);
 
 always_ff@(posedge clk) begin
     
+    OUT_tmrIRQ <= 0;
+    
     if (rst) begin
-        gpioCnt <= 0;
         weReg <= 1;
         for (i = 0; i < 6; i=i+1)
             cRegs64[i] <= 0;
             
         for (i = 0; i < 8; i=i+1)
             cRegs[i] <= 0; 
-            
-        for (i = 0; i < 8; i=i+1) begin
-            cRegs[i+8] <= i << 8;
-        end
         
         OUT_SPI_clk <= 0;
         spiCnt <= 0;
@@ -150,13 +132,13 @@ always_ff@(posedge clk) begin
                 end*/
             end
             else begin
-                if (wmReg[0]) cRegs[writeAddrReg[4:0]][7:0] <= dataReg[7:0];
-                if (wmReg[1]) cRegs[writeAddrReg[4:0]][15:8] <= dataReg[15:8];
-                if (wmReg[2]) cRegs[writeAddrReg[4:0]][23:16] <= dataReg[23:16];
-                if (wmReg[3]) cRegs[writeAddrReg[4:0]][31:24] <= dataReg[31:24];
+                if (wmReg[0]) cRegs[writeAddrReg[3:0]][7:0] <= dataReg[7:0];
+                if (wmReg[1]) cRegs[writeAddrReg[3:0]][15:8] <= dataReg[15:8];
+                if (wmReg[2]) cRegs[writeAddrReg[3:0]][23:16] <= dataReg[23:16];
+                if (wmReg[3]) cRegs[writeAddrReg[3:0]][31:24] <= dataReg[31:24];
                 
-                if (writeAddrReg[4:0] == 5'd5)
-                    gpioCnt <= cRegs[6][7:0];
+                if (writeAddrReg[3:0] == 4'd3 && (|wmReg[1:0]))
+                    tmrCnt <= 0;
                     
                 if (writeAddrReg[4:0] == 5'd4) begin
                     case (wmReg)
@@ -178,20 +160,9 @@ always_ff@(posedge clk) begin
                     OUT_data <= cRegs64[readAddrReg[3:1]][31:0];
             end
             else begin
-                if (readAddrReg[4:0] == 5'd7)
-                    OUT_data <= {16'bx, IN_GPIO};
-                else
-                    OUT_data <= cRegs[readAddrReg[4:0]];
+                OUT_data <= cRegs[readAddrReg[3:0]];
             end
         end
-
-        
-        
-        if (gpioCnt == 0) begin
-            cRegs[5][31:24] <= (cRegs[5][31:24] | cRegs[6][15:8]) & (~cRegs[6][23:16]);
-        end
-        else
-            gpioCnt <= gpioCnt - 1;
         
         
         if (IN_irqTaken) begin
@@ -205,6 +176,13 @@ always_ff@(posedge clk) begin
         readAddrReg <= IN_readAddr;
         writeAddrReg <= IN_writeAddr;
         dataReg <= IN_data;
+        
+        if (cRegs[3][15:0] != 0 && cRegs[3][15:0] == tmrCnt[25:10]) begin
+            OUT_tmrIRQ <= 1;
+            tmrCnt <= 0;
+        end
+        else if (IN_irqTaken) tmrCnt <= 0;
+        else tmrCnt <= tmrCnt + 1;
         
         // Update Perf Counters
         cRegs64[0] <= cRegs64[0] + 1;

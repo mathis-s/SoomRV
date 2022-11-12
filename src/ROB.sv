@@ -59,11 +59,13 @@ module ROB
     output BranchProv OUT_branch,
     output FetchID_t OUT_curFetchID,
     
+    input wire IN_irq,
     input wire IN_MEM_busy,
     
     output reg OUT_fence,
     output reg OUT_clearICache,
     output wire OUT_disableIFetch,
+    output reg OUT_irqTaken,
     output reg OUT_halt,
     output reg OUT_mispredFlush
 );
@@ -116,6 +118,7 @@ end
 reg stop;
 reg memoryWait;
 reg instrFence;
+reg externalIRQ;
 
 assign OUT_disableIFetch = memoryWait;
 
@@ -130,6 +133,8 @@ always_ff@(posedge clk) begin
     OUT_halt <= 0;
     OUT_fence <= 0;
     OUT_clearICache <= 0;
+    OUT_irqTaken <= 0;
+    externalIRQ <= externalIRQ | IN_irq;
     
     if (rst) begin
         baseIndex = 0;
@@ -203,7 +208,9 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if (pcLookupEntry.flags == FLAGS_EXCEPT) begin
+            else if (pcLookupEntry.flags == FLAGS_EXCEPT || externalIRQ) begin
+                
+                OUT_irqTaken <= 1;
                 
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= IN_irqAddr;
@@ -216,7 +223,8 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 
                 OUT_irqSrc <= {baseIndexPC, 1'b0};
-                OUT_irqFlags <= pcLookupEntry.flags;
+                OUT_irqFlags <= externalIRQ ? 3'b000 : pcLookupEntry.flags;
+                externalIRQ <= 0;
                 
                 stop <= 0;
             end
@@ -288,16 +296,17 @@ always_ff@(posedge clk) begin
                     entries[id].valid <= 0;
                     entries[id].executed <= 0;
                     
-                    if (|entries[id].flags[2:1]) begin
+                    if (|entries[id].flags[2:1] || externalIRQ) begin
                         pcLookupEntry <= entries[id];
                         pcLookupEntrySqN <= {entries[id].sqN_msb, id[5:0]};
                         pred = 1;
                     end
-                        
-                    if (entries[id].flags[2]) begin
+                    
+                    if (entries[id].flags[2] || externalIRQ) begin
                         // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
                         if (entries[id].flags == FLAGS_EXCEPT)
                             OUT_comUOp[i].nmDst <= 0;
+                        
                         stop <= 1;
                         temp = 1;
                     end

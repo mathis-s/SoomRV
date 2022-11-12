@@ -21,10 +21,6 @@ module Core
     output wire[28:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     output wire OUT_halt,
-
-    output wire[15:0] OUT_GPIO_oe,
-    output wire[15:0] OUT_GPIO,
-    input wire[15:0] IN_GPIO,
     
     output wire OUT_SPI_clk,
     output wire OUT_SPI_mosi,
@@ -801,6 +797,7 @@ wire ROB_clearICache;
 
 BPUpdate ROB_bpUpdate;
 wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
+wire ROB_irqTaken;
 ROB rob
 (
     .clk(clk),
@@ -829,16 +826,19 @@ ROB rob
     .OUT_branch(branchProvs[3]),
     .OUT_curFetchID(ROB_curFetchID),
     
+    .IN_irq(timerIRQ),
     .IN_MEM_busy(MEMSUB_busy),
     
     .OUT_fence(ROB_startFence),
     .OUT_clearICache(ROB_clearICache),
     .OUT_disableIFetch(ROB_disableIFetch),
+    .OUT_irqTaken(ROB_irqTaken),
     .OUT_halt(OUT_halt),
     .OUT_mispredFlush(mispredFlush)
 );
 
 wire IO_busy;
+wire timerIRQ;
 ControlRegs cr
 (
     .clk(clk),
@@ -861,18 +861,16 @@ ControlRegs cr
     .IN_comBranch((comUOps[0].valid&&comUOps[0].isBranch)||(comUOps[1].valid&&comUOps[1].isBranch)||(comUOps[2].valid&&comUOps[2].isBranch)||(comUOps[3].valid&&comUOps[3].isBranch)),
     
     .OUT_irqAddr(CR_irqAddr),
-    .IN_irqTaken(branchProvs[3].taken),
+    .IN_irqTaken(ROB_irqTaken),
     .IN_irqSrc(ROB_irqSrc),
     .IN_irqFlags(ROB_irqFlags),
     .IN_irqMemAddr(ROB_irqMemAddr),
     
-    .OUT_GPIO_oe(OUT_GPIO_oe),
-    .OUT_GPIO(OUT_GPIO),
-    .IN_GPIO(IN_GPIO),
-    
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
+
+    .OUT_tmrIRQ(timerIRQ),
 
     .OUT_IO_busy(IO_busy)
 );
