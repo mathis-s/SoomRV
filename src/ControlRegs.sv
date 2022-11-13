@@ -25,7 +25,7 @@ module ControlRegs
     input wire IN_branchMispred,
     input wire IN_wbValid[NUM_WBS-1:0],
     input wire IN_ifValid[NUM_UOPS-1:0],
-    input wire IN_comBranch,
+    input wire IN_comBranch[NUM_UOPS-1:0],
     
     // Control Registers I/0
     output wire[31:0] OUT_irqAddr,
@@ -193,6 +193,8 @@ always_ff@(posedge clk) begin
                 cRegs64[1] = cRegs64[1] + 1;
             if (IN_comValid[i] && !IN_mispredFlush)
                 cRegs64[3] = cRegs64[3] + 1;
+            if (IN_comValid[i] && !IN_mispredFlush && IN_comBranch[i])
+                cRegs64[5] = cRegs64[5] + 1;
         end
         for (i = 0; i < NUM_WBS; i=i+1) begin
             if (IN_wbValid[i])
@@ -200,9 +202,6 @@ always_ff@(posedge clk) begin
         end
         if (IN_branchMispred)
             cRegs64[4] <= cRegs64[4] + 1;
-        
-        if (IN_comBranch)
-            cRegs64[5] <= cRegs64[5] + 1;
         
     end
 

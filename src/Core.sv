@@ -858,7 +858,7 @@ ControlRegs cr
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
     .IN_ifValid('{DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
-    .IN_comBranch((comUOps[0].valid&&comUOps[0].isBranch)||(comUOps[1].valid&&comUOps[1].isBranch)||(comUOps[2].valid&&comUOps[2].isBranch)||(comUOps[3].valid&&comUOps[3].isBranch)),
+    .IN_comBranch({(comUOps[0].valid && comUOps[0].isBranch), (comUOps[1].valid && comUOps[1].isBranch), (comUOps[2].valid && comUOps[2].isBranch), (comUOps[3].valid && comUOps[3].isBranch)}),
     
     .OUT_irqAddr(CR_irqAddr),
     .IN_irqTaken(ROB_irqTaken),
