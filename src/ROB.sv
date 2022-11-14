@@ -80,7 +80,7 @@ reg rnUOpValidSorted[WIDTH-1:0];
 always_comb begin
     for (i = 0; i < WIDTH; i=i+1) begin
         rnUOpValidSorted[i] = 0;
-        rnUOpSorted[i] = 99'bx;
+        rnUOpSorted[i] = 100'bx;
         
         for (j = 0; j < WIDTH; j=j+1) begin
             // This could be one-hot...
@@ -101,7 +101,7 @@ assign OUT_curSqN = baseIndex;
 SqN pcLookupEntrySqN;
 ROBEntry pcLookupEntry;
 assign OUT_pcReadAddr = pcLookupEntry.fetchID;
-wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:2], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
+wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
 BHist_t baseIndexHist;
 BranchPredInfo baseIndexBPI;
 always_comb begin
@@ -349,7 +349,7 @@ always_ff@(posedge clk) begin
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
                 entries[id].executed <= 1;
                 entries[id].flags <= IN_wbUOps[i].flags;
-                entries[id].fetchOffs <= IN_wbUOps[i].pc[2:1] + (IN_wbUOps[i].compressed ? 2'b0 : 2'b1);
+                entries[id].fetchOffs <= IN_wbUOps[i].pc[3:1] + (IN_wbUOps[i].compressed ? 3'b0 : 3'b1);
             end
         end
         

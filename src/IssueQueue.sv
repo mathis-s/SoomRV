@@ -71,7 +71,7 @@ always_comb begin
         end
         
         for (j = 0; j < 2; j=j+1) begin
-            if (IN_issueValid[j] && IN_issueUOps[j].fu == FU_INT && IN_issueUOps[j].nmDst != 0) begin
+            if (IN_issueValid[j] && (IN_issueUOps[j].fu == FU_INT /*|| IN_issueUOps[j].fu == FU_ST*/) && IN_issueUOps[j].nmDst != 0) begin
                 if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
                 if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
             end
@@ -134,11 +134,11 @@ always_ff@(posedge clk) begin
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
                         !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU) && reservedWBs[0]) && 
                         
-                        // Only issue loads that fit into load order buffer
+                        // Only issue stores that fit into store queue
                         ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST) || 
                             queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
                         
-                        // Only issue stores that fit into store queue
+                        // Only issue loads that fit into load order buffer
                         ((FU0 != FU_LSU && FU1 != FU_LSU && FU2 != FU_LSU) || 
                             queue[i].fu != FU_LSU || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         

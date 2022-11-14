@@ -1,5 +1,5 @@
 .text
-
+.align 4
 return_42:
     li a0, 42
     ret

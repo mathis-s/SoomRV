@@ -33,7 +33,7 @@ TagBufEntry tags[63:0];
 always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_issueTags[i] = 6'bx;
-        OUT_issueTagsValid[i] = 0;
+        //OUT_issueTagsValid[i] = 0;
         for (j = 0; j < 64; j=j+1) begin
             if (!tags[j].used && 
                 (i <= 0 || OUT_issueTags[0] != j[5:0]) &&
@@ -41,7 +41,7 @@ always_comb begin
                 (i <= 2 || OUT_issueTags[2] != j[5:0])
                 ) begin
                 OUT_issueTags[i] = j[5:0];
-                OUT_issueTagsValid[i] = 1;
+                //OUT_issueTagsValid[i] = 1;
             end
         end
     end
@@ -53,15 +53,38 @@ always_comb begin
         dbgUsed[i] = tags[i].used;
 end
 
-/*
-RESULTS
-Runtime (cycles) 24008
-Executed (instrs) 38427
-Decoded (instrs) 38895
-mIPC 1600
-mDMIPS/MHz 4761
-36648 cycles
-*/
+reg[2:0] free;
+reg[1:0] resStage0[31:0];
+reg[2:0] resStage1[15:0];
+reg[2:0] resStage2[7:0];
+reg[2:0] resStage3[3:0];
+reg[2:0] resStage4[1:0];
+always_comb begin
+    free = 0;
+    
+    for (i = 0; i < 32; i=i+1) resStage0[i] = (!tags[2*i].used) + (!tags[2*i+1].used);
+    for (i = 0; i < 16; i=i+1) resStage1[i] = resStage0[2*i] + resStage0[2*i+1];
+    for (i = 0; i < 8; i=i+1) begin
+        reg[3:0] temp = resStage1[2*i] + resStage1[2*i+1];
+        resStage2[i] = temp[3] ? 3'b100 : temp[2:0];
+    end 
+    for (i = 0; i < 4; i=i+1) begin
+        reg[3:0] temp = resStage2[2*i] + resStage2[2*i+1];
+        resStage3[i] = temp[3] ? 3'b100 : temp[2:0];
+    end 
+    for (i = 0; i < 2; i=i+1) begin
+        reg[3:0] temp = resStage3[2*i] + resStage3[2*i+1];
+        resStage4[i] = temp[3] ? 3'b100 : temp[2:0];
+    end
+    for (i = 0; i < 1; i=i+1) begin
+        reg[3:0] temp = resStage4[2*i] + resStage4[2*i+1];
+        free = temp[3] ? 3'b100 : temp[2:0];
+    end
+    
+    for (i = 0; i < NUM_UOPS; i=i+1)
+        OUT_issueTagsValid[i] = free > i[2:0];
+end
+
 always_ff@(posedge clk) begin
     if (rst) begin
     
@@ -112,6 +135,7 @@ always_ff@(posedge clk) begin
                         if (!IN_RAT_commitPrevTags[i][6]) begin
                             tags[IN_RAT_commitPrevTags[i][5:0]].committed <= 0;
                             tags[IN_RAT_commitPrevTags[i][5:0]].used <= 0;
+                            free = free + 1;
                         end
                         
                         if (!IN_commitTagDst[i][6]) begin

@@ -84,8 +84,8 @@ wire[29:0] CORE_readAddr;
 wire[31:0] CORE_readData;
 
 wire CORE_instrReadEnable;
-wire[28:0] CORE_instrReadAddress;
-wire[63:0] CORE_instrReadData;
+wire[27:0] CORE_instrReadAddress;
+wire[127:0] CORE_instrReadData;
 Core core
 (
     .clk(clk),
@@ -143,16 +143,16 @@ MemRTL dcache
 MemRTL#(64, 512) icache
 (
     .clk(clk),
-    .IN_nce(MC_DC_if[1].ce),
-    .IN_nwe(MC_DC_if[1].we),
-    .IN_addr(MC_DC_if[1].addr[9:1]),
+    .IN_nce(MC_DC_used[1] ? MC_DC_if[1].ce : CORE_instrReadEnable),
+    .IN_nwe(MC_DC_used[1] ? MC_DC_if[1].we : 1'b1),
+    .IN_addr(MC_DC_used[1] ? MC_DC_if[1].addr[9:1] : {CORE_instrReadAddress[7:0], 1'b1}),
     .IN_data({MC_DC_if[1].data, MC_DC_if[1].data}),
     .IN_wm({{4{MC_DC_if[1].addr[0]}}, {4{~MC_DC_if[1].addr[0]}}}),
-    .OUT_data(),
+    .OUT_data(CORE_instrReadData[127:64]),
     
     .IN_nce1(CORE_instrReadEnable),
-    .IN_addr1(CORE_instrReadAddress[8:0]),
-    .OUT_data1(CORE_instrReadData)
+    .IN_addr1({CORE_instrReadAddress[7:0], 1'b0}),
+    .OUT_data1(CORE_instrReadData[63:0])
 );
 
 always@(posedge clk) begin

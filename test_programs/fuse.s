@@ -3,17 +3,28 @@
 
 main:
     
-    li a1, 10
+    li a1, 30720
+    li s0, 32768
     
+    .align 4
     .loop:
-        li a0, 0x12345678
-        li a0, 0x23456789
-        auipc a0, 0x34567
-        addi a0, a0, 0x7FA
-        li a0, 0x456789AB
-        li a0, 0x56789ABC
-        addi a1, a1, -1
-        bne a1, x0, .loop
+        addi a0, a0, 256
+        sw a0, 0(a1)
+        addi a1, a1, 4
+        bne a1, s0, .loop
     
+    li a0, 128
+    .wait:
+        addi a0, a0, -1
+        bnez a0, .wait
+    li a1, 30720
+    li s0, 32768
     
-    ebreak
+    .align 4
+    .loop2:
+        addi a0, a0, 1
+        sw a0, 0(a1)
+        addi a1, a1, 4
+        bne a1, s0, .loop2
+    
+    ret

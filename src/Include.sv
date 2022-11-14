@@ -11,7 +11,7 @@ typedef logic[6:0] Tag;
 typedef logic[6:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
-typedef logic[1:0] FetchOff_t;
+typedef logic[2:0] FetchOff_t;
 typedef logic[15:0] BHist_t;
 
 typedef enum logic[5:0]
@@ -94,16 +94,23 @@ typedef enum logic[5:0]
     LSU_LH, 
     LSU_LW, 
     LSU_LBU,
-    LSU_LHU,
+    LSU_LHU
+    //LSU_FLW,
+} OPCode_LSU;
+
+typedef enum logic[5:0]
+{
     LSU_SB,
     LSU_SH,
     LSU_SW,
-    LSU_FLW,
-    LSU_FSW,
+    //LSU_FSW,
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
-    LSU_CBO_FLUSH
-} OPCode_LSU;
+    LSU_CBO_FLUSH,
+    
+    LSU_F_ADDI_SW
+    
+} OPCode_ST;
 
 typedef enum logic[5:0]
 {
@@ -155,7 +162,7 @@ typedef struct packed
 typedef struct packed
 {
     bit[30:0] pc;
-    bit[1:0] branchPos;
+    bit[2:0] branchPos;
     BranchPredInfo bpi;
     BHist_t hist;
 } PCFileEntry;
@@ -183,13 +190,13 @@ typedef struct packed
     //logic[31:0] pc;
     logic[31:0] imm;
     logic[4:0] rs0;
-    logic rs0_fp;
+    //logic rs0_fp;
     logic[4:0] rs1;
-    logic rs1_fp;
-    logic[4:0] rs2;
+    //logic rs1_fp;
+   //logic[4:0] rs2;
     logic immB;
     logic[4:0] rd;
-    logic rd_fp;
+    //logic rd_fp;
     logic[5:0] opcode;
     FuncUnit fu;
     FetchID_t fetchID;
@@ -323,3 +330,10 @@ typedef struct packed
     logic branchTaken;
     logic valid;
 } BPUpdate;
+
+typedef struct packed
+{
+    logic[31:0] result;
+    Tag tag;
+    logic valid;
+} ZCForward;

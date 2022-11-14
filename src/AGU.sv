@@ -42,15 +42,12 @@ always_ff@(posedge clk) begin
             // (Unaligned is handled in software)
             case (IN_uop.opcode)
                 LSU_LB,
-                LSU_LBU,
-                LSU_SB: OUT_uop.exception <= (addr == 0);
+                LSU_LBU: OUT_uop.exception <= (addr == 0);
                 
                 LSU_LH,
-                LSU_LHU,
-                LSU_SH: OUT_uop.exception <= (addr == 0) || (addr[0]);
+                LSU_LHU: OUT_uop.exception <= (addr == 0) || (addr[0]);
                 
-                LSU_LW,
-                LSU_SW: OUT_uop.exception <= (addr == 0) || (addr[0] || addr[1]);
+                LSU_LW: OUT_uop.exception <= (addr == 0) || (addr[0] || addr[1]);
                 
                 default: begin end
             endcase
@@ -70,7 +67,6 @@ always_ff@(posedge clk) begin
                     OUT_uop.size <= 1;
                     OUT_uop.signExtend <= 1;
                 end
-                LSU_FLW,
                 LSU_LW: begin
                     OUT_uop.isLoad <= 1;
                     OUT_uop.shamt <= 2'b0;
@@ -89,50 +85,6 @@ always_ff@(posedge clk) begin
                     OUT_uop.size <= 1;
                     OUT_uop.signExtend <= 0;
                 end
-
-                LSU_SB: begin
-                    OUT_uop.isLoad <= 0;
-                    case (addr[1:0]) 
-                        0: begin
-                            OUT_uop.wmask <= 4'b0001;
-                            OUT_uop.data <= IN_uop.srcB;
-                        end
-                        1: begin 
-                            OUT_uop.wmask <= 4'b0010;
-                            OUT_uop.data <= IN_uop.srcB << 8;
-                        end
-                        2: begin
-                            OUT_uop.wmask <= 4'b0100;
-                            OUT_uop.data <= IN_uop.srcB << 16;
-                        end 
-                        3: begin
-                            OUT_uop.wmask <= 4'b1000;
-                            OUT_uop.data <= IN_uop.srcB << 24;
-                        end 
-                    endcase
-                end
-
-                LSU_SH: begin
-                    OUT_uop.isLoad <= 0;
-                    case (addr[1]) 
-                        0: begin
-                            OUT_uop.wmask <= 4'b0011;
-                            OUT_uop.data <= IN_uop.srcB;
-                        end
-                        1: begin 
-                            OUT_uop.wmask <= 4'b1100;
-                            OUT_uop.data <= IN_uop.srcB << 16;
-                        end
-                    endcase
-                end
-                
-                LSU_FSW,
-                LSU_SW: begin
-                    OUT_uop.isLoad <= 0;
-                    OUT_uop.wmask <= 4'b1111;
-                    OUT_uop.data <= IN_uop.srcB;
-                end
-                
                 default: begin end
             endcase
             

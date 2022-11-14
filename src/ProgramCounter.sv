@@ -4,7 +4,7 @@
 module ProgramCounter
 #(
     parameter NUM_UOPS=3,
-    parameter NUM_BLOCKS=4
+    parameter NUM_BLOCKS=8
 )
 (
     input wire clk,
@@ -17,7 +17,7 @@ module ProgramCounter
     input wire IN_branchTaken,
     input FetchID_t IN_fetchID,
 
-    input wire[63:0] IN_instr,
+    input wire[127:0] IN_instr,
     
     input wire IN_clearICache,
     
@@ -39,7 +39,7 @@ module ProgramCounter
     input FetchID_t IN_ROB_curFetchID,
 
     output wire[31:0] OUT_pcRaw,
-    output wire[28:0] OUT_instrAddr,
+    output wire[27:0] OUT_instrAddr,
     
     output IF_Instr OUT_instrs[NUM_BLOCKS-1:0],
     
@@ -60,7 +60,7 @@ reg[30:0] pcLast;
 FetchID_t fetchIDlast;
 BHist_t histLast;
 BranchPredInfo infoLast;
-reg[1:0] branchPosLast;
+reg[2:0] branchPosLast;
 reg multipleLast;
 
 assign OUT_pcRaw = {pc, 1'b0};
@@ -123,12 +123,12 @@ always_ff@(posedge clk) begin
     else begin
         if (en1) begin
             for (i = 0; i < NUM_BLOCKS; i=i+1) begin
-                OUT_instrs[i].pc <= {{pcLast[30:2], 2'b00} + 31'd1 * i[30:0]};
-                OUT_instrs[i].valid <= (i[1:0] >= pcLast[1:0]) && 
-                    (!infoLast.taken || i[1:0] <= branchPosLast) &&
-                    (!multipleLast || i[1:0] <= branchPosLast);
+                OUT_instrs[i].pc <= {{pcLast[30:3], i[2:0]}};
+                OUT_instrs[i].valid <= (i[2:0] >= pcLast[2:0]) && 
+                    (!infoLast.taken || i[2:0] <= branchPosLast) &&
+                    (!multipleLast || i[2:0] <= branchPosLast);
                 OUT_instrs[i].fetchID <= fetchID;
-                OUT_instrs[i].predTaken <= (infoLast.taken && i[1:0] == branchPosLast);
+                OUT_instrs[i].predTaken <= (infoLast.taken && i[2:0] == branchPosLast);
             end
             fetchID <= fetchID + 1;
         end
@@ -138,7 +138,7 @@ always_ff@(posedge clk) begin
             histLast <= IN_BP_history;
             infoLast <= IN_BP_info;
             pcLast <= pc;
-            branchPosLast <= IN_BP_branchSrc[2:1];
+            branchPosLast <= IN_BP_branchSrc[3:1];
             multipleLast <= IN_BP_multipleBranches;
             
             if (IN_BP_branchFound) begin
@@ -153,12 +153,12 @@ always_ff@(posedge clk) begin
                         pc <= IN_BP_branchSrc[31:1] + 1;
                     end
                     else begin
-                        pc <= {pc[30:2] + 29'b1, 2'b00};
+                        pc <= {pc[30:3] + 28'b1, 3'b000};
                     end
                 end
             end
             else begin
-                pc <= {pc[30:2] + 29'b1, 2'b00};
+                pc <= {pc[30:3] + 28'b1, 3'b000};
                 
             end
         end

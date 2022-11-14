@@ -84,7 +84,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
                 
-                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
+                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:3], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
                 //assert(
                 //    ({IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2)) ==
                 //    IN_uop[i].pc

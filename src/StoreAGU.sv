@@ -8,6 +8,8 @@ module StoreAGU
     
     input BranchProv IN_branch,
     
+    output ZCForward OUT_zcFwd,
+    
     input EX_UOp IN_uop,
     output RES_UOp OUT_uop,
     output AGU_UOp OUT_aguOp
@@ -15,6 +17,12 @@ module StoreAGU
 );
 
 integer i;
+
+wire[31:0] dataRes = IN_uop.srcB + {{20{IN_uop.imm[31]}}, IN_uop.imm[31:20]};
+
+assign OUT_zcFwd.valid = IN_uop.valid && IN_uop.nmDst != 0;
+assign OUT_zcFwd.tag = IN_uop.tagDst;
+assign OUT_zcFwd.result = dataRes;
 
 wire[31:0] addr = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
 
@@ -25,6 +33,7 @@ always_comb begin
     case (IN_uop.opcode)
         LSU_SB: except = (addr == 0);
         LSU_SH: except = (addr == 0) || (addr[0]);
+        LSU_F_ADDI_SW,
         LSU_SW: except = (addr == 0) || (addr[0] || addr[1]);
         default: except = 0;
     endcase
@@ -65,7 +74,6 @@ always_ff@(posedge clk) begin
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.valid <= 1;
             
-            
             case (IN_uop.opcode)
                 LSU_SB: begin
                     OUT_aguOp.isLoad <= 0;
@@ -103,7 +111,13 @@ always_ff@(posedge clk) begin
                     endcase
                 end
                 
-                LSU_FSW,
+                LSU_F_ADDI_SW: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= dataRes;
+                    OUT_uop.result <= dataRes;
+                end
+                
                 LSU_SW: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;

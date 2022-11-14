@@ -1,19 +1,19 @@
 
 typedef struct packed
 {
-    logic[28:0] pc;
+    logic[27:0] pc;
     FetchID_t fetchID;
-    logic[1:0] firstValid;
-    logic[1:0] lastValid;
-    logic[1:0] predPos;
+    logic[2:0] firstValid;
+    logic[2:0] lastValid;
+    logic[2:0] predPos;
     logic predTaken;
     
-    logic[3:0][15:0] instr;
+    logic[7:0][15:0] instr;
 } PDEntry;
 
 module PreDecode
 #(
-    parameter NUM_INSTRS_IN=4,
+    parameter NUM_INSTRS_IN=8,
     parameter NUM_INSTRS_OUT=4,
     parameter BUF_SIZE=8
 )
@@ -62,7 +62,7 @@ always_ff@(posedge clk) begin
                     reg[15:0] instr = cur.instr[subIndexOut];
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     
-                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 3'b1) != bufIndexIn) || subIndexOut != cur.lastValid)) begin
+                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid)) begin
                         
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
                         OUT_instrs[i].valid <= 1;
@@ -108,29 +108,29 @@ always_ff@(posedge clk) begin
             end
         end
         
-        if (ifetchValid && (IN_instrs[0].valid||IN_instrs[1].valid||IN_instrs[2].valid||IN_instrs[3].valid)) begin
+        if (ifetchValid && (IN_instrs[0].valid||IN_instrs[1].valid||IN_instrs[2].valid||IN_instrs[3].valid||IN_instrs[4].valid||IN_instrs[5].valid||IN_instrs[6].valid||IN_instrs[7].valid)) begin
             
             buffer[bufIndexIn].predTaken <= 0;
             
             for (i = 0; i < NUM_INSTRS_IN; i=i+1) begin
                 if (IN_instrs[i].valid) begin
                     buffer[bufIndexIn].instr[i] <= IN_instrs[i].instr;
-                    buffer[bufIndexIn].lastValid <= i[1:0];
+                    buffer[bufIndexIn].lastValid <= i[2:0];
                     
                     if (IN_instrs[i].predTaken) begin
                         buffer[bufIndexIn].predTaken <= 1;
-                        buffer[bufIndexIn].predPos <= i[1:0];
+                        buffer[bufIndexIn].predPos <= i[2:0];
                     end
                 end
             end
             
             for (i = NUM_INSTRS_IN-1; i >= 0; i=i-1)
                 if (IN_instrs[i].valid) begin
-                    buffer[bufIndexIn].firstValid <= i[1:0];
-                    if (bufIndexIn == bufIndexOut) subIndexOut = i[1:0];
+                    buffer[bufIndexIn].firstValid <= i[2:0];
+                    if (bufIndexIn == bufIndexOut) subIndexOut = i[2:0];
                 end
             
-            buffer[bufIndexIn].pc <= IN_instrs[0].pc[30:2];
+            buffer[bufIndexIn].pc <= IN_instrs[0].pc[30:3];
             buffer[bufIndexIn].fetchID <= IN_instrs[0].fetchID;
             
             bufIndexIn = bufIndexIn + 1;

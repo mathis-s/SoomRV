@@ -7,7 +7,7 @@ module Core
     input wire clk,
     input wire rst,
     input wire en,
-    input wire[63:0] IN_instrRaw,
+    input wire[127:0] IN_instrRaw,
 
     output wire[29:0] OUT_MEM_writeAddr,
     output wire[31:0] OUT_MEM_writeData,
@@ -18,7 +18,7 @@ module Core
     output wire[29:0] OUT_MEM_readAddr,
     input wire[31:0] IN_MEM_readData,
     
-    output wire[28:0] OUT_instrAddr,
+    output wire[27:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     output wire OUT_halt,
     
@@ -87,7 +87,7 @@ reg[2:0] stateValid;
 assign OUT_instrReadEnable = !(ifetchEn && stateValid[0]);
 
 // 
-reg[63:0] instrRawBackup;
+reg[127:0] instrRawBackup;
 reg useInstrRawBackup;
 always_ff@(posedge clk) begin
     if (rst)
@@ -99,7 +99,7 @@ always_ff@(posedge clk) begin
     else
         useInstrRawBackup <= 0;
 end
-wire[63:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
+wire[127:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
 
 
 BranchProv branchProvs[3:0];
@@ -131,7 +131,7 @@ wire BP_multipleBranches;
 wire BP_branchFound;
 wire BP_branchCompr;
 
-IF_Instr IF_instrs[3:0];
+IF_Instr IF_instrs[7:0];
 
 FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
@@ -465,7 +465,7 @@ RF rf
     .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult_int[0]),
     .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult_int[1]),
     .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult_int[2]),
-    .waddr3(6'bx), .wdata3(32'bx), .wen3(1'b0),
+    .waddr3(wbUOp[3].tagDst[5:0]), .wdata3(wbUOp[3].result), .wen3(wbHasResult_int[3]),
     
     .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
     .raddr1(RF_readAddress[1]), .rdata1(RF_readData[1]),
@@ -498,6 +498,10 @@ FuncUnit LD_fu[3:0];
 wire[31:0] LD_zcFwdResult[1:0];
 Tag LD_zcFwdTag[1:0];
 wire LD_zcFwdValid[1:0];
+
+//assign LD_zcFwdResult[2] = AGU_ST_zcFwd.result;
+//assign LD_zcFwdTag[2] = AGU_ST_zcFwd.tag;
+//assign LD_zcFwdValid[2] = AGU_ST_zcFwd.valid;
 Load ld
 (
     .clk(clk),
@@ -640,6 +644,7 @@ AGU aguLD
 );
 
 AGU_UOp AGU_ST_uop;
+ZCForward AGU_ST_zcFwd;
 StoreAGU aguST
 (
     .clk(clk),
@@ -648,6 +653,8 @@ StoreAGU aguST
     .stall(stall[3]),
     
     .IN_branch(branch),
+    
+    .OUT_zcFwd(AGU_ST_zcFwd),
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),

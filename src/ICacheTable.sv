@@ -15,7 +15,7 @@ module ICacheTable#(parameter NUM_ICACHE_LINES=8)
     input wire IN_lookupValid,
     input wire[30:0] IN_lookupPC,
     
-    output reg[28:0] OUT_lookupAddress,
+    output reg[27:0] OUT_lookupAddress,
     output wire OUT_stall,
     
     output IF_MemoryController OUT_MC_if,
@@ -31,23 +31,23 @@ reg[$clog2(NUM_ICACHE_LINES)-1:0] cacheEntryIndex;
 always_comb begin
     cacheEntryFound = 0;
     cacheEntryIndex = 0;
-    OUT_lookupAddress = 29'bx;
+    OUT_lookupAddress = 28'bx;
     for (i = 0; i < NUM_ICACHE_LINES; i=i+1) begin
         if (icacheTable[i].valid && icacheTable[i].addr == IN_lookupPC[30:8]) begin
-            OUT_lookupAddress = {i[22:0], IN_lookupPC[7:2]};
+            OUT_lookupAddress = {i[22:0], IN_lookupPC[7:3]};
             cacheEntryFound = 1;
             cacheEntryIndex = i[$clog2(NUM_ICACHE_LINES)-1:0];
         end
     end
     
-    if (loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && {lastProgress, 1'b0} > {IN_lookupPC[7:2], 2'b11}) begin
+    if (0 && loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && {lastProgress, 1'b0} > {IN_lookupPC[7:2], 2'b11}) begin
         cacheEntryFound = 1;
         cacheEntryIndex = lruPointer;
-        OUT_lookupAddress = {20'b0, lruPointer, IN_lookupPC[7:2]};
+        //OUT_lookupAddress = {20'b0, lruPointer, IN_lookupPC[7:2]};
     end
 end
 
-assign OUT_stall = !cacheEntryFound;
+assign OUT_stall = !cacheEntryFound || loading;
 reg[$clog2(NUM_ICACHE_LINES)-1:0] lruPointer;
 
 reg[30:0] loadAddr;

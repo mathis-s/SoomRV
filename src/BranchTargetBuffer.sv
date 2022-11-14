@@ -8,7 +8,7 @@ typedef struct packed
     bit[30:0] src;
 } BTBEntry;
 
-module BranchTargetBuffer#(parameter NUM_ENTRIES=32, parameter ASSOC=4)
+module BranchTargetBuffer#(parameter NUM_ENTRIES=64, parameter ASSOC=8)
 (
     input wire clk,
     input wire rst,
@@ -36,7 +36,7 @@ reg[$clog2(ASSOC)-1:0] usedID;
 
 always_comb begin
     
-    BTBEntry[ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+1:2]];
+    BTBEntry[ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+2:3]];
     
     OUT_branchFound = 0;
     OUT_multipleBranches = 0;
@@ -50,8 +50,8 @@ always_comb begin
         
         for (i = 0; i < ASSOC; i=i+1) begin
             
-            if (fetched[i].valid && fetched[i].src[30:2] == IN_pc[30:2] && fetched[i].src[1:0] >= IN_pc[1:0] &&
-                (!OUT_branchFound || fetched[i].src[1:0] < OUT_branchSrc[1:0])) begin
+            if (fetched[i].valid && fetched[i].src[30:3] == IN_pc[30:3] && fetched[i].src[2:0] >= IN_pc[2:0] &&
+                (!OUT_branchFound || fetched[i].src[2:0] < OUT_branchSrc[2:0])) begin
                 
                 if (OUT_branchFound)
                     OUT_multipleBranches = 1;
@@ -81,39 +81,39 @@ always_ff@(posedge clk) begin
             
             // Try to find invalid fields
             for (i = 0; i < ASSOC; i=i+1) begin
-                if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].valid)) begin
+                if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid)) begin
                     
                     inserted = 1;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].valid <= 1;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].used <= 0;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].compr <= IN_btUpdate.compressed;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].isJump <= IN_btUpdate.isJump;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].dst <= IN_btUpdate.dst[31:1];
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].src <= IN_btUpdate.src[31:1];
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 1;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[31:1];
                 end
-                else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].used <= 0;
+                else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
             end
             
             // Try to find unused fields
             for (i = 0; i < ASSOC; i=i+1) begin
-                if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].used)) begin
+                if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used)) begin
                     
                     inserted = 1;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].valid <= 1;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].used <= 0;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].compr <= IN_btUpdate.compressed;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].isJump <= IN_btUpdate.isJump;
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].dst <= IN_btUpdate.dst[31:1];
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].src <= IN_btUpdate.src[31:1];
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 1;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
+                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[31:1];
                 end
-                else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+2:3]][i].used <= 0;
+                else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
             end
             
         end
         
         // maybe else if (for port sharing?)
         if (IN_pcValid && OUT_branchFound && (IN_BPT_branchTaken || OUT_branchIsJump)) begin
-            entries[IN_pc[$clog2(LENGTH)+1:2]][usedID].used <= 1;
+            entries[IN_pc[$clog2(LENGTH)+2:3]][usedID].used <= 1;
         end
     end
 

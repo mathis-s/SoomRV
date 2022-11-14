@@ -185,7 +185,10 @@ typedef union packed
 
 module InstrDecoder
 #(
-    parameter NUM_UOPS=4
+    parameter NUM_UOPS=4,
+    parameter DO_FUSE=1,
+    parameter FUSE_LUI=1,
+    parameter FUSE_STORE_DATA=0
 )
 (
     input wire clk,
@@ -233,6 +236,7 @@ Instr16 i16;
 I32 i32;
 
 D_UOp uopsComb[NUM_UOPS-1:0];
+reg[3:0] validMask;
 
 always_comb begin
     
@@ -241,6 +245,8 @@ always_comb begin
     RS_inPop = 0;
     OUT_decBranch = 0;
     OUT_decBranchDst = 31'bx;
+    validMask = 4'b1111;
+    OUT_decBranchFetchID = 0;
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         
@@ -253,7 +259,7 @@ always_comb begin
         //uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
         uop.fetchID = IN_instrs[i].fetchID;
-        uop.fetchOffs = IN_instrs[i].pc[1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
+        uop.fetchOffs = IN_instrs[i].pc[2:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
         case (instr.opcode)
             `OPC_LUI,
@@ -270,7 +276,6 @@ always_comb begin
         endcase
         
         if (IN_instrs[i].valid && en && !OUT_decBranch) begin
-            reg isJumpBranch = 0;
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
@@ -380,16 +385,36 @@ always_comb begin
                         uop.rs1 = instr.rs1;
                         uop.immB = 0;
                         uop.rd = 0;
-                        
                         uop.fu = FU_INT;
-                        case (instr.funct3)
-                            0: uop.opcode = INT_BEQ;
-                            1: uop.opcode = INT_BNE;
-                            4: uop.opcode = INT_BLT;
-                            5: uop.opcode = INT_BGE;
-                            6: uop.opcode = INT_BLTU;
-                            7: uop.opcode = INT_BGEU;
-                        endcase
+                        
+                        /* verilator lint_off ALWCOMBORDER */
+                        if (DO_FUSE && i != 0 && 
+                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            
+                            uop.rd = uopsComb[i-1].rd;
+                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
+                            validMask[i-1] = 0;
+                            
+                            case (instr.funct3)
+                                0: uop.opcode = INT_F_ADDI_BEQ;
+                                1: uop.opcode = INT_F_ADDI_BNE;
+                                4: uop.opcode = INT_F_ADDI_BLT;
+                                5: uop.opcode = INT_F_ADDI_BGE;
+                                6: uop.opcode = INT_F_ADDI_BLTU;
+                                7: uop.opcode = INT_F_ADDI_BGEU;
+                            endcase
+                        end
+                        else begin
+                            case (instr.funct3)
+                                0: uop.opcode = INT_BEQ;
+                                1: uop.opcode = INT_BNE;
+                                4: uop.opcode = INT_BLT;
+                                5: uop.opcode = INT_BGE;
+                                6: uop.opcode = INT_BLTU;
+                                7: uop.opcode = INT_BGEU;
+                            endcase
+                        end
                         invalidEnc =
                             (uop.opcode == 2) || (uop.opcode == 3);
                     end
@@ -433,22 +458,33 @@ always_comb begin
                         uop.rs1 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
-                        
-                        invalidEnc = (instr.funct3 == 1 && instr.funct7 != 0) || 
-                                    (instr.funct3 == 5 && (instr.funct7 != 7'h20 && instr.funct7 != 0));
                         uop.fu = FU_INT;
-                        case (instr.funct3)
-                            0: uop.opcode = INT_ADD;
-                            1: uop.opcode = INT_SLL;
-                            2: uop.opcode = INT_SLT;
-                            3: uop.opcode = INT_SLTU;
-                            4: uop.opcode = INT_XOR;
-                            5: uop.opcode = (instr.funct7 == 7'h20) ? INT_SRA : INT_SRL;
-                            6: uop.opcode = INT_OR;
-                            7: uop.opcode = INT_AND;
-                        endcase
                         
-                        if (instr.funct7 == 7'b0110000) begin
+                        if (!((instr.funct3 == 1 && instr.funct7 != 0) || 
+                                    (instr.funct3 == 5 && (instr.funct7 != 7'h20 && instr.funct7 != 0)))) begin
+                            case (instr.funct3)
+                                0: uop.opcode = INT_ADD;
+                                1: uop.opcode = INT_SLL;
+                                2: uop.opcode = INT_SLT;
+                                3: uop.opcode = INT_SLTU;
+                                4: uop.opcode = INT_XOR;
+                                5: uop.opcode = (instr.funct7 == 7'h20) ? INT_SRA : INT_SRL;
+                                6: uop.opcode = INT_OR;
+                                7: uop.opcode = INT_AND;
+                            endcase
+                            
+                            if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
+                                uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
+                                uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs0) begin
+                                
+                                uopsComb[i-1].imm[11:0] = uop.imm[11:0];
+                                if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
+                                uop.valid = 0;
+                            end
+                            
+                            invalidEnc = 0;
+                        end
+                        else if (instr.funct7 == 7'b0110000) begin
                             if (instr.funct3 == 3'b001) begin
                                 if (instr.rs1 == 5'b00000) begin
                                     invalidEnc = 0;
@@ -670,7 +706,7 @@ always_comb begin
                         end
                     end
                     
-                    `OPC_FLW: begin
+                    /*`OPC_FLW: begin
                         if (i32.flw.width == 3'b010) begin
                             uop.fu = FU_LSU;
                             uop.opcode = LSU_FLW;
@@ -751,18 +787,18 @@ always_comb begin
                             uop.rd_fp = 1;
                             invalidEnc = 0;
                         end
-                    end
+                    end*/
                     `OPC_FP: begin
                         // single precision
                         if (i32.fp.fmt == 2'b00) begin
                             
                             uop.fu = FU_FPU;
                             uop.rs0 = i32.fp.rs1;
-                            uop.rs0_fp = 1;
+                            //uop.rs0_fp = 1;
                             uop.rs1 = i32.fp.rs2;
-                            uop.rs1_fp = 1;
+                            //uop.rs1_fp = 1;
                             uop.rd = i32.fp.rd;
-                            uop.rd_fp = 1;
+                            // uop.rd_fp = 1;
                             invalidEnc = 0;
                             
                             case (i32.fp.funct5)
@@ -773,7 +809,7 @@ always_comb begin
                                 5'b00011: uop.opcode = FPU_FDIV_S;
                                 5'b01011: begin
                                     uop.opcode = FPU_FSQRT_S;
-                                    uop.rs1_fp = 0;
+                                    //uop.rs1_fp = 0;
                                     uop.rs1 = 0;
                                     if (i32.fp.rs2 != 0) invalidEnc = 1;
                                 end
@@ -795,8 +831,8 @@ always_comb begin
                                 end
                                 5'b11000: begin
                                     uop.rs1 = 0;
-                                    uop.rs1_fp = 0;
-                                    uop.rd_fp = 0;
+                                    //uop.rs1_fp = 0;
+                                    //uop.rd_fp = 0;
                                     if (i32.fp.rs2 == 5'b00000)
                                         uop.opcode = FPU_FCVTWS;
                                     else if (i32.fp.rs2 == 5'b00001)
@@ -804,17 +840,17 @@ always_comb begin
                                     else invalidEnc = 1;
                                 end
                                 5'b11100: begin
-                                    uop.rd_fp = 0;
+                                    //uop.rd_fp = 0;
                                     if (i32.fp.rs2 == 5'b00000 && i32.fp.rm == 3'b000)
                                         uop.opcode = FPU_FMVXW;
                                     else if (i32.fp.rs2 == 5'b00000 && i32.fp.rm == 3'b001) begin
                                         uop.opcode = FPU_FCLASS_S;
-                                        uop.rd_fp = 0;
+                                        //uop.rd_fp = 0;
                                     end
                                     else invalidEnc = 1;
                                 end
                                 5'b10100: begin
-                                    uop.rd_fp = 0;
+                                    //uop.rd_fp = 0;
                                     if (i32.fp.rm == 3'b010)
                                         uop.opcode = FPU_FEQ_S;
                                     else if (i32.fp.rm == 3'b001)
@@ -824,8 +860,8 @@ always_comb begin
                                     else invalidEnc = 1;
                                 end
                                 5'b11010: begin
-                                    uop.rs0_fp = 0;
-                                    uop.rs1_fp = 0;
+                                    //uop.rs0_fp = 0;
+                                    //uop.rs1_fp = 0;
                                     
                                     if (i32.fp.rs2 == 5'b00000) begin
                                         uop.opcode = FPU_FCVTSW;
@@ -836,7 +872,7 @@ always_comb begin
                                     else invalidEnc = 1;
                                 end
                                 5'b11110: begin
-                                    uop.rs0_fp = 0;
+                                    //uop.rs0_fp = 0;
                                     if (i32.fp.rs2 == 0 && i32.fp.rm == 0)
                                         uop.opcode = FPU_FMVWX;
                                     else invalidEnc = 1;
@@ -869,6 +905,18 @@ always_comb begin
                         uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
                         uop.rs0 = {2'b01, i16.cs.rd_rs1};
                         uop.rs1 = {2'b01, i16.cs.rs2};
+                        
+                        /*if (FUSE_STORE_DATA && i != 0 && uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT &&
+                            uopsComb[i-1].rs0 == uopsComb[i-1].rd && uopsComb[i-1].immB &&
+                            uopsComb[i-1].rs0 == uop.rs1 &&
+                            uopsComb[i-1].opcode == INT_ADD) begin
+                            
+                            uop.opcode = LSU_F_ADDI_SW;
+                            uop.rd = uopsComb[i-1].rd;
+                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
+                            validMask[i-1] = 0;
+                            
+                        end*/
                         invalidEnc = 0;
                     end
                     // c.addi4spn
@@ -930,6 +978,17 @@ always_comb begin
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        
+                        if (DO_FUSE && i != 0 && 
+                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            
+                            uop.rd = uopsComb[i-1].rd;
+                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
+                            validMask[i-1] = 0;
+                            uop.opcode = INT_F_ADDI_BEQ;
+                        end
+                        
                         invalidEnc = 0;
                     end
                     // c.bnez
@@ -940,6 +999,16 @@ always_comb begin
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        
+                        if (DO_FUSE && i != 0 && 
+                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            
+                            uop.rd = uopsComb[i-1].rd;
+                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
+                            validMask[i-1] = 0;
+                            uop.opcode = INT_F_ADDI_BNE;
+                        end
                         invalidEnc = 0;
                     end
                     // c.li
@@ -984,6 +1053,15 @@ always_comb begin
                         uop.immB = 1;
                         uop.rs0 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
+                        
+                        if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
+                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
+                            uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs0) begin
+                            
+                            uopsComb[i-1].imm[11:0] = uop.imm[11:0];
+                            if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
+                            uop.valid = 0;
+                        end
                         
                         invalidEnc = 0;
                     end
@@ -1149,8 +1227,10 @@ always@(posedge clk) begin
             OUT_uop[i].valid <= 0;
     end
     else if (en) begin
-        for (i = 0; i < NUM_UOPS; i=i+1)
+        for (i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= uopsComb[i];
+            if (!validMask[i]) OUT_uop[i].valid <= 0;
+        end
     end
 end
 
