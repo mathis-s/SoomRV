@@ -15,7 +15,7 @@ module PreDecode
 #(
     parameter NUM_INSTRS_IN=8,
     parameter NUM_INSTRS_OUT=4,
-    parameter BUF_SIZE=8
+    parameter BUF_SIZE=4
 )
 (
     input wire clk,
@@ -56,7 +56,7 @@ always_ff@(posedge clk) begin
         if (outEn) begin
             for (i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
                 
-                if (bufIndexOut != bufIndexIn) begin
+                if (bufIndexOut != bufIndexIn || freeEntries == 0) begin
                     
                     PDEntry cur = buffer[bufIndexOut];
                     reg[15:0] instr = cur.instr[subIndexOut];
@@ -134,7 +134,7 @@ always_ff@(posedge clk) begin
             buffer[bufIndexIn].fetchID <= IN_instrs[0].fetchID;
             
             bufIndexIn = bufIndexIn + 1;
-            assert(bufIndexIn != bufIndexOut);
+            //assert(bufIndexIn != bufIndexOut);
             freeEntries = freeEntries - 1;
         end
 
@@ -148,7 +148,7 @@ always_ff@(posedge clk) begin
         freeEntries = BUF_SIZE;
     end
     
-    OUT_full <= (freeEntries < 2);
+    OUT_full <= (freeEntries == 0);
 end
 
 endmodule

@@ -121,8 +121,6 @@ typedef enum logic[5:0]
     FPU_FADD_S,
     FPU_FSUB_S,
     FPU_FMUL_S,
-    FPU_FDIV_S,
-    FPU_FSQRT_S,
     FPU_FSGNJ_S,
     FPU_FSGNJN_S,
     FPU_FSGNJX_S,
@@ -140,7 +138,13 @@ typedef enum logic[5:0]
     FPU_FMVWX
 } OPCode_FPU;
 
-typedef enum logic[2:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_RN} FuncUnit;
+typedef enum logic[5:0]
+{
+    FPU_FDIV_S,
+    FPU_FSQRT_S
+} OPCode_FDIV;
+
+typedef enum logic[2:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_RN, FU_FDIV} FuncUnit;
 typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING} Flags;
 
 typedef struct packed

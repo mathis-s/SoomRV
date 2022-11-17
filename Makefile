@@ -7,7 +7,7 @@ decoder_tb:
 	src/InstrDecoder.sv  \
 	src/Rename.sv  \
 	src/Core.sv  \
-	src/IssueQueue  \
+	src/IssueQueue.sv  \
 	src/IntALU.sv  \
 	src/ProgramCounter.sv \
 	src/RF.sv \
@@ -33,6 +33,7 @@ decoder_tb:
 	src/RenameTable.sv \
 	src/TagBuffer.sv \
 	src/FPU.sv \
+	src/FDiv.sv \
 	src/BranchTargetBuffer.sv \
 	src/BranchPredictionTable.sv \
 	src/ReturnStack.sv \

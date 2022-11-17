@@ -57,6 +57,7 @@ always_ff@(posedge clk) begin
         OUT_progress <= 0;
         len <= 0;
         OUT_EXT_bus <= 0;
+        OUT_EXT_en <= 0;
     end
     else begin
         

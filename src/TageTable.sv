@@ -7,7 +7,7 @@ module TageTable
     parameter TAG_SIZE=8,
     parameter USF_SIZE=2,
     parameter CNT_SIZE=2,
-    parameter INTERVAL=5
+    parameter INTERVAL=10
 )
 (
     input wire clk,

@@ -15,11 +15,13 @@ assign bus = oen ? outBus : 32'bz;
 
 reg[31:0] mem[SIZE-1:0] /*verilator public*/;
 reg[31:0] addr;
-reg[1:0] state = 0;
+reg[1:0] state = 2'b00;
+
+initial state = 0;
 
 reg[2:0] waitCycles;
 
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
     case (state)
         
         // lookup

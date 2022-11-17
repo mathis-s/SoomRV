@@ -187,7 +187,7 @@ module InstrDecoder
 #(
     parameter NUM_UOPS=4,
     parameter DO_FUSE=1,
-    parameter FUSE_LUI=1,
+    parameter FUSE_LUI=0,
     parameter FUSE_STORE_DATA=0
 )
 (
@@ -806,11 +806,15 @@ always_comb begin
                                 5'b00000: uop.opcode = FPU_FADD_S;
                                 5'b00001: uop.opcode = FPU_FSUB_S;
                                 5'b00010: uop.opcode = FPU_FMUL_S;
-                                5'b00011: uop.opcode = FPU_FDIV_S;
+                                5'b00011: begin 
+                                    uop.opcode = FPU_FDIV_S; 
+                                    uop.fu = FU_FDIV;
+                                end
                                 5'b01011: begin
                                     uop.opcode = FPU_FSQRT_S;
                                     //uop.rs1_fp = 0;
                                     uop.rs1 = 0;
+                                    uop.fu = FU_FDIV;
                                     if (i32.fp.rs2 != 0) invalidEnc = 1;
                                 end
                                 5'b00100: begin

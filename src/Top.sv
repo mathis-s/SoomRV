@@ -61,7 +61,7 @@ wire EXTMEM_en;
 ExternalMemorySim extMem
 (
     .clk(clk),
-    .en(EXTMEM_en),
+    .en(EXTMEM_en && !rst),
     .bus(EXTMEM_bus)
 );
 

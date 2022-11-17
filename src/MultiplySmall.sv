@@ -40,8 +40,6 @@ MulPS pl;
 /* verilator lint_off UNSIGNED */
 assign OUT_busy = pl.valid && (stage < NUM_STAGES - 1);
 /* verilator lint_on UNSIGNED */
-
-reg[63:0] result;
 reg[3:0] stage;
 
 always_ff@(posedge clk) begin
@@ -63,7 +61,6 @@ always_ff@(posedge clk) begin
             
             case (IN_uop.opcode)
                 
-                MUL_MUL,
                 MUL_MULH: begin
                     pl.invert <= IN_uop.srcA[31] ^ IN_uop.srcB[31];
                     pl.srcA <= IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA;
@@ -74,6 +71,7 @@ always_ff@(posedge clk) begin
                     pl.srcA <= IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA;
                     pl.srcB <= IN_uop.srcB;
                 end
+                MUL_MUL,
                 MUL_MULU: begin
                     pl.invert <= 0;
                     pl.srcA <= IN_uop.srcA;
@@ -99,12 +97,10 @@ always_ff@(posedge clk) begin
                     OUT_uop.flags <= FLAGS_NONE;
                     OUT_uop.compressed <= 0;
                     
-                    result = (pl.invert ? (-pl.res) : pl.res);
-                    
                     if (pl.high)
-                        OUT_uop.result <= result[63:32];
+                        OUT_uop.result <= pl.invert ? (~pl.res[63:32] + ((pl.res[31:0] == 0) ? 1 : 0)) : pl.res[63:32];
                     else
-                        OUT_uop.result <= result[31:0];
+                        OUT_uop.result <= pl.res[31:0];
                 end
             end
         end

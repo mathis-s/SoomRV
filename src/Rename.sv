@@ -261,8 +261,8 @@ always_ff@(posedge clk) begin
                 
                 case (IN_uop[i].fu)
                     FU_INT: intOrder = !intOrder;
-                    FU_DIV, FU_FPU: intOrder = 1;
-                    FU_MUL: intOrder = 0;
+                    FU_DIV, FU_FPU:  intOrder = 1;
+                    FU_FDIV, FU_MUL: intOrder = 0;
                     
                     FU_ST: counterStoreSqN = counterStoreSqN + 1;
                     FU_LSU: counterLoadSqN = counterLoadSqN + 1;

@@ -1,7 +1,6 @@
 module TagePredictor
 #(
     parameter NUM_STAGES=3,
-    parameter L_0=4,
     parameter FACTOR=2,
     parameter TABLE_SIZE=64,
     parameter TAG_SIZE=8
@@ -53,7 +52,15 @@ reg[TAG_SIZE-1:0] predTags[NUM_STAGES-2:0];
 reg[TAG_SIZE-1:0] writeTags[NUM_STAGES-2:0];
 
 always_comb begin
+    
     for (i = 0; i < NUM_STAGES-1; i=i+1) begin
+    
+        //reg[$bits(BHist_t)-1:0] historyPred;
+        //reg[$bits(BHist_t)-1:0] historyWrite;
+        //for (j = 0; j < $bits(BHist_t); j=j+1) begin
+        //    historyPred[j] = IN_predHistory[j % (8 * (FACTOR ** i))];
+        //    historyWrite[j] = IN_writeHistory[j % (8 * (FACTOR ** i))];
+        //end
         
         predTags[i] = IN_predAddr[TAG_SIZE-1:0];
         writeTags[i] = IN_writeAddr[TAG_SIZE-1:0];
@@ -62,6 +69,7 @@ always_comb begin
         writeHashes[i] = IN_writeAddr[HASH_SIZE-1:0] ^ IN_writeAddr[2*HASH_SIZE-1:HASH_SIZE];
         
         for (j = 0; j < ((FACTOR ** i)); j=j+1) begin
+        
             predHashes[i] = predHashes[i] ^ IN_predHistory[HASH_SIZE*j+:HASH_SIZE];
             writeHashes[i] = writeHashes[i] ^ IN_writeHistory[HASH_SIZE*j+:HASH_SIZE];
             

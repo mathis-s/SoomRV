@@ -147,6 +147,41 @@ main:
     mul a0, a0, a0
     mul a0, a0, a0
     
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    fdiv.s a0, a0, a0
+    
     div a0, a0, a0
     div a0, a0, a0
     div a0, a0, a0

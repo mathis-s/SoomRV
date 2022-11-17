@@ -186,11 +186,12 @@ always_ff@(posedge clk) begin
         
         // Update Perf Counters
         cRegs64[0] <= cRegs64[0] + 1;
+        cRegs64[1] = cRegs64[1] + 1;
         
         for (i = 0; i < NUM_UOPS; i=i+1) begin
         
-            if (IN_ifValid[i])
-                cRegs64[1] = cRegs64[1] + 1;
+            //if (IN_ifValid[i])
+            //    cRegs64[1] = cRegs64[1] + 1;
             if (IN_comValid[i] && !IN_mispredFlush)
                 cRegs64[3] = cRegs64[3] + 1;
             if (IN_comValid[i] && !IN_mispredFlush && IN_comBranch[i])

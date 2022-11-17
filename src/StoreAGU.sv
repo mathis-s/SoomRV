@@ -66,10 +66,6 @@ always_ff@(posedge clk) begin
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.pc <= IN_uop.pc;
-            //OUT_uop.isBranch <= 0;
-            //OUT_uop.branchTaken <= 0;
-            //OUT_uop.bpi <= 0;
-            //OUT_uop.history <= IN_uop.history;
             OUT_uop.flags <= except ? FLAGS_EXCEPT : FLAGS_NONE;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.valid <= 1;

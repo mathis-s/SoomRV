@@ -3,12 +3,14 @@ module IssueQueue
     parameter SIZE = 8,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
+    parameter IMM_BITS=32,
     parameter FU0 = FU_ST,
     parameter FU1 = FU_ST,
     parameter FU2 = FU_ST,
     parameter FU0_SPLIT=0,
     parameter FU0_ORDER=0,
     parameter FU1_DLY=0
+    
 )
 (
     input wire clk,
@@ -17,6 +19,7 @@ module IssueQueue
     
     input wire IN_stall,
     input wire IN_doNotIssueFU1,
+    input wire IN_doNotIssueFU2,
     
     input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
@@ -49,7 +52,27 @@ localparam ID_LEN = $clog2(SIZE);
 integer i;
 integer j;
 
-R_UOp queue[SIZE-1:0];
+typedef struct packed
+{
+    logic[IMM_BITS-1:0] imm;
+    logic availA;
+    Tag tagA;
+    logic availB;
+    Tag tagB;
+    logic immB;
+    SqN sqN;
+    Tag tagDst;
+    RegNm nmDst;
+    logic[5:0] opcode;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
+    SqN storeSqN;
+    SqN loadSqN;
+    FuncUnit fu;
+    logic compressed;
+} R_ST_UOp;
+
+R_ST_UOp queue[SIZE-1:0];
 reg valid[SIZE-1:0];
 
 reg[$clog2(SIZE):0] insertIndex;
@@ -66,12 +89,15 @@ always_comb begin
         newAvailB[i] = 0;
         
         for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-            if (IN_resultValid[j] && queue[i].tagA == IN_resultUOp[j].tagDst) newAvailA[i] = 1;
-            if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
+            // Store Pipeline doesn't produce results
+            if (j != 3) begin
+                if (IN_resultValid[j] && queue[i].tagA == IN_resultUOp[j].tagDst) newAvailA[i] = 1;
+                if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
+            end
         end
         
         for (j = 0; j < 2; j=j+1) begin
-            if (IN_issueValid[j] && (IN_issueUOps[j].fu == FU_INT /*|| IN_issueUOps[j].fu == FU_ST*/) && IN_issueUOps[j].nmDst != 0) begin
+            if (IN_issueValid[j] && (IN_issueUOps[j].fu == FU_INT) && IN_issueUOps[j].nmDst != 0) begin
                 if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
                 if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
             end
@@ -132,6 +158,7 @@ always_ff@(posedge clk) begin
                 if (i < insertIndex && !issued) begin
                     if ((queue[i].availA || newAvailA[i]) && (queue[i].availB || newAvailB[i]) && 
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
+                        (queue[i].fu != FU2 || !IN_doNotIssueFU2) && 
                         !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU) && reservedWBs[0]) && 
                         
                         // Only issue stores that fit into store queue
@@ -144,7 +171,24 @@ always_ff@(posedge clk) begin
                         
                         issued = 1;
                         OUT_valid <= 1;
-                        OUT_uop <= queue[i];
+                        //OUT_uop <= queue[i];
+                        
+                        OUT_uop.imm <= {{(32 - IMM_BITS){1'b0}}, queue[i].imm};
+                        OUT_uop.availA <= queue[i].availA;
+                        OUT_uop.tagA <= queue[i].tagA;
+                        OUT_uop.availB <= queue[i].availB;
+                        OUT_uop.tagB <= queue[i].tagB;
+                        OUT_uop.immB <= queue[i].immB;
+                        OUT_uop.sqN <= queue[i].sqN;
+                        OUT_uop.tagDst <= queue[i].tagDst;
+                        OUT_uop.nmDst <= queue[i].nmDst;
+                        OUT_uop.opcode <= queue[i].opcode;
+                        OUT_uop.fetchID <= queue[i].fetchID;
+                        OUT_uop.fetchOffs <= queue[i].fetchOffs;
+                        OUT_uop.storeSqN <= queue[i].storeSqN;
+                        OUT_uop.loadSqN <= queue[i].loadSqN;
+                        OUT_uop.fu <= queue[i].fu;
+                        OUT_uop.compressed <= queue[i].compressed;
                         
                         // Shift other ops forward
                         for (j = i; j < SIZE-1; j=j+1) begin
@@ -169,7 +213,24 @@ always_ff@(posedge clk) begin
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                         IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
                     
-                    R_UOp temp = IN_uop[i];
+                    R_ST_UOp temp;// = IN_uop[i];
+                    
+                    temp.imm = IN_uop[i].imm[IMM_BITS-1:0];
+                    temp.availA = IN_uop[i].availA;
+                    temp.tagA = IN_uop[i].tagA;
+                    temp.availB = IN_uop[i].availB;
+                    temp.tagB = IN_uop[i].tagB;
+                    temp.immB = IN_uop[i].immB;
+                    temp.sqN = IN_uop[i].sqN;
+                    temp.tagDst = IN_uop[i].tagDst;
+                    temp.nmDst = IN_uop[i].nmDst;
+                    temp.opcode = IN_uop[i].opcode;
+                    temp.fetchID = IN_uop[i].fetchID;
+                    temp.fetchOffs = IN_uop[i].fetchOffs;
+                    temp.storeSqN = IN_uop[i].storeSqN;
+                    temp.loadSqN = IN_uop[i].loadSqN;
+                    temp.fu = IN_uop[i].fu;
+                    temp.compressed = IN_uop[i].compressed;
 
                     // Check if the result for this op is being broadcasted in the current cycle
                     for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
