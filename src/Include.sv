@@ -13,6 +13,7 @@ typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[15:0] BHist_t;
+typedef logic[2:0] TageUseful_t;
 
 typedef enum logic[5:0]
 {
@@ -152,7 +153,7 @@ typedef struct packed
     bit predicted;
     bit taken;
     bit[2:0] tageID;
-    bit[4:0] tageUseful;
+    TageUseful_t tageUseful;
     bit isJump;
 } BranchPredInfo;
 
