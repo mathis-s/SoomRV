@@ -75,8 +75,8 @@ always_ff@(posedge clk) begin
         // Registers initialized with 0
         for (i = 0; i < NUM_REGS; i=i+1) begin
             rat[i].avail <= 1;
-            rat[i].comTag <= 7'h7f;
-            rat[i].specTag <= 7'h7f;
+            rat[i].comTag <= 7'h40;
+            rat[i].specTag <= 7'h40;
         end
     end
     else begin

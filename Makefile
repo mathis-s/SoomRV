@@ -19,6 +19,7 @@ decoder_tb:
 	src/LoadBuffer.sv \
 	src/StoreQueue.sv \
 	src/MultiplySmall.sv \
+	src/Multiply.sv \
 	src/Divide.sv \
 	src/ControlRegs.sv \
 	src/LZCnt.sv \

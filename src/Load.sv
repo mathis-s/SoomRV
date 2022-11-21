@@ -110,8 +110,8 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].valid <= 1;
                 
-                if (IN_uop[i].tagA == 7'h7f) begin
-                    OUT_uop[i].srcA <= 0;
+                if (IN_uop[i].tagA[6]) begin
+                    OUT_uop[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
                 end
                 else begin 
                     reg found = 0;
@@ -145,8 +145,8 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].immB) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
-                else if (IN_uop[i].tagB == 7'h7f) begin
-                    OUT_uop[i].srcB <= 0;
+                else if (IN_uop[i].tagB[6]) begin
+                    OUT_uop[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
                 end
                 else begin
                     reg found = 0;

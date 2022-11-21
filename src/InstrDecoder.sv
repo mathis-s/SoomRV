@@ -553,7 +553,13 @@ always_comb begin
                         end
                         
                         // li rd, 0 is eliminated during rename
-                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs0 == 0 && uop.imm == 0) begin
+                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs0 == 0 && 
+                            uop.imm[11] == uop.imm[10] &&
+                            uop.imm[11] == uop.imm[9] &&
+                            uop.imm[11] == uop.imm[8] &&
+                            uop.imm[11] == uop.imm[7] &&
+                            uop.imm[11] == uop.imm[6] &&
+                            uop.imm[11] == uop.imm[5]) begin
                             if (uop.rd == 0) uop.valid = 0;
                             else uop.fu = FU_RN;
                         end
@@ -1015,19 +1021,12 @@ always_comb begin
                         end
                         invalidEnc = 0;
                     end
-                    // c.li
+                    // c.li 
                     else if (i16.ci.funct3 == 3'b010 && !(i16.ci.rd_rs1 == 0)) begin
-                        uop.opcode = INT_ADD;
-                        uop.fu = FU_INT;
+                        uop.fu = FU_RN; // eliminated during rename
                         uop.imm = {{26{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm};
                         uop.immB = 1;
                         uop.rd = i16.ci.rd_rs1;
-                        
-                        // li rd, 0 is eliminated during rename
-                        if (uop.imm == 0) begin
-                            uop.fu = FU_RN;
-                        end
-                        
                         invalidEnc = 0;
                     end
                     // c.lui / c.addi16sp

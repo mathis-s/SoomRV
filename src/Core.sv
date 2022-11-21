@@ -777,8 +777,8 @@ IntALU ialu1
 
 RES_UOp MUL_uop;
 wire MUL_busy;
-wire MUL_doNotIssue = MUL_busy || (LD_uop[1].valid && enabledXUs[1][3]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
-MultiplySmall mul
+wire MUL_doNotIssue = 0;//MUL_busy || (LD_uop[1].valid && enabledXUs[1][3]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
+Multiply mul
 (
     .clk(clk),
     .rst(rst),

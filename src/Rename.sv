@@ -72,8 +72,8 @@ always_comb begin
     nextCounterSqN = counterSqN;
     
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;//{IN_uop[i].rs0_fp, IN_uop[i].rs0};
-        RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;//{IN_uop[i].rs1_fp, IN_uop[i].rs1};
+        RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
+        RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
     end
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         // Issue/Lookup
@@ -145,7 +145,8 @@ always_comb begin
             newTags[i] = {1'b0, TB_tags[i]};
         //else if (TB_issueValid_fp[i])
         //    newTags[i] = {1'b1, TB_FP_tags[i]};
-        else newTags[i] = 7'h7f;
+        else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
+        else newTags[i] = 7'h40;
     end
 end
 TagBuffer tb

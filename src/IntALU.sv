@@ -180,7 +180,7 @@ always_ff@(posedge clk) begin
             OUT_ibInfo.valid <= 0;
             
             if (IN_uop.opcode == INT_JAL)
-                OUT_branch.history <= IN_uop.history;
+                OUT_branch.history <= IN_uop.history;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
             else
                 OUT_branch.history <= {IN_uop.history[$bits(BHist_t)-2:0], branchTaken};
             
