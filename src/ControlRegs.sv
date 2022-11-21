@@ -24,7 +24,7 @@ module ControlRegs
     input wire IN_comValid[NUM_UOPS-1:0],
     input wire IN_branchMispred,
     input wire IN_wbValid[NUM_WBS-1:0],
-    input wire IN_ifValid[NUM_UOPS-1:0],
+    input wire[NUM_UOPS-1:0] IN_ifValid,
     input wire IN_comBranch[NUM_UOPS-1:0],
     
     // Control Registers I/0
@@ -81,10 +81,12 @@ reg[5:0] spiCnt;
 reg[25:0] tmrCnt;
 
 assign OUT_IO_busy = (spiCnt != 0);
+reg[3:0] ifetchValidReg;
 
 always_ff@(posedge clk) begin
     
     OUT_tmrIRQ <= 0;
+    ifetchValidReg <= IN_ifValid;
     
     if (rst) begin
         weReg <= 1;
@@ -190,8 +192,8 @@ always_ff@(posedge clk) begin
         
         for (i = 0; i < NUM_UOPS; i=i+1) begin
         
-            //if (IN_ifValid[i])
-            //    cRegs64[1] = cRegs64[1] + 1;
+            if (ifetchValidReg[i])
+                cRegs64[1] = cRegs64[1] + 1;
             if (IN_comValid[i] && !IN_mispredFlush)
                 cRegs64[3] = cRegs64[3] + 1;
             if (IN_comValid[i] && !IN_mispredFlush && IN_comBranch[i])
