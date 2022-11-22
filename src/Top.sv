@@ -86,6 +86,9 @@ wire[31:0] CORE_readData;
 wire CORE_instrReadEnable;
 wire[27:0] CORE_instrReadAddress;
 wire[127:0] CORE_instrReadData;
+
+wire SPI_mosi;
+wire SPI_clk;
 Core core
 (
     .clk(clk),
@@ -107,8 +110,8 @@ Core core
     .OUT_instrReadEnable(CORE_instrReadEnable),
     .OUT_halt(OUT_halt),
     
-    .OUT_SPI_clk(),
-    .OUT_SPI_mosi(),
+    .OUT_SPI_clk(SPI_clk),
+    .OUT_SPI_mosi(SPI_mosi),
     .IN_SPI_miso(1'b0),
     
     .OUT_MC_ce(MC_ce),
@@ -119,6 +122,18 @@ Core core
     .IN_MC_progress(MC_progress),
     .IN_MC_busy(MC_busy)
 );
+
+integer spiCnt = 0;
+reg[7:0] spiByte = 0;
+always@(posedge SPI_clk) begin
+    spiByte = {spiByte[6:0], SPI_mosi};
+    spiCnt = spiCnt + 1;
+    //$display("cnt %d %x", spiCnt, mprj_io[25]);
+    if (spiCnt == 8) begin
+        $write("%c", spiByte);
+        spiCnt = 0;
+    end
+end
 
 wire[31:0] DC_dataOut;
 

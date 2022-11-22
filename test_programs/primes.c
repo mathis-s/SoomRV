@@ -18,31 +18,7 @@ void mark (uint32_t prime)
     }
 }
 
-static const char hexLut[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-static void printhex (uint32_t num)
-{
-    volatile char* out = (char*) 0xfe000000;
-    
-    *out = hexLut[(num >> 28) & 0xf];
-    *out = hexLut[(num >> 24) & 0xf];
-    *out = hexLut[(num >> 20) & 0xf];
-    *out = hexLut[(num >> 16) & 0xf];
-    *out = hexLut[(num >> 12) & 0xf];
-    *out = hexLut[(num >> 8) & 0xf];
-    *out = hexLut[(num >> 4) & 0xf];
-    *out = hexLut[(num >> 0) & 0xf];
-    *out = '\n';
-    
-    /*for (int i = 7; i >= 0; i--)
-    {
-        uint32_t c = (num >> (i << 2)) & 0xf;
-        if (c <= 9)
-            *out = c + '0';
-        else
-            *out = c + 'a' - 10;
-    }
-    *out = '\n';*/
-}
+void printhex (uint32_t num);
 
 int main ()
 {

@@ -1,3 +1,5 @@
+.set IO_ADDR, 0xfe000000
+
 .globl _start
 _start:
     
@@ -118,7 +120,7 @@ printdecu:
 		mv a0, a2
 		bnez a2, .loop_printdecu_fast
 		
-	li a1, 0xfe000000
+	li a1, IO_ADDR
 	.loop_print:
 		addi a4, a4, -1
 		lb a0, 0(a4)
@@ -169,7 +171,7 @@ printhex:
 	srli	a4,a0,28
 	add	a4,a5,a4
 	lbu	a3,0(a4)
-	li	a4,0xfe000000
+	li	a4,IO_ADDR
 	sb	a3,0(a4)
 	srli	a3,a0,24
 	andi	a3,a3,15

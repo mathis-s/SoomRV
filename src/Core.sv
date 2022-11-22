@@ -714,7 +714,7 @@ StoreQueue sq
     
     .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_IO_busy(IO_busy)
+    .IN_IO_busy(IO_busy || SQ_uop.valid || CC_uopSt.valid)
 );
 
 wire LSU_loadFwdValid;
