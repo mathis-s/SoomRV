@@ -7,6 +7,7 @@ module IssueQueue
     parameter FU0 = FU_ST,
     parameter FU1 = FU_ST,
     parameter FU2 = FU_ST,
+    parameter FU3 = FU_ST,
     parameter FU0_SPLIT=0,
     parameter FU0_ORDER=0,
     parameter FU1_DLY=0
@@ -113,7 +114,7 @@ always_comb begin
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         if (IN_uopValid[i] && 
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
+                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
             count = count + 1;
         end
     end
@@ -159,14 +160,14 @@ always_ff@(posedge clk) begin
                     if ((queue[i].availA || newAvailA[i]) && (queue[i].availB || newAvailB[i]) && 
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
                         (queue[i].fu != FU2 || !IN_doNotIssueFU2) && 
-                        !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU) && reservedWBs[0]) && 
+                        !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) && 
                         
                         // Only issue stores that fit into store queue
-                        ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST) || 
+                        ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST && FU3 != FU_ST) || 
                             queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
                         
                         // Only issue loads that fit into load order buffer
-                        ((FU0 != FU_LSU && FU1 != FU_LSU && FU2 != FU_LSU) || 
+                        ((FU0 != FU_LSU && FU1 != FU_LSU && FU2 != FU_LSU && FU3 != FU_LSU) || 
                             queue[i].fu != FU_LSU || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         
                         issued = 1;
@@ -211,7 +212,7 @@ always_ff@(posedge clk) begin
             for (i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_uopValid[i] && 
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                        IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2)) begin
+                        IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
                     
                     R_ST_UOp temp;// = IN_uop[i];
                     

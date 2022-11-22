@@ -10,8 +10,6 @@ module FPU
     output RES_UOp OUT_uop
 );
 
-// NOTE: Just for simulation/testing purposes, this needs to be pipelined before any real synthesis.
-
 wire[32:0] srcArec;
 wire[32:0] srcBrec;
 fNToRecFN#(8, 24) recA (.in(IN_uop.srcA), .out(srcArec));
@@ -72,22 +70,9 @@ addRecFN#(8, 24) addRec
     .exceptionFlags(addSubFlags)
 );
 
-wire[32:0] mul;
-wire[4:0] mulFlags;
-mulRecFN#(8, 24) mulRec
-(
-    .control(0),
-    .a(srcArec),
-    .b(srcBrec),
-    .roundingMode(rm),
-    .out(mul),
-    .exceptionFlags(mulFlags)
-);
-
 reg[32:0] recResult;
 always_comb begin
     case(IN_uop.opcode)
-        FPU_FMUL_S: recResult = mul;
         FPU_FCVTSWU,
         FPU_FCVTSW: recResult = fromInt;
         default: recResult = addSub;
@@ -120,8 +105,7 @@ always@(posedge clk) begin
             FPU_FADD_S,
             FPU_FSUB_S,
             FPU_FCVTSWU,
-            FPU_FCVTSW,
-            FPU_FMUL_S: OUT_uop.result <= fpResult;
+            FPU_FCVTSW: OUT_uop.result <= fpResult;
             
             FPU_FEQ_S: OUT_uop.result <= {31'b0, equal};
             FPU_FLE_S: OUT_uop.result <= {31'b0, equal || lessThan};

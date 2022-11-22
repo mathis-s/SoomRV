@@ -80,7 +80,7 @@ reg rnUOpValidSorted[WIDTH-1:0];
 always_comb begin
     for (i = 0; i < WIDTH; i=i+1) begin
         rnUOpValidSorted[i] = 0;
-        rnUOpSorted[i] = 100'bx;
+        rnUOpSorted[i] = 101'bx;
         
         for (j = 0; j < WIDTH; j=j+1) begin
             // This could be one-hot...

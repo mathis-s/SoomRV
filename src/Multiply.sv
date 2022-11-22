@@ -46,6 +46,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < NUM_STAGES; i=i+1) begin
             pl[i].valid <= 0;
         end
+        OUT_uop.valid <= 0;
     end
     else begin
         

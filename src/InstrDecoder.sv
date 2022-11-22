@@ -811,7 +811,10 @@ always_comb begin
                                 
                                 5'b00000: uop.opcode = FPU_FADD_S;
                                 5'b00001: uop.opcode = FPU_FSUB_S;
-                                5'b00010: uop.opcode = FPU_FMUL_S;
+                                5'b00010: begin
+                                    uop.opcode = FPU_FMUL_S;
+                                    uop.fu = FU_FMUL;
+                                end
                                 5'b00011: begin 
                                     uop.opcode = FPU_FDIV_S; 
                                     uop.fu = FU_FDIV;

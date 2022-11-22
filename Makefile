@@ -34,6 +34,7 @@ decoder_tb:
 	src/RenameTable.sv \
 	src/TagBuffer.sv \
 	src/FPU.sv \
+	src/FMul.sv \
 	src/FDiv.sv \
 	src/BranchTargetBuffer.sv \
 	src/BranchPredictionTable.sv \

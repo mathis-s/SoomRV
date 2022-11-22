@@ -331,7 +331,7 @@ assign stall[0] = 0;
 assign stall[1] = 0;
 
 wire IQ0_full;
-IssueQueue#(8,4,4,32,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
+IssueQueue#(8,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_FPU,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -363,7 +363,7 @@ IssueQueue#(8,4,4,32,FU_INT,FU_DIV,FU_FPU,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(8,4,4,32,FU_INT,FU_MUL,FU_FDIV,1,1,9-4) iq1
+IssueQueue#(8,4,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -395,7 +395,7 @@ IssueQueue#(8,4,4,32,FU_INT,FU_MUL,FU_FDIV,1,1,9-4) iq1
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
-IssueQueue#(8,4,4,12,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
+IssueQueue#(8,4,4,12,FU_LSU,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -427,7 +427,7 @@ IssueQueue#(8,4,4,12,FU_LSU,FU_LSU,FU_LSU,0,0,0) iq2
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(10,4,4,12,FU_ST,FU_ST,FU_ST,0,0,0) iq3 
+IssueQueue#(10,4,4,12,FU_ST,FU_ST,FU_ST,FU_ST,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),
@@ -496,7 +496,7 @@ RF_FP rf_fp
 );*/
 
 EX_UOp LD_uop[3:0];
-wire[6:0] enabledXUs[3:0];
+wire[7:0] enabledXUs[3:0];
 FuncUnit LD_fu[3:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
@@ -791,6 +791,18 @@ Multiply mul
     .OUT_uop(MUL_uop)
 );
 
+RES_UOp FMUL_uop;
+FMul fmul
+(
+    .clk(clk),
+    .rst(rst), 
+    .en(enabledXUs[1][7]),
+    
+    .IN_branch(branch),
+    .IN_uop(LD_uop[1]),
+    .OUT_uop(FMUL_uop)
+);
+
 wire FDIV_busy;
 wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && enabledXUs[1][6]) || (RV_uopValid[1] && RV_uop[1].fu == FU_FDIV);
 RES_UOp FDIV_uop;
@@ -800,7 +812,7 @@ FDiv fdiv
     .rst(rst),
     .en(enabledXUs[1][6]),
     
-    .IN_wbAvail(!INT1_uop.valid && !MUL_uop.valid),
+    .IN_wbAvail(!INT1_uop.valid && !MUL_uop.valid && !FMUL_uop.valid),
     .OUT_busy(FDIV_busy),
     
     .IN_branch(branch),
@@ -808,7 +820,7 @@ FDiv fdiv
     .OUT_uop(FDIV_uop)
 );
 
-assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : FDIV_uop);
+assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_uop.valid ? FMUL_uop : FDIV_uop));
 
 SqN ROB_maxSqN;
 
