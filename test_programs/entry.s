@@ -13,15 +13,15 @@ _start:
     call main
     
     # print IPC
-    li a0, 0xff000098
-    li a1, 0xff000080
-    lw a0, 0(a0)
-    lw a1, 0(a1)
-    
-    li a2, 1000
-    mul a0, a0, a2
-    divu a0, a0, a1
-    call printdecu
+    #li a0, 0xff000098
+    #li a1, 0xff000080
+    #lw a0, 0(a0)
+    #lw a1, 0(a1)
+    #
+    #li a2, 1000
+    #mul a0, a0, a2
+    #divu a0, a0, a1
+    #call printdecu
     ebreak
     
 _exception:

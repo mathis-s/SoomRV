@@ -110,6 +110,7 @@ Core core
     .OUT_instrReadEnable(CORE_instrReadEnable),
     .OUT_halt(OUT_halt),
     
+    .OUT_SPI_cs(),
     .OUT_SPI_clk(SPI_clk),
     .OUT_SPI_mosi(SPI_mosi),
     .IN_SPI_miso(1'b0),

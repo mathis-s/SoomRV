@@ -34,6 +34,7 @@ module ControlRegs
     input Flags IN_irqFlags,
     input wire[31:0] IN_irqMemAddr,
     
+    output reg OUT_SPI_cs,
     output reg OUT_SPI_clk,
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
@@ -98,6 +99,7 @@ always_ff@(posedge clk) begin
         
         OUT_SPI_clk <= 0;
         spiCnt <= 0;
+        OUT_SPI_cs <= 1;
     end
     else begin
         
@@ -110,6 +112,8 @@ always_ff@(posedge clk) begin
             spiCnt <= spiCnt - 1;
             cRegs[4] <= {cRegs[4][30:0], IN_SPI_miso};
         end
+        if (spiCnt == 0)
+            OUT_SPI_cs <= 1;
         
 
         if (!weReg) begin
@@ -150,6 +154,7 @@ always_ff@(posedge clk) begin
                         default: begin end
                     endcase
                     OUT_SPI_mosi <= dataReg[31];
+                    OUT_SPI_cs <= 0;
                 end
             end
         end

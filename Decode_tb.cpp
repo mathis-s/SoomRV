@@ -90,6 +90,11 @@ int main(int argc, char** argv)
         top->rootp->Top->extMem->mem[i] = ram[i];
         //top->rootp->Top->dcache->mem[i] = ram[i];
     }
+    
+    for (size_t i = 0; i < dataIndex/4+1; i++)
+    {
+        //printf("%.8x\n", top->rootp->Top->extMem->mem[i]);
+    }
 
     // Reset
     top->rst = 1;
@@ -122,7 +127,7 @@ int main(int argc, char** argv)
     }
     
     // Run a few more cycles ...
-    for (int i = 0; i < 200; i=i+1)
+    for (int i = 0; i < 1600; i=i+1)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model

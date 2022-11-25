@@ -22,6 +22,7 @@ module Core
     output wire OUT_instrReadEnable,
     output wire OUT_halt,
     
+    output wire OUT_SPI_cs,
     output wire OUT_SPI_clk,
     output wire OUT_SPI_mosi,
     input wire IN_SPI_miso,
@@ -905,6 +906,7 @@ ControlRegs cr
     .IN_irqFlags(ROB_irqFlags),
     .IN_irqMemAddr(ROB_irqMemAddr),
     
+    .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
