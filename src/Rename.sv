@@ -185,7 +185,7 @@ TagBuffer tb
 always_comb begin
     OUT_stall = 0;
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid && IN_uop[i].rd != 0)
+        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN)
             OUT_stall = 1;
     end
         
