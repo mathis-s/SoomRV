@@ -43,7 +43,7 @@ assign OUT_busy = 0;
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        for (i = 0; i < NUM_STAGES; i=i+1) begin
+        for (i = 0; i < NUM_STAGES+1; i=i+1) begin
             pl[i].valid <= 0;
         end
         OUT_uop.valid <= 0;

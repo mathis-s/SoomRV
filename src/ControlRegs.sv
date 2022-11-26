@@ -39,6 +39,10 @@ module ControlRegs
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
+    output ModeFlags OUT_mode,
+    output wire[63:0] OUT_wmask,
+    output wire[63:0] OUT_rmask,
+    
     output reg OUT_tmrIRQ,
     output wire OUT_IO_busy
 );
@@ -65,17 +69,17 @@ reg[63:0] cRegs64[5:0];
 
 
 // 32-bit Control Regs
-//  0 IRQ handler,
-//  1 IRQ src
-//  2 IRQ addr|flags
-//  3 unused | TIMER IRQ count
-//  4 SPI out/in
-//  5 unused
-//  6 unused
-//  7 unused
+//  0 SPI out/in
+//  1 IRQ handler (4)
+//  2 IRQ src (8)
+//  3 8 mode (15) | 8 IRQ flags (14) | 16 TIMER IRQ count (12) 
+//  4 rmask0
+//  5 rmask1
+//  6 wmask2
+//  7 wmask3
 
 reg[31:0] cRegs[15:0];
-assign OUT_irqAddr = cRegs[0];
+assign OUT_irqAddr = cRegs[1];
 
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
@@ -83,6 +87,10 @@ reg[25:0] tmrCnt;
 
 assign OUT_IO_busy = (spiCnt > 0) || (!IN_we) || !weReg;
 reg[3:0] ifetchValidReg;
+
+assign OUT_rmask = {cRegs[5], cRegs[4]};
+assign OUT_wmask = {cRegs[7], cRegs[6]};
+assign OUT_mode = cRegs[3][31:24];
 
 always_ff@(posedge clk) begin
     
@@ -100,17 +108,18 @@ always_ff@(posedge clk) begin
         OUT_SPI_clk <= 0;
         spiCnt <= 0;
         OUT_SPI_cs <= 1;
+        OUT_SPI_mosi <= 0;
     end
     else begin
         
         if (OUT_SPI_clk == 1) begin
             OUT_SPI_clk <= 0;
-            OUT_SPI_mosi <= cRegs[4][31];
+            OUT_SPI_mosi <= cRegs[0][31];
         end
         else if (spiCnt != 0) begin
             OUT_SPI_clk <= 1;
             spiCnt <= spiCnt - 1;
-            cRegs[4] <= {cRegs[4][30:0], IN_SPI_miso};
+            cRegs[0] <= {cRegs[0][30:0], IN_SPI_miso};
         end
         if (spiCnt == 0)
             OUT_SPI_cs <= 1;
@@ -146,7 +155,7 @@ always_ff@(posedge clk) begin
                 if (writeAddrReg[3:0] == 4'd3 && (|wmReg[1:0]))
                     tmrCnt <= 0;
                     
-                if (writeAddrReg[4:0] == 5'd4) begin
+                if (writeAddrReg[4:0] == 0) begin
                     case (wmReg)
                         4'b1111: spiCnt <= 32;
                         4'b1100: spiCnt <= 16;
@@ -171,10 +180,21 @@ always_ff@(posedge clk) begin
             end
         end
         
+        // Timer interrupt is active in user mode
+        if (OUT_mode[0]) begin
+            if (cRegs[3][15:0] != 0 && cRegs[3][15:0] == tmrCnt[25:10]) begin
+                OUT_tmrIRQ <= 1;
+                tmrCnt <= 0;
+            end
+            else tmrCnt <= tmrCnt + 1;
+        end
         
         if (IN_irqTaken) begin
-            cRegs[1] <= IN_irqSrc;
-            cRegs[2] <= {IN_irqMemAddr[31:2], IN_irqFlags[1:0]};
+            cRegs[2] <= IN_irqSrc;
+            cRegs[3][23:16] <= {6'b0, IN_irqFlags[1:0]};
+            // Reset mode register on taken interrupt
+            cRegs[3][31:24] <= 0;
+            tmrCnt <= 0;
         end
         
         reReg <= IN_re;
@@ -183,14 +203,7 @@ always_ff@(posedge clk) begin
         readAddrReg <= IN_readAddr;
         writeAddrReg <= IN_writeAddr;
         dataReg <= IN_data;
-        
-        if (cRegs[3][15:0] != 0 && cRegs[3][15:0] == tmrCnt[25:10]) begin
-            OUT_tmrIRQ <= 1;
-            tmrCnt <= 0;
-        end
-        else if (IN_irqTaken) tmrCnt <= 0;
-        else tmrCnt <= tmrCnt + 1;
-        
+
         // Update Perf Counters
         cRegs64[0] <= cRegs64[0] + 1;
         cRegs64[1] = cRegs64[1] + 1;

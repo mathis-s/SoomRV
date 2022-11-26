@@ -1,4 +1,4 @@
-.set IO_ADDR, 0xfe000000
+.set IO_ADDR, 0xfe000003
 
 .globl _start
 _start:
@@ -7,7 +7,7 @@ _start:
     lui a0, %hi(_exception)
     addi a0, a0, %lo(_exception)
     li a1, 0xff000000
-    sw a0, 0(a1)
+    sw a0, 4(a1)
     
     li sp, 0x20000
     call main

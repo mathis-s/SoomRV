@@ -6,8 +6,10 @@ module StoreAGU
     input wire en,
     input wire stall,
     
-    input BranchProv IN_branch,
+    input ModeFlags IN_mode,
+    input wire[63:0] IN_wmask,
     
+    input BranchProv IN_branch,
     output ZCForward OUT_zcFwd,
     
     input EX_UOp IN_uop,
@@ -18,25 +20,30 @@ module StoreAGU
 
 integer i;
 
-wire[31:0] dataRes = IN_uop.srcB + {{20{IN_uop.imm[31]}}, IN_uop.imm[31:20]};
+// wire[31:0] dataRes = IN_uop.srcB + {{20{IN_uop.imm[31]}}, IN_uop.imm[31:20]};
+// 
+// assign OUT_zcFwd.valid = IN_uop.valid && IN_uop.nmDst != 0;
+// assign OUT_zcFwd.tag = IN_uop.tagDst;
+// assign OUT_zcFwd.result = dataRes;
 
-assign OUT_zcFwd.valid = IN_uop.valid && IN_uop.nmDst != 0;
-assign OUT_zcFwd.tag = IN_uop.tagDst;
-assign OUT_zcFwd.result = dataRes;
-
-wire[31:0] addr = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
+wire[31:0] addrSum = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
+wire[31:0] addr = (IN_uop.opcode >= LSU_SB_I) ? IN_uop.srcA : addrSum;
 
 reg except;
 always_comb begin
     // Exception fires on Null pointer or unaligned access
     // (Unaligned is handled in software)
     case (IN_uop.opcode)
-        LSU_SB: except = (addr == 0);
-        LSU_SH: except = (addr == 0) || (addr[0]);
+        LSU_SB_I, LSU_SB: except = (addr == 0);
+        LSU_SH_I, LSU_SH: except = (addr == 0) || (addr[0]);
         LSU_F_ADDI_SW,
-        LSU_SW: except = (addr == 0) || (addr[0] || addr[1]);
+        LSU_SW_I, LSU_SW: except = (addr == 0) || (addr[0] || addr[1]);
         default: except = 0;
     endcase
+    
+    if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_WR]) except = 1;
+    
+    if (!IN_wmask[addr[31:26]] && IN_mode[MODE_WMASK]) except = 1;
 end
 
 always_ff@(posedge clk) begin
@@ -68,10 +75,12 @@ always_ff@(posedge clk) begin
             OUT_uop.pc <= IN_uop.pc;
             OUT_uop.flags <= except ? FLAGS_EXCEPT : FLAGS_NONE;
             OUT_uop.compressed <= IN_uop.compressed;
+            OUT_uop.result <= addrSum;
             OUT_uop.valid <= 1;
+                
             
             case (IN_uop.opcode)
-                LSU_SB: begin
+                LSU_SB, LSU_SB_I: begin
                     OUT_aguOp.isLoad <= 0;
                     case (addr[1:0]) 
                         0: begin
@@ -93,7 +102,7 @@ always_ff@(posedge clk) begin
                     endcase
                 end
 
-                LSU_SH: begin
+                LSU_SH, LSU_SH_I: begin
                     OUT_aguOp.isLoad <= 0;
                     case (addr[1]) 
                         0: begin
@@ -107,14 +116,14 @@ always_ff@(posedge clk) begin
                     endcase
                 end
                 
-                LSU_F_ADDI_SW: begin
+                /*LSU_F_ADDI_SW: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
                     OUT_aguOp.data <= dataRes;
                     OUT_uop.result <= dataRes;
-                end
+                end*/
                 
-                LSU_SW: begin
+                LSU_SW, LSU_SW_I: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
                     OUT_aguOp.data <= IN_uop.srcB;

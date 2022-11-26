@@ -3,13 +3,13 @@
 	
 irq_handler:
 	# print interrupt reason (with marker)
-    li a1, 0xff000008
-    lw a1, 0(a1)
+    li a1, 0xff000000
+    lb a1, 14(a1)
     ori a0, a1, 0x100
     call printhex
     # get irq src
-    li a1, 0xff000004
-    lw a1, 0(a1)
+    li a1, 0xff000000
+    lw a1, 8(a1)
     # skip over exception
     # load first byte of instruction
     lb a2, 0(a1)
@@ -30,7 +30,10 @@ main:
     lui a0, %hi(irq_handler)
     addi a0, a0, %lo(irq_handler)
     li a1, 0xff000000
-    sw a0, 0(a1)
+    sw a0, 4(a1)
+    
+    li a0, 1
+    sb a0, 15(a1)
     
     # print first 
     li a0, 1

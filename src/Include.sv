@@ -95,8 +95,14 @@ typedef enum logic[5:0]
     LSU_LH, 
     LSU_LW, 
     LSU_LBU,
-    LSU_LHU
+    LSU_LHU,
     //LSU_FLW,
+    LSU_LB_RR, 
+    LSU_LH_RR, 
+    LSU_LW_RR, 
+    LSU_LBU_RR,
+    LSU_LHU_RR
+    
 } OPCode_LSU;
 
 typedef enum logic[5:0]
@@ -105,11 +111,16 @@ typedef enum logic[5:0]
     LSU_SH,
     LSU_SW,
     //LSU_FSW,
+    
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
     LSU_CBO_FLUSH,
     
-    LSU_F_ADDI_SW
+    LSU_F_ADDI_SW,
+    
+    LSU_SB_I,
+    LSU_SH_I,
+    LSU_SW_I
     
 } OPCode_ST;
 
@@ -147,6 +158,22 @@ typedef enum logic[5:0]
 
 typedef enum logic[3:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN} FuncUnit;
 typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING} Flags;
+
+typedef enum logic[2:0]
+{
+    MODE_USER,
+    MODE_WMASK,
+    MODE_RMASK,
+    MODE_NO_CREGS_RD,
+    MODE_NO_CREGS_WR,
+    MODE_TMR,
+    MODE_NO_FP,
+    MODE_NO_EXT
+} ModeFlagsIDs;
+    
+
+
+typedef logic[7:0] ModeFlags;
 
 typedef struct packed
 {

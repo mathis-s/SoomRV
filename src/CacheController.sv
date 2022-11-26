@@ -239,9 +239,9 @@ always_ff@(posedge clk) begin
         // Load Pipeline
         if (!OUT_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             // Cache hit
-            if (IN_uopLd.exception || cacheTableEntryFound[0] || IN_uopLd.addr[31:24] >= 8'hfe) begin
+            if (IN_uopLd.exception || cacheTableEntryFound[0] || IN_uopLd.addr[31:24] >= 8'hff) begin
                 OUT_uopLd <= IN_uopLd;
-                if (IN_uopLd.addr[31:24] < 8'hfe && !IN_uopLd.exception) begin
+                if (IN_uopLd.addr[31:24] < 8'hff && !IN_uopLd.exception) begin
                     OUT_uopLd.addr <= {20'b0, cacheTableEntry[0], IN_uopLd.addr[7:0]};
                     ctable[cacheTableEntry[0]].used <= 1;
                 end

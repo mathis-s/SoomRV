@@ -171,9 +171,9 @@ MemRTL#(64, 512) icache
     .OUT_data1(CORE_instrReadData[63:0])
 );
 
-always@(posedge clk) begin
-    if (!CORE_DC_if.ce && !CORE_DC_if.we && CORE_DC_if.wm == 4'b0001 && CORE_DC_if.addr == 30'h3F800000)
-        $write("%c", CORE_DC_if.data[7:0]);
-end
+//always@(posedge clk) begin
+//    if (!CORE_DC_if.ce && !CORE_DC_if.we && CORE_DC_if.wm == 4'b0001 && CORE_DC_if.addr == 30'h3F800000)
+//        $write("%c", CORE_DC_if.data[7:0]);
+//end
 
 endmodule

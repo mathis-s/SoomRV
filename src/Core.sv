@@ -263,6 +263,7 @@ InstrDecoder idec
     .IN_instrs(PD_instrs),
     
     .IN_indirBranchTarget(IBP_predDst),
+    .IN_enCustom(!CR_mode[MODE_NO_EXT]),
     
     .OUT_decBranch(DEC_branch),
     .OUT_decBranchDst(DEC_branchDst),
@@ -642,6 +643,9 @@ AGU aguLD
     .en(enabledXUs[2][1]),
     .stall(stall[2]),
     
+    .IN_mode(CR_mode),
+    .IN_rmask(CR_rmask),
+    
     .IN_branch(branch),
 
     .IN_uop(LD_uop[2]),
@@ -656,6 +660,9 @@ StoreAGU aguST
     .rst(rst),
     .en(enabledXUs[3][2]),
     .stall(stall[3]),
+    
+    .IN_mode(CR_mode),
+    .IN_wmask(CR_wmask),
     
     .IN_branch(branch),
     
@@ -879,6 +886,9 @@ ROB rob
 
 wire IO_busy;
 wire timerIRQ;
+ModeFlags CR_mode;
+wire[63:0] CR_wmask;
+wire[63:0] CR_rmask;
 ControlRegs cr
 (
     .clk(clk),
@@ -910,6 +920,10 @@ ControlRegs cr
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
+    
+    .OUT_mode(CR_mode),
+    .OUT_wmask(CR_wmask),
+    .OUT_rmask(CR_rmask),
 
     .OUT_tmrIRQ(timerIRQ),
 

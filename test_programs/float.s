@@ -23,7 +23,7 @@ printdecu_fast:
 		mv a0, a2
 		bnez a2, .loop_printdecu_fast
 		
-	li a1, 0xfe000000
+	li a1, 0xff000003
 	.loop_print:
 		addi a4, a4, -1
 		lb a0, 0(a4)
@@ -72,7 +72,7 @@ main:
 		call printdecu_fast
 		
 		li a0, 10
-		li a1, 0xfe000000
+		li a1, 0xff000003
 		sb a0, 0(a1)
 		
 		addi s2, s2, -1

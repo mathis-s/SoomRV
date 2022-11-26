@@ -8,7 +8,7 @@ typedef struct packed
     bit[30:0] src;
 } BTBEntry;
 
-module BranchTargetBuffer#(parameter NUM_ENTRIES=64, parameter ASSOC=8)
+module BranchTargetBuffer#(parameter NUM_ENTRIES=128, parameter ASSOC=8)
 (
     input wire clk,
     input wire rst,

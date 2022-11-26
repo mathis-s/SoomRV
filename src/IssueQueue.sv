@@ -83,24 +83,33 @@ reg[32:0] reservedWBs;
 
 reg newAvailA[SIZE-1:0];
 reg newAvailB[SIZE-1:0];
+
+reg newAvailA_dl[SIZE-1:0];
+reg newAvailB_dl[SIZE-1:0];
+
 always_comb begin
     for (i = 0; i < SIZE; i=i+1) begin
         
         newAvailA[i] = 0;
         newAvailB[i] = 0;
+        newAvailA_dl[i] = 0;
+        newAvailB_dl[i] = 0;
         
         for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-            // Store Pipeline doesn't produce results
-            if (j != 3) begin
-                if (IN_resultValid[j] && queue[i].tagA == IN_resultUOp[j].tagDst) newAvailA[i] = 1;
-                if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
-            end
+            if (IN_resultValid[j] && queue[i].tagA == IN_resultUOp[j].tagDst) newAvailA[i] = 1;
+            if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
         end
         
         for (j = 0; j < 2; j=j+1) begin
-            if (IN_issueValid[j] && (IN_issueUOps[j].fu == FU_INT) && IN_issueUOps[j].nmDst != 0) begin
-                if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
-                if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
+            if (IN_issueValid[j] && IN_issueUOps[j].nmDst != 0) begin
+                if (IN_issueUOps[j].fu == FU_INT) begin
+                    if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
+                    if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
+                end
+                else if (IN_issueUOps[j].fu == FU_FPU || IN_issueUOps[j].fu == FU_FMUL) begin
+                    if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA_dl[i] = 1;
+                    if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB_dl[i] = 1;
+                end
             end
         end
         
@@ -125,8 +134,8 @@ always_ff@(posedge clk) begin
     
     // Update availability
     for (i = 0; i < SIZE; i=i+1) begin
-        queue[i].availA <= queue[i].availA | newAvailA[i];
-        queue[i].availB <= queue[i].availB | newAvailB[i];
+        queue[i].availA <= queue[i].availA | newAvailA[i] | newAvailA_dl[i];
+        queue[i].availB <= queue[i].availB | newAvailB[i] | newAvailB_dl[i];
     end
     reservedWBs <= {1'b0, reservedWBs[32:1]};
     
@@ -194,8 +203,8 @@ always_ff@(posedge clk) begin
                         // Shift other ops forward
                         for (j = i; j < SIZE-1; j=j+1) begin
                             queue[j] <= queue[j+1];
-                            queue[j].availA <= queue[j+1].availA | newAvailA[j+1];
-                            queue[j].availB <= queue[j+1].availB | newAvailB[j+1];
+                            queue[j].availA <= queue[j+1].availA | newAvailA[j+1] | newAvailA_dl[j+1];
+                            queue[j].availB <= queue[j+1].availB | newAvailB[j+1] | newAvailB_dl[j+1];
                         end
                         insertIndex = insertIndex - 1;
                         

@@ -153,7 +153,7 @@ run:
 	addi	a1,a1,%lo(.LANCHOR0)
 	addi	a0,a0,%lo(.L44)
 	li	t1,7
-	li	t6,-33554432
+	li	t6,-16777216
 	li	t4,2
 	.align	3
 .L22:
@@ -178,7 +178,7 @@ run:
 	.word	.L42
 	.text
 .L41:
-	sb	a2,0(t6)
+	sb	a2,3(t6)
 	lw	a6,%lo(size)(t5)
 .L50:
 	addi	a4,a4,1

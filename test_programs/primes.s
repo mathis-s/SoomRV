@@ -20,8 +20,10 @@ mark:
 	.align	4
 .L3:
 	slli	a5,a5,2
+	#lw	a2,a1(a5)
+	#.quad 0b1000000_01111_01010_010_01100_0110011
+	.word 0b10000000111101010010011000110011
 	add	a5,a1,a5
-	lw	a2,0(a5)
 	sll	a3,a7,a4
 	add	a4,a4,a0
 	or	a3,a3,a2
@@ -61,8 +63,9 @@ main:
 	.align	4
 .L7:
 	slli	a5,a5,2
+	#lw	a2,s3(a5)
+	.word 0b10000000111110011010011000110011
 	add	a5,s3,a5
-	lw	a2,0(a5)
 	sll	a3,s4,a4
 	add	a4,a4,s1
 	or	a3,a3,a2

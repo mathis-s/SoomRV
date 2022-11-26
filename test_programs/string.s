@@ -45,7 +45,7 @@ main:
 
     
 print:
-    li t1, 0xfe000000
+    li t1, 0xff000003
     .print_loop:
         lb t0, 0(a0)
         beqz t0, .print_end

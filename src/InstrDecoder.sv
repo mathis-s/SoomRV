@@ -20,6 +20,9 @@
 `define OPC_FP 7'b1010011
 `define OPC_FENCE 7'b0001111
 
+`define OPC_CUST0 7'b0001011
+`define OPC_CUST1 7'b0001011
+
 typedef struct packed
 {
     logic[6:0] funct7; 
@@ -186,7 +189,7 @@ typedef union packed
 module InstrDecoder
 #(
     parameter NUM_UOPS=4,
-    parameter DO_FUSE=1,
+    parameter DO_FUSE=0,
     parameter FUSE_LUI=0,
     parameter FUSE_STORE_DATA=0
 )
@@ -198,6 +201,7 @@ module InstrDecoder
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
     
     input wire[30:0] IN_indirBranchTarget,
+    input wire IN_enCustom,
     
     output reg OUT_decBranch,
     output reg[30:0] OUT_decBranchDst,
@@ -371,14 +375,34 @@ always_comb begin
                         uop.rd = 0;
 
                         uop.fu = FU_ST;
-                        case (instr.funct3)
-                            0: uop.opcode = LSU_SB;
-                            1: uop.opcode = LSU_SH;
-                            2: uop.opcode = LSU_SW;
-                        endcase
-                        invalidEnc = 
-                            instr.funct3 != 0 && instr.funct3 != 1 &&
-                            instr.funct3 != 2;
+                        if (IN_enCustom && 0) begin
+                            invalidEnc = 0;
+                            
+                            case (instr.funct3)
+                                0: uop.opcode = LSU_SB;
+                                1: uop.opcode = LSU_SH;
+                                2: uop.opcode = LSU_SW;
+                                3: invalidEnc = 1;
+                                
+                                4: uop.opcode = LSU_SB_I;
+                                5: uop.opcode = LSU_SH_I;
+                                6: uop.opcode = LSU_SW_I;
+                                7: invalidEnc = 1;
+                            endcase
+                            
+                            if (instr.funct3[2])
+                                uop.rd = uop.rs0;
+                        end
+                        else begin
+                            case (instr.funct3)
+                                0: uop.opcode = LSU_SB;
+                                1: uop.opcode = LSU_SH;
+                                2: uop.opcode = LSU_SW;
+                            endcase
+                            invalidEnc = 
+                                instr.funct3 != 0 && instr.funct3 != 1 &&
+                                instr.funct3 != 2;
+                        end
                     end
                     `OPC_BRANCH: begin
                         uop.rs0 = instr.rs0;
@@ -387,14 +411,19 @@ always_comb begin
                         uop.rd = 0;
                         uop.fu = FU_INT;
                         
+                        invalidEnc =
+                            (uop.opcode == 2) || (uop.opcode == 3);
+                            
                         /* verilator lint_off ALWCOMBORDER */
-                        if (DO_FUSE && i != 0 && 
+                        if (!invalidEnc && DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0 && uopsComb[i-1].imm != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
                             validMask[i-1] = 0;
+                            
+                            $display("fused at %x", IN_instrs[i].pc);
                             
                             case (instr.funct3)
                                 0: uop.opcode = INT_F_ADDI_BEQ;
@@ -415,8 +444,6 @@ always_comb begin
                                 7: uop.opcode = INT_BGEU;
                             endcase
                         end
-                        invalidEnc =
-                            (uop.opcode == 2) || (uop.opcode == 3);
                     end
                     `OPC_FENCE: begin
                         if (instr.funct3 == 0) begin
@@ -710,6 +737,25 @@ always_comb begin
                                 uop.fu = FU_INT;
                             end
                         end
+                        else if (IN_enCustom && instr.funct7 == 7'b1000000) begin
+                            
+                            invalidEnc = 0;
+                            //$display("%x", instr);
+                            //$display("rd %d", instr.rd);
+                            //$display("rs0 %d", instr.rs0);
+                            //$display("rs1 %d", instr.rs1);
+                            
+                            uop.fu = FU_LSU;
+                            case (instr.funct3)
+                                0: uop.opcode = LSU_LB_RR;
+                                1: uop.opcode = LSU_LH_RR;
+                                2: uop.opcode = LSU_LW_RR;
+                                4: uop.opcode = LSU_LBU_RR;
+                                5: uop.opcode = LSU_LHU_RR;
+                                6: invalidEnc = 1;
+                                7: invalidEnc = 1;
+                            endcase
+                        end
                     end
                     
                     /*`OPC_FLW: begin
@@ -994,7 +1040,7 @@ always_comb begin
                         
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
@@ -1015,7 +1061,7 @@ always_comb begin
                         
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];

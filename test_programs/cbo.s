@@ -57,7 +57,7 @@ main:
         
         
         li a0, 10
-        li a1, 0xfe000000
+        li a1, 0xff000003
         sb a0, 0(a1)
         
         addi s0, s0, -1

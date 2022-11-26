@@ -13,8 +13,12 @@ irq_handler:
     .continue:
     
     # get irq src
-    li a1, 0xff000004
-    lw a1, 0(a1)
+    li a1, 0xff000000
+    # enable timer interrupt again
+    li a0, 1
+    sb a0, 15(a1)
+    
+    lw a1, 8(a1)
     # continue
     jr a1
 
@@ -25,11 +29,15 @@ main:
     lui a0, %hi(irq_handler)
     addi a0, a0, %lo(irq_handler)
     li a1, 0xff000000
-    sw a0, 0(a1)
+    sw a0, 4(a1)
     
     # set timer irq every 2048 cycles.
     li a0, 2
     sh a0, 12(a1)
+    
+    # enable timer
+    li a0, 1
+    sb a0, 15(a1) 
     
     # loop forever
     .loop:

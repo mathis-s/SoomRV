@@ -24,7 +24,7 @@ main:
 	.align	4
 .L2:
 	addi	a5,a5,1
-	sb	a4,19(a3)
+	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L2
 	li	s0,0
