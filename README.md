@@ -18,4 +18,4 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 4. Open `view.gtkw` for a waveform view of the core's internals.
 
 ## Basic Architecture
-![soomrv](https://user-images.githubusercontent.com/39701487/191944891-083a4855-76c8-482b-99e3-48dd6bacaa15.svg)
+![SoomRV](https://user-images.githubusercontent.com/39701487/218574949-e18bcb51-5050-4f99-82a6-c8ea58c11a93.png)
