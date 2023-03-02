@@ -875,6 +875,7 @@ ROB rob
     
     .IN_irq(timerIRQ),
     .IN_MEM_busy(MEMSUB_busy),
+    .IN_allowBreak(!CR_mode[MODE_NO_BRK]),
     
     .OUT_fence(ROB_startFence),
     .OUT_clearICache(ROB_clearICache),

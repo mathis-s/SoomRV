@@ -12,7 +12,7 @@ typedef logic[6:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
-typedef logic[15:0] BHist_t;
+typedef logic[17:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 
 typedef enum logic[5:0]
@@ -167,7 +167,7 @@ typedef enum logic[2:0]
     MODE_NO_CREGS_RD,
     MODE_NO_CREGS_WR,
     MODE_TMR,
-    MODE_NO_FP,
+    MODE_NO_BRK,
     MODE_NO_EXT
 } ModeFlagsIDs;
     
@@ -258,23 +258,23 @@ typedef struct packed
     logic compressed;
 } R_UOp;
 
-typedef struct packed
+typedef struct packed // 199
 {
-    logic[31:0] srcA;
-    logic[31:0] srcB;
-    logic[31:0] pc;
-    logic[31:0] imm;
-    logic[5:0] opcode;
-    Tag tagDst;
-    RegNm nmDst;
-    SqN sqN;
-    FetchID_t fetchID;
-    BranchPredInfo bpi;
-    BHist_t history;
-    SqN storeSqN;
-    SqN loadSqN;
-    logic compressed;
-    logic valid;
+    logic[31:0] srcA; // 167
+    logic[31:0] srcB; // 135
+    logic[31:0] pc; // 103
+    logic[31:0] imm; // 71
+    logic[5:0] opcode; // 65
+    Tag tagDst; // 58
+    RegNm nmDst; // 53
+    SqN sqN; // 46
+    FetchID_t fetchID; //  41
+    BranchPredInfo bpi; // 32
+    BHist_t history; // 16
+    SqN storeSqN; // 9
+    SqN loadSqN; // 2
+    logic compressed; // 1
+    logic valid; // 0
 } EX_UOp;
 
 typedef struct packed

@@ -24,7 +24,7 @@ reg disableMispredFlush;
 always_comb begin
     OUT_branch.taken = 0;
     OUT_branch = 0;
-    for (i = 0; i < 4; i=i+1) begin
+    for (i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 
             (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0) &&
             (!IN_mispredFlush || $signed(IN_branches[i].sqN - mispredFlushSqN) < 0)) begin
@@ -38,6 +38,18 @@ always_comb begin
             OUT_branch.fetchID = IN_branches[i].fetchID;
             OUT_branch.history = IN_branches[i].history;
         end
+    end
+    
+    if (IN_branches[3].taken && 
+        (!IN_mispredFlush || $signed(IN_branches[3].sqN - mispredFlushSqN) < 0)) begin
+        OUT_branch.taken = 1;
+        OUT_branch.dstPC = IN_branches[3].dstPC;
+        OUT_branch.sqN = IN_branches[3].sqN;
+        OUT_branch.loadSqN = IN_branches[3].loadSqN;
+        OUT_branch.storeSqN = IN_branches[3].storeSqN;
+        OUT_branch.flush = IN_branches[3].flush;
+        OUT_branch.fetchID = IN_branches[3].fetchID;
+        OUT_branch.history = IN_branches[3].history;
     end
 end
 

@@ -61,6 +61,7 @@ module ROB
     
     input wire IN_irq,
     input wire IN_MEM_busy,
+    input wire IN_allowBreak,
     
     output reg OUT_fence,
     output reg OUT_clearICache,
@@ -129,7 +130,7 @@ SqN misprReplayEndSqN;
 
 
 /* verilator lint_off UNOPTFLAT */
-// All commits/reads from the ROB are sequenatial.
+// All commits/reads from the ROB are sequential.
 // This should convince synthesis of that too.
 reg[3:0] deqAddresses[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
@@ -213,7 +214,7 @@ always_ff@(posedge clk) begin
         // Exception and branch prediction update handling
         pcLookupEntry.valid <= 0;
         if (pcLookupEntry.valid) begin
-            if (pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
+            if ((pcLookupEntry.flags == FLAGS_BRK && IN_allowBreak) || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
                 
                 if (pcLookupEntry.flags == FLAGS_BRK)
                     OUT_halt <= 1;
@@ -236,7 +237,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if (pcLookupEntry.flags == FLAGS_EXCEPT || externalIRQ) begin
+            else if ((pcLookupEntry.flags == FLAGS_BRK && !IN_allowBreak) || pcLookupEntry.flags == FLAGS_EXCEPT || externalIRQ) begin
                 
                 OUT_irqTaken <= 1;
                 
@@ -251,7 +252,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 
                 OUT_irqSrc <= {baseIndexPC, 1'b0};
-                OUT_irqFlags <= externalIRQ ? 3'b000 : pcLookupEntry.flags;
+                OUT_irqFlags <= externalIRQ ? FLAGS_NONE : pcLookupEntry.flags;
                 externalIRQ <= 0;
                 
                 stop <= 0;

@@ -69,7 +69,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i].valid <= 0;
-            OUT_funcUnit[i] <= 0;
+            OUT_funcUnit[i] <= FU_INT;
             OUT_enableXU[i] <= 0;
         end
     end
