@@ -176,8 +176,8 @@ always_ff@(posedge clk) begin
                             queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
                         
                         // Only issue loads that fit into load order buffer
-                        ((FU0 != FU_LSU && FU1 != FU_LSU && FU2 != FU_LSU && FU3 != FU_LSU) || 
-                            queue[i].fu != FU_LSU || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
+                        ((FU0 != FU_LD && FU1 != FU_LD && FU2 != FU_LD && FU3 != FU_LD) || 
+                            queue[i].fu != FU_LD || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         
                         issued = 1;
                         OUT_valid <= 1;
@@ -241,12 +241,39 @@ always_ff@(posedge clk) begin
                     temp.loadSqN = IN_uop[i].loadSqN;
                     temp.fu = IN_uop[i].fu;
                     temp.compressed = IN_uop[i].compressed;
-
+                    
+                    
                     // Check if the result for this op is being broadcasted in the current cycle
                     for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                         if (IN_resultValid[j]) begin
                             if (temp.tagA == IN_resultUOp[j].tagDst) temp.availA = 1;
                             if (temp.tagB == IN_resultUOp[j].tagDst) temp.availB = 1;
+                        end
+                    end
+                    
+                    // Special handling for multi-uop instructions
+                    if (IN_uop[i].fu == FU_ATOMIC) begin
+                    
+                        // First uop goes into load FU
+                        if (FU0 == FU_LD) begin
+                            // Operand is not required
+                            temp.tagB = 0;
+                            temp.availB = 1;
+                        end
+                        
+                        // Second uop goes into first int FU
+                        /*else if (FU0 == FU_INT) begin
+                            // First operand is loaded value
+                            temp.tagA = IN_uop[i].tagDst;
+                        end*/
+                        
+                        // Third uop goes into store FU
+                        else if (FU0 == FU_ST) begin
+                            // Data operand is result of op
+                            //temp.tagB = IN_uop[i].tagDst;
+                            //temp.availB = 0;
+                            // Result was already written by second uop
+                            temp.nmDst = 0;
                         end
                     end
                     

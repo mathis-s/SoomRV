@@ -20,6 +20,8 @@
 `define OPC_FP 7'b1010011
 `define OPC_FENCE 7'b0001111
 
+`define OPC_ATOMIC 7'b0101111
+
 `define OPC_CUST0 7'b0001011
 `define OPC_CUST1 7'b0001011
 
@@ -284,19 +286,75 @@ always_comb begin
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
                     `OPC_ENV: begin
-                        if (uop.imm == 0 || uop.imm == 1) begin
-                            case (uop.imm)
-                                0: uop.imm[2:0] = FLAGS_EXCEPT;
-                                1: uop.imm[2:0] = FLAGS_BRK;
-                            endcase
-                            uop.fu = FU_INT;
-                            uop.rs0 = 0;
-                            uop.rs1 = 0;
-                            uop.rd = 0;
-                            uop.opcode = INT_SYS;
-                            uop.immB = 1;
-                            invalidEnc = 0;
-                        end
+                        case (instr.funct3)
+                            0: begin // ecall, ebreak
+                                if (uop.imm == 0 || uop.imm == 1) begin
+                                    case (uop.imm)
+                                        0: uop.imm[2:0] = FLAGS_EXCEPT;
+                                        1: uop.imm[2:0] = FLAGS_BRK;
+                                    endcase
+                                    uop.fu = FU_INT;
+                                    uop.rs0 = 0;
+                                    uop.rs1 = 0;
+                                    uop.rd = 0;
+                                    uop.opcode = INT_SYS;
+                                    uop.immB = 1;
+                                    invalidEnc = 0;
+                                end
+                            end
+                            
+                            1: begin // csrrw
+                                uop.fu = FU_ATOMIC;
+                                uop.rs0 = instr.rs0;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRW;
+                                uop.imm = {20'bx, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                            
+                            2: begin // csrrs
+                                uop.fu = FU_ATOMIC;
+                                uop.rs0 = instr.rs0;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRS;
+                                uop.imm = {20'bx, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                            
+                            3: begin // csrrc
+                                uop.fu = FU_ATOMIC;
+                                uop.rs0 = instr.rs0;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRC;
+                                uop.imm = {20'bx, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                            
+                            5: begin // csrrwi
+                                uop.fu = FU_ATOMIC;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRWI;
+                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                            
+                            6: begin // csrrsi
+                                uop.fu = FU_ATOMIC;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRSI;
+                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                            
+                            7: begin // csrrci
+                                uop.fu = FU_ATOMIC;
+                                uop.rd = instr.rd;
+                                // uop.opcode = LSU_CSRRCI;
+                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                invalidEnc = 0;
+                            end
+                        
+                        endcase
                     end
                     `OPC_LUI: begin
                         uop.fu = FU_INT;
@@ -355,7 +413,7 @@ always_comb begin
                         uop.immB = 1;
                         uop.rd = instr.rd;
 
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_LD;
                         case (instr.funct3)
                             0: uop.opcode = LSU_LB;
                             1: uop.opcode = LSU_LH;
@@ -745,7 +803,7 @@ always_comb begin
                             //$display("rs0 %d", instr.rs0);
                             //$display("rs1 %d", instr.rs1);
                             
-                            uop.fu = FU_LSU;
+                            uop.fu = FU_LD;
                             case (instr.funct3)
                                 0: uop.opcode = LSU_LB_RR;
                                 1: uop.opcode = LSU_LH_RR;
@@ -760,7 +818,7 @@ always_comb begin
                     
                     /*`OPC_FLW: begin
                         if (i32.flw.width == 3'b010) begin
-                            uop.fu = FU_LSU;
+                            uop.fu = FU_LD;
                             uop.opcode = LSU_FLW;
                             uop.rs0 = i32.flw.rs1;
                             uop.rd = i32.flw.rd;
@@ -941,6 +999,67 @@ always_comb begin
                         end
                     end
                     
+                    `OPC_ATOMIC: begin
+                        if (instr.funct3 == 3'b010) begin
+                            
+                            uop.rd = instr.rd;
+                            uop.rs0 = instr.rs0;
+                            uop.rs1 = instr.rs1;
+                            uop.fu = FU_ATOMIC;
+                            
+                            case (instr.funct7[6:2])
+                                5'b00010: begin // lr.w
+                                    if (instr.rs1 == 5'b0) begin
+                                        uop.opcode = LSU_LR_W;
+                                        invalidEnc = 0;
+                                    end
+                                end
+                                5'b00011: begin // sc.w
+                                    uop.opcode = LSU_SC_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b00001: begin // amoswap.w
+                                    uop.opcode = ATOMIC_AMOSWAP_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b00000: begin // amoadd.w
+                                    uop.opcode = ATOMIC_AMOADD_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b00100: begin // amoxor.w
+                                    uop.opcode = ATOMIC_AMOXOR_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b01100: begin // amoand.w
+                                    uop.opcode = ATOMIC_AMOAND_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b01000: begin // amoor.w
+                                    uop.opcode = ATOMIC_AMOOR_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b10000: begin // amomin.w
+                                    uop.opcode = ATOMIC_AMOMIN_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b10100: begin // amomax.w
+                                    uop.opcode = ATOMIC_AMOMAX_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b11000: begin // amominu.w
+                                    uop.opcode = ATOMIC_AMOMINU_W;
+                                    invalidEnc = 0;
+                                end
+                                5'b11100: begin // amomaxu.w
+                                    uop.opcode = ATOMIC_AMOMAXU_W;
+                                    invalidEnc = 0;
+                                end
+                                
+                                default: invalidEnc = 1;
+                            endcase
+                        end
+                    end
+                    
                     default: invalidEnc = 1;
                 endcase
             end
@@ -951,7 +1070,7 @@ always_comb begin
                     // c.lw
                     if (i16.cl.funct3 == 3'b010) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_LD;
                         uop.imm = {25'b0, i16.cl.imm[0], i16.cl.imm2, i16.cl.imm[1], 2'b00};
                         uop.rs0 = {2'b01, i16.cl.rs1};
                         uop.rd = {2'b01, i16.cl.rd};
@@ -1174,7 +1293,7 @@ always_comb begin
                     // c.lwsp
                     if (i16.ci.funct3 == 3'b010 && !(i16.ci.rd_rs1 == 0)) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LSU;
+                        uop.fu = FU_LD;
                         uop.imm = {24'b0, i16.ci.imm[1:0], i16.ci.imm2, i16.ci.imm[4:2], 2'b00};
                         uop.rs0 = 2; // sp
                         uop.rd = i16.ci.rd_rs1;

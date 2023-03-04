@@ -76,6 +76,7 @@ always_ff@(posedge clk) begin
             OUT_uop.flags <= except ? FLAGS_EXCEPT : FLAGS_NONE;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.result <= addrSum;
+            OUT_uop.doNotCommit <= 0;
             OUT_uop.valid <= 1;
                 
             
@@ -123,7 +124,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.result <= dataRes;
                 end*/
                 
-                LSU_SW, LSU_SW_I: begin
+                ATOMIC_AMOSWAP_W, LSU_SW, LSU_SW_I: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
                     OUT_aguOp.data <= IN_uop.srcB;

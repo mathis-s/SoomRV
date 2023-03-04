@@ -11,8 +11,7 @@ typedef struct packed
 module CacheController
 #(
     parameter SIZE=16,
-    parameter NUM_UOPS=2,
-    parameter QUEUE_SIZE=4
+    parameter NUM_UOPS=2
 )
 (
     input wire clk,

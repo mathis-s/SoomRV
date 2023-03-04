@@ -51,6 +51,7 @@ always@(posedge clk) begin
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
         OUT_uop.result <= fpResult;
+        OUT_uop.doNotCommit <= 0;
     end
     else begin
         OUT_uop.valid <= 0;

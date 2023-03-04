@@ -112,12 +112,13 @@ always_comb begin
 
     OUT_uopLd.result = result;
     OUT_uopLd.tagDst = uopLd_1.tagDst;
-    OUT_uopLd.nmDst = /*uopLd_1.exception ? uopLd_1.addr[25:20] : */uopLd_1.nmDst;
+    OUT_uopLd.nmDst = uopLd_1.nmDst;
     OUT_uopLd.sqN = uopLd_1.sqN;
     OUT_uopLd.pc = uopLd_1.pc;
     OUT_uopLd.valid = uopLd_1.valid;
     OUT_uopLd.flags = uopLd_1.exception ? FLAGS_EXCEPT : FLAGS_NONE;
-    OUT_uopLd.compressed = uopLd_1.compressed;//uopLd_1.addr[18:11];
+    OUT_uopLd.compressed = uopLd_1.compressed;
+    OUT_uopLd.doNotCommit = uopLd_1.doNotCommit;
 end
 
 always_ff@(posedge clk) begin

@@ -251,6 +251,7 @@ always_ff@(posedge clk) begin
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.result <= resC;
             OUT_uop.sqN <= IN_uop.sqN;
+            OUT_uop.doNotCommit <= 0;
             
             if (IN_uop.bpi.predicted)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;

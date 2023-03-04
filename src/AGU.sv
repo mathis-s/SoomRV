@@ -39,6 +39,8 @@ always_ff@(posedge clk) begin
             OUT_uop.fetchID <= IN_uop.fetchID;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.history <= IN_uop.history;
+            
+            OUT_uop.doNotCommit <= IN_uop.opcode >= ATOMIC_AMOSWAP_W;
             OUT_uop.valid <= 1;
             
             // Exception fires on Null pointer or unaligned access
@@ -55,6 +57,7 @@ always_ff@(posedge clk) begin
                 LSU_LH,
                 LSU_LHU: OUT_uop.exception <= (addr == 0) || (addr[0]);
                 
+                ATOMIC_AMOSWAP_W,
                 LSU_LW_RR,
                 LSU_LW: OUT_uop.exception <= (addr == 0) || (addr[0] || addr[1]);
                 
@@ -78,7 +81,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.size <= 1;
                     OUT_uop.signExtend <= 1;
                 end
-                LSU_LW_RR, LSU_LW: begin
+                ATOMIC_AMOSWAP_W, LSU_LW_RR, LSU_LW: begin
                     OUT_uop.isLoad <= 1;
                     OUT_uop.shamt <= 2'b0;
                     OUT_uop.size <= 2;

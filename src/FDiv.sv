@@ -68,6 +68,7 @@ always_ff@(posedge clk) begin
         OUT_uop.flags <= FLAGS_NONE;
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
+        OUT_uop.doNotCommit <= 0;
         running <= 1;
     end
     else if (running && outValid && (!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin

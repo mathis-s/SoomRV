@@ -178,15 +178,20 @@ always_ff@(posedge clk) begin
                 // Try to get from current WB
                 case (IN_uop[i].fu)
                     FU_INT:  OUT_enableXU[i] <= 8'b00000001;
-                    FU_LSU:  OUT_enableXU[i] <= 8'b00000010;
-                    FU_ST:  OUT_enableXU[i] <=  8'b00000100;
+                    FU_LD:   OUT_enableXU[i] <= 8'b00000010;
+                    FU_ST:   OUT_enableXU[i] <=  8'b00000100;
                     FU_MUL:  OUT_enableXU[i] <= 8'b00001000;
                     FU_DIV:  OUT_enableXU[i] <= 8'b00010000;
-                    FU_FPU: OUT_enableXU[i] <=  8'b00100000;
+                    FU_FPU:  OUT_enableXU[i] <=  8'b00100000;
                     FU_FDIV: OUT_enableXU[i] <= 8'b01000000;
                     FU_FMUL: OUT_enableXU[i] <= 8'b10000000;
                     default: begin end
                 endcase
+                
+                if (IN_uop[i].fu == FU_ATOMIC) begin
+                    OUT_enableXU[i] <= 8'b00000010 | 8'b00000100;
+                end
+                
                 outFU[i] <= IN_uop[i].fu;
             end
             else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin

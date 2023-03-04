@@ -96,6 +96,8 @@ typedef enum logic[5:0]
     LSU_LW, 
     LSU_LBU,
     LSU_LHU,
+    
+    LSU_LR_W,
     //LSU_FLW,
     LSU_LB_RR, 
     LSU_LH_RR, 
@@ -120,7 +122,9 @@ typedef enum logic[5:0]
     
     LSU_SB_I,
     LSU_SH_I,
-    LSU_SW_I
+    LSU_SW_I,
+    
+    LSU_SC_W
     
 } OPCode_ST;
 
@@ -156,7 +160,21 @@ typedef enum logic[5:0]
     FPU_FSQRT_S
 } OPCode_FDIV;
 
-typedef enum logic[3:0] {FU_INT, FU_LSU, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN} FuncUnit;
+typedef enum logic[5:0]
+{
+    ATOMIC_AMOSWAP_W=32,
+    ATOMIC_AMOADD_W,
+    ATOMIC_AMOXOR_W,
+    ATOMIC_AMOAND_W,
+    ATOMIC_AMOOR_W,
+    ATOMIC_AMOMIN_W,
+    ATOMIC_AMOMAX_W,
+    ATOMIC_AMOMINU_W,
+    ATOMIC_AMOMAXU_W
+    
+} OPCode_FU_ATOMIC;
+
+typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC} FuncUnit;
 typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING} Flags;
 
 typedef enum logic[2:0]
@@ -170,8 +188,6 @@ typedef enum logic[2:0]
     MODE_NO_BRK,
     MODE_NO_EXT
 } ModeFlagsIDs;
-    
-
 
 typedef logic[7:0] ModeFlags;
 
@@ -285,6 +301,7 @@ typedef struct packed
     SqN sqN;
     bit[31:0] pc;
     Flags flags;
+    logic doNotCommit;
     logic compressed;
     bit valid;
 } RES_UOp;
@@ -328,6 +345,7 @@ typedef struct packed
     SqN loadSqN;
     FetchID_t fetchID;
     BHist_t history;
+    logic doNotCommit;
     logic exception;
     logic compressed;
     logic valid;

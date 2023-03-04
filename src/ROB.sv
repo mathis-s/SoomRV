@@ -383,8 +383,8 @@ always_ff@(posedge clk) begin
         
         // Mark committed ops as valid and set flags
         for (i = 0; i < WIDTH_WB; i=i+1) begin
-            if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0)) begin
-            
+            if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_wbUOps[i].doNotCommit) begin
+                
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
                 entries[id].executed <= 1;
                 entries[id].flags <= IN_wbUOps[i].flags;

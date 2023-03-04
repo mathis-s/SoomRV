@@ -266,7 +266,12 @@ always_ff@(posedge clk) begin
                     FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
                     
                     FU_ST: counterStoreSqN = counterStoreSqN + 1;
-                    FU_LSU: counterLoadSqN = counterLoadSqN + 1;
+                    FU_LD: counterLoadSqN = counterLoadSqN + 1;
+                    
+                    FU_ATOMIC: begin
+                        counterStoreSqN = counterStoreSqN + 1;
+                        counterLoadSqN = counterLoadSqN + 1;
+                    end
                     default: begin end
                 endcase
                 

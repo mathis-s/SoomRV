@@ -96,6 +96,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.pc <= pl.pc;
                     OUT_uop.flags <= FLAGS_NONE;
                     OUT_uop.compressed <= 0;
+                    OUT_uop.doNotCommit <= 0;
                     
                     if (pl.high)
                         OUT_uop.result <= pl.invert ? (~pl.res[63:32] + ((pl.res[31:0] == 0) ? 1 : 0)) : pl.res[63:32];

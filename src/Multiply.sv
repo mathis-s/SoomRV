@@ -104,6 +104,7 @@ always_ff@(posedge clk) begin
                 OUT_uop.pc <= pl[NUM_STAGES].pc;
                 OUT_uop.flags <= FLAGS_NONE;
                 OUT_uop.compressed <= 0;
+                OUT_uop.doNotCommit <= 0;
                 
                 if (pl[NUM_STAGES].high)
                     OUT_uop.result <= pl[NUM_STAGES].invert ? (~pl[NUM_STAGES].res[63:32] + ((pl[NUM_STAGES].res[31:0] == 0) ? 1 : 0)) : pl[NUM_STAGES].res[63:32];
