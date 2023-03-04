@@ -54,13 +54,8 @@ always_comb begin
         OUT_pcReadAddr[i] = IN_uop[i].fetchID;
     end
     
-    // Port 2 has one read from fp rf
-    //OUT_rfReadAddr_fp[3] = IN_uop[2].tagB[5:0];
-    
-    // Port 0 has three reads from fp rf
-    //OUT_rfReadAddr_fp[0] = IN_uop[0].tagA[5:0];
-    //OUT_rfReadAddr_fp[1] = IN_uop[0].tagB[5:0];
-    //OUT_rfReadAddr_fp[2] = IN_uop[0].tagC[5:0];
+    // Second AGU_LD read port is used as third AGU_ST read port (for atomics)
+    OUT_rfReadAddr[2+NUM_UOPS] = IN_uop[3].tagC[5:0];
 end
 
 FuncUnit outFU[NUM_UOPS-1:0];
@@ -175,6 +170,22 @@ always_ff@(posedge clk) begin
                             OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                     end
                 end
+                
+                // Store Pipeline has a third read port for atomics
+                if (i == 3) begin
+                    reg found = 0;
+                    // Try to forward from wbs
+                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                        // TODO: one-hot
+                        if (IN_wbHasResult[j] && IN_uop[i].tagC == IN_wbUOp[j].tagDst) begin
+                            OUT_uop[i].srcC <= IN_wbUOp[j].result;
+                            found = 1;
+                        end
+                    end
+                    if (!found)
+                        OUT_uop[i].srcC <= IN_rfReadData[2 + NUM_UOPS];
+                end
+                
                 // Try to get from current WB
                 case (IN_uop[i].fu)
                     FU_INT:  OUT_enableXU[i] <= 8'b00000001;

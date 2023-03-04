@@ -184,18 +184,25 @@ always_ff@(posedge clk) begin
                         
                         OUT_uop.imm <= {{(32 - IMM_BITS){1'b0}}, queue[i].imm};
                         
-                        OUT_uop.availA <= queue[i].avail[0];
                         OUT_uop.tagA <= queue[i].tags[0];
                         
                         if (NUM_OPERANDS >= 2) begin
                             // verilator lint_off SELRANGE
-                            OUT_uop.availB <= queue[i].avail[1];
                             OUT_uop.tagB <= queue[i].tags[1];
                             // verilator lint_on SELRANGE
                         end
                         else begin
-                            OUT_uop.availB <= 1;
+                            //OUT_uop.availB <= 1;
                             OUT_uop.tagB <= 7'h40;
+                        end
+                        
+                        if (NUM_OPERANDS >= 3) begin
+                            // verilator lint_off SELRANGE
+                            OUT_uop.tagC <= queue[i].tags[2];
+                            // verilator lint_on SELRANGE
+                        end
+                        else begin
+                            OUT_uop.tagC <= 7'h40;
                         end
                         
                         OUT_uop.immB <= queue[i].immB;
@@ -232,7 +239,7 @@ always_ff@(posedge clk) begin
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                         IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
                     
-                    R_ST_UOp temp;// = IN_uop[i];
+                    R_ST_UOp temp;
                     
                     temp.imm = IN_uop[i].imm[IMM_BITS-1:0];
                     
@@ -268,31 +275,18 @@ always_ff@(posedge clk) begin
                     end
                     
                     // Special handling for multi-uop instructions
-                    if (IN_uop[i].fu == FU_ATOMIC) begin
-                    
-                        // First uop goes into load FU
-                        if (FU0 == FU_LD) begin
-                            // Operand is not required
-                            // verilator lint_off SELRANGE
-                            // temp.tags[1] = 7'h40;
-                            // temp.avail[1] = 1;
-                            // verilator lint_on SELRANGE
-                        end
-                        
-                        // Second uop goes into first int FU
-                        /*else if (FU0 == FU_INT) begin
-                            // First operand is loaded value
-                            temp.tagA = IN_uop[i].tagDst;
-                        end*/
-                        
-                        // Third uop goes into store FU
-                        else if (FU0 == FU_ST) begin
+                    if (FU0 == FU_ST) begin
+                        // verilator lint_off SELRANGE
+                        if (IN_uop[i].fu == FU_ATOMIC) begin
+                            // Second uop goes into store FU
                             // Data operand is result of op
-                            //temp.tagB = IN_uop[i].tagDst;
-                            //temp.availB = 0;
-                            // Result was already written by second uop
+                            temp.tags[2] = IN_uop[i].tagDst;
+                            temp.avail[2] = 0;
+                            // Result was already written
                             temp.nmDst = 0;
                         end
+                        else temp.avail[2] = 1;
+                        // verilator lint_on SELRANGE
                     end
                     
                     queue[insertIndex[ID_LEN-1:0]] <= temp;

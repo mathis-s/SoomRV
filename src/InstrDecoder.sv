@@ -795,13 +795,9 @@ always_comb begin
                                 uop.fu = FU_INT;
                             end
                         end
-                        else if (IN_enCustom && instr.funct7 == 7'b1000000) begin
+                        /*else if (IN_enCustom && instr.funct7 == 7'b1000000) begin
                             
                             invalidEnc = 0;
-                            //$display("%x", instr);
-                            //$display("rd %d", instr.rd);
-                            //$display("rs0 %d", instr.rs0);
-                            //$display("rs1 %d", instr.rs1);
                             
                             uop.fu = FU_LD;
                             case (instr.funct3)
@@ -813,7 +809,7 @@ always_comb begin
                                 6: invalidEnc = 1;
                                 7: invalidEnc = 1;
                             endcase
-                        end
+                        end*/
                     end
                     
                     /*`OPC_FLW: begin

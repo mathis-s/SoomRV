@@ -262,6 +262,7 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
+    Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
     RegNm nmDst;
@@ -274,23 +275,24 @@ typedef struct packed
     logic compressed;
 } R_UOp;
 
-typedef struct packed // 199
+typedef struct packed
 {
-    logic[31:0] srcA; // 167
-    logic[31:0] srcB; // 135
-    logic[31:0] pc; // 103
-    logic[31:0] imm; // 71
-    logic[5:0] opcode; // 65
-    Tag tagDst; // 58
-    RegNm nmDst; // 53
-    SqN sqN; // 46
-    FetchID_t fetchID; //  41
-    BranchPredInfo bpi; // 32
-    BHist_t history; // 16
-    SqN storeSqN; // 9
-    SqN loadSqN; // 2
-    logic compressed; // 1
-    logic valid; // 0
+    logic[31:0] srcA;
+    logic[31:0] srcB;
+    logic[31:0] srcC; // only used in store port (for atomics), optimized out otherwise
+    logic[31:0] pc;
+    logic[31:0] imm;
+    logic[5:0] opcode;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
+    FetchID_t fetchID;
+    BranchPredInfo bpi;
+    BHist_t history;
+    SqN storeSqN;
+    SqN loadSqN;
+    logic compressed;
+    logic valid;
 } EX_UOp;
 
 typedef struct packed

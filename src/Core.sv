@@ -429,7 +429,7 @@ IssueQueue#(8,1,4,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(10,2,4,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(10,3,4,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),

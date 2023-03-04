@@ -124,7 +124,19 @@ always_ff@(posedge clk) begin
                     OUT_uop.result <= dataRes;
                 end*/
                 
-                ATOMIC_AMOSWAP_W, LSU_SW, LSU_SW_I: begin
+                ATOMIC_AMOSWAP_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB;
+                end
+                
+                ATOMIC_AMOADD_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB + IN_uop.srcC;
+                end
+                
+                LSU_SW, LSU_SW_I: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
                     OUT_aguOp.data <= IN_uop.srcB;
