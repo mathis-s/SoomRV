@@ -37,8 +37,6 @@ module Load
     //output reg[5:0] OUT_rfReadAddr_fp[3:0],
     //input wire[31:0] IN_rfReadData_fp[3:0],
 
-    output reg[NUM_XUS-1:0] OUT_enableXU[NUM_UOPS-1:0],
-    output FuncUnit OUT_funcUnit[NUM_UOPS-1:0],
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
 integer i;
@@ -64,8 +62,6 @@ always_ff@(posedge clk) begin
     if (rst) begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i].valid <= 0;
-            OUT_funcUnit[i] <= FU_INT;
-            OUT_enableXU[i] <= 0;
         end
     end
     else begin
@@ -101,7 +97,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
                 OUT_uop[i].compressed <= IN_uop[i].compressed;
                 
-                OUT_funcUnit[i] <= IN_uop[i].fu;
+                OUT_uop[i].fu <= IN_uop[i].fu;
                 
                 OUT_uop[i].valid <= 1;
                 
@@ -137,7 +133,7 @@ always_ff@(posedge clk) begin
                     end
                 end
                 
-                if (IN_uop[i].immB) begin
+                if (IN_uop[i].immB || i == 2) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
                 else if (IN_uop[i].tagB[6]) begin
@@ -186,28 +182,9 @@ always_ff@(posedge clk) begin
                         OUT_uop[i].srcC <= IN_rfReadData[2 + NUM_UOPS];
                 end
                 
-                // Try to get from current WB
-                case (IN_uop[i].fu)
-                    FU_INT:  OUT_enableXU[i] <= 8'b00000001;
-                    FU_LD:   OUT_enableXU[i] <= 8'b00000010;
-                    FU_ST:   OUT_enableXU[i] <=  8'b00000100;
-                    FU_MUL:  OUT_enableXU[i] <= 8'b00001000;
-                    FU_DIV:  OUT_enableXU[i] <= 8'b00010000;
-                    FU_FPU:  OUT_enableXU[i] <=  8'b00100000;
-                    FU_FDIV: OUT_enableXU[i] <= 8'b01000000;
-                    FU_FMUL: OUT_enableXU[i] <= 8'b10000000;
-                    default: begin end
-                endcase
-                
-                if (IN_uop[i].fu == FU_ATOMIC) begin
-                    OUT_enableXU[i] <= 8'b00000010 | 8'b00000100;
-                end
-                
-                outFU[i] <= IN_uop[i].fu;
             end
             else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
                 OUT_uop[i].valid <= 0;
-                OUT_enableXU[i] <= 0;
             end
         
         end 

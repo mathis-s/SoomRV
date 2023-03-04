@@ -291,6 +291,7 @@ typedef struct packed
     BHist_t history;
     SqN storeSqN;
     SqN loadSqN;
+    FuncUnit fu;
     logic compressed;
     logic valid;
 } EX_UOp;

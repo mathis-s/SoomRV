@@ -4,12 +4,12 @@ main:
     
     li a0, 0x1000
     
-    li t0, -1
+    li t0, 2
     li t1, 1
     
     sw t0, 0(a0)
     
-    amomaxu.w t1, t1, (a0)
+    amoadd.w t1, t1, (a0)
     lw t0, 0(a0)
     
     mv s0, t0

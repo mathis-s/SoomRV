@@ -498,8 +498,6 @@ RF_FP rf_fp
 );*/
 
 EX_UOp LD_uop[3:0];
-wire[7:0] enabledXUs[3:0];
-FuncUnit LD_fu[3:0];
 
 wire[31:0] LD_zcFwdResult[1:0];
 Tag LD_zcFwdTag[1:0];
@@ -533,11 +531,6 @@ Load ld
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
     
-    //.OUT_rfReadAddr_fp(RF_FP_readAddress),
-    //.IN_rfReadData_fp(RF_FP_readData),
-    
-    .OUT_enableXU(enabledXUs),
-    .OUT_funcUnit(LD_fu),
     .OUT_uop(LD_uop)
 );
 
@@ -547,7 +540,7 @@ RES_UOp INT0_uop;
 IntALU ialu
 (
     .clk(clk),
-    .en(enabledXUs[0][0]),
+    .en(LD_uop[0].fu == FU_INT),
     .rst(rst),
     
     .IN_wbStall(1'b0),
@@ -571,12 +564,12 @@ IntALU ialu
 
 wire DIV_busy;
 RES_UOp DIV_uop;
-wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && enabledXUs[0][4]) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
+wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && LD_uop[0].fu == FU_DIV) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
 Divide div
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[0][4]),
+    .en(LD_uop[0].fu == FU_DIV),
     
     .OUT_busy(DIV_busy),
     
@@ -591,7 +584,7 @@ FPU fpu
 (
     .clk(clk),
     .rst(rst), 
-    .en(enabledXUs[0][5]),
+    .en(LD_uop[0].fu == FU_FPU),
     
     .IN_branch(branch),
     .IN_uop(LD_uop[0]),
@@ -640,7 +633,7 @@ AGU aguLD
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[2][1]),
+    .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
     .stall(stall[2]),
     
     .IN_mode(CR_mode),
@@ -658,7 +651,7 @@ StoreAGU aguST
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[3][2]),
+    .en(LD_uop[3].fu == FU_ST || LD_uop[3].fu == FU_ATOMIC),
     .stall(stall[3]),
     
     .IN_mode(CR_mode),
@@ -762,7 +755,7 @@ RES_UOp INT1_uop;
 IntALU ialu1
 (
     .clk(clk),
-    .en(enabledXUs[1][0]),
+    .en(LD_uop[1].fu == FU_INT),
     .rst(rst),
     
     .IN_wbStall(1'b0),
@@ -785,12 +778,12 @@ IntALU ialu1
 
 RES_UOp MUL_uop;
 wire MUL_busy;
-wire MUL_doNotIssue = 0;//MUL_busy || (LD_uop[1].valid && enabledXUs[1][3]) || (RV_uopValid[1] && RV_uop[1].fu == FU_MUL);
+wire MUL_doNotIssue = 0;
 Multiply mul
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[1][3]),
+    .en(LD_uop[1].fu == FU_MUL),
     
     .OUT_busy(MUL_busy),
     
@@ -804,7 +797,7 @@ FMul fmul
 (
     .clk(clk),
     .rst(rst), 
-    .en(enabledXUs[1][7]),
+    .en(LD_uop[1].fu == FU_FMUL),
     
     .IN_branch(branch),
     .IN_uop(LD_uop[1]),
@@ -812,13 +805,13 @@ FMul fmul
 );
 
 wire FDIV_busy;
-wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && enabledXUs[1][6]) || (RV_uopValid[1] && RV_uop[1].fu == FU_FDIV);
+wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && LD_uop[1].fu == FU_FDIV) || (RV_uopValid[1] && RV_uop[1].fu == FU_FDIV);
 RES_UOp FDIV_uop;
 FDiv fdiv
 (
     .clk(clk),
     .rst(rst),
-    .en(enabledXUs[1][6]),
+    .en(LD_uop[1].fu == FU_FDIV),
     
     .IN_wbAvail(!INT1_uop.valid && !MUL_uop.valid && !FMUL_uop.valid),
     .OUT_busy(FDIV_busy),
