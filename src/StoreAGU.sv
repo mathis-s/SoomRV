@@ -117,25 +117,6 @@ always_ff@(posedge clk) begin
                     endcase
                 end
                 
-                /*LSU_F_ADDI_SW: begin
-                    OUT_aguOp.isLoad <= 0;
-                    OUT_aguOp.wmask <= 4'b1111;
-                    OUT_aguOp.data <= dataRes;
-                    OUT_uop.result <= dataRes;
-                end*/
-                
-                ATOMIC_AMOSWAP_W: begin
-                    OUT_aguOp.isLoad <= 0;
-                    OUT_aguOp.wmask <= 4'b1111;
-                    OUT_aguOp.data <= IN_uop.srcB;
-                end
-                
-                ATOMIC_AMOADD_W: begin
-                    OUT_aguOp.isLoad <= 0;
-                    OUT_aguOp.wmask <= 4'b1111;
-                    OUT_aguOp.data <= IN_uop.srcB + IN_uop.srcC;
-                end
-                
                 LSU_SW, LSU_SW_I: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
@@ -161,6 +142,62 @@ always_ff@(posedge clk) begin
                     OUT_aguOp.data[1:0] <= 2;
                     OUT_uop.flags <= FLAGS_ORDERING;
                 end
+                
+                
+                ATOMIC_AMOSWAP_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB;
+                end
+                
+                ATOMIC_AMOADD_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB + IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOXOR_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB ^ IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOAND_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB & IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOOR_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= IN_uop.srcB | IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOMIN_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= ($signed(IN_uop.srcB) < $signed(IN_uop.srcC)) ? IN_uop.srcB : IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOMAX_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= !($signed(IN_uop.srcB) < $signed(IN_uop.srcC)) ? IN_uop.srcB : IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOMINU_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= (IN_uop.srcB < IN_uop.srcC) ? IN_uop.srcB : IN_uop.srcC;
+                end
+                
+                ATOMIC_AMOMAXU_W: begin
+                    OUT_aguOp.isLoad <= 0;
+                    OUT_aguOp.wmask <= 4'b1111;
+                    OUT_aguOp.data <= !(IN_uop.srcB < IN_uop.srcC) ? IN_uop.srcB : IN_uop.srcC;
+                end
+                
                 
                 default: begin end
             endcase

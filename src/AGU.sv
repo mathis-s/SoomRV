@@ -81,7 +81,10 @@ always_ff@(posedge clk) begin
                     OUT_uop.size <= 1;
                     OUT_uop.signExtend <= 1;
                 end
-                ATOMIC_AMOSWAP_W, ATOMIC_AMOADD_W,
+                
+                ATOMIC_AMOSWAP_W, ATOMIC_AMOADD_W, ATOMIC_AMOXOR_W, 
+                ATOMIC_AMOAND_W, ATOMIC_AMOOR_W, ATOMIC_AMOMIN_W, 
+                ATOMIC_AMOMAX_W, ATOMIC_AMOMINU_W, ATOMIC_AMOMAXU_W,
                 LSU_LW_RR, LSU_LW: begin
                     OUT_uop.isLoad <= 1;
                     OUT_uop.shamt <= 2'b0;
