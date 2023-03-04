@@ -1,6 +1,7 @@
 module IssueQueue
 #(
     parameter SIZE = 8,
+    parameter NUM_OPERANDS = 2,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
     parameter IMM_BITS=32,
@@ -52,14 +53,15 @@ localparam ID_LEN = $clog2(SIZE);
 
 integer i;
 integer j;
+integer k;
 
 typedef struct packed
 {
     logic[IMM_BITS-1:0] imm;
-    logic availA;
-    Tag tagA;
-    logic availB;
-    Tag tagB;
+    
+    logic[NUM_OPERANDS-1:0] avail;
+    Tag[NUM_OPERANDS-1:0] tags;
+    
     logic immB;
     SqN sqN;
     Tag tagDst;
@@ -81,40 +83,38 @@ reg[32:0] reservedWBs;
 
 //assign OUT_full = insertIndex > (SIZE-NUM_UOPS);
 
-reg newAvailA[SIZE-1:0];
-reg newAvailB[SIZE-1:0];
+reg[NUM_OPERANDS-1:0] newAvail[SIZE-1:0];
+reg[NUM_OPERANDS-1:0] newAvail_dl[SIZE-1:0];
 
-reg newAvailA_dl[SIZE-1:0];
-reg newAvailB_dl[SIZE-1:0];
 
 always_comb begin
     for (i = 0; i < SIZE; i=i+1) begin
         
-        newAvailA[i] = 0;
-        newAvailB[i] = 0;
-        newAvailA_dl[i] = 0;
-        newAvailB_dl[i] = 0;
+        for (k = 0; k < NUM_OPERANDS; k=k+1) begin
+            newAvail[i][k] = 0;
+            newAvail_dl[i][k] = 0;
+        end
         
         for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-            if (IN_resultValid[j] && queue[i].tagA == IN_resultUOp[j].tagDst) newAvailA[i] = 1;
-            if (IN_resultValid[j] && queue[i].tagB == IN_resultUOp[j].tagDst) newAvailB[i] = 1;
+            for (k = 0; k < NUM_OPERANDS; k=k+1)
+                if (IN_resultValid[j] && queue[i].tags[k] == IN_resultUOp[j].tagDst) newAvail[i][k] = 1;
         end
         
         for (j = 0; j < 2; j=j+1) begin
             if (IN_issueValid[j] && IN_issueUOps[j].nmDst != 0) begin
                 if (IN_issueUOps[j].fu == FU_INT) begin
-                    if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA[i] = 1;
-                    if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB[i] = 1;
+                    for (k = 0; k < NUM_OPERANDS; k=k+1)
+                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
                 end
                 else if (IN_issueUOps[j].fu == FU_FPU || IN_issueUOps[j].fu == FU_FMUL) begin
-                    if (queue[i].tagA == IN_issueUOps[j].tagDst) newAvailA_dl[i] = 1;
-                    if (queue[i].tagB == IN_issueUOps[j].tagDst) newAvailB_dl[i] = 1;
+                    for (k = 0; k < NUM_OPERANDS; k=k+1)
+                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail_dl[i][k] = 1;
                 end
             end
         end
         
-        if (IN_loadForwardValid && queue[i].tagA == IN_loadForwardTag) newAvailA[i] = 1;
-        if (IN_loadForwardValid && queue[i].tagB == IN_loadForwardTag) newAvailB[i] = 1;
+        for (k = 0; k < NUM_OPERANDS; k=k+1)
+            if (IN_loadForwardValid && queue[i].tags[k] == IN_loadForwardTag) newAvail[i][k] = 1;
     end
 end
 
@@ -134,8 +134,7 @@ always_ff@(posedge clk) begin
     
     // Update availability
     for (i = 0; i < SIZE; i=i+1) begin
-        queue[i].availA <= queue[i].availA | newAvailA[i] | newAvailA_dl[i];
-        queue[i].availB <= queue[i].availB | newAvailB[i] | newAvailB_dl[i];
+        queue[i].avail <= queue[i].avail | newAvail[i] | newAvail_dl[i];
     end
     reservedWBs <= {1'b0, reservedWBs[32:1]};
     
@@ -166,7 +165,7 @@ always_ff@(posedge clk) begin
             
             for (i = 0; i < SIZE; i=i+1) begin
                 if (i < insertIndex && !issued) begin
-                    if ((queue[i].availA || newAvailA[i]) && (queue[i].availB || newAvailB[i]) && 
+                    if (&(queue[i].avail | newAvail[i]) &&
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
                         (queue[i].fu != FU2 || !IN_doNotIssueFU2) && 
                         !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) && 
@@ -184,10 +183,21 @@ always_ff@(posedge clk) begin
                         //OUT_uop <= queue[i];
                         
                         OUT_uop.imm <= {{(32 - IMM_BITS){1'b0}}, queue[i].imm};
-                        OUT_uop.availA <= queue[i].availA;
-                        OUT_uop.tagA <= queue[i].tagA;
-                        OUT_uop.availB <= queue[i].availB;
-                        OUT_uop.tagB <= queue[i].tagB;
+                        
+                        OUT_uop.availA <= queue[i].avail[0];
+                        OUT_uop.tagA <= queue[i].tags[0];
+                        
+                        if (NUM_OPERANDS >= 2) begin
+                            // verilator lint_off SELRANGE
+                            OUT_uop.availB <= queue[i].avail[1];
+                            OUT_uop.tagB <= queue[i].tags[1];
+                            // verilator lint_on SELRANGE
+                        end
+                        else begin
+                            OUT_uop.availB <= 1;
+                            OUT_uop.tagB <= 7'h40;
+                        end
+                        
                         OUT_uop.immB <= queue[i].immB;
                         OUT_uop.sqN <= queue[i].sqN;
                         OUT_uop.tagDst <= queue[i].tagDst;
@@ -203,8 +213,7 @@ always_ff@(posedge clk) begin
                         // Shift other ops forward
                         for (j = i; j < SIZE-1; j=j+1) begin
                             queue[j] <= queue[j+1];
-                            queue[j].availA <= queue[j+1].availA | newAvailA[j+1] | newAvailA_dl[j+1];
-                            queue[j].availB <= queue[j+1].availB | newAvailB[j+1] | newAvailB_dl[j+1];
+                            queue[j].avail <= queue[j+1].avail | newAvail[j+1] | newAvail_dl[j+1];
                         end
                         insertIndex = insertIndex - 1;
                         
@@ -226,10 +235,17 @@ always_ff@(posedge clk) begin
                     R_ST_UOp temp;// = IN_uop[i];
                     
                     temp.imm = IN_uop[i].imm[IMM_BITS-1:0];
-                    temp.availA = IN_uop[i].availA;
-                    temp.tagA = IN_uop[i].tagA;
-                    temp.availB = IN_uop[i].availB;
-                    temp.tagB = IN_uop[i].tagB;
+                    
+                    temp.avail[0] = IN_uop[i].availA;
+                    temp.tags[0] = IN_uop[i].tagA;
+                    
+                    if (NUM_OPERANDS >= 2) begin
+                        // verilator lint_off SELRANGE
+                        temp.avail[1] = IN_uop[i].availB;
+                        temp.tags[1] = IN_uop[i].tagB;
+                        // verilator lint_on SELRANGE
+                    end
+                    
                     temp.immB = IN_uop[i].immB;
                     temp.sqN = IN_uop[i].sqN;
                     temp.tagDst = IN_uop[i].tagDst;
@@ -246,8 +262,8 @@ always_ff@(posedge clk) begin
                     // Check if the result for this op is being broadcasted in the current cycle
                     for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                         if (IN_resultValid[j]) begin
-                            if (temp.tagA == IN_resultUOp[j].tagDst) temp.availA = 1;
-                            if (temp.tagB == IN_resultUOp[j].tagDst) temp.availB = 1;
+                            for (k = 0; k < NUM_OPERANDS; k=k+1)
+                                if (temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                         end
                     end
                     
@@ -257,8 +273,10 @@ always_ff@(posedge clk) begin
                         // First uop goes into load FU
                         if (FU0 == FU_LD) begin
                             // Operand is not required
-                            temp.tagB = 0;
-                            temp.availB = 1;
+                            // verilator lint_off SELRANGE
+                            // temp.tags[1] = 7'h40;
+                            // temp.avail[1] = 1;
+                            // verilator lint_on SELRANGE
                         end
                         
                         // Second uop goes into first int FU
