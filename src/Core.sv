@@ -333,7 +333,7 @@ assign stall[0] = 0;
 assign stall[1] = 0;
 
 wire IQ0_full;
-IssueQueue#(8,2,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_FPU,1,0,33) iq0
+IssueQueue#(8,2,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -359,6 +359,7 @@ IssueQueue#(8,2,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_FPU,1,0,33) iq0
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
+    .IN_commitSqN(ROB_curSqN),
     
     .OUT_valid(RV_uopValid[0]),
     .OUT_uop(RV_uop[0]),
@@ -391,6 +392,7 @@ IssueQueue#(8,2,4,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
+    .IN_commitSqN(ROB_curSqN),
     
     .OUT_valid(RV_uopValid[1]),
     .OUT_uop(RV_uop[1]),
@@ -423,6 +425,7 @@ IssueQueue#(8,1,4,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
+    .IN_commitSqN(ROB_curSqN),
     
     .OUT_valid(RV_uopValid[2]),
     .OUT_uop(RV_uop[2]),
@@ -455,6 +458,7 @@ IssueQueue#(10,3,4,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
+    .IN_commitSqN(ROB_curSqN),
     
     .OUT_valid(RV_uopValid[3]),
     .OUT_uop(RV_uop[3]),
@@ -591,7 +595,18 @@ FPU fpu
     .OUT_uop(FPU_uop)
 );
 
-assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (FPU_uop.valid ? FPU_uop : DIV_uop);
+RES_UOp CSR_uop;
+CSR csr
+(
+    .clk(clk),
+    .rst(rst),
+    .en(LD_uop[0].fu == FU_CSR),
+    .IN_uop(LD_uop[0]),
+    .IN_branch(branch),
+    .OUT_uop(CSR_uop)
+);
+
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
 //assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
 
 AGU_UOp CC_uopLd;

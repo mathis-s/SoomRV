@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     
     if (argc != 1 && argv[1][0] != '+')
     {
-        system((std::string("riscv32-unknown-elf-as -mabi=ilp32 -march=rv32imac_zfinx_zba_zbb -o temp.o ") + std::string(argv[1])).c_str());
+        system((std::string("riscv32-unknown-elf-as -mabi=ilp32 -march=rv32imac_zfinx_zba_zbb_zicsr -o temp.o ") + std::string(argv[1])).c_str());
         system("riscv32-unknown-elf-ld -Tlinker.ld test_programs/entry.o temp.o");
     }
     system("riscv32-unknown-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");

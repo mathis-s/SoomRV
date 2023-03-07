@@ -304,52 +304,52 @@ always_comb begin
                             end
                             
                             1: begin // csrrw
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rs0 = instr.rs0;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRW;
+                                uop.opcode = CSR_RW;
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             2: begin // csrrs
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rs0 = instr.rs0;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRS;
+                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RS;
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             3: begin // csrrc
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rs0 = instr.rs0;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRC;
+                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RC;
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             5: begin // csrrwi
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRWI;
+                                uop.opcode = CSR_RW_I;
                                 uop.imm = {15'bx, instr.rs0, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             6: begin // csrrsi
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRSI;
+                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RS_I;
                                 uop.imm = {15'bx, instr.rs0, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             7: begin // csrrci
-                                uop.fu = FU_ATOMIC;
+                                uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
-                                // uop.opcode = LSU_CSRRCI;
+                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RC_I;
                                 uop.imm = {15'bx, instr.rs0, instr[31:20]};
                                 invalidEnc = 0;
                             end

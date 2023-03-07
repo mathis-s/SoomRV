@@ -42,6 +42,7 @@ module IssueQueue
     
     input SqN IN_maxStoreSqN,
     input SqN IN_maxLoadSqN,
+    input SqN IN_commitSqN,
     
     output reg OUT_valid,
     output R_UOp OUT_uop,
@@ -169,6 +170,10 @@ always_ff@(posedge clk) begin
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
                         (queue[i].fu != FU2 || !IN_doNotIssueFU2) && 
                         !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) && 
+                        
+                        // Issue CSR accesses in order
+                        ((FU0 != FU_CSR && FU1 != FU_CSR && FU2 != FU_CSR && FU3 != FU_CSR) ||
+                            queue[i].fu != FU_CSR || (i == 0 && queue[i].sqN == IN_commitSqN)) &&
                         
                         // Only issue stores that fit into store queue
                         ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST && FU3 != FU_ST) || 
