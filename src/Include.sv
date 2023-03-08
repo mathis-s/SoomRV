@@ -423,3 +423,9 @@ typedef struct packed
     
     logic valid;
 } TrapInfoUpdate;
+
+typedef struct packed
+{
+    logic[4:0] flags;
+    logic valid;
+} FloatFlagsUpdate;

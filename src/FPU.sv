@@ -7,6 +7,8 @@ module FPU
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
+    output FloatFlagsUpdate OUT_flagsUpdate,
+    
     output RES_UOp OUT_uop
 );
 
@@ -25,7 +27,7 @@ compareRecFN#(8, 24) compare
 (
     .a(srcArec),
     .b(srcBrec),
-    .signaling(1'b1),
+    .signaling(IN_uop.opcode != FPU_FEQ_S),
     .lt(lessThan),
     .eq(equal),
     .gt(greaterThan),
@@ -85,7 +87,24 @@ recFNToFN#(8, 24) recode
     .out(fpResult)
 );
 
+wire srcAIsNaN = IN_uop.srcA[30:23] == 8'hFF && IN_uop.srcA[22:0] != 0;
+wire srcBIsNaN = IN_uop.srcB[30:23] == 8'hFF && IN_uop.srcB[22:0] != 0;
+
+wire minChooseA = 
+    srcBIsNaN || 
+    lessThan ||
+    (equal && IN_uop.srcA[31] && !IN_uop.srcB[31]);
+    
+wire maxChooseA = 
+    srcBIsNaN || 
+    greaterThan ||
+    (equal && !IN_uop.srcA[31] && IN_uop.srcB[31]);
+    
+wire minMaxCanonicalNaN = srcAIsNaN && srcBIsNaN;
+
 always@(posedge clk) begin
+    
+    OUT_flagsUpdate.valid <= 0;
     
     if (rst) begin
         OUT_uop.valid <= 0;
@@ -119,12 +138,35 @@ always@(posedge clk) begin
             FPU_FCVTWS,
             FPU_FCVTWUS: OUT_uop.result <= toInt;
             
-            
-            // TODO: Handle edge cases for min/max in accordance to standard
-            FPU_FMIN_S: OUT_uop.result <= lessThan ? IN_uop.srcA : IN_uop.srcB;
-            FPU_FMAX_S: OUT_uop.result <= lessThan ? IN_uop.srcB : IN_uop.srcA;
+            FPU_FMVWX, FPU_FMVXW: OUT_uop.result <= IN_uop.srcA;
+                        
+            FPU_FMIN_S: begin
+                if (minMaxCanonicalNaN)
+                    OUT_uop.result <= 32'h7FC00000;
+                else if (minChooseA)
+                    OUT_uop.result <= IN_uop.srcA;
+                else
+                    OUT_uop.result <= IN_uop.srcB;
+            end
+            FPU_FMAX_S: begin
+                if (minMaxCanonicalNaN)
+                    OUT_uop.result <= 32'h7FC00000;
+                else if (maxChooseA)
+                    OUT_uop.result <= IN_uop.srcA;
+                else
+                    OUT_uop.result <= IN_uop.srcB;
+            end
             default: begin end
         endcase
+        
+        case (IN_uop.opcode)
+            FPU_FADD_S: OUT_flagsUpdate.flags <= addSubFlags;
+            FPU_FCVTSWU, FPU_FCVTSW: OUT_flagsUpdate.flags <= fromIntFlags;
+            FPU_FEQ_S, FPU_FLE_S, FPU_FLT_S: OUT_flagsUpdate.flags <= compareFlags;
+            FPU_FCVTWS, FPU_FCVTWUS: OUT_flagsUpdate.flags <= {intFlags[2] | intFlags[1], 3'b0, intFlags[0]};
+            default: OUT_flagsUpdate.flags <= 0;
+        endcase
+        
     end
     else begin
         OUT_uop.valid <= 0;

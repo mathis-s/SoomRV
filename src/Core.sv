@@ -566,6 +566,7 @@ Divide div
 
 );
 
+FloatFlagsUpdate FPU_flagsUpdate;
 RES_UOp FPU_uop;
 FPU fpu
 (
@@ -575,6 +576,8 @@ FPU fpu
     
     .IN_branch(branch),
     .IN_uop(LD_uop[0]),
+    
+    .OUT_flagsUpdate(FPU_flagsUpdate),
     .OUT_uop(FPU_uop)
 );
 
