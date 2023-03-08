@@ -290,8 +290,8 @@ always_comb begin
                             0: begin 
                                 if (uop.imm == 0 || uop.imm == 1) begin
                                     case (uop.imm)
-                                        0: uop.imm[2:0] = FLAGS_EXCEPT;
-                                        1: uop.imm[2:0] = FLAGS_BRK;
+                                        0: uop.imm[3:0] = FLAGS_EXCEPT;
+                                        1: uop.imm[3:0] = FLAGS_BRK;
                                     endcase
                                     uop.fu = FU_INT;
                                     uop.rs0 = 0;
@@ -519,13 +519,13 @@ always_comb begin
                         if (instr.funct3 == 0) begin
                             uop.fu = FU_INT;
                             uop.opcode = INT_SYS;
-                            uop.imm = {29'bx, FLAGS_FENCE};
+                            uop.imm = {28'bx, FLAGS_FENCE};
                             invalidEnc = 0;
                         end
                         else if (instr.funct3 == 1) begin
                             uop.fu = FU_INT;
                             uop.opcode = INT_SYS;
-                            uop.imm = {29'bx, FLAGS_FENCE};
+                            uop.imm = {28'bx, FLAGS_FENCE};
                             invalidEnc = 0;
                         end
                         // cbo.inval -> runs as store op, invalidates to instruction after itself
@@ -1384,7 +1384,7 @@ always_comb begin
                         uop.opcode = INT_SYS;
                         uop.fu = FU_INT;
                         uop.immB = 1;
-                        uop.imm[2:0] = FLAGS_BRK;
+                        uop.imm[3:0] = FLAGS_BRK;
                         invalidEnc = 0;
                     end
                 end

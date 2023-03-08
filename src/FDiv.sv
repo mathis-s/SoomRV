@@ -10,6 +10,8 @@ module FDiv
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
+    //output FloatFlagsUpdate OUT_flagsUpdate,
+    
     output RES_UOp OUT_uop
 );
 
@@ -25,6 +27,7 @@ assign OUT_busy = !ready || (en && IN_uop.valid) || OUT_uop.valid;
 wire ready;
 wire outValid;
 
+wire[4:0] flags;
 wire[32:0] result;
 divSqrtRecFN_small#(8, 24, 0) fdiv
 (
@@ -43,7 +46,7 @@ divSqrtRecFN_small#(8, 24, 0) fdiv
     .outValid(outValid),
     .sqrtOpOut(),
     .out(result),
-    .exceptionFlags()
+    .exceptionFlags(flags)
 );
 
 wire[31:0] fpResult;
@@ -56,6 +59,7 @@ recFNToFN#(8, 24) recode
 reg running;
 always_ff@(posedge clk) begin
     
+    //OUT_flagsUpdate.valid <= 0;
     if (rst) begin
         running <= 0;
     end
@@ -69,11 +73,17 @@ always_ff@(posedge clk) begin
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
         OUT_uop.doNotCommit <= 0;
+        
+        //OUT_flagsUpdate.sqN <= IN_uop.sqN;
         running <= 1;
     end
     else if (running && outValid && (!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
         OUT_uop.valid <= 1;
         OUT_uop.result <= fpResult;
+        
+        //OUT_flagsUpdate.valid <= 1;
+        //OUT_flagsUpdate.flags <= flags;
+        
         running <= 0;
     end
     else begin

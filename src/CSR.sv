@@ -1,4 +1,4 @@
-module CSR
+module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
 (
     input wire clk,
     input wire rst,
@@ -9,6 +9,7 @@ module CSR
     
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
+    
     
     output RES_UOp OUT_uop
 );

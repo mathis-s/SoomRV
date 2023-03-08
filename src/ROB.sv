@@ -9,7 +9,7 @@ typedef struct packed
     FetchID_t fetchID;
     bit compressed;
     bit valid;
-    bit executed;
+    //bit executed;
 } ROBEntry;
 
 module ROB
@@ -20,7 +20,7 @@ module ROB
 
     parameter WIDTH = 4,
     parameter WIDTH_WB = 4
-    )
+)
 (
     input wire clk,
     input wire rst,
@@ -150,7 +150,6 @@ always_comb begin
     end
 end
 
-// 19112
 always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
@@ -164,7 +163,6 @@ always_ff@(posedge clk) begin
         baseIndex <= 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
-            entries[i].executed <= 0;
         end
         for (i = 0; i < WIDTH; i=i+1) begin
             OUT_comUOp[i].valid <= 0;
@@ -182,7 +180,6 @@ always_ff@(posedge clk) begin
         for (i = 0; i < LENGTH; i=i+1) begin
             if ($signed(({entries[i].sqN_msb, i[5:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
-                entries[i].executed <= 0;
             end
         end
         misprReplay <= 1;
@@ -290,7 +287,7 @@ always_ff@(posedge clk) begin
                         OUT_comUOp[i].valid <= 1;
                         OUT_comUOp[i].nmDst <= deqEntries[i].name;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                        OUT_comUOp[i].compressed <= deqEntries[i].executed;
+                        OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
                         for (j = 0; j < WIDTH_WB; j=j+1)
                             if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == deqEntries[i].tag)
                                 OUT_comUOp[i].compressed <= 1;
@@ -314,7 +311,7 @@ always_ff@(posedge clk) begin
             
                 reg[$clog2(LENGTH)-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
-                if (!temp && deqEntries[i].executed && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
+                if (!temp && deqEntries[i].valid && deqEntries[i].flags != FLAGS_NX && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
                     OUT_comUOp[i].nmDst <= deqEntries[i].name;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
@@ -342,8 +339,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     entries[id].valid <= 0;
-                    entries[id].executed <= 0;     
-                    
+
                     cnt = cnt + 1;
                 end
                 else begin
@@ -351,14 +347,6 @@ always_ff@(posedge clk) begin
                     OUT_comUOp[i].valid <= 0;
                 end
             end
-            
-
-            /*for (i = 0; i < WIDTH; i=i+1) begin
-                if (commitedMask[i]) begin
-                    entries[{deqAddresses[i], i[1:0]}].valid <= 0;
-                    entries[{deqAddresses[i], i[1:0]}].executed <= 0;
-                end
-            end*/
             
             baseIndex <= baseIndex + cnt;
         end
@@ -378,8 +366,7 @@ always_ff@(posedge clk) begin
                 entries[id].sqN_msb <= rnUOpSorted[i].sqN[6];
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;
-                entries[id].executed <= rnUOpSorted[i].fu == FU_RN;
-                entries[id].flags <= FLAGS_NONE;
+                entries[id].flags <= rnUOpSorted[i].fu == FU_RN ? FLAGS_NONE : FLAGS_NX;
                 entries[id].fetchOffs <= rnUOpSorted[i].fetchOffs;
             end
         end
@@ -389,8 +376,8 @@ always_ff@(posedge clk) begin
             if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_wbUOps[i].doNotCommit) begin
                 
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
-                entries[id].executed <= 1;
                 entries[id].flags <= IN_wbUOps[i].flags;
+                assert(IN_wbUOps[i].flags != FLAGS_NX);
             end
         end
         

@@ -191,7 +191,7 @@ typedef enum logic[5:0]
 } OPCode_FU_CSR;
 
 typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR} FuncUnit;
-typedef enum bit[2:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING} Flags;
+typedef enum bit[3:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING, FLAGS_NX} Flags;
 
 typedef enum logic[2:0]
 {
@@ -427,5 +427,6 @@ typedef struct packed
 typedef struct packed
 {
     logic[4:0] flags;
+    SqN sqN;
     logic valid;
 } FloatFlagsUpdate;

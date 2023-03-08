@@ -7,7 +7,7 @@ module FPU
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
-    output FloatFlagsUpdate OUT_flagsUpdate,
+    //output FloatFlagsUpdate OUT_flagsUpdate,
     
     output RES_UOp OUT_uop
 );
@@ -104,7 +104,7 @@ wire minMaxCanonicalNaN = srcAIsNaN && srcBIsNaN;
 
 always@(posedge clk) begin
     
-    OUT_flagsUpdate.valid <= 0;
+    //OUT_flagsUpdate.valid <= 0;
     
     if (rst) begin
         OUT_uop.valid <= 0;
@@ -119,6 +119,9 @@ always@(posedge clk) begin
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.doNotCommit <= 0;
         OUT_uop.compressed <= 0;
+        
+        //OUT_flagsUpdate.valid <= 1;
+        //OUT_flagsUpdate.sqN <= IN_uop.sqN;
             
         case (IN_uop.opcode)
             
@@ -159,13 +162,13 @@ always@(posedge clk) begin
             default: begin end
         endcase
         
-        case (IN_uop.opcode)
+        /*case (IN_uop.opcode)
             FPU_FADD_S: OUT_flagsUpdate.flags <= addSubFlags;
             FPU_FCVTSWU, FPU_FCVTSW: OUT_flagsUpdate.flags <= fromIntFlags;
             FPU_FEQ_S, FPU_FLE_S, FPU_FLT_S: OUT_flagsUpdate.flags <= compareFlags;
             FPU_FCVTWS, FPU_FCVTWUS: OUT_flagsUpdate.flags <= {intFlags[2] | intFlags[1], 3'b0, intFlags[0]};
             default: OUT_flagsUpdate.flags <= 0;
-        endcase
+        endcase*/
         
     end
     else begin

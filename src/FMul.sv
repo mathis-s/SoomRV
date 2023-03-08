@@ -7,6 +7,8 @@ module FMul
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
+    //output FloatFlagsUpdate OUT_flagsUpdate,
+    
     output RES_UOp OUT_uop
 );
 
@@ -38,6 +40,7 @@ recFNToFN#(8, 24) recode
 // 149390 cycles
 always@(posedge clk) begin
     
+    //OUT_flagsUpdate.valid <= 0;
     if (rst) begin
         OUT_uop.valid <= 0;
     end
@@ -52,6 +55,10 @@ always@(posedge clk) begin
         OUT_uop.compressed <= 0;
         OUT_uop.result <= fpResult;
         OUT_uop.doNotCommit <= 0;
+        
+        //OUT_flagsUpdate.valid <= 1;
+        //OUT_flagsUpdate.sqN <= IN_uop.sqN;
+        //OUT_flagsUpdate.flags <= mulFlags;
     end
     else begin
         OUT_uop.valid <= 0;
