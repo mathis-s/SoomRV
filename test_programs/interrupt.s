@@ -1,15 +1,13 @@
 .text
 .globl main
-	
+
+.align 2
 irq_handler:
-	# print interrupt reason (with marker)
-    li a1, 0xff000000
-    lb a1, 14(a1)
-    ori a0, a1, 0x100
-    call printhex
+    
+    csrrs a0, mcause, x0
+    call printdecu
     # get irq src
-    li a1, 0xff000000
-    lw a1, 8(a1)
+    csrrs a1, mepc, x0
     # skip over exception
     # load first byte of instruction
     lb a2, 0(a1)
@@ -27,10 +25,8 @@ irq_handler:
 main:
     
     # set irq handler address
-    lui a0, %hi(irq_handler)
-    addi a0, a0, %lo(irq_handler)
-    li a1, 0xff000000
-    sw a0, 4(a1)
+    la a0, irq_handler
+    csrrw x0, mtvec, a0
     
     li a0, 1
     sb a0, 15(a1)

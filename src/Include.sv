@@ -183,7 +183,10 @@ typedef enum logic[5:0]
     
     CSR_RW_I,
     CSR_RS_I,
-    CSR_RC_I
+    CSR_RC_I,
+    
+    CSR_SRET,
+    CSR_MRET
     
 } OPCode_FU_CSR;
 
@@ -403,3 +406,20 @@ typedef struct packed
     Tag tag;
     logic valid;
 } ZCForward;
+
+typedef struct packed
+{
+    logic[29:0] tvec;
+    logic vectord;
+    
+} TrapControlState;
+
+typedef struct packed
+{
+    logic[31:0] trapPC;
+    
+    logic isInterrupt;
+    logic[3:0] cause;
+    
+    logic valid;
+} TrapInfoUpdate;

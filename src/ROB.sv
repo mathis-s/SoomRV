@@ -4,20 +4,13 @@ typedef struct packed
     Flags flags;
     Tag tag;
     bit sqN_msb;
-    //bit[30:0] pc;
     RegNm name;
-    //bit isBranch;
-    //bit branchTaken;
-    //bit predicted;
-    //BranchPredInfo bpi;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
-    //BHist_t history;
     bit compressed;
     bit valid;
     bit executed;
 } ROBEntry;
-
 
 module ROB
 #(
@@ -47,10 +40,13 @@ module ROB
     
     output BPUpdate OUT_bpUpdate,
     
-    input wire[31:0] IN_irqAddr,
-    output Flags OUT_irqFlags,
-    output reg[31:0] OUT_irqSrc,
-    output reg[31:0] OUT_irqMemAddr,
+    //input wire[31:0] IN_irqAddr,
+    input TrapControlState IN_trapControl,
+    
+    output TrapInfoUpdate OUT_trapInfo,
+    //output Flags OUT_irqFlags,
+    //output reg[31:0] OUT_irqSrc,
+    //output reg[31:0] OUT_irqMemAddr,
     
     output FetchID_t OUT_pcReadAddr,
     input PCFileEntry IN_pcReadData,
@@ -66,7 +62,6 @@ module ROB
     output reg OUT_fence,
     output reg OUT_clearICache,
     output wire OUT_disableIFetch,
-    output reg OUT_irqTaken,
     output reg OUT_halt,
     output reg OUT_mispredFlush
 );
@@ -159,10 +154,10 @@ end
 always_ff@(posedge clk) begin
 
     OUT_branch.taken <= 0;
+    OUT_trapInfo.valid <= 0;
     OUT_halt <= 0;
     OUT_fence <= 0;
     OUT_clearICache <= 0;
-    OUT_irqTaken <= 0;
     externalIRQ <= externalIRQ | IN_irq;
     
     if (rst) begin
@@ -239,10 +234,8 @@ always_ff@(posedge clk) begin
             end
             else if ((pcLookupEntry.flags == FLAGS_BRK && !IN_allowBreak) || pcLookupEntry.flags == FLAGS_EXCEPT || externalIRQ) begin
                 
-                OUT_irqTaken <= 1;
-                
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= IN_irqAddr;
+                OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
                 OUT_branch.sqN <= pcLookupEntrySqN;
                 OUT_branch.flush <= 1;
                 // These don't matter, the entire pipeline will be flushed
@@ -250,11 +243,21 @@ always_ff@(posedge clk) begin
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= pcLookupEntry.fetchID;
                 OUT_branch.history <= baseIndexHist;
+                    
+                OUT_trapInfo.valid <= 1;
+                OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
                 
-                OUT_irqSrc <= {baseIndexPC, 1'b0};
-                OUT_irqFlags <= externalIRQ ? FLAGS_NONE : pcLookupEntry.flags;
+                // TODO: add all trap reasons
+                case (pcLookupEntry.flags)
+                    FLAGS_BRK: OUT_trapInfo.cause <= 3;
+                    FLAGS_EXCEPT: OUT_trapInfo.cause <= 2; // (FIXME: need to differentiate betw. 2, 4, 5, 6, 7, 8, 9, 11, ...)
+                    default: OUT_trapInfo.cause <= 7;
+                endcase
+                
+                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_EXCEPT);
+                
+                // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
                 externalIRQ <= 0;
-                
                 stop <= 0;
             end
             else begin

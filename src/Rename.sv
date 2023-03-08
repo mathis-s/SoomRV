@@ -291,7 +291,6 @@ always_ff@(posedge clk) begin
                 OUT_uopValid[i] <= 0;
         end
         counterSqN <= nextCounterSqN;
-         
     end
     else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)

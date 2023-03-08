@@ -287,7 +287,7 @@ always_comb begin
                 case (instr.opcode)
                     `OPC_ENV: begin
                         case (instr.funct3)
-                            0: begin // ecall, ebreak
+                            0: begin 
                                 if (uop.imm == 0 || uop.imm == 1) begin
                                     case (uop.imm)
                                         0: uop.imm[2:0] = FLAGS_EXCEPT;
@@ -300,6 +300,18 @@ always_comb begin
                                     uop.opcode = INT_SYS;
                                     uop.immB = 1;
                                     invalidEnc = 0;
+                                end
+                                else if (instr.rs1 == 5'b00010) begin
+                                    if (instr.funct7 == 7'b0001000) begin
+                                        uop.fu = FU_CSR;
+                                        uop.opcode = CSR_SRET;
+                                        invalidEnc = 0;
+                                    end
+                                    else if (instr.funct7 == 7'b0011000) begin
+                                        uop.fu = FU_CSR;
+                                        uop.opcode = CSR_MRET;
+                                        invalidEnc = 0;
+                                    end
                                 end
                             end
                             

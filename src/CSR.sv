@@ -7,6 +7,9 @@ module CSR
     input EX_UOp IN_uop,
     input BranchProv IN_branch,
     
+    input TrapInfoUpdate IN_trapInfo,
+    output TrapControlState OUT_trapControl,
+    
     output RES_UOp OUT_uop
 );
 
@@ -154,7 +157,14 @@ struct packed
 reg[63:0] mcycle;
 reg[63:0] minstret;
 
+reg[31:0] mepc;
+reg[31:0] mcause;
+reg[31:0] mtval;
+
 reg[31:0] rdata;
+
+assign OUT_trapControl.vectord = mtvec.mode[0];
+assign OUT_trapControl.tvec = mtvec.base;
 
 always_comb begin
     case (IN_uop.imm[11:0])
@@ -164,6 +174,9 @@ always_comb begin
         
         CSR_mstatus: rdata = mstatus;
         CSR_mtvec: rdata = mtvec;
+        CSR_mepc: rdata = mepc;
+        CSR_mcause: rdata = mcause;
+        CSR_mtval: rdata = mtval;
 
         CSR_mcycle: rdata = mcycle[31:0];
         CSR_mcycleh: rdata = mcycle[63:32];
@@ -185,6 +198,10 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mcycle <= 0;
         minstret <= 0;
+        mtvec <= 0;
+        mepc <= 0;
+        mcause <= 0;
+        mtval <= 0;
         // ...
         
         OUT_uop.valid <= 0;
@@ -228,6 +245,18 @@ always_ff@(posedge clk) begin
                 CSR_minstret: minstret[31:0] <= wdata;
                 CSR_minstreth: minstret[63:32] <= wdata;
                 
+                CSR_mtvec: begin
+                    mtvec.base <= wdata[31:2];
+                    mtvec.mode[0] <= wdata[0];
+                end
+                
+                CSR_mepc: mepc[31:1] <= wdata[31:1];
+                CSR_mcause: begin
+                    mcause[3:0] <= wdata[3:0];
+                    mcause[31] <= wdata[31];
+                end
+                CSR_mtval: mtval <= wdata;
+                
                 default: begin end
             endcase
         end
@@ -240,6 +269,14 @@ always_ff@(posedge clk) begin
     end
     else begin
         OUT_uop.valid <= 0;
+    end
+    
+    
+    if (!rst && IN_trapInfo.valid) begin
+        mtval <= 0;
+        mcause[3:0] <= IN_trapInfo.cause;
+        mcause[31] <= IN_trapInfo.isInterrupt;
+        mepc <= IN_trapInfo.trapPC;
     end
 end
 

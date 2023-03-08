@@ -1,13 +1,11 @@
-.set IO_ADDR, 0xfe000003
+.set IO_ADDR, 0xff000003
 
 .globl _start
 _start:
     
     # set irq handler address
-    lui a0, %hi(_exception)
-    addi a0, a0, %lo(_exception)
-    li a1, 0xff000000
-    sw a0, 4(a1)
+    la a0, _exception
+    csrrw x0, mtvec, a0
     
     li sp, 0x20000
     call main
@@ -23,11 +21,11 @@ _start:
     #divu a0, a0, a1
     #call printdecu
     ebreak
-    
+
+.align 2
 _exception:
     #li a1, 0xff000004
     #lw a1, 0(a1)
-    #call printhex
     ebreak
 
     

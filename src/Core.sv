@@ -486,20 +486,6 @@ RF rf
     .raddr6(RF_readAddress[6]), .rdata6(RF_readData[6]),
     .raddr7(RF_readAddress[7]), .rdata7(RF_readData[7])
 );
-/*
-wire[5:0] RF_FP_readAddress[3:0];
-wire[31:0] RF_FP_readData[3:0];
-RF_FP rf_fp
-(
-    .clk(clk),
-    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult_fp[0]),
-    .waddr1(wbUOp[2].tagDst[5:0]), .wdata1(wbUOp[2].result), .wen1(wbHasResult_fp[2]),
-    
-    .raddr0(RF_FP_readAddress[0]), .rdata0(RF_FP_readData[0]),
-    .raddr1(RF_FP_readAddress[1]), .rdata1(RF_FP_readData[1]),
-    .raddr2(RF_FP_readAddress[2]), .rdata2(RF_FP_readData[2]),
-    .raddr3(RF_FP_readAddress[3]), .rdata3(RF_FP_readData[3])
-);*/
 
 EX_UOp LD_uop[3:0];
 
@@ -507,9 +493,6 @@ wire[31:0] LD_zcFwdResult[1:0];
 Tag LD_zcFwdTag[1:0];
 wire LD_zcFwdValid[1:0];
 
-//assign LD_zcFwdResult[2] = AGU_ST_zcFwd.result;
-//assign LD_zcFwdTag[2] = AGU_ST_zcFwd.tag;
-//assign LD_zcFwdValid[2] = AGU_ST_zcFwd.valid;
 Load ld
 (
     .clk(clk),
@@ -596,6 +579,7 @@ FPU fpu
 );
 
 RES_UOp CSR_uop;
+TrapControlState CSR_trapControl;
 CSR csr
 (
     .clk(clk),
@@ -603,11 +587,12 @@ CSR csr
     .en(LD_uop[0].fu == FU_CSR),
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
+    .IN_trapInfo(ROB_trapInfo),
+    .OUT_trapControl(CSR_trapControl),
     .OUT_uop(CSR_uop)
 );
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
-//assign wbUOp[0] = INT0_uop.valid ? INT0_uop : DIV_uop;
 
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
@@ -841,10 +826,6 @@ assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_u
 SqN ROB_maxSqN;
 
 wire ROB_startFence;
-wire[31:0] CR_irqAddr;
-Flags ROB_irqFlags;
-wire[31:0] ROB_irqSrc;
-wire[31:0] ROB_irqMemAddr;
 wire ROB_disableIFetch;
 
 FetchID_t ROB_curFetchID;
@@ -852,7 +833,9 @@ wire ROB_clearICache;
 
 BPUpdate ROB_bpUpdate;
 wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
-wire ROB_irqTaken;
+
+TrapInfoUpdate ROB_trapInfo;
+
 ROB rob
 (
     .clk(clk),
@@ -870,10 +853,8 @@ ROB rob
     .OUT_comUOp(comUOps),
     .OUT_bpUpdate(ROB_bpUpdate),
     
-    .IN_irqAddr(CR_irqAddr),
-    .OUT_irqFlags(ROB_irqFlags),
-    .OUT_irqSrc(ROB_irqSrc),
-    .OUT_irqMemAddr(ROB_irqMemAddr),
+    .IN_trapControl(CSR_trapControl),
+    .OUT_trapInfo(ROB_trapInfo),
     
     .OUT_pcReadAddr(PC_readAddress[4]),
     .IN_pcReadData(PC_readData[4]),
@@ -888,7 +869,6 @@ ROB rob
     .OUT_fence(ROB_startFence),
     .OUT_clearICache(ROB_clearICache),
     .OUT_disableIFetch(ROB_disableIFetch),
-    .OUT_irqTaken(ROB_irqTaken),
     .OUT_halt(OUT_halt),
     .OUT_mispredFlush(mispredFlush)
 );
@@ -918,12 +898,6 @@ ControlRegs cr
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
     .IN_ifValid({DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
     .IN_comBranch({(comUOps[0].valid && comUOps[0].isBranch), (comUOps[1].valid && comUOps[1].isBranch), (comUOps[2].valid && comUOps[2].isBranch), (comUOps[3].valid && comUOps[3].isBranch)}),
-    
-    .OUT_irqAddr(CR_irqAddr),
-    .IN_irqTaken(ROB_irqTaken),
-    .IN_irqSrc(ROB_irqSrc),
-    .IN_irqFlags(ROB_irqFlags),
-    .IN_irqMemAddr(ROB_irqMemAddr),
     
     .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),

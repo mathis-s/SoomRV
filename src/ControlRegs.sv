@@ -28,11 +28,11 @@ module ControlRegs
     input wire IN_comBranch[NUM_UOPS-1:0],
     
     // Control Registers I/0
-    output wire[31:0] OUT_irqAddr,
-    input wire IN_irqTaken,
-    input wire[31:0] IN_irqSrc,
-    input Flags IN_irqFlags,
-    input wire[31:0] IN_irqMemAddr,
+    //output wire[31:0] OUT_irqAddr,
+    //input wire IN_irqTaken,
+    //input wire[31:0] IN_irqSrc,
+    //input Flags IN_irqFlags,
+    //input wire[31:0] IN_irqMemAddr,
     
     output reg OUT_SPI_cs,
     output reg OUT_SPI_clk,
@@ -79,7 +79,6 @@ reg[63:0] cRegs64[5:0];
 //  7 wmask3
 
 reg[31:0] cRegs[15:0];
-assign OUT_irqAddr = cRegs[1];
 
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
@@ -187,14 +186,6 @@ always_ff@(posedge clk) begin
                 tmrCnt <= 0;
             end
             else tmrCnt <= tmrCnt + 1;
-        end
-        
-        if (IN_irqTaken) begin
-            cRegs[2] <= IN_irqSrc;
-            cRegs[3][23:16] <= {6'b0, IN_irqFlags[1:0]};
-            // Reset mode register on taken interrupt
-            cRegs[3][31:24] <= 0;
-            tmrCnt <= 0;
         end
         
         reReg <= IN_re;
