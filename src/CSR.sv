@@ -11,6 +11,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
+    output wire[2:0] OUT_fRoundMode,
     
     output RES_UOp OUT_uop
 );
@@ -170,6 +171,7 @@ reg[2:0] frm;
 
 assign OUT_trapControl.vectord = mtvec.mode[0];
 assign OUT_trapControl.tvec = mtvec.base;
+assign OUT_fRoundMode = frm;
 
 always_comb begin
     case (IN_uop.imm[11:0])

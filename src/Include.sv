@@ -284,7 +284,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    //logic[31:0] pc; 10044
     logic[31:0] imm;
     logic availA;
     Tag tagA;

@@ -1,3 +1,5 @@
+`include "../hardfloat/HardFloat_consts.vi"
+
 module FDiv
 (
     input wire clk,
@@ -10,12 +12,12 @@ module FDiv
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
-    //output FloatFlagsUpdate OUT_flagsUpdate,
+    input wire[2:0] IN_fRoundMode,
     
     output RES_UOp OUT_uop
 );
 
-wire[2:0] rm = 0;
+wire[2:0] rm = IN_fRoundMode;
 
 wire[32:0] srcArec;
 wire[32:0] srcBrec;
@@ -33,7 +35,7 @@ divSqrtRecFN_small#(8, 24, 0) fdiv
 (
     .nReset(!rst),
     .clock(clk),
-    .control(1'b1),
+    .control(`flControl_tininessAfterRounding),
     
     .inReady(ready),
     .inValid(en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)),
@@ -59,7 +61,6 @@ recFNToFN#(8, 24) recode
 reg running;
 always_ff@(posedge clk) begin
     
-    //OUT_flagsUpdate.valid <= 0;
     if (rst) begin
         running <= 0;
     end
@@ -72,8 +73,6 @@ always_ff@(posedge clk) begin
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
         OUT_uop.doNotCommit <= 0;
-        
-        //OUT_flagsUpdate.sqN <= IN_uop.sqN;
         running <= 1;
     end
     else if (running && outValid && (!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
@@ -91,6 +90,9 @@ always_ff@(posedge clk) begin
         endcase
         /* verilator lint_on CASEOVERLAP */
         
+        if (rm >= 3'b101)
+            OUT_uop.flags <= FLAGS_EXCEPT;
+                
         running <= 0;
     end
     else begin

@@ -24,8 +24,6 @@ _start:
 
 .align 2
 _exception:
-    #li a1, 0xff000004
-    #lw a1, 0(a1)
     ebreak
 
     

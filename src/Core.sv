@@ -576,11 +576,13 @@ FPU fpu
     .IN_branch(branch),
     .IN_uop(LD_uop[0]),
     
+    .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FPU_uop)
 );
 
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl;
+wire[2:0] CSR_fRoundMode;
 CSR csr
 (
     .clk(clk),
@@ -591,6 +593,7 @@ CSR csr
     .IN_fpNewFlags(ROB_fpNewFlags),
     .IN_trapInfo(ROB_trapInfo),
     .OUT_trapControl(CSR_trapControl),
+    .OUT_fRoundMode(CSR_fRoundMode),
     .OUT_uop(CSR_uop)
 );
 
@@ -802,6 +805,8 @@ FMul fmul
     
     .IN_branch(branch),
     .IN_uop(LD_uop[1]),
+    
+    .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FMUL_uop)
 );
 
@@ -819,6 +824,7 @@ FDiv fdiv
     
     .IN_branch(branch),
     .IN_uop(LD_uop[1]),
+    .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FDIV_uop)
 );
 

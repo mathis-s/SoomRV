@@ -1,3 +1,5 @@
+`include "../hardfloat/HardFloat_consts.vi"
+
 module FPU
 (
     input wire clk,
@@ -7,7 +9,7 @@ module FPU
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
-    //output FloatFlagsUpdate OUT_flagsUpdate,
+    input wire[2:0] IN_fRoundMode,
     
     output RES_UOp OUT_uop
 );
@@ -17,7 +19,7 @@ wire[32:0] srcBrec;
 fNToRecFN#(8, 24) recA (.in(IN_uop.srcA), .out(srcArec));
 fNToRecFN#(8, 24) recB (.in(IN_uop.srcB), .out(srcBrec));
 
-wire[2:0] rm = 0;
+wire[2:0] rm = IN_fRoundMode;
 
 wire lessThan;
 wire equal;
@@ -39,7 +41,7 @@ wire[31:0] toInt;
 wire[2:0] intFlags;
 recFNToIN#(8, 24, 32) toIntRec
 (
-    .control(0),
+    .control(`flControl_tininessAfterRounding),
     .in(srcArec),
     .roundingMode(rm),
     .signedOut(IN_uop.opcode == FPU_FCVTWS),
@@ -51,7 +53,7 @@ wire[32:0] fromInt;
 wire[4:0] fromIntFlags;
 iNToRecFN#(32, 8, 24)  intToRec
 (
-    .control(0),
+    .control(`flControl_tininessAfterRounding),
     .signedIn(IN_uop.opcode == FPU_FCVTSW),
     .in(IN_uop.srcA),
     .roundingMode(rm),
@@ -63,7 +65,7 @@ wire[32:0] addSub;
 wire[4:0] addSubFlags;
 addRecFN#(8, 24) addRec
 (
-    .control(0),
+    .control(`flControl_tininessAfterRounding),
     .subOp(IN_uop.opcode == FPU_FSUB_S),
     .a(srcArec),
     .b(srcBrec),
@@ -104,8 +106,6 @@ wire minMaxCanonicalNaN = srcAIsNaN && srcBIsNaN;
 
 always@(posedge clk) begin
     
-    //OUT_flagsUpdate.valid <= 0;
-    
     if (rst) begin
         OUT_uop.valid <= 0;
     end
@@ -114,14 +114,10 @@ always@(posedge clk) begin
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
-        OUT_uop.flags <= FLAGS_NONE;
         OUT_uop.valid <= 1;
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.doNotCommit <= 0;
         OUT_uop.compressed <= 0;
-        
-        //OUT_flagsUpdate.valid <= 1;
-        //OUT_flagsUpdate.sqN <= IN_uop.sqN;
             
         case (IN_uop.opcode)
             
@@ -191,6 +187,9 @@ always@(posedge clk) begin
                 5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
             endcase
             /* verilator lint_on CASEOVERLAP */
+            
+            if (rm >= 3'b101)
+                OUT_uop.flags <= FLAGS_EXCEPT;
         end
         
     end

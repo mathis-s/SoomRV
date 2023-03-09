@@ -1,3 +1,5 @@
+`include "../hardfloat/HardFloat_consts.vi"
+
 module FMul
 (
     input wire clk,
@@ -7,7 +9,7 @@ module FMul
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
     
-    //output FloatFlagsUpdate OUT_flagsUpdate,
+    input wire[2:0] IN_fRoundMode,
     
     output RES_UOp OUT_uop
 );
@@ -17,13 +19,13 @@ wire[32:0] srcBrec;
 fNToRecFN#(8, 24) recA (.in(IN_uop.srcA), .out(srcArec));
 fNToRecFN#(8, 24) recB (.in(IN_uop.srcB), .out(srcBrec));
 
-wire[2:0] rm = 0;
+wire[2:0] rm = IN_fRoundMode;
 
 wire[32:0] mul;
 wire[4:0] mulFlags;
 mulRecFN#(8, 24) mulRec
 (
-    .control(0),
+    .control(`flControl_tininessAfterRounding),
     .a(srcArec),
     .b(srcBrec),
     .roundingMode(rm),
@@ -37,10 +39,9 @@ recFNToFN#(8, 24) recode
     .in(mul),
     .out(fpResult)
 );
-// 149390 cycles
+
 always@(posedge clk) begin
     
-    //OUT_flagsUpdate.valid <= 0;
     if (rst) begin
         OUT_uop.valid <= 0;
     end
@@ -65,6 +66,8 @@ always@(posedge clk) begin
             5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
         endcase
         /* verilator lint_on CASEOVERLAP */
+        if (rm >= 3'b101)
+            OUT_uop.flags <= FLAGS_EXCEPT;
     end
     else begin
         OUT_uop.valid <= 0;
