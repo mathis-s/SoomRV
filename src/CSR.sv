@@ -7,9 +7,10 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input EX_UOp IN_uop,
     input BranchProv IN_branch,
     
+    input wire[4:0] IN_fpNewFlags,
+    
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
-    
     
     output RES_UOp OUT_uop
 );
@@ -164,6 +165,9 @@ reg[31:0] mtval;
 
 reg[31:0] rdata;
 
+reg[4:0] fflags;
+reg[2:0] frm;
+
 assign OUT_trapControl.vectord = mtvec.mode[0];
 assign OUT_trapControl.tvec = mtvec.base;
 
@@ -185,6 +189,10 @@ always_comb begin
         CSR_minstret: rdata = minstret[31:0];
         CSR_minstreth: rdata = minstret[63:32];
         
+        CSR_fflags: rdata = {27'b0, fflags};
+        CSR_frm: rdata = {29'b0, frm};
+        CSR_fcsr: rdata = {24'b0, frm, fflags};
+        
         //CSR_mcounteren,
         //CSR_mstatush,
         //CSR_mhartid,
@@ -194,7 +202,19 @@ end
 
 always_ff@(posedge clk) begin
 
-    mcycle <= mcycle + 1;
+    // implicit writes
+    if (!rst) begin
+    
+        if (IN_trapInfo.valid) begin
+            mtval <= 0;
+            mcause[3:0] <= IN_trapInfo.cause;
+            mcause[31] <= IN_trapInfo.isInterrupt;
+            mepc <= IN_trapInfo.trapPC;
+        end
+        
+        fflags <= fflags | IN_fpNewFlags;
+        mcycle <= mcycle + 1;
+    end
     
     if (rst) begin
         mcycle <= 0;
@@ -203,6 +223,8 @@ always_ff@(posedge clk) begin
         mepc <= 0;
         mcause <= 0;
         mtval <= 0;
+        fflags <= 0;
+        frm <= 0;
         // ...
         
         OUT_uop.valid <= 0;
@@ -258,6 +280,10 @@ always_ff@(posedge clk) begin
                 end
                 CSR_mtval: mtval <= wdata;
                 
+                CSR_fflags: fflags <= wdata[4:0];
+                CSR_frm: frm <= wdata[2:0];
+                CSR_fcsr: {frm, fflags} <= wdata[7:0];
+                
                 default: begin end
             endcase
         end
@@ -270,14 +296,6 @@ always_ff@(posedge clk) begin
     end
     else begin
         OUT_uop.valid <= 0;
-    end
-    
-    
-    if (!rst && IN_trapInfo.valid) begin
-        mtval <= 0;
-        mcause[3:0] <= IN_trapInfo.cause;
-        mcause[31] <= IN_trapInfo.isInterrupt;
-        mepc <= IN_trapInfo.trapPC;
     end
 end
 

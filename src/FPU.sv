@@ -27,7 +27,7 @@ compareRecFN#(8, 24) compare
 (
     .a(srcArec),
     .b(srcBrec),
-    .signaling(IN_uop.opcode != FPU_FEQ_S),
+    .signaling(IN_uop.opcode == FPU_FLT_S || IN_uop.opcode == FPU_FLE_S),
     .lt(lessThan),
     .eq(equal),
     .gt(greaterThan),
@@ -162,13 +162,36 @@ always@(posedge clk) begin
             default: begin end
         endcase
         
-        /*case (IN_uop.opcode)
-            FPU_FADD_S: OUT_flagsUpdate.flags <= addSubFlags;
-            FPU_FCVTSWU, FPU_FCVTSW: OUT_flagsUpdate.flags <= fromIntFlags;
-            FPU_FEQ_S, FPU_FLE_S, FPU_FLT_S: OUT_flagsUpdate.flags <= compareFlags;
-            FPU_FCVTWS, FPU_FCVTWUS: OUT_flagsUpdate.flags <= {intFlags[2] | intFlags[1], 3'b0, intFlags[0]};
-            default: OUT_flagsUpdate.flags <= 0;
-        endcase*/
+        begin 
+            reg[4:0] except;
+            case (IN_uop.opcode)
+                FPU_FADD_S: except = addSubFlags;
+                FPU_FCVTSWU, 
+                FPU_FCVTSW: except = fromIntFlags;
+                
+                FPU_FMIN_S,
+                FPU_FMAX_S,
+                FPU_FEQ_S, 
+                FPU_FLE_S, 
+                FPU_FLT_S: except = compareFlags;
+                FPU_FCVTWS, 
+                FPU_FCVTWUS: except = {intFlags[2] | intFlags[1], 3'b0, intFlags[0]};
+                default: except = 0;
+            endcase
+            
+            //$display("flags %b\n", except);
+            
+            /* verilator lint_off CASEOVERLAP */
+            casez (except)
+                5'b00000: OUT_uop.flags <= FLAGS_NONE;
+                5'b???1?: OUT_uop.flags <= FLAGS_FP_UF;
+                5'b??1??: OUT_uop.flags <= FLAGS_FP_OF;
+                5'b?1???: OUT_uop.flags <= FLAGS_FP_DZ;
+                5'b1????: OUT_uop.flags <= FLAGS_FP_NV;
+                5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
+            endcase
+            /* verilator lint_on CASEOVERLAP */
+        end
         
     end
     else begin

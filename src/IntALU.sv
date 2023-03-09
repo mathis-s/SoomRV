@@ -67,7 +67,7 @@ wire[31:0] pcPlus4 = IN_uop.pc + 4;
 always_comb begin
     // optimize this depending on how good of a job synthesis does
     case (IN_uop.opcode)
-        INT_AUIPC: resC = IN_uop.pc + imm; // could unify this add and branch add
+        INT_AUIPC: resC = IN_uop.pc + imm;
         INT_ADD: resC = srcA + srcB;
         INT_XOR: resC = srcA ^ srcB;
         INT_OR: resC = srcA | srcB;
@@ -111,7 +111,7 @@ always_comb begin
     
     case (IN_uop.opcode)
         INT_UNDEFINED: flags = FLAGS_EXCEPT;
-        INT_SYS: flags = Flags'(imm[2:0]);
+        INT_SYS: flags = Flags'(imm[3:0]);
         default: flags = FLAGS_NONE;
     endcase
 end 
@@ -157,8 +157,6 @@ always_comb begin
         IN_uop.opcode == INT_F_ADDI_BGEU);
         
 end
-
-
 
 always_ff@(posedge clk) begin
     

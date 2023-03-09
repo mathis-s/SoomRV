@@ -588,6 +588,7 @@ CSR csr
     .en(LD_uop[0].fu == FU_CSR),
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
+    .IN_fpNewFlags(ROB_fpNewFlags),
     .IN_trapInfo(ROB_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_uop(CSR_uop)
@@ -835,6 +836,7 @@ BPUpdate ROB_bpUpdate;
 wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
 
 TrapInfoUpdate ROB_trapInfo;
+wire[4:0] ROB_fpNewFlags;
 
 ROB rob
 (
@@ -855,6 +857,7 @@ ROB rob
     
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(ROB_trapInfo),
+    .OUT_fpNewFlags(ROB_fpNewFlags),
     
     .OUT_pcReadAddr(PC_readAddress[4]),
     .IN_pcReadData(PC_readData[4]),

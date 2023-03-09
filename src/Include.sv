@@ -191,7 +191,20 @@ typedef enum logic[5:0]
 } OPCode_FU_CSR;
 
 typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR} FuncUnit;
-typedef enum bit[3:0] {FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING, FLAGS_NX} Flags;
+typedef enum bit[3:0] 
+{
+    // Flags that do not cause a flush or trap
+    FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
+    FLAGS_FP_NX, FLAGS_FP_UF, FLAGS_FP_OF, FLAGS_FP_DZ, 
+    FLAGS_FP_NV, 
+    
+    // Flags that cause a flush or trap
+    FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING,
+    
+    // Invalid (or not-yet-executed) flag
+    FLAGS_NX = 4'b1111
+    
+} Flags;
 
 typedef enum logic[2:0]
 {

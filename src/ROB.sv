@@ -40,13 +40,9 @@ module ROB
     
     output BPUpdate OUT_bpUpdate,
     
-    //input wire[31:0] IN_irqAddr,
     input TrapControlState IN_trapControl,
-    
     output TrapInfoUpdate OUT_trapInfo,
-    //output Flags OUT_irqFlags,
-    //output reg[31:0] OUT_irqSrc,
-    //output reg[31:0] OUT_irqMemAddr,
+    output reg[4:0] OUT_fpNewFlags,
     
     output FetchID_t OUT_pcReadAddr,
     input PCFileEntry IN_pcReadData,
@@ -157,6 +153,8 @@ always_ff@(posedge clk) begin
     OUT_halt <= 0;
     OUT_fence <= 0;
     OUT_clearICache <= 0;
+    OUT_fpNewFlags <= 0;
+    
     externalIRQ <= externalIRQ | IN_irq;
     
     if (rst) begin
@@ -323,19 +321,28 @@ always_ff@(posedge clk) begin
                     
                     deqMask[id[1:0]] = 1;
                                    
-                    if (|deqEntries[i].flags[2:1] || externalIRQ) begin
+                    if (deqEntries[i].flags > FLAGS_BRANCH || externalIRQ) begin
                         pcLookupEntry <= deqEntries[i];
                         pcLookupEntrySqN <= {deqEntries[i].sqN_msb, id[5:0]};
                         pred = 1;
+                        
+                        if (deqEntries[i].flags >= FLAGS_BRK || externalIRQ) begin
+                            // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
+                            if (deqEntries[i].flags == FLAGS_EXCEPT)
+                                OUT_comUOp[i].nmDst <= 0;
+                            
+                            stop <= 1;
+                            temp = 1;
+                        end
                     end
                     
-                    if (deqEntries[i].flags[2] || externalIRQ) begin
-                        // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
-                        if (deqEntries[i].flags == FLAGS_EXCEPT)
-                            OUT_comUOp[i].nmDst <= 0;
+                    if (deqEntries[i].flags >= FLAGS_FP_NX && deqEntries[i].flags <= FLAGS_FP_NV) begin
+                        OUT_fpNewFlags[deqEntries[i].flags[2:0] - FLAGS_FP_NX[2:0]] <= 1;
                         
-                        stop <= 1;
-                        temp = 1;
+                        // Underflow and overflow imply inexact
+                        if (deqEntries[i].flags == FLAGS_FP_UF || deqEntries[i].flags == FLAGS_FP_OF) begin
+                            OUT_fpNewFlags[FLAGS_FP_NX[2:0]] <= 1;
+                        end
                     end
                     
                     entries[id].valid <= 0;
