@@ -290,7 +290,7 @@ always_comb begin
                             0: begin 
                                 if (uop.imm == 0 || uop.imm == 1) begin
                                     case (uop.imm)
-                                        0: uop.imm[3:0] = FLAGS_EXCEPT;
+                                        0: uop.imm[3:0] = FLAGS_ECALL;
                                         1: uop.imm[3:0] = FLAGS_BRK;
                                     endcase
                                     uop.fu = FU_INT;

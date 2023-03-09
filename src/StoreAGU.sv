@@ -73,7 +73,7 @@ always_ff@(posedge clk) begin
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.pc <= IN_uop.pc;
-            OUT_uop.flags <= except ? FLAGS_EXCEPT : FLAGS_NONE;
+            OUT_uop.flags <= except ? FLAGS_ACCESS_FAULT : FLAGS_NONE;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.result <= addrSum;
             OUT_uop.doNotCommit <= 0;

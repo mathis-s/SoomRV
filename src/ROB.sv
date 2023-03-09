@@ -227,7 +227,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if ((pcLookupEntry.flags == FLAGS_BRK && !IN_allowBreak) || pcLookupEntry.flags == FLAGS_EXCEPT || externalIRQ) begin
+            else if ((pcLookupEntry.flags == FLAGS_BRK && !IN_allowBreak) || pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_ECALL || pcLookupEntry.flags == FLAGS_ACCESS_FAULT  || externalIRQ) begin
                 
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
@@ -245,11 +245,13 @@ always_ff@(posedge clk) begin
                 // TODO: add all trap reasons
                 case (pcLookupEntry.flags)
                     FLAGS_BRK: OUT_trapInfo.cause <= 3;
-                    FLAGS_EXCEPT: OUT_trapInfo.cause <= 2; // (FIXME: need to differentiate betw. 2, 4, 5, 6, 7, 8, 9, 11, ...)
+                    FLAGS_ECALL: OUT_trapInfo.cause <= 11; // FIXME: could also be 8 or 9 in U or S resp
+                    FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
+                    FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
                     default: OUT_trapInfo.cause <= 7;
                 endcase
                 
-                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_BRK || pcLookupEntry.flags == FLAGS_EXCEPT);
+                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_ECALL || pcLookupEntry.flags == FLAGS_ACCESS_FAULT || pcLookupEntry.flags == FLAGS_BRK);
                 
                 // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
                 externalIRQ <= 0;
@@ -321,14 +323,15 @@ always_ff@(posedge clk) begin
                     
                     deqMask[id[1:0]] = 1;
                                    
-                    if (deqEntries[i].flags > FLAGS_BRANCH || externalIRQ) begin
+                    if (deqEntries[i].flags >= FLAGS_PRED_TAKEN || externalIRQ) begin
                         pcLookupEntry <= deqEntries[i];
                         pcLookupEntrySqN <= {deqEntries[i].sqN_msb, id[5:0]};
                         pred = 1;
                         
-                        if (deqEntries[i].flags >= FLAGS_BRK || externalIRQ) begin
+                        if (deqEntries[i].flags >= FLAGS_FENCE || externalIRQ) begin
                             // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
-                            if (deqEntries[i].flags == FLAGS_EXCEPT)
+                            if (deqEntries[i].flags == FLAGS_ILLEGAL_INSTR || 
+                                deqEntries[i].flags == FLAGS_ACCESS_FAULT)
                                 OUT_comUOp[i].nmDst <= 0;
                             
                             stop <= 1;

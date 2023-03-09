@@ -91,7 +91,7 @@ always_ff@(posedge clk) begin
         /* verilator lint_on CASEOVERLAP */
         
         if (rm >= 3'b101)
-            OUT_uop.flags <= FLAGS_EXCEPT;
+            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
                 
         running <= 0;
     end

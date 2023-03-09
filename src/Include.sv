@@ -194,12 +194,18 @@ typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, 
 typedef enum bit[3:0] 
 {
     // Flags that do not cause a flush or trap
-    FLAGS_NONE, FLAGS_BRANCH, FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
+    FLAGS_NONE, FLAGS_BRANCH,
     FLAGS_FP_NX, FLAGS_FP_UF, FLAGS_FP_OF, FLAGS_FP_DZ, 
     FLAGS_FP_NV, 
     
-    // Flags that cause a flush or trap
-    FLAGS_BRK, FLAGS_EXCEPT, FLAGS_FENCE, FLAGS_ORDERING,
+    // Exceptions that require PC lookup (all following)
+    FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
+    
+    // Flags that cause a flush
+    FLAGS_FENCE, FLAGS_ORDERING,
+    
+    // Flags that cause a trap
+    FLAGS_ILLEGAL_INSTR, FLAGS_BRK, FLAGS_ECALL, FLAGS_ACCESS_FAULT,
     
     // Invalid (or not-yet-executed) flag
     FLAGS_NX = 4'b1111

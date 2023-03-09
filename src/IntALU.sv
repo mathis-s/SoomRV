@@ -110,7 +110,7 @@ always_comb begin
     endcase
     
     case (IN_uop.opcode)
-        INT_UNDEFINED: flags = FLAGS_EXCEPT;
+        INT_UNDEFINED: flags = FLAGS_ILLEGAL_INSTR;
         INT_SYS: flags = Flags'(imm[3:0]);
         default: flags = FLAGS_NONE;
     endcase
