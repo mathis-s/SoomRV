@@ -215,7 +215,6 @@ always_ff@(posedge clk) begin
         
         counterSqN <= 0;
         counterStoreSqN = -1;
-        // TODO: check if load sqn is correctly handled
         counterLoadSqN = 0;
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
@@ -244,7 +243,15 @@ always_ff@(posedge clk) begin
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
-            OUT_uop[i].nmDst <= IN_uop[i].rd;//{IN_uop[i].rd_fp, IN_uop[i].rd};
+            
+            // The cause for decode-time pure traps is encoded
+            // in rd. This saves encoding space, as these instructions
+            // have no result anyways.
+            if (IN_uop[i].fu == FU_TRAP)
+                OUT_uop[i].nmDst <= IN_uop[i].opcode[4:0];
+            else
+                OUT_uop[i].nmDst <= IN_uop[i].rd;
+            
             OUT_uop[i].fetchID <= IN_uop[i].fetchID;
             OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
             OUT_uop[i].immB <= IN_uop[i].immB;

@@ -4,7 +4,7 @@ typedef struct packed
     Flags flags;
     Tag tag;
     bit sqN_msb;
-    RegNm name;
+    RegNm name; // also used to differentiate between decode-time exceptions (these have no dst anyways)
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
     bit compressed;
@@ -204,9 +204,9 @@ always_ff@(posedge clk) begin
         // Exception and branch prediction update handling
         pcLookupEntry.valid <= 0;
         if (pcLookupEntry.valid) begin
-            if ((pcLookupEntry.flags == FLAGS_BRK && IN_allowBreak) || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
+            if ((pcLookupEntry.flags == FLAGS_TRAP && IN_allowBreak && pcLookupEntry.name == TRAP_BREAK[4:0]) || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
                 
-                if (pcLookupEntry.flags == FLAGS_BRK)
+                if (pcLookupEntry.flags == FLAGS_TRAP)
                     OUT_halt <= 1;
                 else if (pcLookupEntry.flags == FLAGS_ORDERING) begin
                     memoryWait <= 1;
@@ -227,7 +227,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if ((pcLookupEntry.flags == FLAGS_BRK && !IN_allowBreak) || pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_ECALL || pcLookupEntry.flags == FLAGS_ACCESS_FAULT  || externalIRQ) begin
+            else if (pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT  || externalIRQ) begin
                 
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
@@ -244,14 +244,13 @@ always_ff@(posedge clk) begin
                 
                 // TODO: add all trap reasons
                 case (pcLookupEntry.flags)
-                    FLAGS_BRK: OUT_trapInfo.cause <= 3;
-                    FLAGS_ECALL: OUT_trapInfo.cause <= 11; // FIXME: could also be 8 or 9 in U or S resp
+                    FLAGS_TRAP: OUT_trapInfo.cause <= pcLookupEntry.name[3:0];
                     FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
                     FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
                     default: OUT_trapInfo.cause <= 7;
                 endcase
                 
-                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_ECALL || pcLookupEntry.flags == FLAGS_ACCESS_FAULT || pcLookupEntry.flags == FLAGS_BRK);
+                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT);
                 
                 // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
                 externalIRQ <= 0;
@@ -331,7 +330,8 @@ always_ff@(posedge clk) begin
                         if (deqEntries[i].flags >= FLAGS_FENCE || externalIRQ) begin
                             // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
                             if (deqEntries[i].flags == FLAGS_ILLEGAL_INSTR || 
-                                deqEntries[i].flags == FLAGS_ACCESS_FAULT)
+                                deqEntries[i].flags == FLAGS_ACCESS_FAULT ||
+                                deqEntries[i].flags == FLAGS_TRAP)
                                 OUT_comUOp[i].nmDst <= 0;
                             
                             stop <= 1;
@@ -376,7 +376,14 @@ always_ff@(posedge clk) begin
                 entries[id].sqN_msb <= rnUOpSorted[i].sqN[6];
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;
-                entries[id].flags <= rnUOpSorted[i].fu == FU_RN ? FLAGS_NONE : FLAGS_NX;
+                
+                if (rnUOpSorted[i].fu == FU_RN)
+                    entries[id].flags <= FLAGS_NONE;
+                else if (rnUOpSorted[i].fu == FU_TRAP)
+                    entries[id].flags <= FLAGS_TRAP;
+                else
+                    entries[id].flags <= FLAGS_NX;
+                    
                 entries[id].fetchOffs <= rnUOpSorted[i].fetchOffs;
             end
         end

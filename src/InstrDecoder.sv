@@ -290,14 +290,13 @@ always_comb begin
                             0: begin 
                                 if (uop.imm == 0 || uop.imm == 1) begin
                                     case (uop.imm)
-                                        0: uop.imm[3:0] = FLAGS_ECALL;
-                                        1: uop.imm[3:0] = FLAGS_BRK;
+                                        0: uop.opcode = TRAP_ECALL_M;
+                                        1: uop.opcode = TRAP_BREAK;
                                     endcase
-                                    uop.fu = FU_INT;
+                                    uop.fu = FU_TRAP;
                                     uop.rs0 = 0;
                                     uop.rs1 = 0;
                                     uop.rd = 0;
-                                    uop.opcode = INT_SYS;
                                     uop.immB = 1;
                                     invalidEnc = 0;
                                 end
@@ -1381,10 +1380,8 @@ always_comb begin
                         invalidEnc = 0;
                     end
                     else if (i16.cr.funct4 == 4'b1001 && i16.cr.rd_rs1 == 0 && i16.cr.rs2 == 0) begin
-                        uop.opcode = INT_SYS;
-                        uop.fu = FU_INT;
-                        uop.immB = 1;
-                        uop.imm[3:0] = FLAGS_BRK;
+                        uop.opcode = TRAP_BREAK;
+                        uop.fu = FU_TRAP;
                         invalidEnc = 0;
                     end
                 end
@@ -1393,8 +1390,8 @@ always_comb begin
         
         
         if (invalidEnc) begin
-            uop.opcode = INT_UNDEFINED;
-            uop.fu = FU_INT;
+            uop.opcode = TRAP_ILLEGAL_INSTR;
+            uop.fu = FU_TRAP;
         end
         uopsComb[i] = uop;
     end

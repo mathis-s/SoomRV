@@ -190,7 +190,23 @@ typedef enum logic[5:0]
     
 } OPCode_FU_CSR;
 
-typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR} FuncUnit;
+typedef enum logic[5:0]
+{
+    // Only decode-time traps as executed using FU_TRAP
+    // All other exceptions are passed as result flags from
+    // functional units to the ROB.
+    TRAP_I_ACC_MISAL = 0,
+    TRAP_I_ACC_FAULT = 1,
+    TRAP_ILLEGAL_INSTR = 2,
+    TRAP_BREAK = 3,
+    TRAP_ECALL_U = 8,
+    TRAP_ECALL_S = 9,
+    TRAP_ECALL_M = 11,
+    TRAP_I_PAGE_FAULT = 12
+    
+} OPCode_FU_TRAP;
+
+typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 typedef enum bit[3:0] 
 {
     // Flags that do not cause a flush or trap
@@ -205,7 +221,7 @@ typedef enum bit[3:0]
     FLAGS_FENCE, FLAGS_ORDERING,
     
     // Flags that cause a trap
-    FLAGS_ILLEGAL_INSTR, FLAGS_BRK, FLAGS_ECALL, FLAGS_ACCESS_FAULT,
+    FLAGS_ILLEGAL_INSTR, FLAGS_TRAP, FLAGS_ACCESS_FAULT,
     
     // Invalid (or not-yet-executed) flag
     FLAGS_NX = 4'b1111
