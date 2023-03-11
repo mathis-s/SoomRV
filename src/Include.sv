@@ -38,7 +38,6 @@ typedef enum logic[5:0]
     INT_JAL,
     INT_JALR,
     INT_SYS,
-    INT_UNDEFINED,
     INT_SH1ADD,
     INT_SH2ADD,
     INT_SH3ADD,
