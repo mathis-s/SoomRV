@@ -151,7 +151,7 @@ ProgramCounter progCnt
     .IN_fetchID(branch.taken ? branch.fetchID : DEC_branchFetchID),
     .IN_instr(instrRaw),
     
-    .IN_clearICache(ROB_clearICache),
+    .IN_clearICache(TH_clearICache),
     
     .IN_BP_branchTaken(BP_branchTaken),
     .IN_BP_isJump(BP_isJump),
@@ -186,7 +186,7 @@ BranchPredictor bp
     .clk(clk),
     .rst(rst),
     
-    .IN_clearICache(ROB_clearICache),
+    .IN_clearICache(TH_clearICache),
     
     .IN_mispredFlush(mispredFlush),
     .IN_branch(branch),
@@ -205,7 +205,7 @@ BranchPredictor bp
     
     .IN_btUpdates(BP_btUpdates),
     
-    .IN_bpUpdate(ROB_bpUpdate)
+    .IN_bpUpdate(TH_bpUpdate)
 );
 
 IndirBranchInfo IBP_updates[1:0];
@@ -214,7 +214,7 @@ IndirectBranchPredictor ibp
 (
     .clk(clk),
     .rst(rst),
-    .IN_clearICache(ROB_clearICache),
+    .IN_clearICache(TH_clearICache),
     
     .IN_ibUpdates(IBP_updates),
     .OUT_predDst(IBP_predDst)
@@ -247,7 +247,7 @@ PreDecode preDec
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
-assign ifetchEn = !PD_full && !PC_stall && !ROB_disableIFetch;
+assign ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
 
 D_UOp DE_uop[3:0];
 
@@ -591,7 +591,7 @@ CSR csr
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
-    .IN_trapInfo(ROB_trapInfo),
+    .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
     .OUT_uop(CSR_uop)
@@ -629,7 +629,7 @@ CacheController cc
     .IN_MC_cacheID(OUT_MC_cacheID),
     .IN_MC_busy(IN_MC_busy || PC_MC_if.ce),
     
-    .IN_fence(ROB_startFence),
+    .IN_fence(TH_startFence),
     .OUT_fenceBusy(CC_fenceBusy)
 );
 
@@ -831,19 +831,9 @@ FDiv fdiv
 assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_uop.valid ? FMUL_uop : FDIV_uop));
 
 SqN ROB_maxSqN;
-
-wire ROB_startFence;
-wire ROB_disableIFetch;
-
 FetchID_t ROB_curFetchID;
-wire ROB_clearICache;
-
-BPUpdate ROB_bpUpdate;
-wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
-
-TrapInfoUpdate ROB_trapInfo;
 wire[4:0] ROB_fpNewFlags;
-
+Trap_UOp ROB_trapUOp;
 ROB rob
 (
     .clk(clk),
@@ -857,29 +847,41 @@ ROB rob
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
-    
     .OUT_comUOp(comUOps),
-    .OUT_bpUpdate(ROB_bpUpdate),
-    
-    .IN_trapControl(CSR_trapControl),
-    .OUT_trapInfo(ROB_trapInfo),
     .OUT_fpNewFlags(ROB_fpNewFlags),
-    
+    .OUT_curFetchID(ROB_curFetchID),
+    .OUT_trapUOp(ROB_trapUOp),
+    .OUT_mispredFlush(mispredFlush)
+);
+
+wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
+
+wire TH_startFence;
+wire TH_disableIFetch;
+wire TH_clearICache;
+BPUpdate TH_bpUpdate;
+TrapInfoUpdate TH_trapInfo;
+TrapHandler trapHandler
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_trapInstr(ROB_trapUOp),
     .OUT_pcReadAddr(PC_readAddress[4]),
     .IN_pcReadData(PC_readData[4]),
-    
+    .IN_trapControl(CSR_trapControl),
+    .OUT_trapInfo(TH_trapInfo),
+    .OUT_bpUpdate(TH_bpUpdate),
     .OUT_branch(branchProvs[3]),
-    .OUT_curFetchID(ROB_curFetchID),
     
     .IN_irq(timerIRQ),
     .IN_MEM_busy(MEMSUB_busy),
     .IN_allowBreak(!CR_mode[MODE_NO_BRK]),
     
-    .OUT_fence(ROB_startFence),
-    .OUT_clearICache(ROB_clearICache),
-    .OUT_disableIFetch(ROB_disableIFetch),
-    .OUT_halt(OUT_halt),
-    .OUT_mispredFlush(mispredFlush)
+    .OUT_fence(TH_startFence),
+    .OUT_clearICache(TH_clearICache),
+    .OUT_disableIFetch(TH_disableIFetch),
+    .OUT_halt(OUT_halt)
 );
 
 wire IO_busy;

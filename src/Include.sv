@@ -428,6 +428,19 @@ typedef struct packed
 
 typedef struct packed
 {
+    Flags flags;
+    Tag tag;
+    SqN sqN;
+    RegNm name;
+    FetchOff_t fetchOffs;
+    FetchID_t fetchID;
+    bit compressed;
+    bit valid;
+    
+} Trap_UOp;
+
+typedef struct packed
+{
     logic[30:0] pc;
     logic compressed;
     BranchPredInfo bpi;
@@ -446,8 +459,11 @@ typedef struct packed
 typedef struct packed
 {
     logic[30:0] retvec;
-    logic[29:0] tvec;
+    logic[29:0] mtvec;
     logic vectord;
+    logic[29:0] stvec;
+    logic[15:0] medeleg;
+    logic[15:0] mideleg;
     
 } TrapControlState;
 

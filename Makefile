@@ -46,6 +46,7 @@ decoder_tb:
 	src/ICacheTable.sv \
 	src/StoreAGU.sv \
 	src/CSR.sv \
+	src/TrapHandler.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

@@ -27,38 +27,19 @@ module ROB
 
     input R_UOp IN_uop[WIDTH-1:0],
     input wire IN_uopValid[WIDTH-1:0],
-    
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
     input BranchProv IN_branch,
-    
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
 
     output CommitUOp OUT_comUOp[WIDTH-1:0],
-    
-    output BPUpdate OUT_bpUpdate,
-    
-    input TrapControlState IN_trapControl,
-    output TrapInfoUpdate OUT_trapInfo,
     output reg[4:0] OUT_fpNewFlags,
-    
-    output FetchID_t OUT_pcReadAddr,
-    input PCFileEntry IN_pcReadData,
-    
-    
-    output BranchProv OUT_branch,
     output FetchID_t OUT_curFetchID,
     
-    input wire IN_irq,
-    input wire IN_MEM_busy,
-    input wire IN_allowBreak,
-    
-    output reg OUT_fence,
-    output reg OUT_clearICache,
-    output wire OUT_disableIFetch,
-    output reg OUT_halt,
+    output Trap_UOp OUT_trapUOp,
+
     output reg OUT_mispredFlush
 );
 
@@ -90,29 +71,7 @@ SqN baseIndex;
 assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
 
-SqN pcLookupEntrySqN;
-ROBEntry pcLookupEntry;
-assign OUT_pcReadAddr = pcLookupEntry.fetchID;
-wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], pcLookupEntry.fetchOffs} - (pcLookupEntry.compressed ? 0 : 1);
-BHist_t baseIndexHist;
-BranchPredInfo baseIndexBPI;
-always_comb begin
-    if (IN_pcReadData.bpi.predicted && !IN_pcReadData.bpi.isJump && pcLookupEntry.fetchOffs > IN_pcReadData.branchPos)
-        baseIndexHist = {IN_pcReadData.hist[$bits(BHist_t)-2:0], IN_pcReadData.bpi.taken};
-    else
-        baseIndexHist = IN_pcReadData.hist;
-        
-        baseIndexBPI = (pcLookupEntry.fetchOffs == IN_pcReadData.branchPos) ?
-            IN_pcReadData.bpi :
-            0;
-end
-
 reg stop;
-reg memoryWait;
-reg instrFence;
-reg externalIRQ;
-
-assign OUT_disableIFetch = memoryWait;
 
 reg misprReplay;
 reg misprReplayEnd;
@@ -148,14 +107,7 @@ end
 
 always_ff@(posedge clk) begin
 
-    OUT_branch.taken <= 0;
-    OUT_trapInfo.valid <= 0;
-    OUT_halt <= 0;
-    OUT_fence <= 0;
-    OUT_clearICache <= 0;
     OUT_fpNewFlags <= 0;
-    
-    externalIRQ <= externalIRQ | IN_irq;
     
     if (rst) begin
         baseIndex <= 0;
@@ -165,14 +117,11 @@ always_ff@(posedge clk) begin
         for (i = 0; i < WIDTH; i=i+1) begin
             OUT_comUOp[i].valid <= 0;
         end
-        OUT_branch.taken <= 0;
         misprReplay <= 0;
         OUT_mispredFlush <= 0;
         OUT_curFetchID <= -1;
-        OUT_bpUpdate.valid <= 0;
-        pcLookupEntry.valid <= 0;
+        OUT_trapUOp.valid <= 0;
         stop <= 0;
-        memoryWait <= 0;
     end
     else if (IN_branch.taken) begin
         for (i = 0; i < LENGTH; i=i+1) begin
@@ -189,87 +138,8 @@ always_ff@(posedge clk) begin
     
     if (!rst) begin
     
-        OUT_bpUpdate.valid <= 0;
-        
-        if (memoryWait && !IN_MEM_busy) begin
-            if (instrFence) begin
-                instrFence <= 0;
-                OUT_clearICache <= 1;
-            end
-            else begin
-                memoryWait <= 0;
-            end
-        end
-        
-        // Exception and branch prediction update handling
-        pcLookupEntry.valid <= 0;
-        if (pcLookupEntry.valid) begin
-            if ((pcLookupEntry.flags == FLAGS_TRAP && IN_allowBreak && pcLookupEntry.name == TRAP_BREAK[4:0]) || pcLookupEntry.flags == FLAGS_FENCE || pcLookupEntry.flags == FLAGS_ORDERING) begin
-                
-                if (pcLookupEntry.flags == FLAGS_TRAP)
-                    OUT_halt <= 1;
-                else if (pcLookupEntry.flags == FLAGS_ORDERING) begin
-                    memoryWait <= 1;
-                end
-                else if (pcLookupEntry.flags == FLAGS_FENCE) begin
-                    instrFence <= 1;
-                    memoryWait <= 1;
-                    OUT_fence <= 1;
-                end
-                
-                OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + (pcLookupEntry.compressed ? 31'd1 : 31'd2), 1'b0};
-                OUT_branch.sqN <= pcLookupEntrySqN;
-                OUT_branch.flush <= 1;
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= pcLookupEntry.fetchID;
-                OUT_branch.history <= baseIndexHist;
-                stop <= 0;
-            end
-            else if (pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT || pcLookupEntry.flags == FLAGS_XRET || externalIRQ) begin
-                
-                OUT_branch.taken <= 1;
-                
-                if (pcLookupEntry.flags == FLAGS_XRET)
-                    OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
-                else begin
-                    OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
-                    OUT_trapInfo.valid <= 1;
-                    OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
-                    
-                    // TODO: add all trap reasons
-                    case (pcLookupEntry.flags)
-                        FLAGS_TRAP: OUT_trapInfo.cause <= pcLookupEntry.name[3:0];
-                        FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
-                        FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
-                        default: OUT_trapInfo.cause <= 7;
-                    endcase
-                    
-                    OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT);
-                end
-                    
-                OUT_branch.sqN <= pcLookupEntrySqN;
-                OUT_branch.flush <= 1;
-                // These don't matter, the entire pipeline will be flushed
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= pcLookupEntry.fetchID;
-                OUT_branch.history <= baseIndexHist;
-                    
-                // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
-                externalIRQ <= 0;
-                stop <= 0;
-            end
-            else begin
-                OUT_bpUpdate.valid <= 1;
-                OUT_bpUpdate.pc <= IN_pcReadData.pc;
-                OUT_bpUpdate.compressed <= pcLookupEntry.compressed;
-                OUT_bpUpdate.history <= IN_pcReadData.hist;
-                OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
-                OUT_bpUpdate.branchTaken <= pcLookupEntry.flags == FLAGS_PRED_TAKEN;
-            end
-        end
+        OUT_trapUOp.valid <= 0;
+        stop <= 0;
         
         // After mispredict, we replay all ops from last committed to the branch
         // without actually committing them, to roll back the Rename Map.
@@ -327,12 +197,20 @@ always_ff@(posedge clk) begin
                     
                     deqMask[id[1:0]] = 1;
                                    
-                    if (deqEntries[i].flags >= FLAGS_PRED_TAKEN || externalIRQ) begin
-                        pcLookupEntry <= deqEntries[i];
-                        pcLookupEntrySqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                    if (deqEntries[i].flags >= FLAGS_PRED_TAKEN) begin
+                        
+                        OUT_trapUOp.flags <= deqEntries[i].flags;
+                        OUT_trapUOp.tag <= deqEntries[i].tag;
+                        OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                        OUT_trapUOp.name <= deqEntries[i].name;
+                        OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
+                        OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
+                        OUT_trapUOp.compressed <= deqEntries[i].compressed;
+                        OUT_trapUOp.valid <= 1;
+                        
                         pred = 1;
                         
-                        if (deqEntries[i].flags >= FLAGS_FENCE || externalIRQ) begin
+                        if (deqEntries[i].flags >= FLAGS_FENCE) begin
                             // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
                             if (deqEntries[i].flags == FLAGS_ILLEGAL_INSTR || 
                                 deqEntries[i].flags == FLAGS_ACCESS_FAULT ||

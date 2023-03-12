@@ -178,14 +178,16 @@ reg[31:0] mscratch;
 reg[31:0] mepc;
 reg[31:0] mcause;
 reg[31:0] mtval;
-
 reg[31:0] sepc;
+
+reg[15:0] medeleg;
+reg[15:0] mideleg;
 
 
 reg[30:0] retvec;
 
 assign OUT_trapControl.vectord = mtvec.mode[0];
-assign OUT_trapControl.tvec = mtvec.base;
+assign OUT_trapControl.mtvec = mtvec.base;
 assign OUT_trapControl.retvec = retvec;
 assign OUT_fRoundMode = frm;
 
@@ -209,6 +211,8 @@ always_comb begin
         
         CSR_mstatus: rdata = mstatus;
         CSR_mtvec: rdata = mtvec;
+        CSR_medeleg: rdata = {16'b0, medeleg};
+        CSR_mideleg: rdata = {16'b0, mideleg};
         CSR_mscratch: rdata = mscratch;
         CSR_mepc: rdata = mepc;
         CSR_mcause: rdata = mcause;
@@ -237,6 +241,7 @@ always_ff@(posedge clk) begin
             mepc <= IN_trapInfo.trapPC;
             
             // For now, assume all exceptions/interrupts are handled in m mode, ie medeleg = mideleg = 0
+            
             mstatus.mpie <= mstatus.mie;
             mstatus.mie <= 0;
             mstatus.mpp <= priv;
@@ -358,6 +363,9 @@ always_ff@(posedge clk) begin
                         mtvec.base <= wdata[31:2];
                         mtvec.mode[0] <= wdata[0];
                     end
+                    
+                    CSR_medeleg: medeleg <= wdata[15:0];
+                    CSR_mideleg: mideleg <= wdata[15:0];
                     
                     CSR_mscratch: mscratch <= wdata;
                     
