@@ -227,10 +227,28 @@ always_ff@(posedge clk) begin
                 OUT_branch.history <= baseIndexHist;
                 stop <= 0;
             end
-            else if (pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT  || externalIRQ) begin
+            else if (pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT || pcLookupEntry.flags == FLAGS_XRET || externalIRQ) begin
                 
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
+                
+                if (pcLookupEntry.flags == FLAGS_XRET)
+                    OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
+                else begin
+                    OUT_branch.dstPC <= {IN_trapControl.tvec, 2'b0};
+                    OUT_trapInfo.valid <= 1;
+                    OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
+                    
+                    // TODO: add all trap reasons
+                    case (pcLookupEntry.flags)
+                        FLAGS_TRAP: OUT_trapInfo.cause <= pcLookupEntry.name[3:0];
+                        FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
+                        FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
+                        default: OUT_trapInfo.cause <= 7;
+                    endcase
+                    
+                    OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT);
+                end
+                    
                 OUT_branch.sqN <= pcLookupEntrySqN;
                 OUT_branch.flush <= 1;
                 // These don't matter, the entire pipeline will be flushed
@@ -239,19 +257,6 @@ always_ff@(posedge clk) begin
                 OUT_branch.fetchID <= pcLookupEntry.fetchID;
                 OUT_branch.history <= baseIndexHist;
                     
-                OUT_trapInfo.valid <= 1;
-                OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
-                
-                // TODO: add all trap reasons
-                case (pcLookupEntry.flags)
-                    FLAGS_TRAP: OUT_trapInfo.cause <= pcLookupEntry.name[3:0];
-                    FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
-                    FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
-                    default: OUT_trapInfo.cause <= 7;
-                endcase
-                
-                OUT_trapInfo.isInterrupt <= !(pcLookupEntry.flags == FLAGS_ILLEGAL_INSTR || pcLookupEntry.flags == FLAGS_TRAP || pcLookupEntry.flags == FLAGS_ACCESS_FAULT);
-                
                 // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
                 externalIRQ <= 0;
                 stop <= 0;

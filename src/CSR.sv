@@ -126,7 +126,21 @@ typedef enum logic[11:0]
     CSR_mhpmevent31=12'h33F
 } CSRAddr;
 
-struct packed
+typedef enum logic[1:0] 
+{
+    PRIV_USER=0, PRIV_SUPERVISOR=1, PRIV_MACHINE=3
+} PrivLevel;
+
+PrivLevel priv;
+
+
+reg[4:0] fflags;
+reg[2:0] frm;
+
+reg[63:0] mcycle;
+reg[63:0] minstret;
+
+typedef struct packed
 {
     bit sd; // state dirty
     bit[7:0] wpri23;
@@ -138,7 +152,7 @@ struct packed
     bit mprv; // memory privilege (1 -> ld/st memory access via mode in MPP), 0 if u mode not supported
     bit[1:0] xs; // extended register state
     bit[1:0] fs_; // floating point register state
-    bit[1:0] mpp; // machine prior privilege
+    PrivLevel mpp; // machine prior privilege
     bit[1:0] vs; // vector register state
     bit spp; // supervisor prior privilege 
     bit mpie; // machine prior interrupt enable
@@ -149,7 +163,9 @@ struct packed
     bit wpri2;
     bit sie; // supervisor interrupt enable
     bit wpri0;
-} mstatus;
+} MStatus_t;
+
+MStatus_t mstatus;
 
 struct packed
 {
@@ -157,44 +173,51 @@ struct packed
     bit[1:0] mode;
 } mtvec;
 
-reg[63:0] mcycle;
-reg[63:0] minstret;
+reg[31:0] mscratch;
 
 reg[31:0] mepc;
 reg[31:0] mcause;
 reg[31:0] mtval;
 
-reg[31:0] rdata;
+reg[31:0] sepc;
 
-reg[4:0] fflags;
-reg[2:0] frm;
+
+reg[30:0] retvec;
 
 assign OUT_trapControl.vectord = mtvec.mode[0];
 assign OUT_trapControl.tvec = mtvec.base;
+assign OUT_trapControl.retvec = retvec;
 assign OUT_fRoundMode = frm;
 
+reg[31:0] rdata;
 always_comb begin
     case (IN_uop.imm[11:0])
-        CSR_misa: rdata = 32'b01_0000_11100000100010000000000100;
-        CSR_marchid: rdata = 32'h50087501;
-        CSR_mimpid: rdata = 32'h50087532;
+    
+        CSR_fflags: rdata = {27'b0, fflags};
+        CSR_frm: rdata = {29'b0, frm};
+        CSR_fcsr: rdata = {24'b0, frm, fflags};
         
-        CSR_mstatus: rdata = mstatus;
-        CSR_mtvec: rdata = mtvec;
-        CSR_mepc: rdata = mepc;
-        CSR_mcause: rdata = mcause;
-        CSR_mtval: rdata = mtval;
-
         CSR_mcycle: rdata = mcycle[31:0];
         CSR_mcycleh: rdata = mcycle[63:32];
         
         CSR_minstret: rdata = minstret[31:0];
         CSR_minstreth: rdata = minstret[63:32];
         
-        CSR_fflags: rdata = {27'b0, fflags};
-        CSR_frm: rdata = {29'b0, frm};
-        CSR_fcsr: rdata = {24'b0, frm, fflags};
+        CSR_misa: rdata = 32'b01_0000_11100000100010000000000100;
+        CSR_marchid: rdata = 32'h50087501;
+        CSR_mimpid: rdata = 32'h50087532;
         
+        CSR_mstatus: rdata = mstatus;
+        CSR_mtvec: rdata = mtvec;
+        CSR_mscratch: rdata = mscratch;
+        CSR_mepc: rdata = mepc;
+        CSR_mcause: rdata = mcause;
+        CSR_mtval: rdata = mtval;
+
+        CSR_sepc: rdata = sepc;
+        
+        
+        //CSR_mconfigptr,
         //CSR_mcounteren,
         //CSR_mstatush,
         //CSR_mhartid,
@@ -212,6 +235,13 @@ always_ff@(posedge clk) begin
             mcause[3:0] <= IN_trapInfo.cause;
             mcause[31] <= IN_trapInfo.isInterrupt;
             mepc <= IN_trapInfo.trapPC;
+            
+            // For now, assume all exceptions/interrupts are handled in m mode, ie medeleg = mideleg = 0
+            mstatus.mpie <= mstatus.mie;
+            mstatus.mie <= 0;
+            mstatus.mpp <= priv;
+            
+            priv <= PRIV_MACHINE;
         end
         
         fflags <= fflags | IN_fpNewFlags;
@@ -219,15 +249,19 @@ always_ff@(posedge clk) begin
     end
     
     if (rst) begin
+        priv <= PRIV_MACHINE;
+        fflags <= 0;
+        frm <= 0;
+        
+        mstatus <= 0;
         mcycle <= 0;
         minstret <= 0;
         mtvec <= 0;
         mepc <= 0;
         mcause <= 0;
         mtval <= 0;
-        fflags <= 0;
-        frm <= 0;
-        // ...
+        
+        sepc <= 0;
         
         OUT_uop.valid <= 0;
     end
@@ -242,58 +276,110 @@ always_ff@(posedge clk) begin
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.tagDst <= IN_uop.tagDst;
         
-        // Do write?
-        if (IN_uop.opcode != CSR_R) begin
-            reg[31:0] wdata;
+        if (IN_uop.opcode == CSR_MRET || IN_uop.opcode == CSR_SRET) begin
             
-            // TODO: writes to CSR without implicit reads do not need ordering
-            OUT_uop.flags <= FLAGS_ORDERING;
+            OUT_uop.flags <= FLAGS_XRET;
             
-            case (IN_uop.opcode)
+            if (IN_uop.opcode == CSR_SRET && mstatus.tsr == 1)
+                OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                
+            if (IN_uop.opcode == CSR_MRET) begin
+                
+                if (priv < PRIV_MACHINE)
+                    OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                    
+                mstatus.mie <= mstatus.mpie;
+                priv <= mstatus.mpp;
+                mstatus.mpp <= PRIV_USER;
+                mstatus.mprv <= 0;
+                
+                retvec <= mepc[31:1];
+            end
+            else begin
+                if (priv < PRIV_SUPERVISOR)
+                    OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                
+                mstatus.sie <= mstatus.spie;
+                priv <= PrivLevel'({1'b0, mstatus.spp});
+                mstatus.spp <= 1'b0;
+                mstatus.mprv <= 0;
+                
+                retvec <= sepc[31:1];
+            end
             
-                CSR_RW: wdata = IN_uop.srcA;
-                CSR_RW_I: wdata = {27'b0, IN_uop.imm[16:12]};
-                
-                CSR_RS: wdata = rdata | IN_uop.srcA;
-                CSR_RS_I: wdata = rdata | {27'b0, IN_uop.imm[16:12]};
-                
-                CSR_RC: wdata = rdata & (~IN_uop.srcA);
-                CSR_RC_I: wdata = rdata & (~{27'b0, IN_uop.imm[16:12]});
-                
-                default: begin end
-            endcase
-            
-            case (IN_uop.imm[11:0])
-                CSR_mcycle: mcycle[31:0] <= wdata;
-                CSR_mcycleh: mcycle[63:32] <= wdata;
-                
-                CSR_minstret: minstret[31:0] <= wdata;
-                CSR_minstreth: minstret[63:32] <= wdata;
-                
-                CSR_mtvec: begin
-                    mtvec.base <= wdata[31:2];
-                    mtvec.mode[0] <= wdata[0];
-                end
-                
-                CSR_mepc: mepc[31:1] <= wdata[31:1];
-                CSR_mcause: begin
-                    mcause[3:0] <= wdata[3:0];
-                    mcause[31] <= wdata[31];
-                end
-                CSR_mtval: mtval <= wdata;
-                
-                CSR_fflags: fflags <= wdata[4:0];
-                CSR_frm: frm <= wdata[2:0];
-                CSR_fcsr: {frm, fflags} <= wdata[7:0];
-                
-                default: begin end
-            endcase
         end
-        
-        // Do read?
-        if ((IN_uop.opcode != CSR_RW && IN_uop.opcode != CSR_RW_I) || IN_uop.nmDst != 0) begin
-            OUT_uop.result <= rdata;
-            // read side effects
+        else begin
+            // Do write?
+            if (IN_uop.opcode != CSR_R) begin
+                reg[31:0] wdata;
+                
+                // TODO: writes to CSR without implicit reads do not need ordering
+                OUT_uop.flags <= FLAGS_ORDERING;
+                
+                case (IN_uop.opcode)
+                
+                    CSR_RW: wdata = IN_uop.srcA;
+                    CSR_RW_I: wdata = {27'b0, IN_uop.imm[16:12]};
+                    
+                    CSR_RS: wdata = rdata | IN_uop.srcA;
+                    CSR_RS_I: wdata = rdata | {27'b0, IN_uop.imm[16:12]};
+                    
+                    CSR_RC: wdata = rdata & (~IN_uop.srcA);
+                    CSR_RC_I: wdata = rdata & (~{27'b0, IN_uop.imm[16:12]});
+                    
+                    default: begin end
+                endcase
+                
+                case (IN_uop.imm[11:0])
+                
+                                        
+                    CSR_fflags: fflags <= wdata[4:0];
+                    CSR_frm: frm <= wdata[2:0];
+                    CSR_fcsr: {frm, fflags} <= wdata[7:0];
+                    
+                    CSR_mcycle: mcycle[31:0] <= wdata;
+                    CSR_mcycleh: mcycle[63:32] <= wdata;
+                    
+                    CSR_minstret: minstret[31:0] <= wdata;
+                    CSR_minstreth: minstret[63:32] <= wdata;
+                    
+                    CSR_mstatus: begin
+                        MStatus_t temp = wdata;
+                        mstatus.sie <= temp.sie;
+                        mstatus.mie <= temp.mie;
+                        mstatus.spie <= temp.spie;
+                        mstatus.mpie <= temp.mpie;
+                        mstatus.spp <= temp.spp;
+                        mstatus.mpp <= temp.mpp;
+                        mstatus.mprv <= temp.mprv;
+                    end
+                    
+                    CSR_mtvec: begin
+                        mtvec.base <= wdata[31:2];
+                        mtvec.mode[0] <= wdata[0];
+                    end
+                    
+                    CSR_mscratch: mscratch <= wdata;
+                    
+                    CSR_mepc: mepc[31:1] <= wdata[31:1];
+                    CSR_mcause: begin
+                        mcause[3:0] <= wdata[3:0];
+                        mcause[31] <= wdata[31];
+                    end
+                    CSR_mtval: mtval <= wdata;
+                    
+                    CSR_sepc: sepc[31:1] <= wdata[31:1];
+                    
+                    //CSR_mconfigptr,
+                    default: begin end
+                endcase
+            end
+            
+            // Do read?
+            if ((IN_uop.opcode != CSR_RW && IN_uop.opcode != CSR_RW_I) || IN_uop.nmDst != 0) begin
+                OUT_uop.result <= rdata;
+                // read side effects
+            end
         end
     end
     else begin

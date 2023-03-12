@@ -6,6 +6,10 @@ irq_handler:
     
     csrrs a0, mcause, x0
     call printdecu
+    
+    csrrs a0, mstatus, x0
+    call printhex
+    
     # get irq src
     csrrs a1, mepc, x0
     # skip over exception
@@ -19,8 +23,12 @@ irq_handler:
     xori a2, a2, 1
     add a2, a2, a2
     add a1, a1, a2
+    #jalr zero, a1, 2
     
-    jalr zero, a1, 2
+    addi a1, a1, 2
+    csrrw zero, mepc, a1
+    mret
+    
     
 main:
     

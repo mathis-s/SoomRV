@@ -222,6 +222,9 @@ typedef enum bit[3:0]
     // Flags that cause a trap
     FLAGS_ILLEGAL_INSTR, FLAGS_TRAP, FLAGS_ACCESS_FAULT,
     
+    // Return from exception
+    FLAGS_XRET,
+    
     // Invalid (or not-yet-executed) flag
     FLAGS_NX = 4'b1111
     
@@ -442,6 +445,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[30:0] retvec;
     logic[29:0] tvec;
     logic vectord;
     
