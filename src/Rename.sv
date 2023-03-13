@@ -82,8 +82,7 @@ always_comb begin
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN;
         // Only need new tag if instruction writes to a register
-        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN;
-        //TB_issueValid_fp[i] = RAT_issueValid[i] && IN_uop[i].rd_fp;
+        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP;
         
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
@@ -136,15 +135,10 @@ RenameTable rt
 
 reg[5:0] TB_tags[WIDTH_UOPS-1:0];
 reg[6:0] newTags[WIDTH_UOPS-1:0];
-//reg[5:0] TB_FP_tags[WIDTH_UOPS-1:0];
 reg TB_tagsValid[WIDTH_UOPS-1:0];
-//reg TB_FP_tagsValid[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        if (TB_issueValid[i])
-            newTags[i] = {1'b0, TB_tags[i]};
-        //else if (TB_issueValid_fp[i])
-        //    newTags[i] = {1'b1, TB_FP_tags[i]};
+        if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
         else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
         else newTags[i] = 7'h40;
     end
@@ -290,9 +284,7 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
                 OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
 
-                if (IN_uop[i].rd != 0) begin
-                    OUT_uop[i].tagDst <= newTags[i];
-                end
+                OUT_uop[i].tagDst <= newTags[i];
             end
             else
                 OUT_uopValid[i] <= 0;

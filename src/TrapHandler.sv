@@ -102,25 +102,48 @@ always_ff@(posedge clk) begin
             else if (IN_trapInstr.flags == FLAGS_ILLEGAL_INSTR || IN_trapInstr.flags == FLAGS_TRAP || 
                 IN_trapInstr.flags == FLAGS_ACCESS_FAULT || IN_trapInstr.flags == FLAGS_XRET || externalIRQ) begin
                 
+                
                 OUT_branch.taken <= 1;
                 
                 if (IN_trapInstr.flags == FLAGS_XRET)
                     OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
                 else begin
-                    OUT_branch.dstPC <= {IN_trapControl.mtvec, 2'b0};
+                    reg[3:0] trapCause;
+                    reg delegate;
+                    reg isInterrupt = !(IN_trapInstr.flags == FLAGS_ILLEGAL_INSTR || 
+                        IN_trapInstr.flags == FLAGS_TRAP || IN_trapInstr.flags == FLAGS_ACCESS_FAULT);
+                        
+                    // TODO: add all trap reasons
+                    if (isInterrupt)
+                        trapCause = 0;
+                    else begin
+                        case (IN_trapInstr.flags)
+                            FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
+                            FLAGS_ACCESS_FAULT: trapCause = 4; // FIXME: could also be 5, 6, 7, 8
+                            FLAGS_ILLEGAL_INSTR: trapCause = 2; 
+                            default: trapCause = 7;
+                        endcase
+                        
+                        // Distinguish between ecall in different priv levels
+                        if (trapCause == TRAP_ECALL_M[3:0]) begin
+                            case (IN_trapControl.priv)
+                                PRIV_SUPERVISOR: trapCause = TRAP_ECALL_S[3:0];
+                                PRIV_USER: trapCause = TRAP_ECALL_U[3:0];
+                                default: begin end
+                            endcase
+                        end
+                    end
+                    
+                    delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
+                        (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
+                    
+                    OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
+                    
                     OUT_trapInfo.valid <= 1;
                     OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
-                    
-                    // TODO: add all trap reasons
-                    case (IN_trapInstr.flags)
-                        FLAGS_TRAP: OUT_trapInfo.cause <= IN_trapInstr.name[3:0];
-                        FLAGS_ACCESS_FAULT: OUT_trapInfo.cause <= 4; // FIXME: could also be 5, 6, 7, 8
-                        FLAGS_ILLEGAL_INSTR: OUT_trapInfo.cause <= 2; 
-                        default: OUT_trapInfo.cause <= 7;
-                    endcase
-                    
-                    OUT_trapInfo.isInterrupt <= !(IN_trapInstr.flags == FLAGS_ILLEGAL_INSTR || 
-                        IN_trapInstr.flags == FLAGS_TRAP || IN_trapInstr.flags == FLAGS_ACCESS_FAULT);
+                    OUT_trapInfo.cause <= trapCause;
+                    OUT_trapInfo.delegate <= delegate;
+                    OUT_trapInfo.isInterrupt <= isInterrupt;
                 end
                     
                 OUT_branch.sqN <= IN_trapInstr.sqN;

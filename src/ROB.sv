@@ -156,10 +156,12 @@ always_ff@(posedge clk) begin
                 for (i = 0; i < WIDTH; i=i+1) begin
                     if ($signed((misprReplayIter + i[$bits(SqN)-1:0]) - misprReplayEndSqN) <= 0) begin
                         
-                        //reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
+                        reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
                         
+                        assert(deqEntries[i].valid);
                         OUT_comUOp[i].valid <= 1;
-                        OUT_comUOp[i].nmDst <= deqEntries[i].name;
+                        //OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                        OUT_comUOp[i].nmDst <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].name;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
                         for (j = 0; j < WIDTH_WB; j=j+1)

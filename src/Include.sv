@@ -242,6 +242,11 @@ typedef enum logic[2:0]
     MODE_NO_EXT
 } ModeFlagsIDs;
 
+typedef enum logic[1:0] 
+{
+    PRIV_USER=0, PRIV_SUPERVISOR=1, PRIV_MACHINE=3
+} PrivLevel;
+
 typedef logic[7:0] ModeFlags;
 
 typedef struct packed
@@ -291,13 +296,9 @@ typedef struct packed
     //logic[31:0] pc;
     logic[31:0] imm;
     logic[4:0] rs0;
-    //logic rs0_fp;
     logic[4:0] rs1;
-    //logic rs1_fp;
-   //logic[4:0] rs2;
     logic immB;
     logic[4:0] rd;
-    //logic rd_fp;
     logic[5:0] opcode;
     FuncUnit fu;
     FetchID_t fetchID;
@@ -460,20 +461,21 @@ typedef struct packed
 {
     logic[30:0] retvec;
     logic[29:0] mtvec;
-    logic vectord;
+    logic mvectord;
     logic[29:0] stvec;
+    logic svectord;
     logic[15:0] medeleg;
     logic[15:0] mideleg;
+    PrivLevel priv;
     
 } TrapControlState;
 
 typedef struct packed
 {
     logic[31:0] trapPC;
-    
     logic isInterrupt;
     logic[3:0] cause;
-    
+    logic delegate;
     logic valid;
 } TrapInfoUpdate;
 

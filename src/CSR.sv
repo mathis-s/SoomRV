@@ -126,11 +126,6 @@ typedef enum logic[11:0]
     CSR_mhpmevent31=12'h33F
 } CSRAddr;
 
-typedef enum logic[1:0] 
-{
-    PRIV_USER=0, PRIV_SUPERVISOR=1, PRIV_MACHINE=3
-} PrivLevel;
-
 PrivLevel priv;
 
 
@@ -167,28 +162,38 @@ typedef struct packed
 
 MStatus_t mstatus;
 
-struct packed
+typedef struct packed
 {
     bit[29:0] base;
     bit[1:0] mode;
-} mtvec;
+} TVec_t;
+
+TVec_t mtvec;
+TVec_t stvec;
 
 reg[31:0] mscratch;
 
 reg[31:0] mepc;
 reg[31:0] mcause;
 reg[31:0] mtval;
-reg[31:0] sepc;
-
 reg[15:0] medeleg;
 reg[15:0] mideleg;
 
+reg[31:0] sepc;
+reg[31:0] sscratch;
+reg[31:0] scause;
+reg[31:0] stval;
 
 reg[30:0] retvec;
 
-assign OUT_trapControl.vectord = mtvec.mode[0];
+assign OUT_trapControl.mvectord = mtvec.mode[0];
 assign OUT_trapControl.mtvec = mtvec.base;
+assign OUT_trapControl.svectord = stvec.mode[0];
+assign OUT_trapControl.stvec = stvec.base;
 assign OUT_trapControl.retvec = retvec;
+assign OUT_trapControl.mideleg = mideleg;
+assign OUT_trapControl.medeleg = medeleg;
+assign OUT_trapControl.priv = priv;
 assign OUT_fRoundMode = frm;
 
 reg[31:0] rdata;
@@ -219,6 +224,10 @@ always_comb begin
         CSR_mtval: rdata = mtval;
 
         CSR_sepc: rdata = sepc;
+        CSR_sscratch: rdata = sscratch;
+        CSR_scause: rdata = scause;
+        CSR_stval: rdata = stval;
+        CSR_stvec: rdata = stvec;
         
         
         //CSR_mconfigptr,
@@ -233,22 +242,30 @@ always_ff@(posedge clk) begin
 
     // implicit writes
     if (!rst) begin
-    
         if (IN_trapInfo.valid) begin
-            mtval <= 0;
-            mcause[3:0] <= IN_trapInfo.cause;
-            mcause[31] <= IN_trapInfo.isInterrupt;
-            mepc <= IN_trapInfo.trapPC;
-            
-            // For now, assume all exceptions/interrupts are handled in m mode, ie medeleg = mideleg = 0
-            
-            mstatus.mpie <= mstatus.mie;
-            mstatus.mie <= 0;
-            mstatus.mpp <= priv;
-            
-            priv <= PRIV_MACHINE;
+            if (IN_trapInfo.delegate) begin
+                mstatus.spie <= mstatus.sie;
+                mstatus.sie <= 0;
+                mstatus.spp <= priv[0];
+                sepc <= IN_trapInfo.trapPC;
+                scause[3:0] <= IN_trapInfo.cause;
+                scause[31] <= IN_trapInfo.isInterrupt;
+                stval <= 0;
+                
+                priv <= PRIV_SUPERVISOR;
+            end
+            else begin
+                mstatus.mpie <= mstatus.mie;
+                mstatus.mie <= 0;
+                mstatus.mpp <= priv;
+                mepc <= IN_trapInfo.trapPC;
+                mcause[3:0] <= IN_trapInfo.cause;
+                mcause[31] <= IN_trapInfo.isInterrupt;
+                mtval <= 0;
+                
+                priv <= PRIV_MACHINE;
+            end
         end
-        
         fflags <= fflags | IN_fpNewFlags;
         mcycle <= mcycle + 1;
     end
@@ -265,8 +282,13 @@ always_ff@(posedge clk) begin
         mepc <= 0;
         mcause <= 0;
         mtval <= 0;
+        mideleg <= 0;
+        medeleg <= 0;
         
         sepc <= 0;
+        scause <= 0;
+        stval <= 0;
+        stvec <= 0;
         
         OUT_uop.valid <= 0;
     end
@@ -377,6 +399,16 @@ always_ff@(posedge clk) begin
                     CSR_mtval: mtval <= wdata;
                     
                     CSR_sepc: sepc[31:1] <= wdata[31:1];
+                    CSR_sscratch: sscratch <= wdata;
+                    CSR_scause: begin
+                        scause[4:0] <= wdata[4:0];
+                        scause[31] <= wdata[31];
+                    end
+                    CSR_stval: stval <= wdata;
+                    CSR_stvec: begin
+                        stvec.base <= wdata[31:2];
+                        stvec.mode[0] <= wdata[0];
+                    end
                     
                     //CSR_mconfigptr,
                     default: begin end
