@@ -1018,11 +1018,13 @@ always_comb begin
                                 5'b00010: begin // lr.w
                                     if (instr.rs1 == 5'b0) begin
                                         uop.opcode = LSU_LR_W;
+                                        uop.fu = FU_LD;
                                         invalidEnc = 0;
                                     end
                                 end
                                 5'b00011: begin // sc.w
                                     uop.opcode = LSU_SC_W;
+                                    uop.fu = FU_ST;
                                     invalidEnc = 0;
                                 end
                                 5'b00001: begin // amoswap.w

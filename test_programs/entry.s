@@ -6,6 +6,7 @@ _start:
     # set irq handler address
     la a0, _exception
     csrrw x0, mtvec, a0
+    csrrw x0, stvec, a0
     
     li sp, 0x20000
     call main

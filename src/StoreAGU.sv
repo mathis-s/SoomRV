@@ -36,9 +36,7 @@ always_comb begin
     case (IN_uop.opcode)
         LSU_SB_I, LSU_SB: except = (addr == 0);
         LSU_SH_I, LSU_SH: except = (addr == 0) || (addr[0]);
-        LSU_F_ADDI_SW,
-        LSU_SW_I, LSU_SW: except = (addr == 0) || (addr[0] || addr[1]);
-        default: except = 0;
+        default: except = (addr == 0) || (addr[0] || addr[1]);
     endcase
     
     if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_WR]) except = 1;
@@ -78,6 +76,13 @@ always_ff@(posedge clk) begin
             OUT_uop.result <= addrSum;
             OUT_uop.doNotCommit <= 0;
             OUT_uop.valid <= 1;
+            
+            // HACKY: Successful SC return value has already been handled
+            // in rename; thus outputting a result here again might cause problems, so redirect to zero register.
+            if (IN_uop.opcode == LSU_SC_W) begin
+                OUT_uop.nmDst <= 0;
+                OUT_uop.tagDst <= 7'h40;
+            end
                 
             
             case (IN_uop.opcode)
@@ -117,7 +122,7 @@ always_ff@(posedge clk) begin
                     endcase
                 end
                 
-                LSU_SW, LSU_SW_I: begin
+                LSU_SC_W, LSU_SW, LSU_SW_I: begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 4'b1111;
                     OUT_aguOp.data <= IN_uop.srcB;

@@ -39,6 +39,12 @@ module Rename
     output SqN OUT_nextStoreSqN
 );
 
+typedef struct packed
+{
+    SqN sqN;
+    logic valid;
+} LrScRsv;
+
 integer i;
 integer j;
 
@@ -52,8 +58,6 @@ reg RAT_issueAvail[WIDTH_UOPS-1:0];
 SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
 
 reg commitValid[WIDTH_UOPS-1:0];
-reg commitValid_int[WIDTH_UOPS-1:0];
-//reg commitValid_fp[WIDTH_UOPS-1:0];
 
 reg[4:0] RAT_commitIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_commitTags[WIDTH_UOPS-1:0];
@@ -64,25 +68,59 @@ reg[4:0] RAT_wbIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_wbTags[WIDTH_UOPS-1:0];
 
 reg TB_issueValid[WIDTH_UOPS-1:0];
-//reg TB_issueValid_fp[WIDTH_UOPS-1:0];
 
 SqN nextCounterSqN;
+
+
+reg isSc[3:0];
+reg scSuccessful[3:0];
+LrScRsv lrScRsv;
+LrScRsv nextLrScRsv;
+
 always_comb begin
-    
     nextCounterSqN = counterSqN;
+    nextLrScRsv = lrScRsv;
+    
+    if ($signed(lrScRsv.sqN - counterSqN) >= 0)
+        nextLrScRsv.valid = 0;
     
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
     end
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        
+        isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
+        
         // Issue/Lookup
-        RAT_issueIDs[i] = IN_uop[i].rd;//{IN_uop[i].rd_fp, IN_uop[i].rd};
+        RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
-        RAT_issueAvail[i] = IN_uop[i].fu == FU_RN;
+        RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
+        
+        // LR/SC Handling
+        scSuccessful[i] = 0;
+        if (RAT_issueValid[i]) begin
+            // Reserve if LR
+            if (IN_uop[i].fu == FU_LD && IN_uop[i].opcode == LSU_LR_W) begin
+                nextLrScRsv.sqN = RAT_issueSqNs[i];
+                nextLrScRsv.valid = 1;
+            end
+            // Use reservation if SC
+            else if (isSc[i]) begin
+                scSuccessful[i] = nextLrScRsv.valid;
+                nextLrScRsv.valid = 0;
+            end
+            // All other stores, cmo or amo ops clear reservation
+            else if (IN_uop[i].fu == FU_ST || IN_uop[i].fu == FU_ATOMIC) begin
+                nextLrScRsv.valid = 0;
+            end
+        end
+        
         // Only need new tag if instruction writes to a register
-        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP;
+        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 &&
+            // these don't write or writes are eliminated
+            IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
         
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
@@ -90,10 +128,6 @@ always_comb begin
         // Commit
         commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0) && 
             (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
-        
-        commitValid_int[i] = commitValid[i];// && !IN_comUOp[i].nmDst[5];
-        //commitValid_fp[i] = (IN_comUOp[i].valid && IN_comUOp[i].nmDst[5] && 
-        //    (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
@@ -140,6 +174,7 @@ always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
         else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
+        else if (isSc[i]) newTags[i] = {1'b1, 5'b0, !scSuccessful[i]};
         else newTags[i] = 7'h40;
     end
 end
@@ -154,35 +189,18 @@ TagBuffer tb
     .OUT_issueTags(TB_tags),
     .OUT_issueTagsValid(TB_tagsValid),
     
-    .IN_commitValid(commitValid_int),
+    .IN_commitValid(commitValid),
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
     .IN_commitTagDst(RAT_commitTags)
 );
-/*TagBuffer tb_fp
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_mispr(IN_branchTaken),
-    .IN_mispredFlush(IN_mispredFlush),
-    
-    .IN_issueValid(TB_issueValid_fp),
-    .OUT_issueTags(TB_FP_tags),
-    .OUT_issueTagsValid(TB_FP_tagsValid),
-    
-    .IN_commitValid(commitValid_fp),
-    .IN_commitNewest(isNewestCommit),
-    .IN_RAT_commitPrevTags(TB_RAT_commitPrevTags),
-    .IN_commitTagDst(TB_RAT_commitTags)
-);*/
 
 always_comb begin
     OUT_stall = 0;
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-        if ((!TB_tagsValid[i]/* || !TB_FP_tagsValid[i]*/) && IN_uop[i].valid && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN)
+        if ((!TB_tagsValid[i]) && IN_uop[i].valid && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN)
             OUT_stall = 1;
     end
-        
 end
 
 reg intOrder;
@@ -213,6 +231,7 @@ always_ff@(posedge clk) begin
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
         intOrder = 0;
+        lrScRsv.valid <= 0;
     
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             OUT_uop[i].sqN <= i[$bits(SqN)-1:0];
@@ -231,6 +250,7 @@ always_ff@(posedge clk) begin
     end
 
     else if (en && frontEn && !OUT_stall) begin
+
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
             //OUT_uop[i].pc <= IN_uop[i].pc;
@@ -245,6 +265,10 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].nmDst <= IN_uop[i].opcode[4:0];
             else
                 OUT_uop[i].nmDst <= IN_uop[i].rd;
+                
+            // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
+            if (isSc[i] && !scSuccessful[i])
+                OUT_uop[i].fu <= FU_RN;
             
             OUT_uop[i].fetchID <= IN_uop[i].fetchID;
             OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
@@ -261,20 +285,21 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
                 
-                case (IN_uop[i].fu)
-                    FU_INT: intOrder = !intOrder;
-                    FU_DIV, FU_FPU:  intOrder = 1;
-                    FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
-                    
-                    FU_ST: counterStoreSqN = counterStoreSqN + 1;
-                    FU_LD: counterLoadSqN = counterLoadSqN + 1;
-                    
-                    FU_ATOMIC: begin
-                        counterStoreSqN = counterStoreSqN + 1;
-                        counterLoadSqN = counterLoadSqN + 1;
-                    end
-                    default: begin end
-                endcase
+                if (!(isSc[i] && !scSuccessful[i]))
+                    case (IN_uop[i].fu)
+                        FU_INT: intOrder = !intOrder;
+                        FU_DIV, FU_FPU:  intOrder = 1;
+                        FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
+                        
+                        FU_ST: counterStoreSqN = counterStoreSqN + 1;
+                        FU_LD: counterLoadSqN = counterLoadSqN + 1;
+                        
+                        FU_ATOMIC: begin
+                            counterStoreSqN = counterStoreSqN + 1;
+                            counterLoadSqN = counterLoadSqN + 1;
+                        end
+                        default: begin end
+                    endcase
                 
                 OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;
@@ -283,13 +308,14 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagB <= RAT_lookupSpecTag[2*i+1];
                 OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
                 OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
-
+                
                 OUT_uop[i].tagDst <= newTags[i];
             end
             else
                 OUT_uopValid[i] <= 0;
         end
         counterSqN <= nextCounterSqN;
+        lrScRsv <= nextLrScRsv;
     end
     else if (!en) begin
         for (i = 0; i < WIDTH_UOPS; i=i+1)

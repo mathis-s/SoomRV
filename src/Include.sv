@@ -96,13 +96,12 @@ typedef enum logic[5:0]
     LSU_LBU,
     LSU_LHU,
     
-    LSU_LR_W,
-    //LSU_FLW,
-    LSU_LB_RR, 
-    LSU_LH_RR, 
-    LSU_LW_RR, 
-    LSU_LBU_RR,
-    LSU_LHU_RR
+    LSU_LR_W
+    //LSU_LB_RR, 
+    //LSU_LH_RR, 
+    //LSU_LW_RR, 
+    //LSU_LBU_RR,
+    //LSU_LHU_RR
     
 } OPCode_LSU;
 
@@ -111,7 +110,6 @@ typedef enum logic[5:0]
     LSU_SB,
     LSU_SH,
     LSU_SW,
-    //LSU_FSW,
     
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
