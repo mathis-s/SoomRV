@@ -185,7 +185,6 @@ always_ff@(posedge clk) begin
                         
                         issued = 1;
                         OUT_valid <= 1;
-                        //OUT_uop <= queue[i];
                         
                         OUT_uop.imm <= {{(32 - IMM_BITS){1'b0}}, queue[i].imm};
                         
@@ -196,19 +195,18 @@ always_ff@(posedge clk) begin
                             OUT_uop.tagB <= queue[i].tags[1];
                             // verilator lint_on SELRANGE
                         end
-                        else begin
-                            //OUT_uop.availB <= 1;
+                        else
                             OUT_uop.tagB <= 7'h40;
-                        end
+                    
                         
                         if (NUM_OPERANDS >= 3) begin
                             // verilator lint_off SELRANGE
                             OUT_uop.tagC <= queue[i].tags[2];
                             // verilator lint_on SELRANGE
                         end
-                        else begin
+                        else
                             OUT_uop.tagC <= 7'h40;
-                        end
+                        
                         
                         OUT_uop.immB <= queue[i].immB;
                         OUT_uop.sqN <= queue[i].sqN;

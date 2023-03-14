@@ -34,8 +34,7 @@ Flags flags;
 
 assign OUT_zcFwdResult = resC;
 assign OUT_zcFwdTag = IN_uop.tagDst;
-// maybe invalidate?
-assign OUT_zcFwdValid = IN_uop.valid && en && IN_uop.nmDst != 0;//&& !IN_wbStall;
+assign OUT_zcFwdValid = IN_uop.valid && en && IN_uop.nmDst != 0;
 
 
 wire[5:0] resLzTz;
@@ -237,12 +236,7 @@ always_ff@(posedge clk) begin
                 end
                 //else $display("Ret correct");
             end
-            
-            //OUT_uop.isBranch <= isBranch && (IN_uop.opcode != INT_JAL);
-            //OUT_uop.branchTaken <= branchTaken;
-            //OUT_uop.history <= IN_uop.history;
-            //OUT_uop.bpi <= IN_uop.bpi;
-            
+                        
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;

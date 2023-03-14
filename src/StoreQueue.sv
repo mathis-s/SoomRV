@@ -22,7 +22,6 @@ module StoreQueue
     input wire IN_stallLd,
     output reg OUT_empty,
     
-    // 0->LD, 1->ST
     input AGU_UOp IN_uopSt,
     input AGU_UOp IN_uopLd,
     
@@ -133,10 +132,7 @@ always_ff@(posedge clk) begin
         // Dequeue
         if (!IN_disable && entries[0].valid && !IN_branch.taken && entries[0].ready &&
             // Don't issue Memory Mapped IO ops while IO is not ready
-            (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hFF)// &&
-            // Don't issue load&store at the same address in the same cycle
-            // (!load || OUT_MEM_readAddr[0] != entries[0].addr)
-            ) begin
+            (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hFF)) begin
                 
             entries[NUM_ENTRIES-1].valid <= 0;
             

@@ -9,7 +9,6 @@ typedef struct packed
     FetchID_t fetchID;
     bit compressed;
     bit valid;
-    //bit executed;
 } ROBEntry;
 
 module ROB

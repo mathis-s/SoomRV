@@ -27,13 +27,6 @@ module ControlRegs
     input wire[NUM_UOPS-1:0] IN_ifValid,
     input wire IN_comBranch[NUM_UOPS-1:0],
     
-    // Control Registers I/0
-    //output wire[31:0] OUT_irqAddr,
-    //input wire IN_irqTaken,
-    //input wire[31:0] IN_irqSrc,
-    //input Flags IN_irqFlags,
-    //input wire[31:0] IN_irqMemAddr,
-    
     output reg OUT_SPI_cs,
     output reg OUT_SPI_clk,
     output reg OUT_SPI_mosi,

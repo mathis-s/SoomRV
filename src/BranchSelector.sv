@@ -13,7 +13,6 @@ module BranchSelector
     input SqN IN_ROB_curSqN,
     input SqN IN_RN_nextSqN,
     input wire IN_mispredFlush
-    //output reg OUT_mispredFlush
 );
 
 integer i;
@@ -58,19 +57,10 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mispredFlushSqN <= 0;
         disableMispredFlush <= 0;
-        //OUT_mispredFlush <= 0;
     end
     else if (OUT_branch.taken) begin
         mispredFlushSqN <= OUT_branch.sqN;
-        //OUT_mispredFlush <= (IN_ROB_curSqN != IN_RN_nextSqN);
-        //disableMispredFlush <= 0;
     end
-    /*else if (OUT_mispredFlush) begin
-        disableMispredFlush <= (IN_ROB_curSqN == IN_RN_nextSqN);
-        if (disableMispredFlush)
-            OUT_mispredFlush <= 0;
-    end*/
-
 end
 
 endmodule

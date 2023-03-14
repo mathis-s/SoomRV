@@ -60,21 +60,16 @@ integer i;
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
 wire wbHasResult_int[NUM_WBS-1:0];
-//wire wbHasResult_fp[NUM_WBS-1:0];
+
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 assign wbHasResult[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
 
-assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;// && !wbUOp[0].nmDst[5];
-assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;// && !wbUOp[1].nmDst[5];
-assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;// && !wbUOp[2].nmDst[5];
-assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;// && !wbUOp[3].nmDst[5];
-
-//assign wbHasResult_fp[0] = wbUOp[0].valid && wbUOp[0].nmDst[5];
-//assign wbHasResult_fp[1] = wbUOp[1].valid && wbUOp[1].nmDst[5];
-//assign wbHasResult_fp[2] = wbUOp[2].valid && wbUOp[2].nmDst[5];
-//assign wbHasResult_fp[3] = wbUOp[3].valid && wbUOp[3].nmDst[5];
+assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
+assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
+assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
+assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
 
 CommitUOp comUOps[3:0];
 wire comValid[3:0];
@@ -83,11 +78,9 @@ wire frontendEn;
 
 wire ifetchEn;
 
-// IF -> DE -> RN
 reg[2:0] stateValid;
 assign OUT_instrReadEnable = !(ifetchEn && stateValid[0]);
 
-// 
 reg[127:0] instrRawBackup;
 reg useInstrRawBackup;
 always_ff@(posedge clk) begin
@@ -117,7 +110,6 @@ BranchSelector bsel
     .IN_ROB_curSqN(ROB_curSqN),
     .IN_RN_nextSqN(RN_nextSqN),
     .IN_mispredFlush(mispredFlush)
-    //.OUT_mispredFlush()
 );
 
 wire[31:0] PC_pc;

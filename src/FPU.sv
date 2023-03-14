@@ -175,8 +175,6 @@ always@(posedge clk) begin
                 default: except = 0;
             endcase
             
-            //$display("flags %b\n", except);
-            
             /* verilator lint_off CASEOVERLAP */
             casez (except)
                 5'b00000: OUT_uop.flags <= FLAGS_NONE;
