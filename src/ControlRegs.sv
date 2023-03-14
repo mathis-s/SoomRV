@@ -21,7 +21,7 @@ module ControlRegs
     
     
     // Various Signals to update perf counters
-    input wire IN_comValid[NUM_UOPS-1:0],
+    input wire[NUM_UOPS-1:0] IN_comValid,
     input wire IN_branchMispred,
     input wire IN_wbValid[NUM_WBS-1:0],
     input wire[NUM_UOPS-1:0] IN_ifValid,

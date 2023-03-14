@@ -3,7 +3,7 @@
 
 main:
 
-    li s0, 100
+    li s0, 16
     
     .loop:
         csrrw a0, minstret, zero

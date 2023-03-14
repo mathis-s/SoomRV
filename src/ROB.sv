@@ -28,6 +28,9 @@ module ROB
     input wire IN_uopValid[WIDTH-1:0],
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
+    // for perf counters
+    output reg[3:0] OUT_validRetire,
+    
     input BranchProv IN_branch,
 
     output SqN OUT_maxSqN,
@@ -107,6 +110,7 @@ end
 always_ff@(posedge clk) begin
 
     OUT_fpNewFlags <= 0;
+    OUT_validRetire <= 0;
     
     if (rst) begin
         baseIndex <= 0;
@@ -187,6 +191,7 @@ always_ff@(posedge clk) begin
                 reg[$clog2(LENGTH)-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
                 if (!temp && deqEntries[i].valid && deqEntries[i].flags != FLAGS_NX && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
+                
                     OUT_comUOp[i].nmDst <= deqEntries[i].name;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
@@ -194,6 +199,10 @@ always_ff@(posedge clk) begin
                         deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN;
                     OUT_comUOp[i].compressed <= deqEntries[i].compressed;
                     OUT_comUOp[i].valid <= 1;
+                    
+                    // Synchronous exceptions do not increment minstret, but mret/sret do.
+                    OUT_validRetire[i] <= deqEntries[i].flags <= FLAGS_ORDERING || deqEntries[i].flags == FLAGS_XRET;
+                    
                     OUT_curFetchID <= deqEntries[i].fetchID;
                     
                     deqMask[id[1:0]] = 1;

@@ -436,7 +436,7 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-
+    
     // implicit writes
     if (!rst) begin
         if (IN_trapInfo.valid) begin

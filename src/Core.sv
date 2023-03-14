@@ -576,7 +576,7 @@ CSR csr
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
-    .IN_commitValid('{comUOps[0].valid && !mispredFlush, comUOps[1].valid && !mispredFlush, comUOps[2].valid && !mispredFlush, comUOps[3].valid && !mispredFlush}),
+    .IN_commitValid(ROB_validRetire),
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
@@ -819,6 +819,7 @@ assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_u
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
+wire[3:0] ROB_validRetire;
 Trap_UOp ROB_trapUOp;
 ROB rob
 (
@@ -835,6 +836,7 @@ ROB rob
     .OUT_curSqN(ROB_curSqN),
     .OUT_comUOp(comUOps),
     .OUT_fpNewFlags(ROB_fpNewFlags),
+    .OUT_validRetire(ROB_validRetire),
     .OUT_curFetchID(ROB_curFetchID),
     .OUT_trapUOp(ROB_trapUOp),
     .OUT_mispredFlush(mispredFlush)
@@ -890,11 +892,11 @@ ControlRegs cr
     .IN_readAddr(OUT_MEM_readAddr[6:0]),
     .OUT_data(CSR_dataOut),
 
-    .IN_comValid('{comUOps[0].valid && !mispredFlush, comUOps[1].valid && !mispredFlush, comUOps[2].valid && !mispredFlush, comUOps[3].valid && !mispredFlush}),
+    .IN_comValid(ROB_validRetire),
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
     .IN_ifValid({DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
-    .IN_comBranch({(comUOps[0].valid && comUOps[0].isBranch && !mispredFlush), (comUOps[1].valid && comUOps[1].isBranch&& !mispredFlush), (comUOps[2].valid && comUOps[2].isBranch && !mispredFlush), (comUOps[3].valid && comUOps[3].isBranch && !mispredFlush)}),
+    .IN_comBranch({(ROB_validRetire[0] && comUOps[0].isBranch), (ROB_validRetire[1] && comUOps[1].isBranch), (ROB_validRetire[2] && comUOps[2].isBranch), (ROB_validRetire[3] && comUOps[3].isBranch)}),
     
     .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),
