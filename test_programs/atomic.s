@@ -9,7 +9,8 @@ main:
     
     sw t0, 0(a0)
     
-    amoadd.w t1, t1, (a0)
+    amoadd.w x0, t1, (a0)
+    amoadd.w x0, t1, (a0)
     lw t0, 0(a0)
     
     mv s0, t0

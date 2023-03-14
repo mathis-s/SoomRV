@@ -43,7 +43,7 @@ always_ff@(posedge clk) begin
         end
         baseIndex = 0;
         OUT_branch.taken <= 0;
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
+        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
     end
     else begin
     
@@ -51,7 +51,7 @@ always_ff@(posedge clk) begin
         
         if (IN_branch.taken) begin
             for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ($signed(entries[i].sqN - IN_branch.sqN) > 0)
+                if ($signed(entries[i].sqN - IN_branch.sqN) >= 0)
                     entries[i].valid <= 0;
             end
             
@@ -75,7 +75,7 @@ always_ff@(posedge clk) begin
             
                 if (i == 0) begin
                     reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
-                    assert(IN_uop[i].loadSqN < baseIndex + NUM_ENTRIES);
+                    assert(IN_uop[i].loadSqN <= baseIndex + NUM_ENTRIES - 1);
                     
                     //mispredict[i] <= 0;
 
@@ -111,7 +111,7 @@ always_ff@(posedge clk) begin
             end
         end
         
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[5:0] - 1;
+        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
     end
 
 end

@@ -12,7 +12,8 @@ void mark (uint32_t prime)
             break;
         
         uint32_t mask = 1U << (iter & 31);
-        sieve[index] |= mask;
+        //sieve[index] |= mask;
+        __atomic_fetch_or(&sieve[index], mask, 0);
         
         iter += prime;
     }

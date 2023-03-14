@@ -1,6 +1,6 @@
 	.file	"primes.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_m2p0_c2p0"
+	.attribute arch, "rv32i2p0_m2p0_a2p0_c2p0_zba1p0_zbb1p0"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
@@ -13,23 +13,17 @@ mark:
 	srli	a5,a4,5
 	li	a3,127
 	bgtu	a5,a3,.L1
-	lui	a1,%hi(.LANCHOR0)
-	addi	a1,a1,%lo(.LANCHOR0)
-	li	a7,1
-	li	a6,127
-	.align	4
+	lui	a2,%hi(.LANCHOR0)
+	addi	a2,a2,%lo(.LANCHOR0)
+	li	a6,1
+	li	a1,127
 .L3:
-	slli	a5,a5,2
-	#lw	a2,a1(a5)
-	#.quad 0b1000000_01111_01010_010_01100_0110011
-	.word 0b10000000111101010010011000110011
-	add	a5,a1,a5
-	sll	a3,a7,a4
+	sll	a3,a6,a4
+	sh2add	a5,a5,a2
+	amoor.w zero,a3,0(a5)
 	add	a4,a4,a0
-	or	a3,a3,a2
-	sw	a3,0(a5)
 	srli	a5,a4,5
-	bleu	a5,a6,.L3
+	bleu	a5,a1,.L3
 .L1:
 	ret
 	.size	mark, .-mark
@@ -60,27 +54,20 @@ main:
 	add	a4,a4,s1
 	srli	a5,a4,5
 	bgtu	a5,s5,.L8
-	.align	4
 .L7:
-	slli	a5,a5,2
-	#lw	a2,s3(a5)
-	.word 0b10000000111110011010011000110011
-	add	a5,s3,a5
 	sll	a3,s4,a4
+	sh2add	a5,a5,s3
+	amoor.w tp,a3,0(a5)
 	add	a4,a4,s1
-	or	a3,a3,a2
-	sw	a3,0(a5)
 	srli	a5,a4,5
 	bleu	a5,s5,.L7
-	.align	4
 .L8:
 	bne	s0,s6,.L11
 	beq	s2,s5,.L12
 	addi	s2,s2,1
 	li	s0,-1
 .L11:
-	slli	a5,s2,2
-	add	a5,s3,a5
+	sh2add	a5,s2,s3
 	lw	a4,0(a5)
 	addi	s0,s0,1
 	sll	a5,s4,s0
@@ -111,4 +98,5 @@ main:
 	.size	sieve, 512
 sieve:
 	.zero	512
-	.ident	"GCC: (g1ea978e3066) 12.1.0"
+	.ident	"GCC: (g2ee5e430018) 12.2.0"
+	.section	.note.GNU-stack,"",@progbits

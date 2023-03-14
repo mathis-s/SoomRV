@@ -27,7 +27,7 @@ integer i;
 // assign OUT_zcFwd.result = dataRes;
 
 wire[31:0] addrSum = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
-wire[31:0] addr = (IN_uop.opcode >= LSU_SB_I) ? IN_uop.srcA : addrSum;
+wire[31:0] addr = (IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? IN_uop.srcA : addrSum;
 
 reg except;
 always_comb begin

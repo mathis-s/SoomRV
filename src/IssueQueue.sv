@@ -273,7 +273,7 @@ always_ff@(posedge clk) begin
                     for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                         if (IN_resultValid[j]) begin
                             for (k = 0; k < NUM_OPERANDS; k=k+1)
-                                if (temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
+                                if (k < 2 && temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                         end
                     end
                     
@@ -287,9 +287,14 @@ always_ff@(posedge clk) begin
                             temp.avail[2] = 0;
                             // Result was already written
                             temp.nmDst = 0;
+                            temp.tagDst = 7'h40;
                         end
                         else temp.avail[2] = 1;
                         // verilator lint_on SELRANGE
+                    end
+                    
+                    if (temp.fu == FU_ATOMIC) begin
+                        temp.fu = FuncUnit'(FU0);
                     end
                     
                     queue[insertIndex[ID_LEN-1:0]] <= temp;

@@ -125,11 +125,7 @@ always_ff@(posedge clk) begin
                     end
                 
                     if (!found) begin
-                        // Upper half of tag space is for FP registers
-                        //if (i == 0 && IN_uop[i].tagA[6])
-                        //    OUT_uop[i].srcA <= IN_rfReadData_fp[0];
-                        //else
-                            OUT_uop[i].srcA <= IN_rfReadData[i];
+                        OUT_uop[i].srcA <= IN_rfReadData[i];
                     end
                 end
                 
@@ -158,12 +154,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     if (!found) begin
-                        //if (i == 0 && IN_uop[i].tagB[6])
-                        //    OUT_uop[i].srcB <= IN_rfReadData_fp[1];
-                        //else if (i == 2 && IN_uop[i].tagB[6])
-                        //    OUT_uop[i].srcB <= IN_rfReadData_fp[3];
-                        //else
-                            OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                        OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                     end
                 end
                 
@@ -178,6 +169,15 @@ always_ff@(posedge clk) begin
                             found = 1;
                         end
                     end
+                    
+                    // ZC is impossible as the atomic memory operand always comes from the Load port
+                    /*for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagC) begin
+                            OUT_uop[i].srcC <= IN_zcFwdResult[j];
+                            found = 1;
+                        end
+                    end*/
+                    
                     if (!found)
                         OUT_uop[i].srcC <= IN_rfReadData[2 + NUM_UOPS];
                 end
