@@ -59,17 +59,10 @@ integer i;
 
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
-wire wbHasResult_int[NUM_WBS-1:0];
-
 assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
 assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
 assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
 assign wbHasResult[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
-
-assign wbHasResult_int[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
-assign wbHasResult_int[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
-assign wbHasResult_int[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
-assign wbHasResult_int[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
 
 CommitUOp comUOps[3:0];
 wire comValid[3:0];
@@ -464,10 +457,10 @@ RF rf
 (
     .clk(clk),
     
-    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult_int[0]),
-    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult_int[1]),
-    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult_int[2]),
-    .waddr3(wbUOp[3].tagDst[5:0]), .wdata3(wbUOp[3].result), .wen3(wbHasResult_int[3]),
+    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
+    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
+    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
+    .waddr3(wbUOp[3].tagDst[5:0]), .wdata3(wbUOp[3].result), .wen3(wbHasResult[3]),
     
     .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
     .raddr1(RF_readAddress[1]), .rdata1(RF_readData[1]),
@@ -583,6 +576,7 @@ CSR csr
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
+    .IN_commitValid('{comUOps[0].valid && !mispredFlush, comUOps[1].valid && !mispredFlush, comUOps[2].valid && !mispredFlush, comUOps[3].valid && !mispredFlush}),
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
@@ -896,11 +890,11 @@ ControlRegs cr
     .IN_readAddr(OUT_MEM_readAddr[6:0]),
     .OUT_data(CSR_dataOut),
 
-    .IN_comValid('{comUOps[0].valid, comUOps[1].valid, comUOps[2].valid, comUOps[3].valid}),
+    .IN_comValid('{comUOps[0].valid && !mispredFlush, comUOps[1].valid && !mispredFlush, comUOps[2].valid && !mispredFlush, comUOps[3].valid && !mispredFlush}),
     .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
     .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
     .IN_ifValid({DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
-    .IN_comBranch({(comUOps[0].valid && comUOps[0].isBranch), (comUOps[1].valid && comUOps[1].isBranch), (comUOps[2].valid && comUOps[2].isBranch), (comUOps[3].valid && comUOps[3].isBranch)}),
+    .IN_comBranch({(comUOps[0].valid && comUOps[0].isBranch && !mispredFlush), (comUOps[1].valid && comUOps[1].isBranch&& !mispredFlush), (comUOps[2].valid && comUOps[2].isBranch && !mispredFlush), (comUOps[3].valid && comUOps[3].isBranch && !mispredFlush)}),
     
     .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),

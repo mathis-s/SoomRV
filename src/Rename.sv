@@ -126,8 +126,8 @@ always_comb begin
             nextCounterSqN = nextCounterSqN + 1;
         
         // Commit
-        commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0) && 
-            (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
+        commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
+            //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
