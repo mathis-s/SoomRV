@@ -62,9 +62,11 @@ reg running;
 always_ff@(posedge clk) begin
     
     if (rst) begin
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
         running <= 0;
     end
-    if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+    else if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         
         // Store metadata in output uop (without setting it valid)
         OUT_uop.tagDst <= IN_uop.tagDst;
@@ -96,11 +98,11 @@ always_ff@(posedge clk) begin
         running <= 0;
     end
     else begin
-        if (!(!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0) || IN_wbAvail) begin
+        if ((IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0) || IN_wbAvail) begin
             OUT_uop.valid <= 0;
         end
         
-        if (!(!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
+        if (IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0) begin
             running <= 0;
         end
     end

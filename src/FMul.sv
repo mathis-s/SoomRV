@@ -42,10 +42,10 @@ recFNToFN#(8, 24) recode
 
 always@(posedge clk) begin
     
-    if (rst) begin
-        OUT_uop.valid <= 0;
-    end
-    else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+    OUT_uop <= 'x;
+    OUT_uop.valid <= 0;
+    
+    if (!rst && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.nmDst <= IN_uop.nmDst;
@@ -69,10 +69,6 @@ always@(posedge clk) begin
         if (rm >= 3'b101)
             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
     end
-    else begin
-        OUT_uop.valid <= 0;
-    end
-
 end
 
 endmodule

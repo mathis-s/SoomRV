@@ -142,6 +142,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         insertIndex = 0;
         reservedWBs <= 0;
+        OUT_uop <= 'x;
         OUT_valid <= 0;
     end
     else if (IN_branch.taken) begin
@@ -154,14 +155,17 @@ always_ff@(posedge clk) begin
             end
         end
         insertIndex = newInsertIndex;
-        if (!IN_stall || $signed(OUT_uop.sqN - IN_branch.sqN) > 0)
+        if (!IN_stall || $signed(OUT_uop.sqN - IN_branch.sqN) > 0) begin
+            OUT_uop <= 'x;
             OUT_valid <= 0;
+        end
     end
     else begin
         reg issued = 0;
         
         // Issue
         if (!IN_stall) begin
+            OUT_uop <= 'x;
             OUT_valid <= 0;
             
             for (i = 0; i < SIZE; i=i+1) begin
@@ -293,9 +297,10 @@ always_ff@(posedge clk) begin
                         // verilator lint_on SELRANGE
                     end
                     
-                    if (temp.fu == FU_ATOMIC) begin
-                        temp.fu = FuncUnit'(FU0);
-                    end
+                    if (FU0 == FU_ST || FU0 == FU_LD)
+                        if (temp.fu == FU_ATOMIC) begin
+                            temp.fu = FuncUnit'(FU0);
+                        end
                     
                     queue[insertIndex[ID_LEN-1:0]] <= temp;
                     

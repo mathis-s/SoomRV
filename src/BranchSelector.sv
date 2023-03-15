@@ -21,8 +21,8 @@ SqN mispredFlushSqN;
 reg disableMispredFlush;
 
 always_comb begin
+    OUT_branch = 'x;
     OUT_branch.taken = 0;
-    OUT_branch = 0;
     for (i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 
             (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0) &&

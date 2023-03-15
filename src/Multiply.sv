@@ -42,13 +42,15 @@ assign OUT_busy = 0;
 
 always_ff@(posedge clk) begin
     
-    if (rst) begin
-        for (i = 0; i < NUM_STAGES+1; i=i+1) begin
-            pl[i].valid <= 0;
-        end
-        OUT_uop.valid <= 0;
+
+    for (i = 0; i < NUM_STAGES+1; i=i+1) begin
+        pl[i] <= 'x;
+        pl[i].valid <= 0;
     end
-    else begin
+    OUT_uop <= 'x;
+    OUT_uop.valid <= 0;
+
+    if (!rst) begin
         
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             pl[0].valid <= 1;
@@ -111,8 +113,6 @@ always_ff@(posedge clk) begin
                 else
                     OUT_uop.result <= pl[NUM_STAGES].res[31:0];
             end
-            else
-                OUT_uop.valid <= 0;
         end
     end
 end

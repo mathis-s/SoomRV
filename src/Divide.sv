@@ -26,12 +26,12 @@ reg running;
 assign OUT_busy = running && (cnt != 0 && cnt != 63);
 
 always_ff@(posedge clk) begin
+    
+    running <= 0;
+    OUT_uop <= 'x;
+    OUT_uop.valid <= 0;
 
-    if (rst) begin
-        OUT_uop.valid <= 0;
-        running <= 0;
-    end
-    else begin
+    if (!rst) begin
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             running <= 1;
             uop <= IN_uop;
@@ -63,6 +63,8 @@ always_ff@(posedge clk) begin
                 OUT_uop.valid <= 0;
             end
             else if (cnt != 63) begin
+                running <= 1;
+            
                 if (!r[63]) begin
                     q[cnt[4:0]] <= 1;
                     r <= 2 * r - {d, 32'b0};
@@ -94,10 +96,6 @@ always_ff@(posedge clk) begin
                 else
                     OUT_uop.result <= invert ? (-qRestored) : qRestored;
             end
-        end
-        else begin
-            OUT_uop.valid <= 0;
-            running <= 0;
         end
     end
 end

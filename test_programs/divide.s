@@ -49,7 +49,7 @@ printdecu_slow:
     
 printdec_slow:
     
-    li a4, 1023
+    li a4, 0xff000003
     bnez a0, .check_sign
     li a0, 0x30
     sb a0, 0(a4)

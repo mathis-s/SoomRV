@@ -55,7 +55,7 @@ reg rnUOpValidSorted[WIDTH-1:0];
 always_comb begin
     for (i = 0; i < WIDTH; i=i+1) begin
         rnUOpValidSorted[i] = 0;
-        rnUOpSorted[i] = 108'bx;
+        rnUOpSorted[i] = 'x;
         
         for (j = 0; j < WIDTH; j=j+1) begin
             // This could be one-hot...
@@ -112,18 +112,22 @@ always_ff@(posedge clk) begin
     OUT_fpNewFlags <= 0;
     OUT_validRetire <= 0;
     
+    OUT_trapUOp <= 'x;
+    OUT_trapUOp.valid <= 0;
+    
+    for (i = 0; i < WIDTH; i=i+1) begin
+        OUT_comUOp[i] <= 'x;
+        OUT_comUOp[i].valid <= 0;
+    end
+    
     if (rst) begin
         baseIndex <= 0;
         for (i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
         end
-        for (i = 0; i < WIDTH; i=i+1) begin
-            OUT_comUOp[i].valid <= 0;
-        end
         misprReplay <= 0;
         OUT_mispredFlush <= 0;
         OUT_curFetchID <= -1;
-        OUT_trapUOp.valid <= 0;
         stop <= 0;
     end
     else if (IN_branch.taken) begin
@@ -140,8 +144,6 @@ always_ff@(posedge clk) begin
     end
     
     if (!rst) begin
-    
-        OUT_trapUOp.valid <= 0;
         stop <= 0;
         
         // After mispredict, we replay all ops from last committed to the branch
@@ -150,8 +152,6 @@ always_ff@(posedge clk) begin
             
             if (misprReplayEnd) begin
                 misprReplay <= 0;
-                for (i = 0; i < WIDTH; i=i+1)
-                    OUT_comUOp[i].valid <= 0;
                 OUT_mispredFlush <= 0;
             end
             else begin
@@ -163,7 +163,7 @@ always_ff@(posedge clk) begin
                         
                         assert(deqEntries[i].valid);
                         OUT_comUOp[i].valid <= 1;
-                        //OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                        OUT_comUOp[i].sqN <= 'x;//{deqEntries[i].sqN_msb, id[5:0]};
                         OUT_comUOp[i].nmDst <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].name;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
@@ -171,10 +171,8 @@ always_ff@(posedge clk) begin
                             if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == deqEntries[i].tag)
                                 OUT_comUOp[i].compressed <= 1;
                     end
-                    else begin
-                        OUT_comUOp[i].valid <= 0;
+                    else
                         misprReplayEnd <= 1;
-                    end
                 end
                 misprReplayIter <= misprReplayIter + WIDTH;
             end
@@ -250,17 +248,12 @@ always_ff@(posedge clk) begin
 
                     cnt = cnt + 1;
                 end
-                else begin
-                    temp = 1;
-                    OUT_comUOp[i].valid <= 0;
-                end
+                else temp = 1;
+                    
             end
             
             baseIndex <= baseIndex + cnt;
         end
-        else
-            for (i = 0; i < WIDTH; i=i+1)
-                OUT_comUOp[i].valid <= 0;
         
         // Enqueue ops directly from Rename
         for (i = 0; i < WIDTH; i=i+1) begin

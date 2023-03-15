@@ -158,13 +158,17 @@ end
 
 always_ff@(posedge clk) begin
     
-    if (rst) begin
-        OUT_uop.valid <= 0;
-        OUT_branch.taken <= 0;
-        OUT_btUpdate.valid <= 0;
-        OUT_ibInfo.valid <= 0;
-    end
-    else begin
+
+    OUT_uop <= 'x;
+    OUT_branch <= 'x;
+    OUT_btUpdate <= 'x;
+    OUT_ibInfo <= 'x;
+    OUT_uop.valid <= 0;
+    OUT_branch.taken <= 0;
+    OUT_btUpdate.valid <= 0;
+    OUT_ibInfo.valid <= 0;
+
+    if (!rst) begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
             OUT_branch.sqN <= IN_uop.sqN;
             OUT_branch.loadSqN <= IN_uop.loadSqN;
@@ -253,11 +257,6 @@ always_ff@(posedge clk) begin
             
             OUT_uop.valid <= 1;
             OUT_uop.pc <= IN_uop.pc;
-        end
-        else begin
-            OUT_uop.valid <= 0;
-            OUT_branch.taken <= 0;
-            OUT_btUpdate.valid <= 0;
         end
     end
 end

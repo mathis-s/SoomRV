@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.113 (w)1999-2022 BSI
-[*] Thu Nov 17 18:59:13 2022
+[*] Wed Mar 15 13:43:39 2023
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Thu Nov 17 18:58:04 2022"
-[dumpfile_size] 183580555
+[dumpfile_mtime] "Wed Mar 15 13:43:16 2023"
+[dumpfile_size] 15473194
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 1343
-[size] 1920 2118
-[pos] 1919 -1
-*-2.600000 1355 974 1250 1072 1358 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[timestart] 180
+[size] 3840 2118
+[pos] -1 -1
+*-6.630973 324 974 1250 1072 1358 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -102,7 +102,7 @@
 [sst_width] 314
 [signals_width] 572
 [sst_expanded] 1
-[sst_vpaned_height] 1459
+[sst_vpaned_height] 1511
 @28
 TOP.Top.clk
 TOP.Top.en
@@ -120,7 +120,6 @@ TOP.Top.core.OUT_MEM_writeData[31:0]
 TOP.Top.core.OUT_MEM_writeEnable
 TOP.Top.core.OUT_MEM_readEnable
 TOP.Top.core.SQ_empty
-TOP.Top.core.ROB_disableIFetch
 @200
 -
 @28
@@ -209,7 +208,6 @@ TOP.Top.core.bp.OUT_isJump
 TOP.Top.core.bp.OUT_branchInfo.predicted
 TOP.Top.core.bp.OUT_branchInfo.tageID[2:0]
 @22
-TOP.Top.core.bp.OUT_branchInfo.tageUseful[4:0]
 TOP.Top.core.bp.IN_pc[31:0]
 TOP.Top.core.bp.OUT_branchDst[31:0]
 TOP.Top.core.bp.OUT_branchSrc[31:0]
@@ -223,6 +221,7 @@ TOP.Top.core.bp.btUpdate.valid
 TOP.Top.core.bp.btUpdate.src[31:0]
 TOP.Top.core.bp.btUpdate.dst[31:0]
 @200
+-
 -RN_uop[0]
 @28
 #{TOP.Top.core.rn.OUT_uopValid[0:3]} TOP.Top.core.rn.OUT_uopValid[0] TOP.Top.core.rn.OUT_uopValid[1] TOP.Top.core.rn.OUT_uopValid[2] TOP.Top.core.rn.OUT_uopValid[3]
@@ -298,7 +297,6 @@ TOP.Top.core.iq3.OUT_full
 -LD
 @28
 #{TOP.Top.core.ld.IN_uopValid[0:2]} TOP.Top.core.ld.IN_uopValid[0] TOP.Top.core.ld.IN_uopValid[1] TOP.Top.core.ld.IN_uopValid[2]
-TOP.Top.core.ld.outFU[0][2:0]
 #{TOP.Top.core.ld.IN_stall[0:3]} TOP.Top.core.ld.IN_stall[0] TOP.Top.core.ld.IN_stall[1] TOP.Top.core.ld.IN_stall[2] TOP.Top.core.ld.IN_stall[3]
 @22
 TOP.Top.core.ld.IN_uop[0].sqN[6:0]
@@ -529,7 +527,7 @@ TOP.Top.core.rn.tb.freeCom[6:0]
 #{TOP.Top.core.rn.tb.IN_commitNewest[0:3]} TOP.Top.core.rn.tb.IN_commitNewest[0] TOP.Top.core.rn.tb.IN_commitNewest[1] TOP.Top.core.rn.tb.IN_commitNewest[2] TOP.Top.core.rn.tb.IN_commitNewest[3]
 @200
 -
-@23
+@22
 TOP.Top.core.rn.tb.IN_commitTagDst[0][6:0]
 TOP.Top.core.rn.tb.IN_commitTagDst[1][6:0]
 TOP.Top.core.rn.tb.IN_commitTagDst[2][6:0]
@@ -537,35 +535,15 @@ TOP.Top.core.rn.tb.IN_commitTagDst[3][6:0]
 @200
 -ROB
 -
-@28
-TOP.Top.core.rob.pcLookupEntry.valid
-@22
-TOP.Top.core.rob.baseIndexPC[30:0]
-@28
-TOP.Top.core.rob.baseIndexBPI.isJump
-TOP.Top.core.rob.baseIndexBPI.tageID[2:0]
-TOP.Top.core.rob.baseIndexBPI.taken
-@22
-TOP.Top.core.rob.baseIndexBPI.tageUseful[4:0]
-@28
-TOP.Top.core.rob.baseIndexBPI.predicted
-@200
 -
-@23
+@22
 TOP.Top.core.rob.deqEntries[0].tag[6:0]
-@22
 TOP.Top.core.rob.deqEntries[0].name[4:0]
-@23
 TOP.Top.core.rob.deqEntries[1].tag[6:0]
-@22
 TOP.Top.core.rob.deqEntries[1].name[4:0]
-@23
 TOP.Top.core.rob.deqEntries[2].tag[6:0]
-@22
 TOP.Top.core.rob.deqEntries[2].name[4:0]
-@23
 TOP.Top.core.rob.deqEntries[3].tag[6:0]
-@22
 TOP.Top.core.rob.deqEntries[3].name[4:0]
 @200
 -
@@ -582,13 +560,9 @@ TOP.Top.core.rob.entries[19].name[4:0]
 -
 @22
 TOP.Top.core.rob.baseIndex[6:0]
-@28
-TOP.Top.core.rob.entries[30].executed
-@22
 TOP.Top.core.rob.entries[30].fetchID[4:0]
 @28
 TOP.Top.core.rob.entries[30].valid
 TOP.Top.core.rob.entries[44].valid
-TOP.Top.core.rob.entries[44].executed
 [pattern_trace] 1
 [pattern_trace] 0

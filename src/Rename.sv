@@ -239,7 +239,7 @@ always_ff@(posedge clk) begin
         lrScRsv.valid <= 0;
     
         for (i = 0; i < WIDTH_UOPS; i=i+1) begin
-            OUT_uop[i].sqN <= i[$bits(SqN)-1:0];
+            OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
     end
@@ -250,8 +250,10 @@ always_ff@(posedge clk) begin
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
         
-        for (i = 0; i < WIDTH_UOPS; i=i+1)
+        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+            OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
+        end
     end
 
     else if (en && frontEn && !OUT_stall) begin
@@ -316,15 +318,19 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].tagDst <= newTags[i];
             end
-            else
+            else begin
+                OUT_uop[i] <= 'x;
                 OUT_uopValid[i] <= 0;
+            end
         end
         counterSqN <= nextCounterSqN;
         lrScRsv <= nextLrScRsv;
     end
     else if (!en) begin
-        for (i = 0; i < WIDTH_UOPS; i=i+1)
+        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+            OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
+        end
     end
     
     if (!rst) begin

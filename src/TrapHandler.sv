@@ -48,12 +48,16 @@ end
 
 always_ff@(posedge clk) begin
     
-    OUT_bpUpdate.valid <= 0;
     OUT_halt <= 0;
     OUT_fence <= 0;
-    OUT_branch.taken <= 0;
-    OUT_trapInfo.valid <= 0;
     OUT_clearICache <= 0;
+    
+    OUT_bpUpdate <= 'x;
+    OUT_bpUpdate.valid <= 0;
+    OUT_branch <= 'x;
+    OUT_branch.taken <= 0;
+    OUT_trapInfo <= 'x;
+    OUT_trapInfo.valid <= 0;
     
     if (rst) begin
         memoryWait <= 0;

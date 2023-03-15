@@ -61,12 +61,12 @@ FuncUnit outFU[NUM_UOPS-1:0];
 always_ff@(posedge clk) begin
     if (rst) begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
+            OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;
         end
     end
     else begin
         for (i = 0; i < NUM_UOPS; i=i+1) begin
-            
             if (!IN_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
                 OUT_uop[i].imm <= IN_uop[i].imm;
@@ -184,6 +184,7 @@ always_ff@(posedge clk) begin
                 
             end
             else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
+                OUT_uop[i] <= 'x;
                 OUT_uop[i].valid <= 0;
             end
         
