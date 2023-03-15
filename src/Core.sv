@@ -59,10 +59,10 @@ integer i;
 
 RES_UOp wbUOp[NUM_WBS-1:0];
 wire wbHasResult[NUM_WBS-1:0];
-assign wbHasResult[0] = wbUOp[0].valid && wbUOp[0].nmDst != 0;
-assign wbHasResult[1] = wbUOp[1].valid && wbUOp[1].nmDst != 0;
-assign wbHasResult[2] = wbUOp[2].valid && wbUOp[2].nmDst != 0;
-assign wbHasResult[3] = wbUOp[3].valid && wbUOp[3].nmDst != 0;
+assign wbHasResult[0] = wbUOp[0].valid && !wbUOp[0].tagDst[6];
+assign wbHasResult[1] = wbUOp[1].valid && !wbUOp[1].tagDst[6];
+assign wbHasResult[2] = wbUOp[2].valid && !wbUOp[2].tagDst[6];
+assign wbHasResult[3] = wbUOp[3].valid && !wbUOp[3].tagDst[6];
 
 CommitUOp comUOps[3:0];
 wire comValid[3:0];

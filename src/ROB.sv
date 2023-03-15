@@ -221,11 +221,16 @@ always_ff@(posedge clk) begin
                         pred = 1;
                         
                         if (deqEntries[i].flags >= FLAGS_FENCE) begin
-                            // Redirect result of exception to x0 (TODO: make sure this doesn't leak registers?)
                             if (deqEntries[i].flags == FLAGS_ILLEGAL_INSTR || 
                                 deqEntries[i].flags == FLAGS_ACCESS_FAULT ||
-                                deqEntries[i].flags == FLAGS_TRAP)
+                                deqEntries[i].flags == FLAGS_TRAP) begin
+                                
+                                // Redirect result of exception to x0
+                                // The exception causes an invalidation to committed state,
+                                // so changing these is fine (does not leave us with inconsistent RAT/TB)
                                 OUT_comUOp[i].nmDst <= 0;
+                                OUT_comUOp[i].tagDst <= 7'h40;
+                            end
                             
                             stop <= 1;
                             temp = 1;

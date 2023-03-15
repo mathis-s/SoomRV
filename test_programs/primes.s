@@ -57,7 +57,7 @@ main:
 .L7:
 	sll	a3,s4,a4
 	sh2add	a5,a5,s3
-	amoor.w tp,a3,0(a5)
+	amoor.w zero,a3,0(a5)
 	add	a4,a4,s1
 	srli	a5,a4,5
 	bleu	a5,s5,.L7

@@ -57,7 +57,8 @@ reg RAT_issueValid[WIDTH_UOPS-1:0];
 reg RAT_issueAvail[WIDTH_UOPS-1:0];
 SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
 
-reg commitValid[WIDTH_UOPS-1:0];
+reg RAT_commitValid[WIDTH_UOPS-1:0];
+reg TB_commitValid[WIDTH_UOPS-1:0];
 
 reg[4:0] RAT_commitIDs[WIDTH_UOPS-1:0];
 reg[6:0] RAT_commitTags[WIDTH_UOPS-1:0];
@@ -117,8 +118,9 @@ always_comb begin
             end
         end
         
-        // Only need new tag if instruction writes to a register
-        TB_issueValid[i] = RAT_issueValid[i] && IN_uop[i].rd != 0 &&
+        // Only need new tag if instruction writes to a register.
+        // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
+        TB_issueValid[i] = RAT_issueValid[i] && (IN_uop[i].rd != 0 || IN_uop[i].fu == FU_ATOMIC) &&
             // these don't write or writes are eliminated
             IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
         
@@ -126,14 +128,15 @@ always_comb begin
             nextCounterSqN = nextCounterSqN + 1;
         
         // Commit
-        commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
+        RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
             //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
+        TB_commitValid[i] = IN_comUOp[i].valid;
         
         RAT_commitIDs[i] = IN_comUOp[i].nmDst;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
         RAT_commitAvail[i] = IN_comUOp[i].compressed;
-        
+
         // Writeback
         RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
         RAT_wbTags[i] = IN_wbUOp[i].tagDst;
@@ -156,7 +159,7 @@ RenameTable rt
     .IN_issueTags(newTags),
     .IN_issueAvail(RAT_issueAvail),
     
-    .IN_commitValid(commitValid),
+    .IN_commitValid(RAT_commitValid),
     .IN_commitIDs(RAT_commitIDs),
     .IN_commitTags(RAT_commitTags),
     .IN_commitAvail(RAT_commitAvail),
@@ -189,7 +192,7 @@ TagBuffer tb
     .OUT_issueTags(TB_tags),
     .OUT_issueTagsValid(TB_tagsValid),
     
-    .IN_commitValid(commitValid),
+    .IN_commitValid(TB_commitValid),
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
     .IN_commitTagDst(RAT_commitTags)
@@ -213,6 +216,8 @@ reg isNewestCommit[WIDTH_UOPS-1:0];
 always_comb begin
     for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         
+        // When nmDst == 0, the register is (also) discarded immediately instead of being committed.
+        // This is currently only used for rmw atomics with rd=x0.
         isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].nmDst != 0;
         if (IN_comUOp[i].valid)
             for (j = i + 1; j < WIDTH_UOPS; j=j+1)
