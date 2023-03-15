@@ -49,11 +49,10 @@ main:
     
     li a0, 0x3DFCD6E9 # 0.12345678
     li a1, 0x41200000 # 10.0
-    fdiv.s a0, a0, a1, rup # this does not use frm, does not throw
+    fadd.s a0, a0, a1, rdn # this does not use frm, does not throw
     call printhex
     
-    fdiv.s a0, a0, a1, dyn # this throws
-    
+    fadd.s a0, a0, a1 # this throws
     
     .loop:
         j .loop

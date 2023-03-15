@@ -99,6 +99,9 @@ always_comb begin
         INT_MIN: resC = lessThan ? srcA : srcB;
         INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
+        INT_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
+        INT_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
+        INT_FSGNJX_S: resC = {srcA[31] ^ srcB[31], srcA[30:0]};
         INT_F_ADDI_BEQ,
         INT_F_ADDI_BNE,
         INT_F_ADDI_BLT,

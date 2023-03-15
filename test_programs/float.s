@@ -78,5 +78,5 @@ main:
 		addi s2, s2, -1
 		bnez s2, .loop
 	
-	mv ra, s3
+	fsgnj.s ra, s3, s3
 	ret

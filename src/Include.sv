@@ -62,6 +62,11 @@ typedef enum logic[5:0]
     INT_BEXT,
     INT_BINV,
     INT_BSET,
+    //INT_MV,
+    INT_FSGNJ_S,
+    INT_FSGNJN_S,
+    INT_FSGNJX_S,
+    
     INT_F_ADDI_BEQ,
     INT_F_ADDI_BNE,
     INT_F_ADDI_BLT,
@@ -125,40 +130,48 @@ typedef enum logic[5:0]
     
 } OPCode_ST;
 
-typedef enum logic[5:0]
+typedef enum logic[2:0]
 {
-    FPU_FMADD_S,
-    FPU_FMSUB_S,
-    FPU_FNMSUB_S,
-    FPU_FNMADD_S,
+    // These instructions have an RM field
+    // For these, the rounding mode is encoded in the upper 3 opcode bits
+    //FPU_FMADD_S,
+    //FPU_FMSUB_S,
+    //FPU_FNMSUB_S,
+    //FPU_FNMADD_S,
     FPU_FADD_S,
     FPU_FSUB_S,
-    FPU_FSGNJ_S,
-    FPU_FSGNJN_S,
-    FPU_FSGNJX_S,
-    FPU_FMIN_S,
-    FPU_FMAX_S,
     FPU_FCVTWS,
     FPU_FCVTWUS,
-    FPU_FMVXW,
-    FPU_FEQ_S,
+    FPU_FCVTSW,
+    FPU_FCVTSWU
+    
+} OPCode_FPU;
+
+typedef enum logic[5:0]
+{
+    // These don't
+    // For these, the upper 3 opcode bits are 'b101
+    //FPU_FMVXW,
+    //FPU_FMVWX,
+    FPU_FEQ_S = 6'b101000,
     FPU_FLE_S,
     FPU_FLT_S,
-    FPU_FCLASS_S,
-    FPU_FCVTSW,
-    FPU_FCVTSWU,
-    FPU_FMVWX
-} OPCode_FPU;
+    FPU_FMIN_S,
+    FPU_FMAX_S,
+    FPU_FCLASS_S
+    
+} OPCode_FPU2;
+
 
 typedef enum logic[2:0]
 {
-    FPU_FDIV_S,
-    FPU_FSQRT_S
+    FDIV_FDIV_S,
+    FDIV_FSQRT_S
 } OPCode_FDIV;
 
 typedef enum logic[2:0]
 {
-    FPU_FMUL_S
+    FMUL_FMUL_S
 } OPCode_FMUL;
 
 typedef enum logic[5:0]
