@@ -133,7 +133,6 @@ typedef enum logic[5:0]
     FPU_FNMADD_S,
     FPU_FADD_S,
     FPU_FSUB_S,
-    FPU_FMUL_S,
     FPU_FSGNJ_S,
     FPU_FSGNJN_S,
     FPU_FSGNJX_S,
@@ -151,11 +150,16 @@ typedef enum logic[5:0]
     FPU_FMVWX
 } OPCode_FPU;
 
-typedef enum logic[5:0]
+typedef enum logic[2:0]
 {
     FPU_FDIV_S,
     FPU_FSQRT_S
 } OPCode_FDIV;
+
+typedef enum logic[2:0]
+{
+    FPU_FMUL_S
+} OPCode_FMUL;
 
 typedef enum logic[5:0]
 {

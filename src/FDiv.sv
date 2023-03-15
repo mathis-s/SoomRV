@@ -17,7 +17,7 @@ module FDiv
     output RES_UOp OUT_uop
 );
 
-wire[2:0] rm = IN_fRoundMode;
+wire[2:0] rm = IN_uop.opcode[5:3] == 3'b111 ? IN_fRoundMode : IN_uop.opcode[5:3];
 
 wire[32:0] srcArec;
 wire[32:0] srcBrec;
@@ -75,26 +75,27 @@ always_ff@(posedge clk) begin
         OUT_uop.pc <= IN_uop.pc;
         OUT_uop.compressed <= 0;
         OUT_uop.doNotCommit <= 0;
+        if (rm >= 3'b101)
+            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+            
         running <= 1;
     end
     else if (running && outValid && (!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
         OUT_uop.valid <= 1;
         OUT_uop.result <= fpResult;
         
-        /* verilator lint_off CASEOVERLAP */
-        casez (flags)
-            5'b00000: OUT_uop.flags <= FLAGS_NONE;
-            5'b???1?: OUT_uop.flags <= FLAGS_FP_UF;
-            5'b??1??: OUT_uop.flags <= FLAGS_FP_OF;
-            5'b?1???: OUT_uop.flags <= FLAGS_FP_DZ;
-            5'b1????: OUT_uop.flags <= FLAGS_FP_NV;
-            5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
-        endcase
-        /* verilator lint_on CASEOVERLAP */
+        if (OUT_uop.flags != FLAGS_ILLEGAL_INSTR)
+            /* verilator lint_off CASEOVERLAP */
+            casez (flags)
+                5'b00000: OUT_uop.flags <= FLAGS_NONE;
+                5'b???1?: OUT_uop.flags <= FLAGS_FP_UF;
+                5'b??1??: OUT_uop.flags <= FLAGS_FP_OF;
+                5'b?1???: OUT_uop.flags <= FLAGS_FP_DZ;
+                5'b1????: OUT_uop.flags <= FLAGS_FP_NV;
+                5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
+            endcase
+            /* verilator lint_on CASEOVERLAP */
         
-        if (rm >= 3'b101)
-            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-                
         running <= 0;
     end
     else begin

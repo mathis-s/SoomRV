@@ -19,7 +19,7 @@ wire[32:0] srcBrec;
 fNToRecFN#(8, 24) recA (.in(IN_uop.srcA), .out(srcArec));
 fNToRecFN#(8, 24) recB (.in(IN_uop.srcB), .out(srcBrec));
 
-wire[2:0] rm = IN_fRoundMode;
+wire[2:0] rm = IN_uop.opcode[5:3] == 3'b111 ? IN_fRoundMode : IN_uop.opcode[5:3];
 
 wire[32:0] mul;
 wire[4:0] mulFlags;

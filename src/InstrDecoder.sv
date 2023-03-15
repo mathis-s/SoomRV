@@ -923,16 +923,18 @@ always_comb begin
                                 5'b00000: uop.opcode = FPU_FADD_S;
                                 5'b00001: uop.opcode = FPU_FSUB_S;
                                 5'b00010: begin
-                                    uop.opcode = FPU_FMUL_S;
+                                    uop.opcode[2:0] = FPU_FMUL_S;
+                                    uop.opcode[5:3] = i32.fp.rm;
                                     uop.fu = FU_FMUL;
                                 end
                                 5'b00011: begin 
-                                    uop.opcode = FPU_FDIV_S; 
+                                    uop.opcode[2:0] = FPU_FDIV_S; 
+                                    uop.opcode[5:3] = i32.fp.rm;
                                     uop.fu = FU_FDIV;
                                 end
                                 5'b01011: begin
-                                    uop.opcode = FPU_FSQRT_S;
-                                    //uop.rs1_fp = 0;
+                                    uop.opcode[2:0] = FPU_FSQRT_S;
+                                    uop.opcode[5:3] = i32.fp.rm;
                                     uop.rs1 = 0;
                                     uop.fu = FU_FDIV;
                                     if (i32.fp.rs2 != 0) invalidEnc = 1;
