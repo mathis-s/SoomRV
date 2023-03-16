@@ -404,7 +404,7 @@ always_comb begin
                             OUT_decBranch = 1;
                             OUT_decBranchFetchID = IN_instrs[i].fetchID;
                         end
-                        // Predicted jumps don't need to be executed if the don't write anything
+                        // Predicted jumps don't need to be executed if they don't write anything
                         else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
                             uop.valid = 0;
                         end

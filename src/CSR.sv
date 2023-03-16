@@ -9,8 +9,10 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     
     input wire[4:0] IN_fpNewFlags,
     
-    // for minstret
+    // for perf counters
     input wire[3:0] IN_commitValid,
+    input wire[3:0] IN_commitBranch,
+    input wire IN_branchMispr,
     
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
@@ -257,6 +259,9 @@ reg[2:0] frm;
 
 reg[63:0] mcycle;
 reg[63:0] minstret;
+reg[63:0] mhpmcounter3; // branches
+reg[63:0] mhpmcounter4; // branch mispredicts
+reg[63:0] mhpmcounter5; // total mispredicts
 
 typedef struct packed
 {
@@ -339,12 +344,11 @@ always_comb begin
                 (priv == PRIV_USER && mcounteren[0] && scounteren[0]));
             rdata = mcycle[31:0];
         end
-        
         CSR_cycleh: begin
             invalidCSR = !((priv == PRIV_MACHINE) ||
                 (priv == PRIV_SUPERVISOR && mcounteren[0]) ||
                 (priv == PRIV_USER && mcounteren[0] && scounteren[0]));
-            rdata = mcycle[31:0];
+            rdata = mcycle[63:32];
         end
         
         CSR_instret: begin
@@ -353,14 +357,35 @@ always_comb begin
                 (priv == PRIV_USER && mcounteren[2] && scounteren[2]));
             rdata = minstret[31:0];
         end
-        
         CSR_instreth: begin
             invalidCSR = !((priv == PRIV_MACHINE) ||
                 (priv == PRIV_SUPERVISOR && mcounteren[2]) ||
                 (priv == PRIV_USER && mcounteren[2] && scounteren[2]));
-            rdata = minstret[31:0];
+            rdata = minstret[63:32];
         end
         
+        CSR_hpmcounter3,
+        CSR_hpmcounter3h: begin
+            invalidCSR = !((priv == PRIV_MACHINE) ||
+                (priv == PRIV_SUPERVISOR && mcounteren[3]) ||
+                (priv == PRIV_USER && mcounteren[3] && scounteren[3]));
+            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter3) ? mhpmcounter3[31:0] : mhpmcounter3[63:32];
+        end
+        CSR_hpmcounter4,
+        CSR_hpmcounter4h: begin
+            invalidCSR = !((priv == PRIV_MACHINE) ||
+                (priv == PRIV_SUPERVISOR && mcounteren[4]) ||
+                (priv == PRIV_USER && mcounteren[4] && scounteren[4]));
+            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter4) ? mhpmcounter4[31:0] : mhpmcounter4[63:32];
+        end
+        CSR_hpmcounter5,
+        CSR_hpmcounter5h: begin
+            invalidCSR = !((priv == PRIV_MACHINE) ||
+                (priv == PRIV_SUPERVISOR && mcounteren[5]) ||
+                (priv == PRIV_USER && mcounteren[5] && scounteren[5]));
+            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter5) ? mhpmcounter5[31:0] : mhpmcounter5[63:32];
+        end
+
         CSR_misa: rdata = 32'b01_0000_11100000100010000000000100;
         CSR_marchid: rdata = 32'h50087501;
         CSR_mimpid: rdata = 32'h50087532;
@@ -371,6 +396,14 @@ always_comb begin
         
         CSR_minstret: rdata = minstret[31:0];
         CSR_minstreth: rdata = minstret[63:32];
+        
+        CSR_mhpmcounter3: rdata = mhpmcounter3[31:0];
+        CSR_mhpmcounter4: rdata = mhpmcounter4[31:0];
+        CSR_mhpmcounter5: rdata = mhpmcounter5[31:0];
+        
+        CSR_mhpmcounter3h: rdata = mhpmcounter3[63:32];
+        CSR_mhpmcounter4h: rdata = mhpmcounter4[63:32];
+        CSR_mhpmcounter5h: rdata = mhpmcounter5[63:32];
         
         CSR_mcounteren: rdata = mcounteren;
         
@@ -401,25 +434,25 @@ always_comb begin
         CSR_mhartid: rdata = 0;
         
         // all unused perf counter stuff, also r/o zero
-        CSR_hpmcounter3, CSR_hpmcounter4, CSR_hpmcounter5, CSR_hpmcounter6, CSR_hpmcounter7, CSR_hpmcounter8, CSR_hpmcounter9,
+        CSR_hpmcounter6, CSR_hpmcounter7, CSR_hpmcounter8, CSR_hpmcounter9,
         CSR_hpmcounter10, CSR_hpmcounter11, CSR_hpmcounter12, CSR_hpmcounter13, CSR_hpmcounter14, CSR_hpmcounter15,
         CSR_hpmcounter16, CSR_hpmcounter17, CSR_hpmcounter18, CSR_hpmcounter19, CSR_hpmcounter20, CSR_hpmcounter21,
         CSR_hpmcounter22, CSR_hpmcounter23, CSR_hpmcounter24, CSR_hpmcounter25, CSR_hpmcounter26, CSR_hpmcounter27,
         CSR_hpmcounter28, CSR_hpmcounter29, CSR_hpmcounter30, CSR_hpmcounter31, 
         
-        CSR_hpmcounter3h, CSR_hpmcounter4h, CSR_hpmcounter5h, CSR_hpmcounter6h, CSR_hpmcounter7h, CSR_hpmcounter8h,
+        CSR_hpmcounter6h, CSR_hpmcounter7h, CSR_hpmcounter8h,
         CSR_hpmcounter9h, CSR_hpmcounter10h, CSR_hpmcounter11h, CSR_hpmcounter12h, CSR_hpmcounter13h, CSR_hpmcounter14h,
         CSR_hpmcounter15h, CSR_hpmcounter16h, CSR_hpmcounter17h, CSR_hpmcounter18h, CSR_hpmcounter19h, CSR_hpmcounter20h,
         CSR_hpmcounter21h, CSR_hpmcounter22h, CSR_hpmcounter23h, CSR_hpmcounter24h, CSR_hpmcounter25h, CSR_hpmcounter26h,
         CSR_hpmcounter27h, CSR_hpmcounter28h, CSR_hpmcounter29h, CSR_hpmcounter30h, CSR_hpmcounter31h,
         
-        CSR_mhpmcounter3, CSR_mhpmcounter4, CSR_mhpmcounter5, CSR_mhpmcounter6, CSR_mhpmcounter7, CSR_mhpmcounter8,
+        CSR_mhpmcounter6, CSR_mhpmcounter7, CSR_mhpmcounter8,
         CSR_mhpmcounter9, CSR_mhpmcounter10, CSR_mhpmcounter11, CSR_mhpmcounter12, CSR_mhpmcounter13, CSR_mhpmcounter14,
         CSR_mhpmcounter15, CSR_mhpmcounter16, CSR_mhpmcounter17, CSR_mhpmcounter18, CSR_mhpmcounter19, CSR_mhpmcounter20,
         CSR_mhpmcounter21, CSR_mhpmcounter22, CSR_mhpmcounter23, CSR_mhpmcounter24, CSR_mhpmcounter25, CSR_mhpmcounter26,
         CSR_mhpmcounter27, CSR_mhpmcounter28, CSR_mhpmcounter29, CSR_mhpmcounter30, CSR_mhpmcounter31,
  
-        CSR_mhpmcounter3h, CSR_mhpmcounter4h, CSR_mhpmcounter5h, CSR_mhpmcounter6h, CSR_mhpmcounter7h, CSR_mhpmcounter8h,
+        CSR_mhpmcounter6h, CSR_mhpmcounter7h, CSR_mhpmcounter8h,
         CSR_mhpmcounter9h, CSR_mhpmcounter10h, CSR_mhpmcounter11h, CSR_mhpmcounter12h, CSR_mhpmcounter13h, CSR_mhpmcounter14h,
         CSR_mhpmcounter15h, CSR_mhpmcounter16h, CSR_mhpmcounter17h, CSR_mhpmcounter18h, CSR_mhpmcounter19h, CSR_mhpmcounter20h,
         CSR_mhpmcounter21h, CSR_mhpmcounter22h, CSR_mhpmcounter23h, CSR_mhpmcounter24h, CSR_mhpmcounter25h, CSR_mhpmcounter26h,
@@ -472,6 +505,19 @@ always_ff@(posedge clk) begin
                 if (IN_commitValid[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
+        
+        begin
+            reg[2:0] temp = 0;
+            for (i = 0; i < 4; i=i+1)
+                if (IN_commitBranch[i]) temp = temp + 1;
+            mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
+        end
+        
+        if (IN_branchMispr)
+            mhpmcounter4 <= mhpmcounter4 + 1;
+            
+        if (IN_branch.taken)
+            mhpmcounter5 <= mhpmcounter5 + 1;
     end
     
     if (rst) begin
@@ -495,6 +541,10 @@ always_ff@(posedge clk) begin
         scause <= 0;
         stval <= 0;
         stvec <= 0;
+        
+        mhpmcounter3 <= 0;
+        mhpmcounter4 <= 0;
+        mhpmcounter5 <= 0;
         
         OUT_uop.valid <= 0;
     end
@@ -593,6 +643,14 @@ always_ff@(posedge clk) begin
                             
                             CSR_minstret: minstret[31:0] <= wdata;
                             CSR_minstreth: minstret[63:32] <= wdata;
+                            
+                            CSR_mhpmcounter3: mhpmcounter3[31:0] <= wdata;
+                            CSR_mhpmcounter4: mhpmcounter4[31:0] <= wdata;
+                            CSR_mhpmcounter5: mhpmcounter5[31:0] <= wdata;
+                            
+                            CSR_mhpmcounter3h: mhpmcounter3[63:32] <= wdata;
+                            CSR_mhpmcounter4h: mhpmcounter4[63:32] <= wdata;
+                            CSR_mhpmcounter5h: mhpmcounter5[63:32] <= wdata;
                             
                             CSR_mcounteren: mcounteren[5:0] <= wdata[5:0];
                             

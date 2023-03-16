@@ -92,6 +92,7 @@ wire[127:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
 BranchProv branchProvs[3:0];
 BranchProv branch;
 wire mispredFlush;
+wire BS_PERFC_branchMispr;
 BranchSelector bsel
 (
     .clk(clk),
@@ -99,6 +100,8 @@ BranchSelector bsel
     
     .IN_branches(branchProvs),
     .OUT_branch(branch),
+    
+    .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
     
     .IN_ROB_curSqN(ROB_curSqN),
     .IN_RN_nextSqN(RN_nextSqN),
@@ -576,7 +579,11 @@ CSR csr
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
+    
     .IN_commitValid(ROB_validRetire),
+    .IN_commitBranch(ROB_retireBranch),
+    .IN_branchMispr(BS_PERFC_branchMispr),
+    
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
@@ -820,6 +827,7 @@ SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
 wire[3:0] ROB_validRetire;
+wire[3:0] ROB_retireBranch;
 Trap_UOp ROB_trapUOp;
 ROB rob
 (
@@ -836,7 +844,8 @@ ROB rob
     .OUT_curSqN(ROB_curSqN),
     .OUT_comUOp(comUOps),
     .OUT_fpNewFlags(ROB_fpNewFlags),
-    .OUT_validRetire(ROB_validRetire),
+    .OUT_PERFC_validRetire(ROB_validRetire),
+    .OUT_PERFC_retireBranch(ROB_retireBranch),
     .OUT_curFetchID(ROB_curFetchID),
     .OUT_trapUOp(ROB_trapUOp),
     .OUT_mispredFlush(mispredFlush)

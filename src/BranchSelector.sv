@@ -10,6 +10,8 @@ module BranchSelector
     input BranchProv IN_branches[NUM_BRANCHES-1:0],
     output BranchProv OUT_branch,
     
+    output reg OUT_PERFC_branchMispr,
+    
     input SqN IN_ROB_curSqN,
     input SqN IN_RN_nextSqN,
     input wire IN_mispredFlush
@@ -24,6 +26,8 @@ always_comb begin
     OUT_branch = 'x;
     OUT_branch.flush = 0;
     OUT_branch.taken = 0;
+    OUT_PERFC_branchMispr = 0;
+    
     for (i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 
             (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0) &&
@@ -37,6 +41,8 @@ always_comb begin
                 OUT_branch.flush = IN_branches[i].flush;
             OUT_branch.fetchID = IN_branches[i].fetchID;
             OUT_branch.history = IN_branches[i].history;
+            
+            if (i < 2) OUT_PERFC_branchMispr = 1;
         end
     end
     
@@ -50,6 +56,7 @@ always_comb begin
         OUT_branch.flush = IN_branches[3].flush;
         OUT_branch.fetchID = IN_branches[3].fetchID;
         OUT_branch.history = IN_branches[3].history;
+        OUT_PERFC_branchMispr = 0;
     end
 end
 

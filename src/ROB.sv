@@ -30,7 +30,8 @@ module ROB
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
     // for perf counters
-    output reg[3:0] OUT_validRetire,
+    output reg[WIDTH-1:0] OUT_PERFC_validRetire,
+    output reg[WIDTH-1:0] OUT_PERFC_retireBranch,
     
     input BranchProv IN_branch,
 
@@ -81,6 +82,11 @@ reg misprReplayEnd;
 SqN misprReplayIter;
 SqN misprReplayEndSqN;
 
+always_comb begin
+    for (i = 0; i < WIDTH; i=i+1) 
+        OUT_PERFC_retireBranch[i] = OUT_PERFC_validRetire[i] && OUT_comUOp[i].isBranch;
+end
+
 
 /* verilator lint_off UNOPTFLAT */
 // All commits/reads from the ROB are sequential.
@@ -111,7 +117,7 @@ end
 always_ff@(posedge clk) begin
 
     OUT_fpNewFlags <= 0;
-    OUT_validRetire <= 0;
+    OUT_PERFC_validRetire <= 0;
     
     OUT_trapUOp <= 'x;
     OUT_trapUOp.valid <= 0;
@@ -197,11 +203,12 @@ always_ff@(posedge clk) begin
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
                     OUT_comUOp[i].isBranch <= deqEntries[i].flags == FLAGS_BRANCH || 
                         deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN;
+                        
                     OUT_comUOp[i].compressed <= deqEntries[i].compressed;
                     OUT_comUOp[i].valid <= 1;
                     
                     // Synchronous exceptions do not increment minstret, but mret/sret do.
-                    OUT_validRetire[i] <= (deqEntries[i].flags <= FLAGS_ORDERING) || deqEntries[i].flags == FLAGS_XRET
+                    OUT_PERFC_validRetire[i] <= (deqEntries[i].flags <= FLAGS_ORDERING) || deqEntries[i].flags == FLAGS_XRET
                         || (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR);
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;

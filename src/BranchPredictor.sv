@@ -89,7 +89,7 @@ TagePredictor tagePredictor
     .OUT_predUseful(OUT_branchInfo.tageUseful),
     .OUT_predTaken(tageTaken),
     
-    .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush),
+    .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush && !IN_bpUpdate.bpi.isJump),
     .IN_writeAddr(IN_bpUpdate.pc[30:0]),
     .IN_writeHistory(IN_bpUpdate.history),
     .IN_writeTageID(IN_bpUpdate.bpi.tageID),

@@ -251,7 +251,7 @@ always_ff@(posedge clk) begin
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.doNotCommit <= 0;
             
-            if (IN_uop.bpi.predicted)
+            if (IN_uop.bpi.predicted && IN_uop.opcode != INT_JAL)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
             else if (isBranch && IN_uop.opcode != INT_JAL)
                 OUT_uop.flags <= FLAGS_BRANCH;

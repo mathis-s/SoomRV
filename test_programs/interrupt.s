@@ -7,8 +7,8 @@ irq_handler:
     csrrs a0, mcause, x0
     call printdecu
     
-    csrrs a0, mstatus, x0
-    call printhex
+    #csrrs a0, mstatus, x0
+    #call printhex
     
     # get irq src
     csrrs a1, mepc, x0
@@ -66,6 +66,7 @@ main:
     li s0, 4
     .loop:
         lw a0, 1(x0)
+        sw a0, 1(x0)
         addi s0, s0, -1
         bnez s0, .loop
     
