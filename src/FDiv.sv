@@ -88,11 +88,11 @@ always_ff@(posedge clk) begin
             /* verilator lint_off CASEOVERLAP */
             casez (flags)
                 5'b00000: OUT_uop.flags <= FLAGS_NONE;
-                5'b???1?: OUT_uop.flags <= FLAGS_FP_UF;
-                5'b??1??: OUT_uop.flags <= FLAGS_FP_OF;
-                5'b?1???: OUT_uop.flags <= FLAGS_FP_DZ;
-                5'b1????: OUT_uop.flags <= FLAGS_FP_NV;
-                5'b????1: OUT_uop.flags <= FLAGS_FP_NX;
+                5'b???1?: OUT_uop.flags <= Flags'(FLAGS_FP_UF);
+                5'b??1??: OUT_uop.flags <= Flags'(FLAGS_FP_OF);
+                5'b?1???: OUT_uop.flags <= Flags'(FLAGS_FP_DZ);
+                5'b1????: OUT_uop.flags <= Flags'(FLAGS_FP_NV);
+                5'b????1: OUT_uop.flags <= Flags'(FLAGS_FP_NX);
             endcase
             /* verilator lint_on CASEOVERLAP */
         

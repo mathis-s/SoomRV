@@ -65,7 +65,7 @@ main:
     # loop of invalid reads
     li s0, 4
     .loop:
-        lw a0, 0(x0)
+        lw a0, 1(x0)
         addi s0, s0, -1
         bnez s0, .loop
     

@@ -7,6 +7,7 @@ typedef struct packed
     RegNm name; // also used to differentiate between decode-time exceptions (these have no dst anyways)
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
+    bit isFP;
     bit compressed;
     bit valid;
 } ROBEntry;
@@ -134,6 +135,7 @@ always_ff@(posedge clk) begin
         for (i = 0; i < LENGTH; i=i+1) begin
             if ($signed(({entries[i].sqN_msb, i[5:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
+                entries[i].isFP <= 0;
             end
         end
         misprReplay <= 1;
@@ -199,13 +201,14 @@ always_ff@(posedge clk) begin
                     OUT_comUOp[i].valid <= 1;
                     
                     // Synchronous exceptions do not increment minstret, but mret/sret do.
-                    OUT_validRetire[i] <= deqEntries[i].flags <= FLAGS_ORDERING || deqEntries[i].flags == FLAGS_XRET;
+                    OUT_validRetire[i] <= (deqEntries[i].flags <= FLAGS_ORDERING) || deqEntries[i].flags == FLAGS_XRET
+                        || (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR);
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
                     
                     deqMask[id[1:0]] = 1;
                                    
-                    if (deqEntries[i].flags >= FLAGS_PRED_TAKEN) begin
+                    if (deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR)) begin
                         
                         OUT_trapUOp.flags <= deqEntries[i].flags;
                         OUT_trapUOp.tag <= deqEntries[i].tag;
@@ -219,9 +222,8 @@ always_ff@(posedge clk) begin
                         pred = 1;
                         
                         if (deqEntries[i].flags >= FLAGS_FENCE) begin
-                            if (deqEntries[i].flags == FLAGS_ILLEGAL_INSTR || 
-                                deqEntries[i].flags == FLAGS_ACCESS_FAULT ||
-                                deqEntries[i].flags == FLAGS_TRAP) begin
+                            if (deqEntries[i].flags >= FLAGS_ILLEGAL_INSTR &&
+                                deqEntries[i].flags <= FLAGS_ST_PF) begin
                                 
                                 // Redirect result of exception to x0
                                 // The exception causes an invalidation to committed state,
@@ -234,12 +236,11 @@ always_ff@(posedge clk) begin
                             temp = 1;
                         end
                     end
-                    
-                    if (deqEntries[i].flags >= FLAGS_FP_NX && deqEntries[i].flags <= FLAGS_FP_NV) begin
+                    else if (deqEntries[i].isFP && deqEntries[i].flags >= Flags'(FLAGS_FP_NX) && deqEntries[i].flags <= Flags'(FLAGS_FP_NV)) begin
                         OUT_fpNewFlags[deqEntries[i].flags[2:0] - FLAGS_FP_NX[2:0]] <= 1;
                         
                         // Underflow and overflow imply inexact
-                        if (deqEntries[i].flags == FLAGS_FP_UF || deqEntries[i].flags == FLAGS_FP_OF) begin
+                        if (deqEntries[i].flags == Flags'(FLAGS_FP_UF) || deqEntries[i].flags == Flags'(FLAGS_FP_OF)) begin
                             OUT_fpNewFlags[FLAGS_FP_NX[2:0]] <= 1;
                         end
                     end
@@ -267,6 +268,7 @@ always_ff@(posedge clk) begin
                 entries[id].sqN_msb <= rnUOpSorted[i].sqN[6];
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;
+                entries[id].isFP <= rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
                 
                 if (rnUOpSorted[i].fu == FU_RN)
                     entries[id].flags <= FLAGS_NONE;

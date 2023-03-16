@@ -221,12 +221,11 @@ typedef enum logic[5:0]
 } OPCode_FU_TRAP;
 
 typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+
 typedef enum bit[3:0] 
 {
     // Flags that do not cause a flush or trap
     FLAGS_NONE, FLAGS_BRANCH,
-    FLAGS_FP_NX, FLAGS_FP_UF, FLAGS_FP_OF, FLAGS_FP_DZ, 
-    FLAGS_FP_NV, 
     
     // Exceptions that require PC lookup (all following)
     FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
@@ -235,7 +234,11 @@ typedef enum bit[3:0]
     FLAGS_FENCE, FLAGS_ORDERING,
     
     // Flags that cause a trap
-    FLAGS_ILLEGAL_INSTR, FLAGS_TRAP, FLAGS_ACCESS_FAULT,
+    FLAGS_ILLEGAL_INSTR, FLAGS_TRAP, 
+    
+    // Memory Exceptions
+    FLAGS_LD_MA, FLAGS_LD_AF, FLAGS_LD_PF,
+    FLAGS_ST_MA, FLAGS_ST_AF, FLAGS_ST_PF,
     
     // Return from exception
     FLAGS_XRET,
@@ -244,6 +247,18 @@ typedef enum bit[3:0]
     FLAGS_NX = 4'b1111
     
 } Flags;
+
+// Floating Point Ops use a different flag encoding to store
+// floating point exceptions
+typedef enum bit[3:0] 
+{
+    FLAGS_FP_NX = FLAGS_LD_MA, 
+    FLAGS_FP_UF = FLAGS_LD_AF, 
+    FLAGS_FP_OF = FLAGS_LD_PF, 
+    FLAGS_FP_DZ = FLAGS_ST_MA, 
+    FLAGS_FP_NV = FLAGS_ST_AF 
+
+} FlagsFP;
 
 typedef enum logic[2:0]
 {
@@ -398,6 +413,14 @@ typedef struct packed
     bit valid;
 } BTUpdate;
 
+
+typedef enum logic[1:0] 
+{
+    AGU_NO_EXCEPTION,
+    AGU_ADDR_MISALIGN,
+    AGU_ACCESS_FAULT,
+    AGU_PAGE_FAULT
+} AGU_Exception;
 typedef struct packed
 {
     logic[31:0] addr;
@@ -417,7 +440,7 @@ typedef struct packed
     FetchID_t fetchID;
     BHist_t history;
     logic doNotCommit;
-    logic exception;
+    AGU_Exception exception;
     logic compressed;
     logic valid;
 } AGU_UOp;

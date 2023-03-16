@@ -22,6 +22,7 @@ reg disableMispredFlush;
 
 always_comb begin
     OUT_branch = 'x;
+    OUT_branch.flush = 0;
     OUT_branch.taken = 0;
     for (i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 

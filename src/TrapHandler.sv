@@ -103,8 +103,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.history <= baseIndexHist;
             end
-            else if (IN_trapInstr.flags == FLAGS_ILLEGAL_INSTR || IN_trapInstr.flags == FLAGS_TRAP || 
-                IN_trapInstr.flags == FLAGS_ACCESS_FAULT || IN_trapInstr.flags == FLAGS_XRET || externalIRQ) begin
+            else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_XRET) || externalIRQ) begin
                 
                 
                 OUT_branch.taken <= 1;
@@ -114,16 +113,22 @@ always_ff@(posedge clk) begin
                 else begin
                     reg[3:0] trapCause;
                     reg delegate;
-                    reg isInterrupt = !(IN_trapInstr.flags == FLAGS_ILLEGAL_INSTR || 
-                        IN_trapInstr.flags == FLAGS_TRAP || IN_trapInstr.flags == FLAGS_ACCESS_FAULT);
+                    reg isInterrupt = !(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
                         
                     // TODO: add all trap reasons
-                    if (isInterrupt)
+                    if (isInterrupt) begin
                         trapCause = 0;
+                        externalIRQ <= 0;
+                    end
                     else begin
                         case (IN_trapInstr.flags)
                             FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
-                            FLAGS_ACCESS_FAULT: trapCause = 4; // FIXME: could also be 5, 6, 7, 8
+                            FLAGS_LD_MA: trapCause = 4;
+                            FLAGS_LD_AF: trapCause = 5;
+                            FLAGS_LD_PF: trapCause = 13;
+                            FLAGS_ST_MA: trapCause = 6;
+                            FLAGS_ST_AF: trapCause = 7;
+                            FLAGS_ST_PF: trapCause = 15;
                             FLAGS_ILLEGAL_INSTR: trapCause = 2; 
                             default: trapCause = 7;
                         endcase
@@ -157,9 +162,6 @@ always_ff@(posedge clk) begin
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.history <= baseIndexHist;
-                    
-                // FIXME: Handle external IRQ if a synchronous exception happens simultaneously
-                externalIRQ <= 0;
             end
             else begin
                 OUT_bpUpdate.valid <= 1;

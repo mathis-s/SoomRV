@@ -116,7 +116,12 @@ always_comb begin
     OUT_uopLd.sqN = uopLd_1.sqN;
     OUT_uopLd.pc = uopLd_1.pc;
     OUT_uopLd.valid = uopLd_1.valid;
-    OUT_uopLd.flags = uopLd_1.exception ? FLAGS_ACCESS_FAULT : FLAGS_NONE;
+    case (uopLd_1.exception)
+        AGU_NO_EXCEPTION: OUT_uopLd.flags = FLAGS_NONE;
+        AGU_ADDR_MISALIGN: OUT_uopLd.flags = FLAGS_LD_MA;
+        AGU_ACCESS_FAULT: OUT_uopLd.flags = FLAGS_LD_AF;
+        AGU_PAGE_FAULT: OUT_uopLd.flags = FLAGS_LD_PF;
+    endcase
     OUT_uopLd.compressed = uopLd_1.compressed;
     OUT_uopLd.doNotCommit = uopLd_1.doNotCommit;
 end

@@ -38,6 +38,7 @@ always_ff@(posedge clk) begin
             OUT_uop.fetchID <= IN_uop.fetchID;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.history <= IN_uop.history;
+            OUT_uop.exception <= AGU_NO_EXCEPTION;
             
             OUT_uop.doNotCommit <= IN_uop.opcode >= ATOMIC_AMOSWAP_W;
             OUT_uop.valid <= 1;
@@ -45,20 +46,23 @@ always_ff@(posedge clk) begin
             // Exception fires on Null pointer or unaligned access
             // (Unaligned is handled in software)
             case (IN_uop.opcode)
-            
-                LSU_LB,
-                LSU_LBU: OUT_uop.exception <= (addr == 0);
+                LSU_LB, LSU_LBU: begin end
                 
-                LSU_LH,
-                LSU_LHU: OUT_uop.exception <= (addr == 0) || (addr[0]);
-                
-                default: OUT_uop.exception <= (addr == 0) || (addr[0] || addr[1]);
-                
+                LSU_LH, LSU_LHU: begin
+                    if (addr[0])
+                        OUT_uop.exception <= AGU_ADDR_MISALIGN;
+                end
+                default: begin
+                    if (addr[0] || addr[1])
+                        OUT_uop.exception <= AGU_ADDR_MISALIGN;
+                end
             endcase
             
-            if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_RD]) OUT_uop.exception <= 1;
-            if (!IN_rmask[addr[31:26]] && IN_mode[MODE_RMASK]) OUT_uop.exception <= 1;
+            if (addr == 0)
+                OUT_uop.exception <= AGU_ACCESS_FAULT;
             
+            //if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_RD]) OUT_uop.exception <= 1;
+            //if (!IN_rmask[addr[31:26]] && IN_mode[MODE_RMASK]) OUT_uop.exception <= 1;
             
             case (IN_uop.opcode)
                 LSU_LB: begin

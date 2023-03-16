@@ -29,21 +29,6 @@ integer i;
 wire[31:0] addrSum = IN_uop.srcA + {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]};
 wire[31:0] addr = (IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? IN_uop.srcA : addrSum;
 
-reg except;
-always_comb begin
-    // Exception fires on Null pointer or unaligned access
-    // (Unaligned is handled in software)
-    case (IN_uop.opcode)
-        LSU_SB_I, LSU_SB: except = (addr == 0);
-        LSU_SH_I, LSU_SH: except = (addr == 0) || (addr[0]);
-        default: except = (addr == 0) || (addr[0] || addr[1]);
-    endcase
-    
-    if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_WR]) except = 1;
-    
-    if (!IN_wmask[addr[31:26]] && IN_mode[MODE_WMASK]) except = 1;
-end
-
 always_ff@(posedge clk) begin
     
     OUT_uop.valid <= 0;
@@ -64,19 +49,48 @@ always_ff@(posedge clk) begin
             OUT_aguOp.fetchID <= IN_uop.fetchID;
             OUT_aguOp.compressed <= IN_uop.compressed;
             OUT_aguOp.history <= IN_uop.history;
-            OUT_aguOp.exception <= except;
+            OUT_aguOp.exception <= AGU_NO_EXCEPTION;
             OUT_aguOp.valid <= 1;
             
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.pc <= IN_uop.pc;
-            OUT_uop.flags <= except ? FLAGS_ACCESS_FAULT : FLAGS_NONE;
+            OUT_uop.flags <= FLAGS_NONE;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.result <= addrSum;
             OUT_uop.doNotCommit <= 0;
             OUT_uop.valid <= 1;
             
+
+            // Exception fires on Null pointer or unaligned access
+            case (IN_uop.opcode)
+            
+                LSU_SB_I, LSU_SB: begin end
+                
+                LSU_SH_I, LSU_SH: begin
+                    if (addr[0]) begin
+                        OUT_aguOp.exception <= AGU_ADDR_MISALIGN;
+                        OUT_uop.flags <= FLAGS_ST_MA;
+                    end
+                end
+                default: begin
+                    if (addr[0] || addr[1]) begin
+                        OUT_aguOp.exception <= AGU_ADDR_MISALIGN;
+                        OUT_uop.flags <= FLAGS_ST_MA;
+                    end
+                end
+            endcase
+            
+            if (addr == 0) begin
+                OUT_aguOp.exception <= AGU_ACCESS_FAULT;
+                OUT_uop.flags <= FLAGS_ST_AF;
+            end
+            
+            //if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_WR]) except = 1;
+            //if (!IN_wmask[addr[31:26]] && IN_mode[MODE_WMASK]) except = 1;
+
+                
             // HACKY: Successful SC return value has already been handled
             // in rename; thus outputting a result here again might cause problems, so redirect to zero register.
             if (IN_uop.opcode == LSU_SC_W) begin
@@ -138,6 +152,7 @@ always_ff@(posedge clk) begin
                     OUT_aguOp.isLoad <= 0;
                     OUT_aguOp.wmask <= 0;
                     OUT_aguOp.data[1:0] <= 1;
+                    // FIXME: exception flags for CBO ops
                     OUT_uop.flags <= FLAGS_ORDERING;
                 end
                 

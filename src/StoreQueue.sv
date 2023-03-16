@@ -170,7 +170,7 @@ always_ff@(posedge clk) begin
         end
     
         // Enqueue
-        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0) && !IN_uopSt.exception) begin
+        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0) && IN_uopSt.exception == AGU_NO_EXCEPTION) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[6:0] - 1);
             entries[index].valid <= 1;
