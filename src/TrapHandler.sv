@@ -100,7 +100,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.flush <= 1;
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= IN_trapInstr.fetchID;
+                OUT_branch.fetchID <= 0;//IN_trapInstr.fetchID;
                 OUT_branch.history <= baseIndexHist;
             end
             else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_XRET) || externalIRQ) begin

@@ -251,7 +251,7 @@ InstrDecoder idec
     .IN_instrs(PD_instrs),
     
     .IN_indirBranchTarget(IBP_predDst),
-    .IN_enCustom(!CR_mode[MODE_NO_EXT]),
+    .IN_enCustom(1'b1),
     
     .OUT_decBranch(DEC_branch),
     .OUT_decBranchDst(DEC_branchDst),
@@ -571,6 +571,7 @@ FPU fpu
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl;
 wire[2:0] CSR_fRoundMode;
+IF_CSR_MMIO if_CSR_MMIO();
 CSR csr
 (
     .clk(clk),
@@ -583,6 +584,8 @@ CSR csr
     .IN_commitValid(ROB_validRetire),
     .IN_commitBranch(ROB_retireBranch),
     .IN_branchMispr(BS_PERFC_branchMispr),
+    
+    .IF_mmio(if_CSR_MMIO.CSR),
     
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
@@ -634,9 +637,6 @@ AGU aguLD
     .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
     .stall(stall[2]),
     
-    .IN_mode(CR_mode),
-    .IN_rmask(CR_rmask),
-    
     .IN_branch(branch),
 
     .IN_uop(LD_uop[2]),
@@ -644,7 +644,6 @@ AGU aguLD
 );
 
 AGU_UOp AGU_ST_uop;
-ZCForward AGU_ST_zcFwd;
 StoreAGU aguST
 (
     .clk(clk),
@@ -652,12 +651,7 @@ StoreAGU aguST
     .en(LD_uop[3].fu == FU_ST || LD_uop[3].fu == FU_ATOMIC),
     .stall(stall[3]),
     
-    .IN_mode(CR_mode),
-    .IN_wmask(CR_wmask),
-    
     .IN_branch(branch),
-    
-    .OUT_zcFwd(AGU_ST_zcFwd),
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
@@ -873,7 +867,7 @@ TrapHandler trapHandler
     
     .IN_irq(timerIRQ),
     .IN_MEM_busy(MEMSUB_busy),
-    .IN_allowBreak(!CR_mode[MODE_NO_BRK]),
+    .IN_allowBreak(1'b1),
     
     .OUT_fence(TH_startFence),
     .OUT_clearICache(TH_clearICache),
@@ -883,14 +877,11 @@ TrapHandler trapHandler
 
 wire IO_busy;
 wire timerIRQ;
-ModeFlags CR_mode;
-wire[63:0] CR_wmask;
-wire[63:0] CR_rmask;
+
 ControlRegs cr
 (
     .clk(clk),
     .rst(rst),
-    .IN_mispredFlush(mispredFlush),
     
     .IN_we(CSR_we),
     .IN_wm(OUT_MEM_writeMask),
@@ -900,21 +891,13 @@ ControlRegs cr
     .IN_re(OUT_MEM_readEnable),
     .IN_readAddr(OUT_MEM_readAddr[6:0]),
     .OUT_data(CSR_dataOut),
-
-    .IN_comValid(ROB_validRetire),
-    .IN_branchMispred((branchProvs[1].taken || branchProvs[0].taken) && !mispredFlush),
-    .IN_wbValid('{wbUOp[0].valid, wbUOp[1].valid, wbUOp[2].valid, wbUOp[3].valid}),
-    .IN_ifValid({DE_uop[0].valid&&!FUSE_full, DE_uop[1].valid&&!FUSE_full, DE_uop[2].valid&&!FUSE_full, DE_uop[3].valid&&!FUSE_full}),
-    .IN_comBranch({(ROB_validRetire[0] && comUOps[0].isBranch), (ROB_validRetire[1] && comUOps[1].isBranch), (ROB_validRetire[2] && comUOps[2].isBranch), (ROB_validRetire[3] && comUOps[3].isBranch)}),
     
     .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
     
-    .OUT_mode(CR_mode),
-    .OUT_wmask(CR_wmask),
-    .OUT_rmask(CR_rmask),
+    .OUT_csrIf(if_CSR_MMIO.MMIO),
 
     .OUT_tmrIRQ(timerIRQ),
 

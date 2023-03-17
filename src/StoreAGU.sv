@@ -6,11 +6,8 @@ module StoreAGU
     input wire en,
     input wire stall,
     
-    input ModeFlags IN_mode,
-    input wire[63:0] IN_wmask,
-    
     input BranchProv IN_branch,
-    output ZCForward OUT_zcFwd,
+    //output ZCForward OUT_zcFwd,
     
     input EX_UOp IN_uop,
     output RES_UOp OUT_uop,

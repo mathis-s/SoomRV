@@ -42,7 +42,7 @@ always_comb begin
             OUT_branch.fetchID = IN_branches[i].fetchID;
             OUT_branch.history = IN_branches[i].history;
             
-            if (i < 2) OUT_PERFC_branchMispr = 1;
+            if (i < 2 && !IN_mispredFlush) OUT_PERFC_branchMispr = 1;
         end
     end
     

@@ -141,9 +141,10 @@ always_ff@(posedge clk) begin
         for (i = 0; i < LENGTH; i=i+1) begin
             if ($signed(({entries[i].sqN_msb, i[5:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
-                entries[i].isFP <= 0;
             end
         end
+        if (IN_branch.flush) 
+            OUT_curFetchID <= IN_branch.fetchID;
         misprReplay <= 1;
         misprReplayEndSqN <= IN_branch.sqN;
         misprReplayIter <= baseIndex;

@@ -523,3 +523,19 @@ typedef struct packed
     SqN sqN;
     logic valid;
 } FloatFlagsUpdate;
+
+interface IF_CSR_MMIO;
+    logic[63:0] mtime;
+    logic[63:0] mtimecmp;
+    
+    modport CSR
+    (
+        input mtime,
+        input mtimecmp
+    );
+    modport MMIO
+    (
+        output mtime,
+        output mtimecmp
+    );
+endinterface

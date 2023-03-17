@@ -6,9 +6,6 @@ module AGU
     input wire en,
     input wire stall,
     
-    input ModeFlags IN_mode,
-    input wire[63:0] IN_rmask,
-    
     input BranchProv IN_branch,
     
     input EX_UOp IN_uop,

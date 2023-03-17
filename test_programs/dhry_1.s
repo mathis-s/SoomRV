@@ -1,6 +1,6 @@
 	.file	"dhry_1.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_m2p0_c2p0_zba1p0_zbb1p0"
+	.attribute arch, "rv32i2p0_m2p0_a2p0_c2p0_zba1p0_zbb1p0"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
@@ -194,21 +194,18 @@ time:
 	.string	"Executed (instrs) "
 	.align	2
 .LC32:
-	.string	"Decoded (instrs) "
-	.align	2
-.LC33:
 	.string	"mIPC "
 	.align	2
-.LC34:
+.LC33:
 	.string	"mDMIPS/MHz "
 	.align	2
-.LC35:
+.LC34:
 	.string	"DHRYSTONE PROGRAM, SOME STRING"
 	.align	2
-.LC36:
+.LC35:
 	.string	"DHRYSTONE PROGRAM, 1'ST STRING"
 	.align	2
-.LC37:
+.LC36:
 	.string	"DHRYSTONE PROGRAM, 2'ND STRING"
 	.section	.text.startup,"ax",@progbits
 	.align	1
@@ -216,8 +213,8 @@ time:
 	.type	main, @function
 main:
 	addi	sp,sp,-176
-	lui	a5,%hi(.LC35)
-	addi	a5,a5,%lo(.LC35)
+	lui	a5,%hi(.LC34)
+	addi	a5,a5,%lo(.LC34)
 	sw	s0,168(sp)
 	li	a3,126976
 	lui	s0,%hi(Next_Ptr_Glob)
@@ -246,8 +243,8 @@ main:
 	sw	s9,132(sp)
 	sw	s10,128(sp)
 	sw	s11,124(sp)
-	lui	a4,%hi(.LC36)
-	addi	a4,a4,%lo(.LC36)
+	lui	a4,%hi(.LC35)
+	addi	a4,a4,%lo(.LC35)
 	sw	a3,0(a5)
 	li	a3,2
 	lw	a2,0(a4)
@@ -301,7 +298,7 @@ main:
 	lui	a5,%hi(Reg)
 	lw	a5,%lo(Reg)(a5)
 	li	a4,80
-	bne	a5,zero,.L81
+	bne	a5,zero,.L80
 	lui	a5,%hi(.LC2)
 	addi	a5,a5,%lo(.LC2)
 	li	a3,-16777216
@@ -310,7 +307,7 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L18
-.L137:
+.L135:
 	li	a5,10
 	sb	a5,3(a3)
 	lui	a5,%hi(.LC3)
@@ -333,76 +330,78 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L22
-	lw	a5,136(a3)
+	lui	a5,%hi(.LC36)
 	lw	a4,128(a3)
-	lui	a2,%hi(Begin_Time)
-	sw	a5,40(sp)
-	sw	a4,%lo(Begin_Time)(a2)
-	lw	a4,152(a3)
-	lui	a5,%hi(.LC37)
-	addi	a5,a5,%lo(.LC37)
-	sw	a4,44(sp)
-	lui	a4,%hi(Ptr_Glob)
-	lw	s0,%lo(Ptr_Glob)(a4)
-	lw	a4,0(a5)
+	addi	a5,a5,%lo(.LC36)
+	lui	a3,%hi(Ptr_Glob)
+	lw	s0,%lo(Ptr_Glob)(a3)
+	lw	a3,0(a5)
 	lbu	s4,50(sp)
 	li	s9,200
-	sw	a4,0(sp)
-	lw	a4,4(a5)
+	sw	a3,4(sp)
+	lw	a3,4(a5)
 	lui	s5,%hi(.LANCHOR1)
-	mv	s2,s4
-	sw	a4,4(sp)
-	lw	a4,8(a5)
+#APP
+# 43 "test_programs/dhry_1.c" 1
+	csrr s2, instret
+# 0 "" 2
+#NO_APP
+	sw	a3,8(sp)
+	lw	a3,8(a5)
+	sw	s2,44(sp)
 	lui	s6,%hi(Ch_1_Glob)
+	sw	a3,12(sp)
+	lw	a3,12(a5)
+	mv	s2,s4
 	addi	s5,s5,%lo(.LANCHOR1)
-	sw	a4,8(sp)
-	lw	a4,12(a5)
+	sw	a3,16(sp)
+	lw	a3,16(a5)
 	li	s8,65
 	li	s1,89
-	sw	a4,12(sp)
-	lw	a4,16(a5)
+	sw	a3,20(sp)
+	lw	a3,20(a5)
 	li	s7,7
 	li	s11,8
-	sw	a4,16(sp)
-	lw	a4,20(a5)
+	sw	a3,24(sp)
+	lw	a3,24(a5)
 	li	s10,5
 	mv	s4,s9
-	sw	a4,20(sp)
-	lw	a4,24(a5)
-	sw	a4,24(sp)
-	lhu	a4,28(a5)
+	sw	a3,28(sp)
+	lhu	a3,28(a5)
 	lbu	a5,30(a5)
-	sw	a4,28(sp)
-	sw	a5,32(sp)
+	sw	a3,32(sp)
+	sw	a5,36(sp)
+	lui	a5,%hi(Begin_Time)
+	sw	a4,%lo(Begin_Time)(a5)
 	lui	a5,%hi(Arr_2_Glob+4096)
 	addi	a5,a5,%lo(Arr_2_Glob+4096)
-	sw	a5,36(sp)
+	sw	a5,40(sp)
 .L29:
 	lui	a5,%hi(Ch_2_Glob)
 	li	a4,66
 	sb	a4,%lo(Ch_2_Glob)(a5)
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	sb	s8,%lo(Ch_1_Glob)(s6)
 	sw	a5,80(sp)
-	lw	a5,4(sp)
-	sw	a5,84(sp)
 	lw	a5,8(sp)
-	sw	a5,88(sp)
+	sw	a5,84(sp)
 	lw	a5,12(sp)
-	sw	a5,92(sp)
+	sw	a5,88(sp)
 	lw	a5,16(sp)
-	sw	a5,96(sp)
+	sw	a5,92(sp)
 	lw	a5,20(sp)
-	sw	a5,100(sp)
+	sw	a5,96(sp)
 	lw	a5,24(sp)
-	sw	a5,104(sp)
+	sw	a5,100(sp)
 	lw	a5,28(sp)
-	sh	a5,108(sp)
+	sw	a5,104(sp)
 	lw	a5,32(sp)
+	sh	a5,108(sp)
+	lw	a5,36(sp)
 	sb	a5,110(sp)
 	li	a5,0
 .L23:
-	beq	s2,s1,.L74
+	beq	s2,s1,.L73
 	li	s9,65
 	beq	a5,zero,.L24
 	sb	s1,%lo(Ch_1_Glob)(s6)
@@ -416,7 +415,7 @@ main:
 	sw	s11,1632(s3)
 	addi	a5,a5,1
 	sw	a5,1628(s3)
-	lw	a5,36(sp)
+	lw	a5,40(sp)
 	sw	s11,1636(s3)
 	sw	s7,36(s5)
 	sw	s7,32(s5)
@@ -454,7 +453,7 @@ main:
 	sw	a3,0(a5)
 	sw	a4,12(s0)
 	lw	a1,4(a5)
-	beq	a1,zero,.L146
+	beq	a1,zero,.L144
 	lw	ra,0(a3)
 	lw	t2,4(a3)
 	lw	t0,8(a3)
@@ -487,15 +486,19 @@ main:
 	addi	s4,s4,-1
 	bne	s4,zero,.L29
 	li	a4,-16777216
-	lw	a3,128(a4)
-	lui	s2,%hi(End_Time)
-	lw	s0,152(a4)
-	lw	s1,136(a4)
+	lw	a4,128(a4)
+	lui	s1,%hi(End_Time)
+	lw	s2,44(sp)
+	sw	a4,%lo(End_Time)(s1)
 	lui	a4,%hi(.LC5)
-	sw	a3,%lo(End_Time)(s2)
-	addi	a4,a4,%lo(.LC5)
 	li	a3,69
+	addi	a4,a4,%lo(.LC5)
 	li	a2,-16777216
+#APP
+# 43 "test_programs/dhry_1.c" 1
+	csrr s0, instret
+# 0 "" 2
+#NO_APP
 .L30:
 	addi	a4,a4,1
 	sb	a3,3(a2)
@@ -523,11 +526,11 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L32
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Int_Glob)
 	lw	a0,%lo(Int_Glob)(a5)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC8)
 	li	a3,66
 	addi	a4,a4,%lo(.LC8)
@@ -537,11 +540,11 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L33
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Bool_Glob)
 	lw	a0,%lo(Bool_Glob)(a5)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC9)
 	li	a3,67
 	addi	a4,a4,%lo(.LC9)
@@ -552,9 +555,9 @@ main:
 	lbu	a3,0(a4)
 	bne	a3,zero,.L34
 	lbu	a0,%lo(Ch_1_Glob)(s6)
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC10)
 	li	a3,67
 	addi	a4,a4,%lo(.LC10)
@@ -564,11 +567,11 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L35
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Ch_2_Glob)
 	lbu	a0,%lo(Ch_2_Glob)(a5)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC11)
 	li	a3,65
 	addi	a4,a4,%lo(.LC11)
@@ -579,9 +582,9 @@ main:
 	lbu	a3,0(a4)
 	bne	a3,zero,.L36
 	lw	a0,32(s5)
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC12)
 	li	a3,65
 	addi	a4,a4,%lo(.LC12)
@@ -592,9 +595,9 @@ main:
 	lbu	a3,0(a4)
 	bne	a3,zero,.L37
 	lw	a0,1628(s3)
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC13)
 	li	a3,80
 	addi	a4,a4,%lo(.LC13)
@@ -614,12 +617,12 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L39
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Ptr_Glob)
 	lw	a4,%lo(Ptr_Glob)(a5)
 	lw	a0,0(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC15)
 	addi	s6,a4,%lo(.LC15)
 	li	a3,32
@@ -630,12 +633,12 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L40
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Ptr_Glob)
 	lw	a4,%lo(Ptr_Glob)(a5)
 	lw	a0,4(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC16)
 	addi	s5,a4,%lo(.LC16)
 	li	a3,32
@@ -646,12 +649,12 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L41
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Ptr_Glob)
 	lw	a4,%lo(Ptr_Glob)(a5)
 	lw	a0,8(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC17)
 	addi	s4,a4,%lo(.LC17)
 	li	a3,32
@@ -662,12 +665,12 @@ main:
 	sb	a3,3(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L42
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Ptr_Glob)
 	lw	a4,%lo(Ptr_Glob)(a5)
 	lw	a0,12(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	lui	a4,%hi(.LC18)
 	addi	s3,a4,%lo(.LC18)
 	li	a3,32
@@ -709,12 +712,12 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(s7)
 	bne	a4,zero,.L47
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a4,%lo(Next_Ptr_Glob)(a5)
 	lw	a0,0(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	li	a4,32
 	li	a3,-16777216
 .L48:
@@ -722,12 +725,12 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(s6)
 	bne	a4,zero,.L48
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a4,%lo(Next_Ptr_Glob)(a5)
 	lw	a0,4(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	li	a4,32
 	li	a3,-16777216
 .L49:
@@ -735,12 +738,12 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(s5)
 	bne	a4,zero,.L49
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a4,%lo(Next_Ptr_Glob)(a5)
 	lw	a0,8(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	li	a4,32
 	li	a3,-16777216
 .L50:
@@ -748,12 +751,12 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(s4)
 	bne	a4,zero,.L50
-	sw	a5,0(sp)
+	sw	a5,4(sp)
 	lui	a5,%hi(Next_Ptr_Glob)
 	lw	a4,%lo(Next_Ptr_Glob)(a5)
 	lw	a0,12(a4)
 	call	printhex
-	lw	a5,0(sp)
+	lw	a5,4(sp)
 	li	a4,32
 	li	a3,-16777216
 .L51:
@@ -893,16 +896,13 @@ main:
 	bne	a4,zero,.L65
 	lui	a5,%hi(Begin_Time)
 	lw	a5,%lo(Begin_Time)(a5)
-	lw	s2,%lo(End_Time)(s2)
-	lw	a4,44(sp)
-	li	a3,-16777216
-	sub	s2,s2,a5
-	lw	a5,40(sp)
-	sub	s0,s0,a4
+	lw	s1,%lo(End_Time)(s1)
+	sub	s0,s0,s2
 	li	a4,10
 	sub	s1,s1,a5
 	lui	a5,%hi(.LC29)
 	addi	a5,a5,%lo(.LC29)
+	li	a3,-16777216
 .L67:
 	addi	a5,a5,1
 	sb	a4,3(a3)
@@ -917,7 +917,7 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L68
-	mv	a0,s2
+	mv	a0,s1
 	call	printdecu
 	lui	a5,%hi(.LC31)
 	li	a4,69
@@ -930,47 +930,36 @@ main:
 	bne	a4,zero,.L69
 	mv	a0,s0
 	call	printdecu
+	li	a5,1000
+	mul	s0,s0,a5
 	lui	a5,%hi(.LC32)
-	li	a4,68
+	li	a4,109
 	addi	a5,a5,%lo(.LC32)
 	li	a3,-16777216
+	divu	a0,s0,s1
 .L70:
 	addi	a5,a5,1
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L70
-	mv	a0,s1
-	call	printdecu
-	li	a5,1000
-	mul	s0,s0,a5
-	lui	a5,%hi(.LC33)
-	li	a4,109
-	addi	a5,a5,%lo(.LC33)
-	li	a3,-16777216
-	divu	a0,s0,s2
-.L71:
-	addi	a5,a5,1
-	sb	a4,3(a3)
-	lbu	a4,0(a5)
-	bne	a4,zero,.L71
 	call	printdecu
 	li	a2,1757
 	li	a1,999424
 	addi	a1,a1,576
 	li	a0,200704
 	addi	a0,a0,-704
-	lui	a5,%hi(.LC34)
+	lui	a5,%hi(.LC33)
 	li	a4,109
-	addi	a5,a5,%lo(.LC34)
+	addi	a5,a5,%lo(.LC33)
 	li	a3,-16777216
-	mul	a2,s2,a2
+	mul	a2,s1,a2
 	divu	a2,a2,a1
 	divu	a0,a0,a2
-.L72:
+.L71:
 	addi	a5,a5,1
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
-	bne	a4,zero,.L72
+	bne	a4,zero,.L71
 	call	printdecu
 	lw	ra,172(sp)
 	lw	s0,168(sp)
@@ -988,15 +977,15 @@ main:
 	li	a0,0
 	addi	sp,sp,176
 	jr	ra
-.L74:
+.L73:
 	li	a5,1
 	j	.L23
-.L146:
+.L144:
 	lw	a1,8(s0)
 	li	a4,6
 	sw	a4,12(a5)
 	li	a4,2
-	beq	a1,a4,.L76
+	beq	a1,a4,.L75
 	beq	a1,zero,.L26
 	addi	a1,a1,-4
 	snez	a1,a1
@@ -1007,10 +996,10 @@ main:
 	sw	a3,0(a5)
 	sw	a4,12(a5)
 	j	.L27
-.L76:
+.L75:
 	li	a1,1
 	j	.L26
-.L81:
+.L80:
 	lui	a5,%hi(.LC1)
 	addi	a5,a5,%lo(.LC1)
 	li	a3,-16777216
@@ -1019,7 +1008,7 @@ main:
 	sb	a4,3(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L16
-	j	.L137
+	j	.L135
 	.size	main, .-main
 	.text
 	.align	1
@@ -1064,7 +1053,7 @@ Proc_1:
 	addi	a3,a1,12
 	sw	a3,12(a4)
 	lw	a3,4(a5)
-	beq	a3,zero,.L155
+	beq	a3,zero,.L153
 	lw	a5,0(a0)
 	lw	t6,0(a5)
 	lw	t5,4(a5)
@@ -1091,35 +1080,35 @@ Proc_1:
 	sw	a4,40(a0)
 	sw	a5,44(a0)
 	ret
-.L155:
+.L153:
 	lw	a3,8(a0)
 	li	a2,6
 	sw	a2,12(a5)
 	li	a2,2
-	beq	a3,a2,.L156
+	beq	a3,a2,.L154
 	li	a0,3
 	sw	a0,8(a5)
 	li	a0,1
-	beq	a3,a0,.L151
+	beq	a3,a0,.L149
 	li	a1,4
-	beq	a3,a1,.L152
-	beq	a3,zero,.L154
-.L150:
+	beq	a3,a1,.L150
+	beq	a3,zero,.L152
+.L148:
 	lw	a4,0(a4)
 	li	a3,18
 	sw	a3,12(a5)
 	sw	a4,0(a5)
 	ret
-.L151:
+.L149:
 	li	a3,100
-	ble	a1,a3,.L150
-.L154:
-	sw	zero,8(a5)
-	j	.L150
+	ble	a1,a3,.L148
 .L152:
+	sw	zero,8(a5)
+	j	.L148
+.L150:
 	sw	a2,8(a5)
-	j	.L150
-.L156:
+	j	.L148
+.L154:
 	lw	a4,0(a4)
 	li	a3,1
 	sw	a3,8(a5)
@@ -1135,9 +1124,9 @@ Proc_2:
 	lui	a5,%hi(Ch_1_Glob)
 	lbu	a4,%lo(Ch_1_Glob)(a5)
 	li	a5,65
-	beq	a4,a5,.L159
+	beq	a4,a5,.L157
 	ret
-.L159:
+.L157:
 	lw	a5,0(a0)
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
@@ -1152,11 +1141,11 @@ Proc_2:
 Proc_3:
 	lui	a4,%hi(Ptr_Glob)
 	lw	a5,%lo(Ptr_Glob)(a4)
-	beq	a5,zero,.L161
+	beq	a5,zero,.L159
 	lw	a5,0(a5)
 	sw	a5,0(a0)
 	lw	a5,%lo(Ptr_Glob)(a4)
-.L161:
+.L159:
 	lui	a4,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a4)
 	addi	a4,a4,12
@@ -1196,28 +1185,28 @@ Proc_5:
 	.type	Proc_6, @function
 Proc_6:
 	li	a5,2
-	beq	a0,a5,.L173
+	beq	a0,a5,.L171
 	li	a4,3
 	sw	a4,0(a1)
 	li	a4,1
-	beq	a0,a4,.L170
+	beq	a0,a4,.L168
 	li	a4,4
-	beq	a0,a4,.L171
-	beq	a0,zero,.L172
-.L169:
+	beq	a0,a4,.L169
+	beq	a0,zero,.L170
+.L167:
 	ret
-.L170:
+.L168:
 	lui	a5,%hi(Int_Glob)
 	lw	a4,%lo(Int_Glob)(a5)
 	li	a5,100
-	ble	a4,a5,.L169
-.L172:
+	ble	a4,a5,.L167
+.L170:
 	sw	zero,0(a1)
 	ret
-.L171:
+.L169:
 	sw	a5,0(a1)
 	ret
-.L173:
+.L171:
 	li	a5,1
 	sw	a5,0(a1)
 	ret
@@ -1266,10 +1255,10 @@ Proc_8:
 Func_1:
 	andi	a0,a0,0xff
 	andi	a1,a1,0xff
-	beq	a0,a1,.L179
+	beq	a0,a1,.L177
 	li	a0,0
 	ret
-.L179:
+.L177:
 	lui	a5,%hi(Ch_1_Glob)
 	sb	a0,%lo(Ch_1_Glob)(a5)
 	li	a0,1
@@ -1285,28 +1274,28 @@ Func_2:
 	lbu	a4,3(a1)
 	li	a2,0
 	li	a3,0
-.L181:
-	beq	a5,a4,.L184
-	beq	a3,zero,.L182
+.L179:
+	beq	a5,a4,.L182
+	beq	a3,zero,.L180
 	lui	a5,%hi(Ch_1_Glob)
 	sb	a2,%lo(Ch_1_Glob)(a5)
-.L182:
+.L180:
 	call	strcmp
 	li	a5,0
-	ble	a0,zero,.L180
+	ble	a0,zero,.L178
 	lui	a5,%hi(Int_Glob)
 	li	a4,10
 	sw	a4,%lo(Int_Glob)(a5)
 	li	a5,1
-.L180:
+.L178:
 	lw	ra,12(sp)
 	mv	a0,a5
 	addi	sp,sp,16
 	jr	ra
-.L184:
+.L182:
 	li	a3,1
 	mv	a2,a5
-	j	.L181
+	j	.L179
 	.size	Func_2, .-Func_2
 	.align	1
 	.globl	Func_3
@@ -1406,5 +1395,5 @@ Ptr_Glob:
 	.size	mallocPtr, 4
 mallocPtr:
 	.word	131072
-	.ident	"GCC: (g1ea978e3066) 12.1.0"
+	.ident	"GCC: (g2ee5e430018) 12.2.0"
 	.section	.note.GNU-stack,"",@progbits

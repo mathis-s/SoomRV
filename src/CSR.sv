@@ -14,6 +14,8 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input wire[3:0] IN_commitBranch,
     input wire IN_branchMispr,
     
+    IF_CSR_MMIO.CSR IF_mmio,
+    
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
     output wire[2:0] OUT_fRoundMode,
@@ -306,6 +308,8 @@ reg[31:0] mcause;
 reg[31:0] mtval;
 reg[15:0] medeleg;
 reg[15:0] mideleg;
+reg[15:0] mip;
+reg[15:0] mie;
 reg[31:0] mcounteren;
 
 reg[31:0] scounteren;
@@ -337,6 +341,14 @@ always_comb begin
         CSR_fflags: rdata = {27'b0, fflags};
         CSR_frm: rdata = {29'b0, frm};
         CSR_fcsr: rdata = {24'b0, frm, fflags};
+        
+        CSR_time,
+        CSR_timeh: begin
+            invalidCSR = !((priv == PRIV_MACHINE) ||
+                (priv == PRIV_SUPERVISOR && mcounteren[1]) ||
+                (priv == PRIV_USER && mcounteren[1] && scounteren[1]));
+            rdata = (IN_uop.imm[11:0] == CSR_time) ? IF_mmio.mtime[31:0] : IF_mmio.mtime[63:32];
+        end
         
         CSR_cycle: begin
             invalidCSR = !((priv == PRIV_MACHINE) ||
@@ -410,6 +422,10 @@ always_comb begin
         CSR_mtvec: rdata = mtvec;
         CSR_medeleg: rdata = {16'b0, medeleg};
         CSR_mideleg: rdata = {16'b0, mideleg};
+        
+        CSR_mip: rdata = {16'b0, mip};
+        CSR_mie: rdata = {16'b0, mie};
+        
         CSR_mscratch: rdata = mscratch;
         CSR_mepc: rdata = mepc;
         CSR_mcause: rdata = mcause;
@@ -421,6 +437,20 @@ always_comb begin
         CSR_scause: rdata = scause;
         CSR_stval: rdata = stval;
         CSR_stvec: rdata = stvec;
+        
+        CSR_sip: begin
+            rdata = 0;
+            rdata[1] = mip[1];
+            rdata[5] = mip[5];
+            rdata[9] = mip[9];
+        end
+        
+        CSR_sie: begin
+            rdata = 0;
+            rdata[1] = mie[1];
+            rdata[5] = mie[5];
+            rdata[9] = mie[9];
+        end
         
         CSR_mhpmevent3: rdata = 3;
         CSR_mhpmevent4: rdata = 4;
@@ -535,6 +565,8 @@ always_ff@(posedge clk) begin
         mtval <= 0;
         mideleg <= 0;
         medeleg <= 0;
+        mip <= 0;
+        mie <= 0;
         
         scounteren <= 0;
         sepc <= 0;
@@ -662,6 +694,23 @@ always_ff@(posedge clk) begin
                             CSR_medeleg: medeleg <= wdata[15:0];
                             CSR_mideleg: mideleg <= wdata[15:0];
                             
+                            CSR_mip: begin
+                                mip[1] <= wdata[1];
+                                // mip[3] <= wdata[3];   // MSIP
+                                mip[5] <= wdata[5];
+                                //mip[7] <= wdata[7];    // timer
+                                mip[9] <= wdata[9];
+                                // mip[11] <= wdata[11]; // external
+                            end
+                            CSR_mie: begin
+                                mie[1] <= wdata[1];
+                                mie[3] <= wdata[3];
+                                mie[5] <= wdata[5];
+                                mie[7] <= wdata[7];
+                                mie[9] <= wdata[9];
+                                mie[11] <= wdata[11];
+                            end
+                            
                             CSR_mscratch: mscratch <= wdata;
                             
                             CSR_mepc: mepc[31:1] <= wdata[31:1];
@@ -683,6 +732,18 @@ always_ff@(posedge clk) begin
                             CSR_stvec: begin
                                 stvec.base <= wdata[31:2];
                                 stvec.mode[0] <= wdata[0];
+                            end
+                            
+                            CSR_sip: begin
+                                mip[1] <= wdata[1]; // SSIP
+                                //mip[5] <= wdata[5]; // STIP
+                                //mip[9] <= wdata[9]; // SEIP
+                            end
+                            
+                            CSR_sie: begin
+                                mie[1] <= wdata[1];
+                                mie[5] <= wdata[5];
+                                mie[9] <= wdata[9];
                             end
                             
                             default: begin end
