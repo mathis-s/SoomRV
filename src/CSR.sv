@@ -253,6 +253,17 @@ typedef enum logic[11:0]
     CSR_mhpmevent31=12'h33F
 } CSRAddr;
 
+typedef enum logic[3:0]
+{
+    SSI=1,
+    MSI=3,
+    STI=5,
+    MTI=7,
+    SEI=9,
+    MEI=11
+} InterruptIndices;
+
+
 PrivLevel priv;
 
 
@@ -329,6 +340,37 @@ assign OUT_trapControl.mideleg = mideleg;
 assign OUT_trapControl.medeleg = medeleg;
 assign OUT_trapControl.priv = priv;
 assign OUT_fRoundMode = frm;
+
+reg interrupt;
+reg[3:0] interruptCause;
+PrivLevel interruptPriv;
+always_comb begin
+    
+    // these are in reverse
+    InterruptIndices mPrio[5:0] = '{STI, SSI, SEI, MTI, MSI, MEI};
+    InterruptIndices sPrio[2:0] = '{STI, SSI, SEI};
+    
+    interruptCause = 0;
+    interrupt = 0;
+    interruptPriv = PRIV_MACHINE;
+    
+        
+    if (priv < PRIV_SUPERVISOR || (mstatus.sie && priv == PRIV_SUPERVISOR))
+        for (i = 0; i < 3; i=i+1)
+            if (mip[sPrio[i]] && mie[sPrio[i]] && !mideleg[sPrio[i]]) begin 
+                interrupt = 1;
+                interruptCause = sPrio[i]; 
+                interruptPriv = PRIV_SUPERVISOR; 
+            end
+            
+    if (priv < PRIV_MACHINE || mstatus.mie)
+        for (i = 0; i < 6; i=i+1)
+            if (mip[mPrio[i]] && mie[mPrio[i]] && !mideleg[mPrio[i]]) begin 
+                interrupt = 1;
+                interruptCause = mPrio[i]; 
+                interruptPriv = PRIV_MACHINE; 
+            end
+end
 
 reg[31:0] rdata;
 reg invalidCSR;
@@ -548,6 +590,9 @@ always_ff@(posedge clk) begin
             
         if (IN_branch.taken)
             mhpmcounter5 <= mhpmcounter5 + 1;
+        
+        // MTIP
+        mip[7] <= IF_mmio.mtimecmp >= IF_mmio.mtime;
     end
     
     if (rst) begin

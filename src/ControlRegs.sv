@@ -60,10 +60,10 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         weReg <= 1;
-        for (i = 0; i < 6; i=i+1)
+        for (i = 0; i < 2; i=i+1)
             cRegs64[i] <= 0;
             
-        for (i = 0; i < 8; i=i+1)
+        for (i = 0; i < 4; i=i+1)
             cRegs[i] <= 0; 
         
         OUT_SPI_clk <= 0;
