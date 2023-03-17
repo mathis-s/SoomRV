@@ -245,11 +245,11 @@ always_ff@(posedge clk) begin
                         end
                     end
                     else if (deqEntries[i].isFP && deqEntries[i].flags >= Flags'(FLAGS_FP_NX) && deqEntries[i].flags <= Flags'(FLAGS_FP_NV)) begin
-                        OUT_fpNewFlags[deqEntries[i].flags[2:0] - FLAGS_FP_NX[2:0]] <= 1;
+                        OUT_fpNewFlags[deqEntries[i].flags[2:0] - 3'(FLAGS_FP_NX)] <= 1;
                         
                         // Underflow and overflow imply inexact
                         if (deqEntries[i].flags == Flags'(FLAGS_FP_UF) || deqEntries[i].flags == Flags'(FLAGS_FP_OF)) begin
-                            OUT_fpNewFlags[FLAGS_FP_NX[2:0]] <= 1;
+                            OUT_fpNewFlags[3'(FLAGS_FP_NX)] <= 1;
                         end
                     end
                     

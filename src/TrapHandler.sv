@@ -134,10 +134,10 @@ always_ff@(posedge clk) begin
                         endcase
                         
                         // Distinguish between ecall in different priv levels
-                        if (trapCause == TRAP_ECALL_M[3:0]) begin
+                        if (trapCause == 4'(TRAP_ECALL_M)) begin
                             case (IN_trapControl.priv)
-                                PRIV_SUPERVISOR: trapCause = TRAP_ECALL_S[3:0];
-                                PRIV_USER: trapCause = TRAP_ECALL_U[3:0];
+                                PRIV_SUPERVISOR: trapCause = 4'(TRAP_ECALL_S);
+                                PRIV_USER: trapCause = 4'(TRAP_ECALL_U);
                                 default: begin end
                             endcase
                         end

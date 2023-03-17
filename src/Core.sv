@@ -7,19 +7,13 @@ module Core
     input wire clk,
     input wire rst,
     input wire en,
-    input wire[127:0] IN_instrRaw,
 
-    output wire[29:0] OUT_MEM_writeAddr,
-    output wire[31:0] OUT_MEM_writeData,
-    output wire OUT_MEM_writeEnable,
-    output wire[3:0] OUT_MEM_writeMask,
-    
-    output wire OUT_MEM_readEnable,
-    output wire[29:0] OUT_MEM_readAddr,
-    input wire[31:0] IN_MEM_readData,
+    IF_Mem.HOST IF_mem,
     
     output wire[27:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
+    input wire[127:0] IN_instrRaw,
+    
     output wire OUT_halt,
     
     output wire OUT_SPI_cs,
@@ -712,6 +706,8 @@ StoreQueue sq
 
 wire LSU_loadFwdValid;
 Tag LSU_loadFwdTag;
+
+IF_Mem IF_mmio;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -721,21 +717,12 @@ LoadStoreUnit lsu
     
     .IN_uopLd(CC_uopLd),
     .IN_uopSt(CC_uopSt),
-    
-    .OUT_MEM_re(OUT_MEM_readEnable),
-    .OUT_MEM_readAddr(OUT_MEM_readAddr),
-    .IN_MEM_readData(IN_MEM_readData),
-    
-    .OUT_MEM_we(OUT_MEM_writeEnable),
-    .OUT_MEM_writeAddr(OUT_MEM_writeAddr),
-    .OUT_MEM_writeData(OUT_MEM_writeData),
-    .OUT_MEM_wm(OUT_MEM_writeMask),
+
+    .IF_mem(IF_mem),
+    .IF_mmio(IF_mmio),
     
     .IN_SQ_lookupMask(SQ_lookupMask),
     .IN_SQ_lookupData(SQ_lookupData),
-    
-    .IN_CSR_data(CSR_dataOut),
-    .OUT_CSR_we(CSR_we),
     
     .OUT_uopLd(wbUOp[2]),
     
@@ -865,7 +852,7 @@ TrapHandler trapHandler
     .OUT_bpUpdate(TH_bpUpdate),
     .OUT_branch(branchProvs[3]),
     
-    .IN_irq(timerIRQ),
+    .IN_irq(1'b0),
     .IN_MEM_busy(MEMSUB_busy),
     .IN_allowBreak(1'b1),
     
@@ -876,30 +863,20 @@ TrapHandler trapHandler
 );
 
 wire IO_busy;
-wire timerIRQ;
 
 ControlRegs cr
 (
     .clk(clk),
     .rst(rst),
-    
-    .IN_we(CSR_we),
-    .IN_wm(OUT_MEM_writeMask),
-    .IN_writeAddr(OUT_MEM_writeAddr[6:0]),
-    .IN_data(OUT_MEM_writeData),
-    
-    .IN_re(OUT_MEM_readEnable),
-    .IN_readAddr(OUT_MEM_readAddr[6:0]),
-    .OUT_data(CSR_dataOut),
-    
+
+    .IF_mem(IF_mmio),
+
     .OUT_SPI_cs(OUT_SPI_cs),
     .OUT_SPI_clk(OUT_SPI_clk),
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso),
     
     .OUT_csrIf(if_CSR_MMIO.MMIO),
-
-    .OUT_tmrIRQ(timerIRQ),
 
     .OUT_IO_busy(IO_busy)
 );

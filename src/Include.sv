@@ -539,3 +539,53 @@ interface IF_CSR_MMIO;
         output mtimecmp
     );
 endinterface
+
+interface IF_MemC;
+    logic ce;
+    logic we;
+    
+    logic[0:0] cacheID;
+    logic[9:0] sramAddr;
+    logic[29:0] extAddr;
+    
+    logic[9:0] progress;
+    logic busy;
+    
+    modport CON
+    (
+        input ce, we, cacheID, sramAddr, extAddr,
+        output progress, busy
+    );
+    
+    modport CT
+    (
+        output ce, we, cacheID, sramAddr, extAddr,
+        input progress, busy
+    );
+endinterface
+
+interface IF_Mem;
+    
+    logic we;
+    logic[30-1:0] waddr;
+    logic[31:0] wdata;
+    logic[3:0] wmask;
+    
+    logic re;
+    logic[30-1:0] raddr;
+    logic[31:0] rdata;
+    
+    
+    modport HOST
+    (
+        output we, waddr, wdata, wmask, re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wdata, wmask, re, raddr,
+        output rdata
+    );
+
+endinterface

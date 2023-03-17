@@ -7,23 +7,12 @@ module LoadStoreUnit
     input AGU_UOp IN_uopLd,
     input ST_UOp IN_uopSt,
     
-    
-    output reg OUT_MEM_re,
-    output reg[29:0] OUT_MEM_readAddr,
-    input wire[31:0] IN_MEM_readData,
-    
-    output reg OUT_MEM_we,
-    output reg[29:0] OUT_MEM_writeAddr,
-    output reg[31:0] OUT_MEM_writeData,
-    output reg[3:0] OUT_MEM_wm,
+    IF_Mem.HOST IF_mem,
+    IF_Mem.HOST IF_mmio,
     
     // Forwarded data from store queue
     input wire[3:0] IN_SQ_lookupMask,
     input wire[31:0] IN_SQ_lookupData,
-    
-    // CSRs can share most ports with regular memory except these
-    input wire[31:0] IN_CSR_data,
-    output reg OUT_CSR_we,
     
     output RES_UOp OUT_uopLd,
     
@@ -43,33 +32,41 @@ assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
 reg isCSRread_1;
 
 always_comb begin
+    IF_mmio.waddr = IF_mem.waddr;
+    IF_mmio.wdata = IF_mem.wdata;
+    IF_mmio.wmask = IF_mem.wmask;
+    IF_mmio.re = IF_mem.re;
+    IF_mmio.raddr = IF_mem.raddr;
+end
+
+always_comb begin
     
-    OUT_MEM_readAddr = IN_uopLd.addr[31:2];
-    OUT_MEM_writeAddr = IN_uopSt.addr[31:2];
-    OUT_MEM_writeData = IN_uopSt.data;
-    OUT_MEM_wm = IN_uopSt.wmask;
+    IF_mem.raddr = IN_uopLd.addr[31:2];
+    IF_mem.waddr = IN_uopSt.addr[31:2];
+    IF_mem.wdata = IN_uopSt.data;
+    IF_mem.wmask = IN_uopSt.wmask;
         
     // Load
     if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111) begin
-        OUT_MEM_re = 0;
+        IF_mem.re = 0;
     end
-    else OUT_MEM_re = 1;
+    else IF_mem.re = 1;
     
     // Store
     if (IN_uopSt.valid) begin
         
         if (IN_uopSt.addr[31:24] == 8'hFF) begin
-            OUT_MEM_we = 1;
-            OUT_CSR_we = 0;
+            IF_mem.we = 1;
+            IF_mmio.we = 0;
         end
         else begin
-            OUT_MEM_we = 0;
-            OUT_CSR_we = 1;
+            IF_mem.we = 0;
+            IF_mmio.we = 1;
         end
     end
     else begin
-        OUT_MEM_we = 1;
-        OUT_CSR_we = 1;
+        IF_mem.we = 1;
+        IF_mmio.we = 1;
     end
 end
 
@@ -77,13 +74,13 @@ always_comb begin
     reg[31:0] result = 32'bx;
     reg[31:0] data;
     data[31:24] = uopLd_1.wmask[3] ? uopLd_1.data[31:24] : 
-        (isCSRread_1 ?  IN_CSR_data[31:24] : IN_MEM_readData[31:24]);
+        (isCSRread_1 ?  IF_mmio.rdata[31:24] : IF_mem.rdata[31:24]);
     data[23:16] = uopLd_1.wmask[2] ? uopLd_1.data[23:16] : 
-        (isCSRread_1 ? IN_CSR_data[23:16] : IN_MEM_readData[23:16]);
+        (isCSRread_1 ? IF_mmio.rdata[23:16] : IF_mem.rdata[23:16]);
     data[15:8] = uopLd_1.wmask[1] ? uopLd_1.data[15:8] : 
-        (isCSRread_1 ? IN_CSR_data[15:8] : IN_MEM_readData[15:8]);
+        (isCSRread_1 ? IF_mmio.rdata[15:8] : IF_mem.rdata[15:8]);
     data[7:0] = uopLd_1.wmask[0] ? uopLd_1.data[7:0] : 
-        (isCSRread_1 ? IN_CSR_data[7:0] : IN_MEM_readData[7:0]);
+        (isCSRread_1 ? IF_mmio.rdata[7:0] : IF_mem.rdata[7:0]);
     
     case (uopLd_1.size)
         

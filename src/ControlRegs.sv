@@ -9,14 +9,7 @@ module ControlRegs
     input wire clk,
     input wire rst,
     
-    input wire IN_we,
-    input wire[3:0] IN_wm,
-    input wire[6:0] IN_writeAddr,
-    input wire[31:0] IN_data,
-    
-    input wire IN_re,
-    input wire[6:0] IN_readAddr,
-    output reg[31:0] OUT_data,
+    IF_Mem.MEM IF_mem,
     
     output reg OUT_SPI_cs,
     output reg OUT_SPI_clk,
@@ -25,7 +18,6 @@ module ControlRegs
     
     IF_CSR_MMIO.MMIO OUT_csrIf,
     
-    output reg OUT_tmrIRQ,
     output wire OUT_IO_busy
 );
 
@@ -57,14 +49,13 @@ reg[31:0] cRegs[3:0];
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
 
-assign OUT_IO_busy = (spiCnt > 0) || (!IN_we) || !weReg;
+assign OUT_IO_busy = (spiCnt > 0) || (!IF_mem.we) || !weReg;
 
 assign OUT_csrIf.mtime = cRegs64[0];
 assign OUT_csrIf.mtimecmp = cRegs64[1];
 
 always_ff@(posedge clk) begin
     
-    OUT_tmrIRQ <= 0;
     cRegs64[0] <= cRegs64[0] + 1;
     
     if (rst) begin
@@ -135,21 +126,21 @@ always_ff@(posedge clk) begin
         if (!reReg) begin
             if (readAddrReg[5]) begin
                 if (readAddrReg[0])
-                    OUT_data <= cRegs64[readAddrReg[1:1]][63:32];
+                    IF_mem.rdata <= cRegs64[readAddrReg[1:1]][63:32];
                 else
-                    OUT_data <= cRegs64[readAddrReg[1:1]][31:0];
+                    IF_mem.rdata <= cRegs64[readAddrReg[1:1]][31:0];
             end
             else begin
-                OUT_data <= cRegs[readAddrReg[1:0]];
+                IF_mem.rdata <= cRegs[readAddrReg[1:0]];
             end
         end
         
-        reReg <= IN_re;
-        weReg <= IN_we;
-        wmReg <= IN_wm;
-        readAddrReg <= IN_readAddr;
-        writeAddrReg <= IN_writeAddr;
-        dataReg <= IN_data;
+        reReg <= IF_mem.re;
+        weReg <= IF_mem.we;
+        wmReg <= IF_mem.wmask;
+        readAddrReg <= IF_mem.raddr[6:0];
+        writeAddrReg <= IF_mem.waddr[6:0];
+        dataReg <= IF_mem.wdata;
     end
 
 end

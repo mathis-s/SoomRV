@@ -65,23 +65,15 @@ ExternalMemorySim extMem
     .bus(EXTMEM_bus)
 );
 
+IF_Mem IF_mem;
 CacheIF CORE_DC_if;
 always_comb begin
-    CORE_DC_if.ce = CORE_writeEnable;
-    CORE_DC_if.we = CORE_writeEnable;
-    CORE_DC_if.wm = CORE_writeMask;
-    CORE_DC_if.addr = CORE_writeAddr;
-    CORE_DC_if.data = CORE_writeData;
+    CORE_DC_if.ce = IF_mem.we;
+    CORE_DC_if.we = IF_mem.we;
+    CORE_DC_if.wm = IF_mem.wmask;
+    CORE_DC_if.addr = IF_mem.waddr;
+    CORE_DC_if.data = IF_mem.wdata;
 end
-
-wire CORE_writeEnable;
-wire[31:0] CORE_writeData;
-wire[29:0] CORE_writeAddr;
-wire[3:0] CORE_writeMask;
-
-wire CORE_readEnable;
-wire[29:0] CORE_readAddr;
-wire[31:0] CORE_readData;
 
 wire CORE_instrReadEnable;
 wire[27:0] CORE_instrReadAddress;
@@ -89,25 +81,19 @@ wire[127:0] CORE_instrReadData;
 
 wire SPI_mosi;
 wire SPI_clk;
+
 Core core
 (
     .clk(clk),
     .rst(rst),
     .en(en),
     
-    .IN_instrRaw(CORE_instrReadData),
-    
-    .OUT_MEM_writeAddr(CORE_writeAddr),
-    .OUT_MEM_writeData(CORE_writeData),
-    .OUT_MEM_writeEnable(CORE_writeEnable),
-    .OUT_MEM_writeMask(CORE_writeMask),
-    
-    .OUT_MEM_readEnable(CORE_readEnable),
-    .OUT_MEM_readAddr(CORE_readAddr),
-    .IN_MEM_readData(CORE_readData),
+    .IF_mem(IF_mem),
     
     .OUT_instrAddr(CORE_instrReadAddress),
     .OUT_instrReadEnable(CORE_instrReadEnable),
+    .IN_instrRaw(CORE_instrReadData),
+    
     .OUT_halt(OUT_halt),
     
     .OUT_SPI_cs(),
@@ -129,7 +115,6 @@ reg[7:0] spiByte = 0;
 always@(posedge SPI_clk) begin
     spiByte = {spiByte[6:0], SPI_mosi};
     spiCnt = spiCnt + 1;
-    //$display("cnt %d %x", spiCnt, mprj_io[25]);
     if (spiCnt == 8) begin
         $write("%c", spiByte);
         spiCnt = 0;
@@ -150,12 +135,11 @@ MemRTL dcache
     .IN_wm(DC_if.wm),
     .OUT_data(DC_dataOut),
     
-    .IN_nce1(!(!CORE_readEnable && CORE_readAddr < 1024)),
-    .IN_addr1(CORE_readAddr[9:0]),
-    .OUT_data1(CORE_readData)
+    .IN_nce1(!(!IF_mem.re && IF_mem.raddr < 1024)),
+    .IN_addr1(IF_mem.raddr[9:0]),
+    .OUT_data1(IF_mem.rdata)
 );
 
-//wire[31:0] IC_dataOut;
 MemRTL#(64, 512) icache
 (
     .clk(clk),
@@ -170,10 +154,5 @@ MemRTL#(64, 512) icache
     .IN_addr1({CORE_instrReadAddress[7:0], 1'b0}),
     .OUT_data1(CORE_instrReadData[63:0])
 );
-
-//always@(posedge clk) begin
-//    if (!CORE_DC_if.ce && !CORE_DC_if.we && CORE_DC_if.wm == 4'b0001 && CORE_DC_if.addr == 30'h3F800000)
-//        $write("%c", CORE_DC_if.data[7:0]);
-//end
 
 endmodule
