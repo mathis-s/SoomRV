@@ -323,6 +323,7 @@ reg[15:0] mip;
 reg[15:0] mie;
 reg[5:0] mcounteren;
 reg[5:0] mcounterinhibit;
+reg menvcfg_fiom;
 
 reg[5:0] scounteren;
 reg[31:0] sepc;
@@ -483,6 +484,7 @@ always_comb begin
         CSR_mepc: rdata = mepc;
         CSR_mcause: rdata = mcause;
         CSR_mtval: rdata = mtval;
+        CSR_menvcfg: rdata = {31'b0, menvcfg_fiom};
         
         CSR_scounteren: rdata = {26'b0, scounteren};
         CSR_sepc: rdata = sepc;
@@ -510,6 +512,7 @@ always_comb begin
         CSR_mhpmevent5: rdata = 5;
         
         // read-only zero CSRs
+        CSR_menvcfgh,
         CSR_mvendorid,
         CSR_mconfigptr,
         CSR_mstatush,
@@ -574,6 +577,7 @@ always_ff@(posedge clk) begin
                 mstatus.mpp <= priv;
                 mepc <= IN_trapInfo.trapPC;
                 mcause[3:0] <= IN_trapInfo.cause;
+                mcause[4] <= 0;
                 mcause[31] <= IN_trapInfo.isInterrupt;
                 mtval <= 0;
                 
@@ -756,6 +760,7 @@ always_ff@(posedge clk) begin
                                 mtvec.base <= wdata[31:2];
                                 mtvec.mode[0] <= wdata[0];
                             end
+                            CSR_menvcfg: menvcfg_fiom <= wdata[0];
                             
                             CSR_medeleg: medeleg <= wdata[15:0];
                             CSR_mideleg: mideleg <= wdata[15:0];
@@ -781,7 +786,7 @@ always_ff@(posedge clk) begin
                             
                             CSR_mepc: mepc[31:1] <= wdata[31:1];
                             CSR_mcause: begin
-                                mcause[3:0] <= wdata[3:0];
+                                mcause[4:0] <= wdata[4:0];
                                 mcause[31] <= wdata[31];
                             end
                             CSR_mtval: mtval <= wdata;
