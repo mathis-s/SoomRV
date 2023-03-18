@@ -278,27 +278,27 @@ reg[63:0] mhpmcounter5; // total mispredicts
 
 typedef struct packed
 {
-    bit sd; // state dirty
-    bit[7:0] wpri23;
+    bit sd; // state dirty (0)
+    bit[7:0] wpri23; // (0)
     bit tsr; // trap sret
     bit tw; // timeout wait (1 -> illegal instr on wfi)
     bit tvm; // trap virtual memory
     bit mxr; // make exectuable readable, 0 if s mode not supported
     bit sum; // permit supervisor user memory access
     bit mprv; // memory privilege (1 -> ld/st memory access via mode in MPP), 0 if u mode not supported
-    bit[1:0] xs; // extended register state
-    bit[1:0] fs_; // floating point register state
+    bit[1:0] xs; // extended register state (0)
+    bit[1:0] fs_; // floating point register state (0)
     PrivLevel mpp; // machine prior privilege
-    bit[1:0] vs; // vector register state
+    bit[1:0] vs; // vector register state (0)
     bit spp; // supervisor prior privilege 
     bit mpie; // machine prior interrupt enable
-    bit ube; // user big endian
+    bit ube; // user big endian (0)
     bit spie; // supervisor prior interrupt enable
-    bit wpri4;
+    bit wpri4; // (0)
     bit mie; // machine interrupt enable
-    bit wpri2;
+    bit wpri2; // (0)
     bit sie; // supervisor interrupt enable
-    bit wpri0;
+    bit wpri0; // (0)
 } MStatus_t;
 
 MStatus_t mstatus;
@@ -727,6 +727,14 @@ always_ff@(posedge clk) begin
                             
                             CSR_mstatus: begin
                                 MStatus_t temp = wdata;
+                                
+                                mstatus.tsr <= temp.tsr;
+                                mstatus.tw <= temp.tw;
+                                mstatus.tvm <= temp.tvm;
+                                mstatus.mxr <= temp.mxr;
+                                mstatus.sum <= temp.sum;
+                                mstatus.mprv <= temp.mprv;
+                                
                                 mstatus.sie <= temp.sie;
                                 mstatus.mie <= temp.mie;
                                 mstatus.spie <= temp.spie;
