@@ -26,13 +26,14 @@ module TrapHandler
 
 reg memoryWait;
 reg instrFence;
-reg externalIRQ;
 
 assign OUT_disableIFetch = memoryWait;
 
 
 assign OUT_pcReadAddr = IN_trapInstr.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
+wire[31:0] nextInstr = {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
+
 BHist_t baseIndexHist;
 BranchPredInfo baseIndexBPI;
 always_comb begin
@@ -62,11 +63,8 @@ always_ff@(posedge clk) begin
     if (rst) begin
         memoryWait <= 0;
         instrFence <= 0;
-        externalIRQ <= 0;
     end
     else begin
-        
-        externalIRQ <= externalIRQ | IN_irq;
         
         if (memoryWait && !IN_MEM_busy) begin
             if (instrFence) begin
@@ -80,96 +78,132 @@ always_ff@(posedge clk) begin
             
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
+        
             if ((IN_trapInstr.flags == FLAGS_TRAP && IN_allowBreak && IN_trapInstr.name == TRAP_BREAK[4:0]) || 
-                IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING) begin
+                IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING || IN_trapInstr.flags == FLAGS_XRET) begin
                 
-                if (IN_trapInstr.flags == FLAGS_TRAP)
-                    OUT_halt <= 1;
-                else if (IN_trapInstr.flags == FLAGS_ORDERING) begin
-                    memoryWait <= 1;
-                end
-                else if (IN_trapInstr.flags == FLAGS_FENCE) begin
-                    instrFence <= 1;
-                    memoryWait <= 1;
-                    OUT_fence <= 1;
-                end
+                case (IN_trapInstr.flags)
+                    FLAGS_TRAP: begin
+                        OUT_halt <= 1;
+                        OUT_branch.dstPC <= nextInstr;
+                    end
+                    FLAGS_ORDERING: begin
+                        memoryWait <= 1;
+                        OUT_branch.dstPC <= nextInstr;
+                    end
+                    FLAGS_FENCE: begin
+                        instrFence <= 1;
+                        memoryWait <= 1;
+                        OUT_fence <= 1;
+                        OUT_branch.dstPC <= nextInstr;
+                    end
+                    FLAGS_XRET: begin
+                        OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
+                    end
+                    
+                    default: begin end
+                endcase
+                
+                // When an interrupt is pending after mret/sret or FLAGS_ORDERING (includes CSR write), execute it immediately
+                if (IN_trapInstr.flags == FLAGS_XRET || IN_trapInstr.flags == FLAGS_ORDERING)
+                    if (IN_trapControl.interruptPending) begin
+                        OUT_trapInfo.valid <= 1;
+                        OUT_trapInfo.trapPC <= IN_trapInstr.flags == FLAGS_XRET ? {IN_trapControl.retvec, 1'b0} : nextInstr;
+                        OUT_trapInfo.cause <= IN_trapControl.interruptCause;
+                        OUT_trapInfo.delegate <= IN_trapControl.interruptDelegate;
+                        OUT_trapInfo.isInterrupt <= 1;
+                        OUT_branch.dstPC <= {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
+                    end
                 
                 OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
+                OUT_branch.history <= baseIndexHist;
+                
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= 0;//IN_trapInstr.fetchID;
-                OUT_branch.history <= baseIndexHist;
+                OUT_branch.fetchID <= 0;
             end
-            else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_XRET) || externalIRQ) begin
+            else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)) begin
                 
-                
-                OUT_branch.taken <= 1;
-                
-                if (IN_trapInstr.flags == FLAGS_XRET)
-                    OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
-                else begin
-                    reg[3:0] trapCause;
-                    reg delegate;
-                    reg isInterrupt = !(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
+                reg[3:0] trapCause;
+                reg delegate;
+                reg isInterrupt = !(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
                         
-                    // TODO: add all trap reasons
-                    if (isInterrupt) begin
-                        trapCause = 0;
-                        externalIRQ <= 0;
-                    end
-                    else begin
-                        case (IN_trapInstr.flags)
-                            FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
-                            FLAGS_LD_MA: trapCause = 4;
-                            FLAGS_LD_AF: trapCause = 5;
-                            FLAGS_LD_PF: trapCause = 13;
-                            FLAGS_ST_MA: trapCause = 6;
-                            FLAGS_ST_AF: trapCause = 7;
-                            FLAGS_ST_PF: trapCause = 15;
-                            FLAGS_ILLEGAL_INSTR: trapCause = 2; 
-                            default: trapCause = 7;
-                        endcase
-                        
-                        // Distinguish between ecall in different priv levels
-                        if (trapCause == 4'(TRAP_ECALL_M)) begin
-                            case (IN_trapControl.priv)
-                                PRIV_SUPERVISOR: trapCause = 4'(TRAP_ECALL_S);
-                                PRIV_USER: trapCause = 4'(TRAP_ECALL_U);
-                                default: begin end
-                            endcase
-                        end
-                    end
-                    
-                    delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
-                        (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
-                    
-                    OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
-                    
-                    OUT_trapInfo.valid <= 1;
-                    OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
-                    OUT_trapInfo.cause <= trapCause;
-                    OUT_trapInfo.delegate <= delegate;
-                    OUT_trapInfo.isInterrupt <= isInterrupt;
+                // TODO: add all trap reasons
+                if (isInterrupt) begin
+                    trapCause = 0;
                 end
+                else begin
+                    case (IN_trapInstr.flags)
+                        FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
+                        FLAGS_LD_MA: trapCause = 4;
+                        FLAGS_LD_AF: trapCause = 5;
+                        FLAGS_LD_PF: trapCause = 13;
+                        FLAGS_ST_MA: trapCause = 6;
+                        FLAGS_ST_AF: trapCause = 7;
+                        FLAGS_ST_PF: trapCause = 15;
+                        FLAGS_ILLEGAL_INSTR: trapCause = 2; 
+                        default: trapCause = 7;
+                    endcase
                     
+                    // Distinguish between ecall in different priv levels
+                    if (trapCause == 4'(TRAP_ECALL_M)) begin
+                        case (IN_trapControl.priv)
+                            PRIV_SUPERVISOR: trapCause = 4'(TRAP_ECALL_S);
+                            PRIV_USER: trapCause = 4'(TRAP_ECALL_U);
+                            default: begin end
+                        endcase
+                    end
+                end
+                
+                delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
+                    (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
+                
+                OUT_trapInfo.valid <= 1;
+                OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
+                OUT_trapInfo.cause <= trapCause;
+                OUT_trapInfo.delegate <= delegate;
+                OUT_trapInfo.isInterrupt <= isInterrupt;
+
+                OUT_branch.taken <= 1;
+                OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
+                OUT_branch.history <= baseIndexHist;
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= IN_trapInstr.fetchID;
-                OUT_branch.history <= baseIndexHist;
+                OUT_branch.fetchID <= 0;
             end
             else begin
-                OUT_bpUpdate.valid <= 1;
-                OUT_bpUpdate.pc <= IN_pcReadData.pc;
-                OUT_bpUpdate.compressed <= IN_trapInstr.compressed;
-                OUT_bpUpdate.history <= IN_pcReadData.hist;
-                OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
-                OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
+                if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
+                    OUT_bpUpdate.valid <= 1;
+                    OUT_bpUpdate.pc <= IN_pcReadData.pc;
+                    OUT_bpUpdate.compressed <= IN_trapInstr.compressed;
+                    OUT_bpUpdate.history <= IN_pcReadData.hist;
+                    OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
+                    OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
+                end
+                else assert(IN_trapInstr.flags == FLAGS_NONE);
+                
+                if (IN_trapControl.interruptPending && IN_trapInstr.allowInterrupt) begin
+                    OUT_trapInfo.valid <= 1;
+                    OUT_trapInfo.trapPC <= nextInstr;
+                    OUT_trapInfo.cause <= IN_trapControl.interruptCause;
+                    OUT_trapInfo.delegate <= IN_trapControl.interruptDelegate;
+                    OUT_trapInfo.isInterrupt <= 1;
+                    
+                    OUT_branch.dstPC <= {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
+                    OUT_branch.taken <= 1;
+                    OUT_branch.sqN <= IN_trapInstr.sqN;
+                    OUT_branch.flush <= 1;
+                    OUT_branch.history <= baseIndexHist;
+                    
+                    OUT_branch.storeSqN <= 0;
+                    OUT_branch.loadSqN <= 0;
+                    OUT_branch.fetchID <= 0;
+                end
             end
         end
     end

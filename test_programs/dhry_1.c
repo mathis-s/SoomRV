@@ -44,6 +44,13 @@ inline  int __attribute__((always_inline)) read_cycles() {
     return result; 
 }
 
+inline  int __attribute__((always_inline)) read_time() {
+    int result;
+    asm("csrr %0, time" : "=r"(result));
+    return result; 
+}
+
+
     
 void printf (const char* c, ...)
 {
@@ -82,12 +89,6 @@ Enumeration     Func_1 ();
 #else
         Boolean Reg = true;
 #endif
-
-/* variables for time measurement: */
-long     time()
-{
-  return *((volatile uint32_t*)0xff000080);
-}
 
 extern char* strcpy(char *restrict d, const char *restrict s);
 /*char* strcpy(char *restrict d, const char *restrict s)
@@ -170,7 +171,7 @@ int main ()
   /* Start timer */
   /***************/
   
-  Begin_Time = time();
+  Begin_Time = read_time();
   uint32_t execdBegin = read_cycles();
   
   for (Run_Index = 1; Run_Index <= Number_Of_Runs; ++Run_Index)
@@ -224,7 +225,7 @@ int main ()
   /**************/
   
 
-  End_Time = time();
+  End_Time = read_time();
   uint32_t execdEnd = read_cycles();
 
   printf ("Execution ends\n");

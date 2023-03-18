@@ -1,6 +1,6 @@
 	.file	"bf.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_m2p0_c2p0_zba1p0_zbb1p0"
+	.attribute arch, "rv32i2p0_m2p0_a2p0_c2p0_zba1p0_zbb1p0"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
@@ -20,7 +20,6 @@ translate:
 	addi	t1,t1,%lo(.L5)
 	addi	t4,t4,%lo(.LANCHOR0)
 	li	t5,128
-	.align	3
 .L16:
 	addi	a5,a5,-43
 	andi	a5,a5,0xff
@@ -95,7 +94,6 @@ translate:
 .L4:
 	addi	a1,a3,1
 	li	a5,3
-	.align	3
 .L15:
 	add	t3,a4,a7
 	sub	t3,t3,a0
@@ -155,7 +153,6 @@ run:
 	li	t1,7
 	li	t6,-16777216
 	li	t4,2
-	.align	3
 .L22:
 	sh2add	a3,a4,a1
 	lw	a5,0(a3)
@@ -299,5 +296,5 @@ tape:
 	.size	size, 4
 size:
 	.zero	4
-	.ident	"GCC: (g1ea978e3066) 12.1.0"
+	.ident	"GCC: (g2ee5e430018) 12.2.0"
 	.section	.note.GNU-stack,"",@progbits

@@ -331,19 +331,9 @@ reg[31:0] stval;
 
 reg[30:0] retvec;
 
-assign OUT_trapControl.mvectord = mtvec.mode[0];
-assign OUT_trapControl.mtvec = mtvec.base;
-assign OUT_trapControl.svectord = stvec.mode[0];
-assign OUT_trapControl.stvec = stvec.base;
-assign OUT_trapControl.retvec = retvec;
-assign OUT_trapControl.mideleg = mideleg;
-assign OUT_trapControl.medeleg = medeleg;
-assign OUT_trapControl.priv = priv;
-assign OUT_fRoundMode = frm;
-
 reg interrupt;
 reg[3:0] interruptCause;
-PrivLevel interruptPriv;
+reg interruptDelegate;
 always_comb begin
     
     // these are in reverse
@@ -352,15 +342,15 @@ always_comb begin
     
     interruptCause = 0;
     interrupt = 0;
-    interruptPriv = PRIV_MACHINE;
+    interruptDelegate = 0;
     
         
     if (priv < PRIV_SUPERVISOR || (mstatus.sie && priv == PRIV_SUPERVISOR))
         for (i = 0; i < 3; i=i+1)
-            if (mip[sPrio[i]] && mie[sPrio[i]] && !mideleg[sPrio[i]]) begin 
+            if (mip[sPrio[i]] && mie[sPrio[i]]) begin 
                 interrupt = 1;
                 interruptCause = sPrio[i]; 
-                interruptPriv = PRIV_SUPERVISOR; 
+                interruptDelegate = 1; 
             end
             
     if (priv < PRIV_MACHINE || mstatus.mie)
@@ -368,9 +358,28 @@ always_comb begin
             if (mip[mPrio[i]] && mie[mPrio[i]] && !mideleg[mPrio[i]]) begin 
                 interrupt = 1;
                 interruptCause = mPrio[i]; 
-                interruptPriv = PRIV_MACHINE; 
+                interruptDelegate = 0; 
             end
 end
+
+
+
+assign OUT_trapControl.mvectord = mtvec.mode[0];
+assign OUT_trapControl.mtvec = mtvec.base;
+assign OUT_trapControl.svectord = stvec.mode[0];
+assign OUT_trapControl.stvec = stvec.base;
+assign OUT_trapControl.retvec = retvec;
+assign OUT_trapControl.mideleg = mideleg;
+assign OUT_trapControl.medeleg = medeleg;
+assign OUT_trapControl.priv = priv;
+assign OUT_trapControl.interruptPending = interrupt;
+assign OUT_trapControl.interruptCause = interruptCause;
+assign OUT_trapControl.interruptDelegate = interruptDelegate;
+
+
+assign OUT_fRoundMode = frm;
+
+
 
 reg[31:0] rdata;
 reg invalidCSR;
@@ -544,6 +553,8 @@ always_ff@(posedge clk) begin
     
     // implicit writes
     if (!rst) begin
+    
+        // CSR writes on trap/interrupt
         if (IN_trapInfo.valid) begin
             if (IN_trapInfo.delegate) begin
                 mstatus.spie <= mstatus.sie;
@@ -568,6 +579,8 @@ always_ff@(posedge clk) begin
                 priv <= PRIV_MACHINE;
             end
         end
+        
+        // Other implicit writes
         fflags <= fflags | IN_fpNewFlags;
         mcycle <= mcycle + 1;
         
@@ -592,7 +605,7 @@ always_ff@(posedge clk) begin
             mhpmcounter5 <= mhpmcounter5 + 1;
         
         // MTIP
-        mip[7] <= IF_mmio.mtimecmp >= IF_mmio.mtime;
+        mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
     end
     
     if (rst) begin

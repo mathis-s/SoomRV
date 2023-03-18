@@ -467,6 +467,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    bit allowInterrupt;
     Flags flags;
     Tag tag;
     SqN sqN;
@@ -505,6 +506,10 @@ typedef struct packed
     logic[15:0] medeleg;
     logic[15:0] mideleg;
     PrivLevel priv;
+    
+    logic interruptPending;
+    logic[3:0] interruptCause;
+    logic interruptDelegate;
     
 } TrapControlState;
 

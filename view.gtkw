@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.113 (w)1999-2022 BSI
-[*] Wed Mar 15 13:43:39 2023
+[*] Sat Mar 18 14:09:45 2023
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Wed Mar 15 13:43:16 2023"
-[dumpfile_size] 15473194
+[dumpfile_mtime] "Sat Mar 18 14:09:04 2023"
+[dumpfile_size] 34710881
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 180
+[timestart] 253
 [size] 3840 2118
 [pos] -1 -1
-*-6.630973 324 974 1250 1072 1358 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-9.330974 9690 974 1250 1072 1358 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -102,7 +102,7 @@
 [sst_width] 314
 [signals_width] 572
 [sst_expanded] 1
-[sst_vpaned_height] 1511
+[sst_vpaned_height] 1477
 @28
 TOP.Top.clk
 TOP.Top.en
@@ -113,12 +113,7 @@ TOP.Top.core.DEC_branch
 @22
 TOP.Top.core.DEC_branchDst[30:0]
 TOP.Top.core.branch.dstPC[31:0]
-@820
-TOP.Top.core.IN_MEM_readData[31:0]
-TOP.Top.core.OUT_MEM_writeData[31:0]
 @28
-TOP.Top.core.OUT_MEM_writeEnable
-TOP.Top.core.OUT_MEM_readEnable
 TOP.Top.core.SQ_empty
 @200
 -
@@ -391,13 +386,6 @@ TOP.Top.core.cc.ctable[0].valid
 @200
 -LSU
 @22
-TOP.Top.core.lsu.OUT_MEM_writeData[31:0]
-TOP.Top.core.lsu.OUT_MEM_writeAddr[29:0]
-@28
-TOP.Top.core.lsu.OUT_MEM_we
-@22
-TOP.Top.core.lsu.IN_MEM_readData[31:0]
-TOP.Top.core.lsu.OUT_MEM_readAddr[29:0]
 TOP.Top.core.cc.ctable[7].addr[23:0]
 @28
 TOP.Top.core.cc.ctable[7].used
@@ -558,11 +546,7 @@ TOP.Top.core.rob.entries[19].tag[6:0]
 TOP.Top.core.rob.entries[19].name[4:0]
 @200
 -
-@22
-TOP.Top.core.rob.baseIndex[6:0]
-TOP.Top.core.rob.entries[30].fetchID[4:0]
-@28
-TOP.Top.core.rob.entries[30].valid
-TOP.Top.core.rob.entries[44].valid
+@201
+-TH
 [pattern_trace] 1
 [pattern_trace] 0

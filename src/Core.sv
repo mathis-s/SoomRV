@@ -816,8 +816,9 @@ ROB rob
     .rst(rst),
     .IN_uop(RN_uop),
     .IN_uopValid(RN_uopValid),
-    
     .IN_wbUOps(wbUOp),
+    
+    .IN_interruptPending(CSR_trapControl.interruptPending),
 
     .IN_branch(branch),
     
