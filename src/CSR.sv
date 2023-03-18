@@ -321,9 +321,10 @@ reg[15:0] medeleg;
 reg[15:0] mideleg;
 reg[15:0] mip;
 reg[15:0] mie;
-reg[31:0] mcounteren;
+reg[5:0] mcounteren;
+reg[5:0] mcounterinhibit;
 
-reg[31:0] scounteren;
+reg[5:0] scounteren;
 reg[31:0] sepc;
 reg[31:0] sscratch;
 reg[31:0] scause;
@@ -468,7 +469,8 @@ always_comb begin
         CSR_mhpmcounter4h: rdata = mhpmcounter4[63:32];
         CSR_mhpmcounter5h: rdata = mhpmcounter5[63:32];
         
-        CSR_mcounteren: rdata = mcounteren;
+        CSR_mcounteren: rdata = {26'b0, mcounteren};
+        CSR_mcounterinhibit: rdata = {26'b0, mcounterinhibit};
         
         CSR_mtvec: rdata = mtvec;
         CSR_medeleg: rdata = {16'b0, medeleg};
@@ -482,7 +484,7 @@ always_comb begin
         CSR_mcause: rdata = mcause;
         CSR_mtval: rdata = mtval;
         
-        CSR_scounteren: rdata = scounteren;
+        CSR_scounteren: rdata = {26'b0, scounteren};
         CSR_sepc: rdata = sepc;
         CSR_sscratch: rdata = sscratch;
         CSR_scause: rdata = scause;
@@ -508,7 +510,6 @@ always_comb begin
         CSR_mhpmevent5: rdata = 5;
         
         // read-only zero CSRs
-        CSR_mcounterinhibit,
         CSR_mvendorid,
         CSR_mconfigptr,
         CSR_mstatush,
@@ -582,26 +583,28 @@ always_ff@(posedge clk) begin
         
         // Other implicit writes
         fflags <= fflags | IN_fpNewFlags;
-        mcycle <= mcycle + 1;
         
-        begin
+        if (!mcounterinhibit[0])
+            mcycle <= mcycle + 1;
+        
+        if (!mcounterinhibit[2]) begin
             reg[2:0] temp = 0;
             for (i = 0; i < 4; i=i+1)
                 if (IN_commitValid[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
         
-        begin
+        if (!mcounterinhibit[3]) begin
             reg[2:0] temp = 0;
             for (i = 0; i < 4; i=i+1)
                 if (IN_commitBranch[i]) temp = temp + 1;
             mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
         end
         
-        if (IN_branchMispr)
+        if (!mcounterinhibit[4] && IN_branchMispr)
             mhpmcounter4 <= mhpmcounter4 + 1;
             
-        if (IN_branch.taken)
+        if (!mcounterinhibit[5] && IN_branch.taken)
             mhpmcounter5 <= mhpmcounter5 + 1;
         
         // MTIP
@@ -617,6 +620,7 @@ always_ff@(posedge clk) begin
         mcycle <= 0;
         minstret <= 0;
         mcounteren <= 0;
+        mcounterinhibit <= 0;
         mtvec <= 0;
         mepc <= 0;
         mcause <= 0;
@@ -743,6 +747,10 @@ always_ff@(posedge clk) begin
                             CSR_mhpmcounter5h: mhpmcounter5[63:32] <= wdata;
                             
                             CSR_mcounteren: mcounteren[5:0] <= wdata[5:0];
+                            CSR_mcounterinhibit: begin
+                                mcounterinhibit[0] <= wdata[0];
+                                mcounterinhibit[5:2] <= wdata[5:2];
+                            end
                             
                             CSR_mtvec: begin
                                 mtvec.base <= wdata[31:2];
