@@ -32,14 +32,17 @@ assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
 reg isCSRread_1;
 
 always_comb begin
-    IF_mmio.waddr = IF_mem.waddr;
+    
     IF_mmio.wdata = IF_mem.wdata;
     IF_mmio.wmask = IF_mem.wmask;
     IF_mmio.re = IF_mem.re;
-    IF_mmio.raddr = IF_mem.raddr;
+    
 end
 
 always_comb begin
+    
+    IF_mmio.raddr = IN_uopLd.addr[31:2];
+    IF_mmio.waddr = IN_uopSt.addr[31:2];
     
     IF_mem.raddr = IN_uopLd.addr[31:2];
     IF_mem.waddr = IN_uopSt.addr[31:2];

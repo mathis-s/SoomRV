@@ -50,6 +50,8 @@ reg[31:0] cRegs[3:0];
 reg[5:0] spiCnt;
 
 assign OUT_IO_busy = (spiCnt > 0) || (!IF_mem.we) || !weReg;
+assign IF_mem.rbusy = OUT_IO_busy;
+assign IF_mem.wbusy = OUT_IO_busy;
 
 assign OUT_csrIf.mtime = cRegs64[0];
 assign OUT_csrIf.mtimecmp = cRegs64[1];

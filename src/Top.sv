@@ -135,10 +135,12 @@ MemRTL dcache
     .IN_wm(DC_if.wm),
     .OUT_data(DC_dataOut),
     
-    .IN_nce1(!(!IF_mem.re && IF_mem.raddr < 1024)),
+    .IN_nce1(!(!IF_mem.re)),
     .IN_addr1(IF_mem.raddr[9:0]),
     .OUT_data1(IF_mem.rdata)
 );
+assign IF_mem.rbusy = 1'b0;
+assign IF_mem.wbusy = MC_DC_used[0];
 
 MemRTL#(64, 512) icache
 (

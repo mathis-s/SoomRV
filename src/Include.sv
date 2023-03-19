@@ -569,28 +569,31 @@ interface IF_MemC;
     );
 endinterface
 
-interface IF_Mem;
+interface IF_Mem();
+    
+    localparam ADDR_LEN=30;
     
     logic we;
-    logic[30-1:0] waddr;
+    logic[ADDR_LEN-1:0] waddr;
     logic[31:0] wdata;
     logic[3:0] wmask;
     
     logic re;
-    logic[30-1:0] raddr;
+    logic[ADDR_LEN-1:0] raddr;
     logic[31:0] rdata;
     
+    logic rbusy;
+    logic wbusy;
     
     modport HOST
     (
         output we, waddr, wdata, wmask, re, raddr,
-        input rdata
+        input rdata, rbusy, wbusy
     );
     
     modport MEM
     (
         input we, waddr, wdata, wmask, re, raddr,
-        output rdata
+        output rdata, rbusy, wbusy
     );
-
 endinterface

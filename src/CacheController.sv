@@ -307,7 +307,6 @@ always_ff@(posedge clk) begin
             loading && !waitCycle && 
             cmissUOpSt.addr[31:8] == OUT_MC_extAddr[29:6] && !IN_MC_busy) begin
 
-                // Issue the op as soon as the relevant address is available
                 OUT_uopSt <= cmissUOpSt;
                 OUT_uopSt.addr <= {20'b0, freeEntryID, cmissUOpSt.addr[7:0]};
                 cmissUOpSt.valid <= 0;
