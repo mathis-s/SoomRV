@@ -28,7 +28,7 @@ always_ff@(posedge clk) begin
         0: begin
             if (en) begin
                 addr <= bus;
-                waitCycles <= 2;
+                waitCycles <= 1;
                 state <= 1;
             end
             oen <= 0;

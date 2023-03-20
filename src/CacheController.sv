@@ -102,6 +102,10 @@ reg evictionRqActive;
 reg outHistory;
 always_ff@(posedge clk) begin
     
+    OUT_MC_we <= 0;
+    OUT_MC_ce <= 0;
+    waitCycle <= 0;
+        
     if (rst) begin
         for (i = 0; i < SIZE; i=i+1) begin
             ctable[i].valid <= 0;
@@ -112,16 +116,11 @@ always_ff@(posedge clk) begin
         freeEntryAvail <= 1;
         freeEntryID <= 0;
         
-        OUT_MC_ce <= 0;
-        OUT_MC_we <= 0;
-        
         evicting <= 0;
         loading <= 0;
         
         cmissUOpLd.valid <= 0;
         cmissUOpSt.valid <= 0;
-        
-        waitCycle <= 0;
         
         OUT_uopLd.valid <= 0;
         OUT_uopSt.valid <= 0;
@@ -129,9 +128,6 @@ always_ff@(posedge clk) begin
         evictionRq <= EV_RQ_NONE;
     end
     else begin
-        OUT_MC_ce <= 0;
-        OUT_MC_we <= 0;
-        waitCycle <= 0;
         
         if (fenceActive) begin
             // During fence, we search for used entries using lruPointer to evict them

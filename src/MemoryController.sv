@@ -71,23 +71,31 @@ always_ff@(posedge clk) begin
                     
                 if (IN_ce) begin
                     
-                    // Next state
+                    
                     if (IN_we) begin
+                        // Write
                         isExtWrite <= 1;
                         state <= 2;
                         OUT_CACHE_used[cacheID] <= 1;
+                        
+                        // Start reading from cache immediately
+                        OUT_CACHE_ce[cacheID] <= 0;
+                        OUT_CACHE_we[cacheID] <= 1;
+                        OUT_CACHE_addr[cacheID] <= IN_sramAddr;
+                        sramAddr <= IN_sramAddr + 1;
+                        cnt <= 1;
                     end
                     else begin
+                        // Read
                         isExtWrite <= 0;
-                        waitCycles <= 4;
+                        waitCycles <= 3;
                         state <= 1;
+                        cnt <= 0;
+                        sramAddr <= IN_sramAddr;
                     end
                     
                     cacheID <= IN_cacheID;
                     
-                    // SRAM 
-                    sramAddr <= IN_sramAddr;
-                    cnt <= 0;
                     
                     if (IN_cacheID == 0) len <= 64;
                     else len <= 128;
