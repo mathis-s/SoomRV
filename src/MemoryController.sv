@@ -65,19 +65,24 @@ always_ff@(posedge clk) begin
             
             // Idle
             0: begin
+                OUT_EXT_oen <= 1;
+                for (i = 0; i < NUM_CACHES; i=i+1)
+                    OUT_CACHE_used[i] <= 0;
+                    
                 if (IN_ce) begin
                     
                     // Next state
                     if (IN_we) begin
                         isExtWrite <= 1;
-                        waitCycles <= 0;
+                        state <= 2;
+                        OUT_CACHE_used[cacheID] <= 1;
                     end
                     else begin
                         isExtWrite <= 0;
-                        waitCycles <= 5;
+                        waitCycles <= 4;
+                        state <= 1;
                     end
                     
-                    state <= 1;
                     cacheID <= IN_cacheID;
                     
                     // SRAM 
@@ -106,21 +111,14 @@ always_ff@(posedge clk) begin
                     OUT_progress <= 0;
                     OUT_EXT_bus <= 0;
                 end
-                
-                OUT_EXT_oen <= 1;
-                for (i = 0; i < NUM_CACHES; i=i+1)
-                    OUT_CACHE_used[i] <= 0;
             end
             
             
-            // Wait for external memory
+            // Wait until external memory is ready to send data
             1: begin
                 if (waitCycles == 0) begin
-                    if (isExtWrite) state <= 2;
-                    else begin
-                        state <= 3;
-                        OUT_EXT_oen <= 0;
-                    end
+                    state <= 3;
+                    OUT_EXT_oen <= 0;
                     OUT_CACHE_used[cacheID] <= 1;
                 end
                 waitCycles <= waitCycles - 1;
