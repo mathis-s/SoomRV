@@ -1,5 +1,5 @@
 
-module AGU
+module LoadAGU
 (
     input wire clk,
     input wire rst,

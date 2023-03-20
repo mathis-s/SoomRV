@@ -595,7 +595,7 @@ CacheController cc
 );
 
 AGU_UOp AGU_LD_uop;
-AGU aguLD
+LoadAGU aguLD
 (
     .clk(clk),
     .rst(rst),

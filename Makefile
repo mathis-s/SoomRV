@@ -13,7 +13,7 @@ decoder_tb:
 	src/RF.sv \
 	src/Load.sv \
 	src/ROB.sv \
-	src/AGU.sv \
+	src/LoadAGU.sv \
 	src/BranchPredictor.sv \
 	src/IndirectBranchPredictor.sv \
 	src/LoadBuffer.sv \
