@@ -18,25 +18,15 @@ module Top
 wire[1:0] MC_DC_used;
 CacheIF MC_DC_if[1:0];
 
-wire MC_ce;
-wire MC_we;
-wire[0:0] MC_cacheID;
-wire[9:0] MC_sramAddr;
-wire[29:0] MC_extAddr;
-wire[9:0] MC_progress;
-wire MC_busy;
+CTRL_MemC MemC_ctrl;
+STAT_MemC MemC_stat;
 MemoryController memc
 (
     .clk(clk),
     .rst(rst),
     
-    .IN_ce(MC_ce),
-    .IN_we(MC_we),
-    .IN_cacheID(MC_cacheID),
-    .IN_sramAddr(MC_sramAddr),
-    .IN_extAddr(MC_extAddr),
-    .OUT_progress(MC_progress),
-    .OUT_busy(MC_busy),
+    .IN_ctrl(MemC_ctrl),
+    .OUT_stat(MemC_stat),
     
     .OUT_CACHE_used(MC_DC_used),
     .OUT_CACHE_we('{MC_DC_if[1].we, MC_DC_if[0].we}),
@@ -101,13 +91,8 @@ Core core
     .OUT_SPI_mosi(SPI_mosi),
     .IN_SPI_miso(1'b0),
     
-    .OUT_MC_ce(MC_ce),
-    .OUT_MC_we(MC_we),
-    .OUT_MC_cacheID(MC_cacheID),
-    .OUT_MC_sramAddr(MC_sramAddr),
-    .OUT_MC_extAddr(MC_extAddr),
-    .IN_MC_progress(MC_progress),
-    .IN_MC_busy(MC_busy)
+    .OUT_memc(MemC_ctrl),
+    .IN_memc(MemC_stat)
 );
 
 integer spiCnt = 0;

@@ -3,13 +3,8 @@ module MemoryController#(parameter NUM_CACHES=2)
     input wire clk,
     input wire rst,
     
-    input wire IN_ce,
-    input wire IN_we,
-    input wire[$clog2(NUM_CACHES)-1:0] IN_cacheID,
-    input wire[9:0] IN_sramAddr,
-    input wire[29:0] IN_extAddr,
-    output reg[9:0] OUT_progress,
-    output reg OUT_busy,
+    input CTRL_MemC IN_ctrl,
+    output STAT_MemC OUT_stat,
     
     output reg[NUM_CACHES-1:0] OUT_CACHE_used,
     output reg OUT_CACHE_we[NUM_CACHES-1:0],
@@ -38,10 +33,8 @@ reg[$clog2(NUM_CACHES)-1:0] cacheID;
 
 reg[2:0] waitCycles;
 
-
 assign OUT_CACHE_wm[0] = 4'b1111;
 assign OUT_CACHE_wm[1] = 4'b1111;
-
 
 always_ff@(posedge clk) begin
     
@@ -52,9 +45,9 @@ always_ff@(posedge clk) begin
             OUT_CACHE_we[i] <= 1;
             OUT_CACHE_ce[i] <= 1;
         end
-        OUT_busy <= 0;
+        OUT_stat.busy <= 0;
         OUT_EXT_oen <= 1;
-        OUT_progress <= 0;
+        OUT_stat.progress <= 0;
         len <= 0;
         OUT_EXT_bus <= 0;
         OUT_EXT_en <= 0;
@@ -69,20 +62,20 @@ always_ff@(posedge clk) begin
                 for (i = 0; i < NUM_CACHES; i=i+1)
                     OUT_CACHE_used[i] <= 0;
                     
-                if (IN_ce) begin
+                if (IN_ctrl.ce) begin
                     
                     
-                    if (IN_we) begin
+                    if (IN_ctrl.we) begin
                         // Write
                         isExtWrite <= 1;
                         state <= 2;
-                        OUT_CACHE_used[cacheID] <= 1;
+                        OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
                         
                         // Start reading from cache immediately
-                        OUT_CACHE_ce[cacheID] <= 0;
-                        OUT_CACHE_we[cacheID] <= 1;
-                        OUT_CACHE_addr[cacheID] <= IN_sramAddr;
-                        sramAddr <= IN_sramAddr + 1;
+                        OUT_CACHE_ce[IN_ctrl.cacheID] <= 0;
+                        OUT_CACHE_we[IN_ctrl.cacheID] <= 1;
+                        OUT_CACHE_addr[IN_ctrl.cacheID] <= IN_ctrl.sramAddr;
+                        sramAddr <= IN_ctrl.sramAddr + 1;
                         cnt <= 1;
                     end
                     else begin
@@ -91,32 +84,32 @@ always_ff@(posedge clk) begin
                         waitCycles <= 3;
                         state <= 1;
                         cnt <= 0;
-                        sramAddr <= IN_sramAddr;
+                        sramAddr <= IN_ctrl.sramAddr;
                     end
                     
-                    cacheID <= IN_cacheID;
+                    cacheID <= IN_ctrl.cacheID;
                     
-                    
-                    if (IN_cacheID == 0) len <= 64;
+                    if (IN_ctrl.cacheID == 0) len <= 64;
                     else len <= 128;
                     
                     // External RAM
                     OUT_EXT_en <= 1;
-                    OUT_EXT_bus <= {IN_we, IN_cacheID[0], IN_extAddr[29:0]};
+                    OUT_EXT_bus <= {IN_ctrl.we, IN_ctrl.cacheID[0], IN_ctrl.extAddr[29:0]};
                     OUT_EXT_oen <= 1;
                     
                     // Interface
-                    OUT_busy <= 1;
-                    OUT_progress <= 0;
+                    OUT_stat.busy <= 1;
+                    OUT_stat.progress <= 0;
+                    OUT_stat.cacheID <= IN_ctrl.cacheID;
                 end
                 else begin
                     for (i = 0; i < NUM_CACHES; i=i+1) begin
                         OUT_CACHE_we[i] <= 1;
                         OUT_CACHE_ce[i] <= 1;
                     end
-                    OUT_busy <= 0;
+                    OUT_stat.busy <= 0;
                     OUT_EXT_en <= 0;
-                    OUT_progress <= 0;
+                    OUT_stat.progress <= 0;
                     OUT_EXT_bus <= 0;
                 end
             end
@@ -146,7 +139,7 @@ always_ff@(posedge clk) begin
                 if (cnt == len + 3) begin
                     OUT_EXT_en <= 0;
                     state <= 0;
-                    OUT_busy <= 0;
+                    OUT_stat.busy <= 0;
                 end
                 else if (cnt > 2) begin
                     OUT_EXT_bus <= IN_CACHE_data[cacheID];
@@ -162,14 +155,14 @@ always_ff@(posedge clk) begin
                     OUT_CACHE_addr[cacheID] <= sramAddr;
                     sramAddr <= sramAddr + 1;
                     OUT_CACHE_data[cacheID] <= IN_EXT_bus;
-                    OUT_progress <= OUT_progress + 1;
+                    OUT_stat.progress <= OUT_stat.progress + 1;
                 end
                 else begin
                     OUT_CACHE_ce[cacheID] <= 1;
                     OUT_CACHE_we[cacheID] <= 1;
                     OUT_CACHE_used[cacheID] <= 0;
-                    OUT_busy <= 0;
-                    OUT_progress <= 0;
+                    OUT_stat.busy <= 0;
+                    OUT_stat.progress <= 0;
                     state <= 0;
                     OUT_EXT_en <= 0;
                 end

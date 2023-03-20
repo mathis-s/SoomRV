@@ -21,33 +21,11 @@ module Core
     output wire OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
-    output reg OUT_MC_ce,
-    output reg OUT_MC_we,
-    output reg[0:0] OUT_MC_cacheID,
-    output reg[9:0] OUT_MC_sramAddr,
-    output reg[29:0] OUT_MC_extAddr,
-    input wire[9:0] IN_MC_progress,
-    input wire IN_MC_busy
+    output CTRL_MemC OUT_memc,
+    input STAT_MemC IN_memc
 );
 
-
-always_comb begin
-    
-    if (PC_MC_if.ce) begin
-        OUT_MC_ce = PC_MC_if.ce;
-        OUT_MC_we = PC_MC_if.we;
-        OUT_MC_sramAddr = PC_MC_if.sramAddr;
-        OUT_MC_extAddr = PC_MC_if.extAddr;
-        OUT_MC_cacheID = 1;
-    end
-    else begin
-        OUT_MC_ce = CC_MC_if.ce;
-        OUT_MC_we = CC_MC_if.we;
-        OUT_MC_sramAddr = CC_MC_if.sramAddr;
-        OUT_MC_extAddr = CC_MC_if.extAddr;
-        OUT_MC_cacheID = 0;
-    end
-end
+assign OUT_memc = PC_MC_if.ce ? PC_MC_if : CC_MC_if;
 
 integer i;
 
@@ -120,7 +98,7 @@ FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
 wire PC_stall;
 
-IF_MemoryController PC_MC_if;
+CTRL_MemC PC_MC_if;
 ProgramCounter progCnt
 (
     .clk(clk),
@@ -156,10 +134,8 @@ ProgramCounter progCnt
     
     .OUT_stall(PC_stall),
     
-    .OUT_MC_if(PC_MC_if),
-    .IN_MC_cacheID(OUT_MC_cacheID),
-    .IN_MC_progress(IN_MC_progress),
-    .IN_MC_busy(IN_MC_busy || CC_MC_if.ce)
+    .OUT_memc(PC_MC_if),
+    .IN_memc(IN_memc)
 );
 
 BTUpdate BP_btUpdates[1:0];
@@ -592,7 +568,7 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uo
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
-IF_MemoryController CC_MC_if;
+CTRL_MemC CC_MC_if;
 
 wire CC_fenceBusy;
 
@@ -611,13 +587,8 @@ CacheController cc
     .IN_uopSt(SQ_uop),
     .OUT_uopSt(CC_uopSt),
     
-    .OUT_MC_ce(CC_MC_if.ce),
-    .OUT_MC_we(CC_MC_if.we),
-    .OUT_MC_sramAddr(CC_MC_if.sramAddr),
-    .OUT_MC_extAddr(CC_MC_if.extAddr),
-    .IN_MC_progress(IN_MC_progress),
-    .IN_MC_cacheID(OUT_MC_cacheID),
-    .IN_MC_busy(IN_MC_busy || PC_MC_if.ce),
+    .OUT_memc(CC_MC_if),
+    .IN_memc(IN_memc),
     
     .IN_fence(TH_startFence),
     .OUT_fenceBusy(CC_fenceBusy)
@@ -833,7 +804,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || IN_MC_busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
+wire MEMSUB_busy = !SQ_empty || IN_memc.busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
 
 wire TH_startFence;
 wire TH_disableIFetch;

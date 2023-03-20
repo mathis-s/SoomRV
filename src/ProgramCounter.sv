@@ -45,10 +45,8 @@ module ProgramCounter
     
     output wire OUT_stall,
     
-    output IF_MemoryController OUT_MC_if,
-    input wire[0:0] IN_MC_cacheID,
-    input wire[9:0] IN_MC_progress,
-    input wire IN_MC_busy
+    output CTRL_MemC OUT_memc,
+    input STAT_MemC IN_memc
 );
 
 integer i;
@@ -101,10 +99,8 @@ ICacheTable ict
     .OUT_lookupAddress(OUT_instrAddr),
     .OUT_stall(icacheStall),
     
-    .OUT_MC_if(OUT_MC_if),
-    .IN_MC_cacheID(IN_MC_cacheID),
-    .IN_MC_progress(IN_MC_progress),
-    .IN_MC_busy(IN_MC_busy)
+    .OUT_memc(OUT_memc),
+    .IN_memc(IN_memc)
 );
 
 assign OUT_stall = (IN_ROB_curFetchID == fetchID) || icacheStall;

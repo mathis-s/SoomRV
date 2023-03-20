@@ -4,7 +4,15 @@ typedef struct packed
     logic we;
     logic[9:0] sramAddr;
     logic[29:0] extAddr;
-} IF_MemoryController;
+    logic[0:0] cacheID;
+} CTRL_MemC;
+
+typedef struct packed
+{
+    logic[9:0] progress;
+    logic[0:0] cacheID;
+    logic busy;
+} STAT_MemC;
 
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
@@ -562,7 +570,7 @@ interface IF_MemC;
         output progress, busy
     );
     
-    modport CT
+    modport CORE
     (
         output ce, we, cacheID, sramAddr, extAddr,
         input progress, busy

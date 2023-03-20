@@ -18,10 +18,8 @@ module ICacheTable#(parameter NUM_ICACHE_LINES=8)
     output reg[27:0] OUT_lookupAddress,
     output wire OUT_stall,
     
-    output IF_MemoryController OUT_MC_if,
-    input wire IN_MC_cacheID,
-    input wire[9:0] IN_MC_progress,
-    input wire IN_MC_busy
+    output CTRL_MemC OUT_memc,
+    input STAT_MemC IN_memc
 );
 integer i;
 
@@ -57,30 +55,30 @@ reg[6:0] lastProgress;
 always_ff@(posedge clk) begin
     
     waitCycle <= 0;
-    lastProgress <= IN_MC_progress[6:0];
+    lastProgress <= IN_memc.progress[6:0];
     
     if (rst) begin
         for (i = 0; i < NUM_ICACHE_LINES; i=i+1)
             icacheTable[i].valid <= 0;
         lruPointer <= 0;
         loading <= 0;
-        OUT_MC_if.ce <= 0;
-        OUT_MC_if.we <= 0;
+        OUT_memc.ce <= 0;
+        OUT_memc.we <= 0;
     end
     else begin
     
-        OUT_MC_if.ce <= 0;
-        OUT_MC_if.we <= 0;
+        OUT_memc.ce <= 0;
+        OUT_memc.we <= 0;
         
         // Mark entries as used
         if (IN_lookupValid && cacheEntryFound)
             icacheTable[cacheEntryIndex].used <= 1;
         
-        // Finish current load
-        if (loading && waitCycle && IN_MC_cacheID != 1) begin
+        if (loading && IN_memc.cacheID != 1 && IN_memc.busy) begin
             loading <= 0;
         end
-        else if (loading && !IN_MC_busy && !waitCycle) begin
+        // Finish current load
+        else if (loading && !IN_memc.busy && !waitCycle) begin
             icacheTable[lruPointer].addr <= loadAddr[30:8];
             icacheTable[lruPointer].valid <= 1;
             icacheTable[lruPointer].used <= 1;
@@ -88,11 +86,12 @@ always_ff@(posedge clk) begin
             loading <= 0;
         end
         // Cache Miss, start load
-        else if (!loading && !IN_MC_busy && !cacheEntryFound) begin
-            OUT_MC_if.ce <= 1;
-            OUT_MC_if.we <= 0;
-            OUT_MC_if.sramAddr <= {lruPointer, 7'b0};
-            OUT_MC_if.extAddr <= {IN_lookupPC[30:8], 7'b0};
+        else if (!loading && !IN_memc.busy && !cacheEntryFound) begin
+            OUT_memc.ce <= 1;
+            OUT_memc.we <= 0;
+            OUT_memc.sramAddr <= {lruPointer, 7'b0};
+            OUT_memc.extAddr <= {IN_lookupPC[30:8], 7'b0};
+            OUT_memc.cacheID <= 1;
             icacheTable[lruPointer].valid <= 0;
             loadAddr <= IN_lookupPC;
             loading <= 1;
