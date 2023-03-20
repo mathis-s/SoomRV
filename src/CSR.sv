@@ -331,6 +331,13 @@ reg[31:0] sscratch;
 reg[31:0] scause;
 reg[31:0] stval;
 
+struct packed 
+{
+    logic mode;
+    logic[8:0] asid;
+    logic[21:0] ppn;
+} satp;
+
 reg[30:0] retvec;
 
 reg interrupt;
@@ -507,6 +514,8 @@ always_comb begin
             rdata[9] = mie[9];
         end
         
+        CSR_satp: rdata = satp;
+        
         CSR_mhpmevent3: rdata = 3;
         CSR_mhpmevent4: rdata = 4;
         CSR_mhpmevent5: rdata = 5;
@@ -639,6 +648,8 @@ always_ff@(posedge clk) begin
         scause <= 0;
         stval <= 0;
         stvec <= 0;
+        
+        satp <= 0;
         
         mhpmcounter3 <= 0;
         mhpmcounter4 <= 0;
@@ -823,6 +834,11 @@ always_ff@(posedge clk) begin
                                 mie[1] <= wdata[1];
                                 mie[5] <= wdata[5];
                                 mie[9] <= wdata[9];
+                            end
+                            
+                            CSR_satp: begin
+                                satp <= wdata;
+                                satp.asid <= 0;
                             end
                             
                             default: begin end
