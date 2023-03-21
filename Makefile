@@ -47,6 +47,7 @@ decoder_tb:
 	src/StoreAGU.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
+	src/CacheInterface.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
