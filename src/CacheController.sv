@@ -97,8 +97,7 @@ reg evictionRqActive;
 reg outHistory;
 always_ff@(posedge clk) begin
     
-    OUT_memc.we <= 0;
-    OUT_memc.ce <= 0;
+    OUT_memc.cmd <= MEMC_NONE;
     waitCycle <= 0;
         
     if (rst) begin
@@ -140,7 +139,7 @@ always_ff@(posedge clk) begin
         // Entry Eviction logic
         if (!loading) begin
             // Abort eviction if memory controller chose another request
-            if (evicting && IN_memc.cacheID != 0) begin
+            if (evicting && IN_memc.cacheID != 0 && IN_memc.busy) begin
                 evicting <= 0;
                 ctable[evictingID].valid <= 1;
             end
@@ -173,9 +172,7 @@ always_ff@(posedge clk) begin
                     else ctable[evictionRqID].dirty <= 0;
                     
                     if (ctable[evictionRqID].dirty && evictionRq != EV_RQ_INVAL) begin
-                        OUT_memc.ce <= 1;
-                        OUT_memc.we <= 1;
-                        
+                        OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {evictionRqID, 6'b0};
                         OUT_memc.extAddr <= {ctable[evictionRqID].addr, 6'b0};
                         
@@ -206,9 +203,7 @@ always_ff@(posedge clk) begin
                     freeEntryID <= lruPointer;
                         
                     if (ctable[lruPointer].dirty) begin
-                        OUT_memc.ce <= 1;
-                        OUT_memc.we <= 1;
-                        
+                        OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {lruPointer, 6'b0};
                         OUT_memc.extAddr <= {ctable[lruPointer].addr, 6'b0};
                         
@@ -323,8 +318,7 @@ always_ff@(posedge clk) begin
         end
         else if (!loading && freeEntryAvail && !IN_branch.taken && !IN_memc.busy && evictionRq == EV_RQ_NONE) begin
             if (cmissUOpLd.valid) begin
-                OUT_memc.ce <= 1;
-                OUT_memc.we <= 0;
+                OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                 OUT_memc.sramAddr <= {freeEntryID, 6'b0};
                 OUT_memc.extAddr <= {cmissUOpLd.addr[31:8], 6'b0};
                 OUT_memc.cacheID <= 0;
@@ -337,8 +331,7 @@ always_ff@(posedge clk) begin
                 setDirty = 0;
             end
             else if (cmissUOpSt.valid) begin
-                OUT_memc.ce <= 1;
-                OUT_memc.we <= 0;
+                OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                 OUT_memc.sramAddr <= {freeEntryID, 6'b0};
                 OUT_memc.extAddr <= {cmissUOpSt.addr[31:8], 6'b0};
                 OUT_memc.cacheID <= 0;

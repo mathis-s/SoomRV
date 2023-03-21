@@ -1,7 +1,18 @@
+typedef enum logic[2:0]
+{
+    MEMC_NONE,
+    MEMC_CP_CACHE_TO_EXT,
+    MEMC_CP_EXT_TO_CACHE,
+    MEMC_PAGE_WALK,
+    MEMC_READ_SINGLE,
+    MEMC_WRITE_SINGLE
+} MemCCmd;
+
 typedef struct packed
 {
-    logic ce;
-    logic we;
+    //logic ce;
+    //logic we;
+    MemCCmd cmd;
     logic[9:0] sramAddr;
     logic[29:0] extAddr;
     logic[0:0] cacheID;

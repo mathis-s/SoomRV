@@ -56,20 +56,15 @@ always_ff@(posedge clk) begin
     
     waitCycle <= 0;
     lastProgress <= IN_memc.progress[6:0];
+    OUT_memc.cmd <= MEMC_NONE;
     
     if (rst) begin
         for (i = 0; i < NUM_ICACHE_LINES; i=i+1)
             icacheTable[i].valid <= 0;
         lruPointer <= 0;
         loading <= 0;
-        OUT_memc.ce <= 0;
-        OUT_memc.we <= 0;
     end
     else begin
-    
-        OUT_memc.ce <= 0;
-        OUT_memc.we <= 0;
-        
         // Mark entries as used
         if (IN_lookupValid && cacheEntryFound)
             icacheTable[cacheEntryIndex].used <= 1;
@@ -87,8 +82,7 @@ always_ff@(posedge clk) begin
         end
         // Cache Miss, start load
         else if (!loading && !IN_memc.busy && !cacheEntryFound) begin
-            OUT_memc.ce <= 1;
-            OUT_memc.we <= 0;
+            OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
             OUT_memc.sramAddr <= {lruPointer, 7'b0};
             OUT_memc.extAddr <= {IN_lookupPC[30:8], 7'b0};
             OUT_memc.cacheID <= 1;

@@ -25,7 +25,7 @@ module Core
     input STAT_MemC IN_memc
 );
 
-assign OUT_memc = PC_MC_if.ce ? PC_MC_if : CC_MC_if;
+assign OUT_memc = (PC_MC_if.cmd != MEMC_NONE) ? PC_MC_if : CC_MC_if;
 
 integer i;
 

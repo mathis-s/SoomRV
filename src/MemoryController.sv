@@ -62,10 +62,10 @@ always_ff@(posedge clk) begin
                 for (i = 0; i < NUM_CACHES; i=i+1)
                     OUT_CACHE_used[i] <= 0;
                     
-                if (IN_ctrl.ce) begin
+                if (IN_ctrl.cmd != MEMC_NONE) begin
                     
                     
-                    if (IN_ctrl.we) begin
+                    if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT) begin
                         // Write
                         isExtWrite <= 1;
                         state <= 2;
@@ -78,7 +78,7 @@ always_ff@(posedge clk) begin
                         sramAddr <= IN_ctrl.sramAddr + 1;
                         cnt <= 1;
                     end
-                    else begin
+                    else if (IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
                         // Read
                         isExtWrite <= 0;
                         waitCycles <= 3;
@@ -86,6 +86,7 @@ always_ff@(posedge clk) begin
                         cnt <= 0;
                         sramAddr <= IN_ctrl.sramAddr;
                     end
+                    else assert(0);
                     
                     cacheID <= IN_ctrl.cacheID;
                     
@@ -94,7 +95,7 @@ always_ff@(posedge clk) begin
                     
                     // External RAM
                     OUT_EXT_en <= 1;
-                    OUT_EXT_bus <= {IN_ctrl.we, IN_ctrl.cacheID[0], IN_ctrl.extAddr[29:0]};
+                    OUT_EXT_bus <= {IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT, IN_ctrl.cacheID[0], IN_ctrl.extAddr[29:0]};
                     OUT_EXT_oen <= 1;
                     
                     // Interface
