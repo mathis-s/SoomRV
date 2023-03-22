@@ -14,9 +14,9 @@ module MemoryController#(parameter NUM_CACHES=2)
     output reg[31:0] OUT_CACHE_data[NUM_CACHES-1:0],
     input wire[31:0] IN_CACHE_data[NUM_CACHES-1:0],
     
-    output reg OUT_EXT_oen,
-    output reg OUT_EXT_en,
-    output reg[31:0] OUT_EXT_bus,
+    output wire OUT_EXT_oen,
+    output wire OUT_EXT_en,
+    output wire[31:0] OUT_EXT_bus,
     input wire[31:0] IN_EXT_bus
     
 );
@@ -24,20 +24,14 @@ module MemoryController#(parameter NUM_CACHES=2)
 integer i;
 
 reg[2:0] state;
-reg isExtWrite;
-
-reg[9:0] sramAddr;
-reg[9:0] cnt;
-reg[9:0] len;
-reg[$clog2(NUM_CACHES)-1:0] cacheID;
-
-reg[2:0] waitCycles;
 
 assign OUT_CACHE_wm[0] = 4'b1111;
 assign OUT_CACHE_wm[1] = 4'b1111;
 
 wire[31:0] outDataCacheIF;
 wire[0:0] idCacheIF;
+
+wire CACHEIF_busy;
 CacheInterface cacheIF
 (
     .clk(clk),
@@ -48,10 +42,10 @@ CacheInterface cacheIF
     .IN_cacheID(IN_ctrl.cacheID),
     .IN_len(IN_ctrl.cacheID ? 128 : 64),
     .IN_addr(IN_ctrl.sramAddr),
-    .OUT_busy(),
+    .OUT_busy(CACHEIF_busy),
     
-    .IN_valid(isExtWrite ? cnt > 2 : state == 3),
-    .IN_data(IN_EXT_bus),
+    .IN_valid(MEM_IF_advance),
+    .IN_data(memoryIFdata),
     .OUT_data(outDataCacheIF),
     
     .OUT_CACHE_id(idCacheIF),
@@ -62,6 +56,30 @@ CacheInterface cacheIF
     .IN_CACHE_data(IN_CACHE_data[idCacheIF])
 );
 
+wire MEM_IF_advance;
+wire[31:0] memoryIFdata;
+wire MEMIF_busy;
+MemoryInterface memoryIF
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_en(state == 0 && IN_ctrl.cmd != MEMC_NONE),
+    .IN_write(IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT),
+    .IN_len(IN_ctrl.cacheID ? 128 : 64),
+    .IN_addr(IN_ctrl.extAddr),
+    .OUT_busy(MEMIF_busy),
+    
+    .OUT_advance(MEM_IF_advance),
+    .IN_data(outDataCacheIF),
+    .OUT_data(memoryIFdata),
+    
+    .OUT_EXT_oen(OUT_EXT_oen),
+    .OUT_EXT_en(OUT_EXT_en),
+    .OUT_EXT_bus(OUT_EXT_bus),
+    .IN_EXT_bus(IN_EXT_bus)
+);
+
 always_ff@(posedge clk) begin
     
     if (rst) begin
@@ -70,11 +88,7 @@ always_ff@(posedge clk) begin
             OUT_CACHE_used[i] <= 0;
         end
         OUT_stat.busy <= 0;
-        OUT_EXT_oen <= 1;
         OUT_stat.progress <= 0;
-        len <= 0;
-        OUT_EXT_bus <= 0;
-        OUT_EXT_en <= 0;
     end
     else begin
         
@@ -82,94 +96,31 @@ always_ff@(posedge clk) begin
             
             // Idle
             0: begin
-                OUT_EXT_oen <= 1;
                 for (i = 0; i < NUM_CACHES; i=i+1)
                     OUT_CACHE_used[i] <= 0;
                     
                 if (IN_ctrl.cmd != MEMC_NONE) begin
                     
-                    
-                    if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT) begin
-                        // Write
-                        isExtWrite <= 1;
-                        state <= 2;
-                        OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
-                        cnt <= 1;
-                    end
-                    else if (IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
-                        // Read
-                        isExtWrite <= 0;
-                        waitCycles <= 3;
-                        OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
-                        state <= 1;
-                        cnt <= 0;
-                        sramAddr <= IN_ctrl.sramAddr;
-                    end
-                    else assert(0);
-                    
-                    cacheID <= IN_ctrl.cacheID;
-                    
-                    if (IN_ctrl.cacheID == 0) len <= 64;
-                    else len <= 128;
-                    
-                    // External RAM
-                    OUT_EXT_en <= 1;
-                    OUT_EXT_bus <= {IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT, IN_ctrl.cacheID[0], IN_ctrl.extAddr[29:0]};
-                    OUT_EXT_oen <= 1;
+                    OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
                     
                     // Interface
                     OUT_stat.busy <= 1;
                     OUT_stat.progress <= 0;
                     OUT_stat.cacheID <= IN_ctrl.cacheID;
+                    
+                    state <= 1;
                 end
                 else begin
                     OUT_stat.busy <= 0;
-                    OUT_EXT_en <= 0;
                     OUT_stat.progress <= 0;
-                    OUT_EXT_bus <= 0;
                 end
             end
             
             
-            // Wait until external memory is ready to send data
+            // Wait until transaction is done
             1: begin
-                if (waitCycles == 0) begin
-                    state <= 3;
-                    OUT_EXT_oen <= 0;
-                end
-                waitCycles <= waitCycles - 1;
-            end
-            
-            // Write to External
-            2: begin
-                if (cnt < len) sramAddr <= sramAddr + 1;
-                else OUT_CACHE_used[cacheID] <= 0;
-                
-                cnt <= cnt + 1;
-                
-                if (cnt == len + 3) begin
-                    OUT_EXT_en <= 0;
+                if (!MEMIF_busy && !CACHEIF_busy) 
                     state <= 0;
-                    OUT_stat.busy <= 0;
-                end
-                else if (cnt > 2) begin
-                    OUT_EXT_bus <= outDataCacheIF;
-                end
-            end
-            
-            // Read from External
-            3: begin
-                cnt <= cnt + 1;
-                if (cnt < len) begin
-                    sramAddr <= sramAddr + 1;
-                    OUT_stat.progress <= OUT_stat.progress + 1;
-                end
-                else begin
-                    OUT_stat.busy <= 0;
-                    OUT_stat.progress <= 0;
-                    state <= 0;
-                    OUT_EXT_en <= 0;
-                end
             end
 
         endcase

@@ -48,6 +48,7 @@ decoder_tb:
 	src/CSR.sv \
 	src/TrapHandler.sv \
 	src/CacheInterface.sv \
+	src/MemoryInterface.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

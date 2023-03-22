@@ -64,6 +64,4 @@ always_ff@(posedge clk) begin
     endcase
 end
 
-wire[31:0] data = mem[4096];
-
 endmodule
