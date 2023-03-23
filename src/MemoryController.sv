@@ -6,7 +6,7 @@ module MemoryController#(parameter NUM_CACHES=2)
     input CTRL_MemC IN_ctrl,
     output STAT_MemC OUT_stat,
     
-    output reg[NUM_CACHES-1:0] OUT_CACHE_used,
+    //output reg[NUM_CACHES-1:0] OUT_CACHE_used,
     output reg OUT_CACHE_we[NUM_CACHES-1:0],
     output reg OUT_CACHE_ce[NUM_CACHES-1:0],
     output reg[3:0] OUT_CACHE_wm[NUM_CACHES-1:0],
@@ -84,9 +84,9 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         state <= 0;
-        for (i = 0; i < NUM_CACHES; i=i+1) begin
-            OUT_CACHE_used[i] <= 0;
-        end
+        //for (i = 0; i < NUM_CACHES; i=i+1) begin
+        //    OUT_CACHE_used[i] <= 0;
+        //end
         OUT_stat.busy <= 0;
         OUT_stat.progress <= 0;
     end
@@ -96,12 +96,12 @@ always_ff@(posedge clk) begin
             
             // Idle
             0: begin
-                for (i = 0; i < NUM_CACHES; i=i+1)
-                    OUT_CACHE_used[i] <= 0;
+                //for (i = 0; i < NUM_CACHES; i=i+1)
+                //    OUT_CACHE_used[i] <= 0;
                     
                 if (IN_ctrl.cmd != MEMC_NONE) begin
                     
-                    OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
+                    //OUT_CACHE_used[IN_ctrl.cacheID] <= 1;
                     
                     // Interface
                     OUT_stat.busy <= 1;

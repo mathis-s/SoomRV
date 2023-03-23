@@ -15,7 +15,7 @@ module Top
     output wire OUT_halt
 );
 
-wire[1:0] MC_DC_used;
+wire[1:0] MC_DC_used = {!MC_DC_if[1].ce, !MC_DC_if[0].ce};
 CacheIF MC_DC_if[1:0];
 
 CTRL_MemC MemC_ctrl;
@@ -28,7 +28,6 @@ MemoryController memc
     .IN_ctrl(MemC_ctrl),
     .OUT_stat(MemC_stat),
     
-    .OUT_CACHE_used(MC_DC_used),
     .OUT_CACHE_we('{MC_DC_if[1].we, MC_DC_if[0].we}),
     .OUT_CACHE_ce('{MC_DC_if[1].ce, MC_DC_if[0].ce}),
     .OUT_CACHE_wm('{MC_DC_if[1].wm, MC_DC_if[0].wm}),
