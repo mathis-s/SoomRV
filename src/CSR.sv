@@ -20,6 +20,8 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     output TrapControlState OUT_trapControl,
     output wire[2:0] OUT_fRoundMode,
     
+    output STAT_VMem OUT_vmem,
+    
     output RES_UOp OUT_uop
 );
 
@@ -385,10 +387,10 @@ assign OUT_trapControl.interruptPending = interrupt;
 assign OUT_trapControl.interruptCause = interruptCause;
 assign OUT_trapControl.interruptDelegate = interruptDelegate;
 
-
 assign OUT_fRoundMode = frm;
 
-
+assign OUT_vmem.sv32en = satp.mode;
+assign OUT_vmem.rootPPN = satp.ppn;
 
 reg[31:0] rdata;
 reg invalidCSR;

@@ -25,7 +25,14 @@ module Core
     input STAT_MemC IN_memc
 );
 
-assign OUT_memc = (PC_MC_if.cmd != MEMC_NONE) ? PC_MC_if : CC_MC_if;
+always_comb begin
+    if (LDAGU_memc.cmd != MEMC_NONE)
+        OUT_memc = LDAGU_memc;
+    else if (PC_MC_if.cmd != MEMC_NONE)
+        OUT_memc = PC_MC_if;
+    else
+        OUT_memc = CC_MC_if;
+end
 
 integer i;
 
@@ -230,21 +237,6 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 wire FUSE_full = !frontendEn || RN_stall;
-/*wire FUSE_full;
-D_UOp FUSE_uop[3:0];
-Fuse fuse
-(
-    .clk(clk),
-    .outEn(frontendEn && !RN_stall),
-    .rst(rst),
-    .mispredict(branch.taken),
-    
-    .OUT_full(FUSE_full),
-    
-    .IN_uop(DE_uop),
-    .OUT_uop(FUSE_uop)
-);*/
-
 
 R_UOp RN_uop[3:0];
 wire RN_uopValid[3:0];
@@ -542,6 +534,7 @@ RES_UOp CSR_uop;
 TrapControlState CSR_trapControl;
 wire[2:0] CSR_fRoundMode;
 IF_CSR_MMIO if_CSR_MMIO();
+STAT_VMem CSR_vmem;
 CSR csr
 (
     .clk(clk),
@@ -560,6 +553,9 @@ CSR csr
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
+    
+    .OUT_vmem(CSR_vmem),
+    
     .OUT_uop(CSR_uop)
 );
 
@@ -568,6 +564,7 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uo
 AGU_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
+wire CC_loadStall;
 CTRL_MemC CC_MC_if;
 
 wire CC_fenceBusy;
@@ -579,7 +576,7 @@ CacheController cc
     
     .IN_branch(branch),
     .IN_SQ_empty(SQ_empty),
-    .OUT_stall('{CC_storeStall, stall[2]}),
+    .OUT_stall('{CC_storeStall, CC_loadStall}),
     
     .IN_uopLd(AGU_LD_uop),
     .OUT_uopLd(CC_uopLd),
@@ -595,14 +592,19 @@ CacheController cc
 );
 
 AGU_UOp AGU_LD_uop;
+CTRL_MemC LDAGU_memc;
 LoadAGU aguLD
 (
     .clk(clk),
     .rst(rst),
     .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
-    .stall(stall[2]),
+    .IN_stall(CC_loadStall),
+    .OUT_stall(stall[2]),
     
     .IN_branch(branch),
+    .IN_vmem(CSR_vmem),
+    .OUT_memc(LDAGU_memc),
+    .IN_memc(IN_memc),
 
     .IN_uop(LD_uop[2]),
     .OUT_uop(AGU_LD_uop)
@@ -631,7 +633,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_stall(stall[3:2]),
+    .IN_stall({stall[3], CC_loadStall}),
     .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
     
     .IN_branch(branch),
@@ -655,7 +657,7 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     .IN_disable(CC_storeStall),
-    .IN_stallLd(stall[2]),
+    .IN_stallLd(CC_loadStall),
     .OUT_empty(SQ_empty),
     
     .IN_uopSt(AGU_ST_uop),

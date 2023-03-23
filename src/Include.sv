@@ -10,18 +10,21 @@ typedef enum logic[2:0]
 
 typedef struct packed
 {
-    //logic ce;
-    //logic we;
     MemCCmd cmd;
+    logic[21:0] rootPPN;
     logic[9:0] sramAddr;
     logic[29:0] extAddr;
     logic[0:0] cacheID;
+    logic[1:0] rqID;
 } CTRL_MemC;
 
 typedef struct packed
 {
     logic[9:0] progress;
-    logic[0:0] cacheID;
+    //logic[0:0] cacheID;
+    logic[31:0] result;
+    logic resultValid;
+    logic[1:0] rqID;
     logic busy;
 } STAT_MemC;
 
@@ -440,6 +443,7 @@ typedef enum logic[1:0]
     AGU_ACCESS_FAULT,
     AGU_PAGE_FAULT
 } AGU_Exception;
+
 typedef struct packed
 {
     logic[31:0] addr;
@@ -547,6 +551,12 @@ typedef struct packed
     SqN sqN;
     logic valid;
 } FloatFlagsUpdate;
+
+typedef struct
+{
+    logic sv32en;
+    logic[21:0] rootPPN;
+} STAT_VMem;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;

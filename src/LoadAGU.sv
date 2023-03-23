@@ -4,9 +4,14 @@ module LoadAGU
     input wire clk,
     input wire rst,
     input wire en,
-    input wire stall,
+    input wire IN_stall,
+    output wire OUT_stall,
     
     input BranchProv IN_branch,
+    
+    input STAT_VMem IN_vmem,
+    output CTRL_MemC OUT_memc,
+    input STAT_MemC IN_memc,
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_uop
@@ -14,16 +19,84 @@ module LoadAGU
 
 integer i;
 
+reg pageWalkActive;
+reg pageWalkAccepted;
+assign OUT_stall = IN_stall || pageWalkActive;
+
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
+
+AGU_Exception except;
+always_comb begin
+    
+    except = AGU_NO_EXCEPTION;
+
+    case (IN_uop.opcode)
+        LSU_LB, LSU_LBU: begin end
+        
+        LSU_LH, LSU_LHU: begin
+            if (addr[0])
+                except = AGU_ADDR_MISALIGN;
+        end
+        default: begin
+            if (addr[0] || addr[1])
+                except = AGU_ADDR_MISALIGN;
+        end
+    endcase
+    
+    if (addr == 0)
+        except = AGU_ACCESS_FAULT;
+end
 
 always_ff@(posedge clk) begin
     
+    OUT_memc.cmd <= MEMC_NONE;
+    
     if (rst) begin
         OUT_uop.valid <= 0;
+        pageWalkActive <= 0;
     end
     else begin
         
-        if (!stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+        if (pageWalkActive) begin
+            if ((!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
+                
+                if (!pageWalkAccepted) begin
+                    if (IN_memc.busy && IN_memc.rqID == 2) pageWalkAccepted <= 1;
+                    else begin
+                        OUT_memc.cmd <= MEMC_PAGE_WALK;
+                        OUT_memc.rootPPN <= IN_vmem.rootPPN;
+                        OUT_memc.extAddr <= OUT_uop.addr[31:2];
+                        OUT_memc.cacheID <= 'x;
+                        OUT_memc.sramAddr <= 'x;
+                        OUT_memc.rqID <= 2;
+                    end
+                end
+                
+                // FIXME: unchecked!
+                else if (IN_memc.resultValid) begin
+                    
+                    case (IN_memc.result[3:1])
+                        3'b000,
+                        3'b010,
+                        3'b110: OUT_uop.exception <= AGU_PAGE_FAULT;
+                        
+                        3'b001,
+                        3'b011,
+                        3'b100,
+                        3'b101,
+                        3'b111: OUT_uop.addr[31:12] <= IN_memc.result[29:10];
+                    endcase
+                    
+                    OUT_uop.valid <= 1;
+                    pageWalkActive <= 0;
+                    OUT_memc.cmd <= MEMC_NONE;
+                end
+            end
+            else begin
+                pageWalkActive <= 0;
+            end
+        end
+        else if (!IN_stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             
             OUT_uop.addr <= addr;
             OUT_uop.pc <= IN_uop.pc;
@@ -35,32 +108,21 @@ always_ff@(posedge clk) begin
             OUT_uop.fetchID <= IN_uop.fetchID;
             OUT_uop.compressed <= IN_uop.compressed;
             OUT_uop.history <= IN_uop.history;
-            OUT_uop.exception <= AGU_NO_EXCEPTION;
+            OUT_uop.exception <= except;
             
             OUT_uop.doNotCommit <= IN_uop.opcode >= ATOMIC_AMOSWAP_W;
-            OUT_uop.valid <= 1;
+            
+            if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION) begin
+                OUT_uop.valid <= 0;
+                pageWalkActive <= 1;
+                pageWalkAccepted <= 0;
+            end 
+            else begin
+                OUT_uop.valid <= 1;
+            end
             
             // Exception fires on Null pointer or unaligned access
             // (Unaligned is handled in software)
-            case (IN_uop.opcode)
-                LSU_LB, LSU_LBU: begin end
-                
-                LSU_LH, LSU_LHU: begin
-                    if (addr[0])
-                        OUT_uop.exception <= AGU_ADDR_MISALIGN;
-                end
-                default: begin
-                    if (addr[0] || addr[1])
-                        OUT_uop.exception <= AGU_ADDR_MISALIGN;
-                end
-            endcase
-            
-            if (addr == 0)
-                OUT_uop.exception <= AGU_ACCESS_FAULT;
-            
-            //if (addr[31:24] == 8'hFF && IN_mode[MODE_NO_CREGS_RD]) OUT_uop.exception <= 1;
-            //if (!IN_rmask[addr[31:26]] && IN_mode[MODE_RMASK]) OUT_uop.exception <= 1;
-            
             case (IN_uop.opcode)
                 LSU_LB: begin
                     OUT_uop.isLoad <= 1;
@@ -101,7 +163,7 @@ always_ff@(posedge clk) begin
             endcase
             
         end
-        else if (!stall || (OUT_uop.valid && IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0))
+        else if (!IN_stall || (OUT_uop.valid && IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0))
             OUT_uop.valid <= 0;
     end
     

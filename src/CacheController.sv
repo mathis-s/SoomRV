@@ -139,7 +139,7 @@ always_ff@(posedge clk) begin
         // Entry Eviction logic
         if (!loading) begin
             // Abort eviction if memory controller chose another request
-            if (evicting && IN_memc.cacheID != 0 && IN_memc.busy) begin
+            if (evicting && IN_memc.rqID != 0 && IN_memc.busy) begin
                 evicting <= 0;
                 ctable[evictingID].valid <= 1;
             end
@@ -175,6 +175,8 @@ always_ff@(posedge clk) begin
                         OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {evictionRqID, 6'b0};
                         OUT_memc.extAddr <= {ctable[evictionRqID].addr, 6'b0};
+                        OUT_memc.cacheID <= 0;
+                        OUT_memc.rqID <= 0;
                         
                         evicting <= 1;
                         waitCycle <= 1;
@@ -206,6 +208,8 @@ always_ff@(posedge clk) begin
                         OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {lruPointer, 6'b0};
                         OUT_memc.extAddr <= {ctable[lruPointer].addr, 6'b0};
+                        OUT_memc.cacheID <= 0;
+                        OUT_memc.rqID <= 0;
                         
                         evicting <= 1;
                         waitCycle <= 1;
@@ -301,7 +305,7 @@ always_ff@(posedge clk) begin
         else OUT_uopSt.valid <= 0;
         
         // Handle cache misses
-        if (loading && IN_memc.cacheID != 0 && IN_memc.busy) begin
+        if (loading && IN_memc.rqID != 0 && IN_memc.busy) begin
             // Check if our request is the one being handled by the memory controller, otherwise abort
             loading <= 0;
             ctable[freeEntryID].used <= 0;
@@ -322,6 +326,7 @@ always_ff@(posedge clk) begin
                 OUT_memc.sramAddr <= {freeEntryID, 6'b0};
                 OUT_memc.extAddr <= {cmissUOpLd.addr[31:8], 6'b0};
                 OUT_memc.cacheID <= 0;
+                OUT_memc.rqID <= 0;
                 
                 ctable[freeEntryID].used <= 1;
                 ctable[freeEntryID].addr <= cmissUOpLd.addr[31:8];
@@ -335,6 +340,7 @@ always_ff@(posedge clk) begin
                 OUT_memc.sramAddr <= {freeEntryID, 6'b0};
                 OUT_memc.extAddr <= {cmissUOpSt.addr[31:8], 6'b0};
                 OUT_memc.cacheID <= 0;
+                OUT_memc.rqID <= 0;
                 
                 ctable[freeEntryID].used <= 1;
                 ctable[freeEntryID].addr <= cmissUOpSt.addr[31:8];
