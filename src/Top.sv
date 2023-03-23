@@ -55,7 +55,7 @@ ExternalMemorySim extMem
     .bus(EXTMEM_bus)
 );
 
-IF_Mem IF_mem;
+IF_Mem IF_mem();
 CacheIF CORE_DC_if;
 always_comb begin
     CORE_DC_if.ce = IF_mem.we;

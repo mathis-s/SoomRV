@@ -678,7 +678,7 @@ StoreQueue sq
 wire LSU_loadFwdValid;
 Tag LSU_loadFwdTag;
 
-IF_Mem IF_mmio;
+IF_Mem IF_mmio();
 LoadStoreUnit lsu
 (
     .clk(clk),

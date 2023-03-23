@@ -79,7 +79,7 @@ always_ff@(posedge clk) begin
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
         
-            if ((IN_trapInstr.flags == FLAGS_TRAP && IN_allowBreak && IN_trapInstr.name == TRAP_BREAK[4:0]) || 
+            if ((IN_trapInstr.flags == FLAGS_TRAP && IN_allowBreak && IN_trapInstr.name == 5'(TRAP_BREAK)) || 
                 IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING || IN_trapInstr.flags == FLAGS_XRET) begin
                 
                 case (IN_trapInstr.flags)
