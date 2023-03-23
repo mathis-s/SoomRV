@@ -21,9 +21,11 @@ typedef struct packed
 typedef struct packed
 {
     logic[9:0] progress;
-    //logic[0:0] cacheID;
+    
+    logic isSuperPage;
     logic[31:0] result;
     logic resultValid;
+    
     logic[1:0] rqID;
     logic busy;
 } STAT_MemC;

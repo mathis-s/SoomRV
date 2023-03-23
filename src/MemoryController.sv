@@ -52,7 +52,7 @@ always_comb begin
     
     if (!rst && state == 0) begin
         if (IN_ctrl.cmd == MEMC_PAGE_WALK) begin
-            extAddr = {IN_ctrl.rootPPN[19:0], IN_ctrl.extAddr[19:10]};
+            extAddr = {IN_ctrl.rootPPN[19:0], IN_ctrl.extAddr[29:20]};
             accessLength = 1;
             enableExt = 1;
         end
@@ -71,7 +71,7 @@ always_comb begin
         accessLength = 1;
         enableExt = 1;
         // NOTE: currently ignoring the upper two bits of 34 bit phy addr
-        extAddr = {OUT_stat.result[29:10], rqExtAddr[29:20]};
+        extAddr = {OUT_stat.result[29:10], rqExtAddr[19:10]};
     end
 end
 
@@ -186,6 +186,7 @@ always_ff@(posedge clk) begin
                     else begin
                         state <= 0;
                         OUT_stat.resultValid <= 1;
+                        OUT_stat.isSuperPage <= (pageWalkLevel == 0);
                     end
                 end
             end

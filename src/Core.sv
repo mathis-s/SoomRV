@@ -26,7 +26,9 @@ module Core
 );
 
 always_comb begin
-    if (LDAGU_memc.cmd != MEMC_NONE)
+    if (STAGU_memc.cmd != MEMC_NONE)
+        OUT_memc = STAGU_memc;
+    else if (LDAGU_memc.cmd != MEMC_NONE)
         OUT_memc = LDAGU_memc;
     else if (PC_MC_if.cmd != MEMC_NONE)
         OUT_memc = PC_MC_if;
@@ -593,7 +595,7 @@ CacheController cc
 
 AGU_UOp AGU_LD_uop;
 CTRL_MemC LDAGU_memc;
-LoadAGU aguLD
+AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
@@ -607,18 +609,25 @@ LoadAGU aguLD
     .IN_memc(IN_memc),
 
     .IN_uop(LD_uop[2]),
-    .OUT_uop(AGU_LD_uop)
+    .OUT_aguOp(AGU_LD_uop),
+    .OUT_uop()
 );
 
 AGU_UOp AGU_ST_uop;
-StoreAGU aguST
+CTRL_MemC STAGU_memc;
+AGU#(.LOAD_AGU(0), .RQ_ID(3)) aguST
 (
     .clk(clk),
     .rst(rst),
     .en(LD_uop[3].fu == FU_ST || LD_uop[3].fu == FU_ATOMIC),
-    .stall(stall[3]),
+    .IN_stall(1'b0),
+    .OUT_stall(stall[3]),
     
     .IN_branch(branch),
+    .IN_vmem(CSR_vmem),
+    .OUT_memc(STAGU_memc),
+    .IN_memc(IN_memc),
+
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
@@ -633,7 +642,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_stall({stall[3], CC_loadStall}),
+    .IN_stall({1'b0, CC_loadStall}),
     .IN_uop('{AGU_ST_uop, AGU_LD_uop}),
     
     .IN_branch(branch),
@@ -650,7 +659,6 @@ ST_UOp SQ_uop;
 wire[3:0] SQ_lookupMask;
 wire[31:0] SQ_lookupData;
 SqN SQ_maxStoreSqN;
-assign stall[3] = 1'b0;
 wire SQ_flush;
 StoreQueue sq
 (
