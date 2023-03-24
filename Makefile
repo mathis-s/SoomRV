@@ -9,7 +9,7 @@ decoder_tb:
 	src/Core.sv  \
 	src/IssueQueue.sv  \
 	src/IntALU.sv  \
-	src/ProgramCounter.sv \
+	src/IFetch.sv \
 	src/RF.sv \
 	src/Load.sv \
 	src/ROB.sv \
