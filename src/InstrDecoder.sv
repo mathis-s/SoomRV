@@ -410,7 +410,7 @@ always_comb begin
                         end
                         // Predicted jumps don't need to be executed if they don't write anything
                         else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
-                            uop.valid = 0;
+                            uop.fu = FU_RN;
                         end
                         
                     end
@@ -663,8 +663,7 @@ always_comb begin
                             uop.imm[11] == uop.imm[7] &&
                             uop.imm[11] == uop.imm[6] &&
                             uop.imm[11] == uop.imm[5]) begin
-                            if (uop.rd == 0) uop.valid = 0;
-                            else uop.fu = FU_RN;
+                            uop.fu = FU_RN;
                         end
                     end
                     `OPC_REG_REG: begin
@@ -1155,7 +1154,7 @@ always_comb begin
                             OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
                         else
-                            uop.valid = 0;
+                            uop.fu = FU_RN;
                         
                         uop.immB = 1;
                         invalidEnc = 0;
@@ -1323,10 +1322,7 @@ always_comb begin
                     end
                     // c.nop
                     else if (i16.ci.funct3 == 3'b000 && i16.ci.imm2 == 1'b0 && i16.ci.rd_rs1 == 5'b0 && i16.ci.imm == 5'b0) begin
-                        // don't execute nops
-                        uop.valid = 0;
-                        uop.opcode = INT_ADD;
-                        uop.fu = FU_INT;
+                        uop.fu = FU_RN;
                         invalidEnc = 0;
                     end
                 end
