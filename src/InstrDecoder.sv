@@ -205,11 +205,9 @@ module InstrDecoder
     input wire[30:0] IN_indirBranchTarget,
     input wire IN_enCustom,
     
-    output reg OUT_decBranch,
-    output reg[30:0] OUT_decBranchDst,
-    output FetchID_t OUT_decBranchFetchID,
-    
-    //output BTUpdate OUT_btUpdate,
+    output DecodeBranchProv OUT_decBranch,
+    //output reg[30:0] OUT_decBranchDst,
+    //output FetchID_t OUT_decBranchFetchID,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -249,10 +247,9 @@ always_comb begin
     RS_inValid = 0;
     RS_inData = 31'bx;
     RS_inPop = 0;
-    OUT_decBranch = 0;
-    OUT_decBranchDst = 31'bx;
+    OUT_decBranch = 'x;
+    OUT_decBranch.taken = 0;
     validMask = 4'b1111;
-    OUT_decBranchFetchID = 0;
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         
@@ -263,7 +260,7 @@ always_comb begin
         uop = 0;
         invalidEnc = 1;
         //uop.pc = {IN_instrs[i].pc, 1'b0};
-        uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
+        uop.valid = IN_instrs[i].valid && en && !OUT_decBranch.taken;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[2:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
@@ -281,7 +278,7 @@ always_comb begin
             default:      uop.imm = 0;
         endcase
         
-        if (IN_instrs[i].valid && en && !OUT_decBranch) begin
+        if (IN_instrs[i].valid && en && !OUT_decBranch.taken) begin
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
@@ -400,9 +397,9 @@ always_comb begin
                         end
                         // Handle unpredicted jumps right away
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
                         // Predicted jumps don't need to be executed if they don't write anything
                         else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
@@ -1140,9 +1137,9 @@ always_comb begin
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                             
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
                         else
                             uop.valid = 0;
@@ -1163,9 +1160,9 @@ always_comb begin
                         RS_inData = IN_instrs[i].pc + 1;
                         
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
 
                         invalidEnc = 0;
@@ -1343,18 +1340,18 @@ always_comb begin
                             uop.imm = {RS_outData, 1'b0};
                             uop.immB = 1;
                             
-                            OUT_decBranch = 1;
-                            OUT_decBranchDst = RS_outData;
-                            OUT_decBranchFetchID = uop.fetchID;
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.dst = RS_outData;
+                            OUT_decBranch.fetchID = uop.fetchID;
                         end
                         else begin
                             uop.opcode = INT_V_JR;
                             uop.imm = {IN_indirBranchTarget, 1'b0};
                             uop.immB = 1;
                             
-                            OUT_decBranch = 1;
-                            OUT_decBranchDst = IN_indirBranchTarget;
-                            OUT_decBranchFetchID = uop.fetchID;
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.dst = IN_indirBranchTarget;
+                            OUT_decBranch.fetchID = uop.fetchID;
                         end
                         invalidEnc = 0;
                     end

@@ -25,6 +25,8 @@ module Core
     input STAT_MemC IN_memc
 );
 
+integer i;
+
 always_comb begin
     if (STAGU_memc.cmd != MEMC_NONE)
         OUT_memc = STAGU_memc;
@@ -36,143 +38,64 @@ always_comb begin
         OUT_memc = CC_MC_if;
 end
 
-integer i;
+RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
+reg wbHasResult[NUM_WBS-1:0];
+always_comb begin
+    for (i = 0; i < 4; i=i+1)
+        wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[6];
+end
 
-RES_UOp wbUOp[NUM_WBS-1:0];
-wire wbHasResult[NUM_WBS-1:0];
-assign wbHasResult[0] = wbUOp[0].valid && !wbUOp[0].tagDst[6];
-assign wbHasResult[1] = wbUOp[1].valid && !wbUOp[1].tagDst[6];
-assign wbHasResult[2] = wbUOp[2].valid && !wbUOp[2].tagDst[6];
-assign wbHasResult[3] = wbUOp[3].valid && !wbUOp[3].tagDst[6];
-
-CommitUOp comUOps[3:0];
-wire comValid[3:0];
+CommitUOp comUOps[3:0] /*verilator public*/;
 
 wire frontendEn;
-
-wire ifetchEn;
-
-reg[2:0] stateValid;
-assign OUT_instrReadEnable = !(ifetchEn && stateValid[0]);
-
-reg[127:0] instrRawBackup;
-reg useInstrRawBackup;
-always_ff@(posedge clk) begin
-    if (rst)
-        useInstrRawBackup <= 0;
-    else if (!(ifetchEn && stateValid[0])) begin
-        instrRawBackup <= instrRaw;
-        useInstrRawBackup <= 1;
-    end
-    else
-        useInstrRawBackup <= 0;
-end
-wire[127:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
-
+wire ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
 
 BranchProv branchProvs[3:0];
 BranchProv branch;
 wire mispredFlush;
 wire BS_PERFC_branchMispr;
-BranchSelector bsel
-(
-    .clk(clk),
-    .rst(rst),
-    
-    .IN_branches(branchProvs),
-    .OUT_branch(branch),
-    
-    .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
-    
-    .IN_ROB_curSqN(ROB_curSqN),
-    .IN_RN_nextSqN(RN_nextSqN),
-    .IN_mispredFlush(mispredFlush)
-);
 
-wire[31:0] PC_pc;
-
-wire BP_branchTaken;
-wire BP_isJump;
-wire[31:0] BP_branchSrc;
-wire[31:0] BP_branchDst;
-BHist_t BP_branchHistory;
-BranchPredInfo BP_info;
-wire BP_multipleBranches;
-wire BP_branchFound;
-wire BP_branchCompr;
-
-IF_Instr IF_instrs[7:0];
+IF_Instr IF_instrs;
+BTUpdate BP_btUpdates[1:0];
 
 FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
 wire PC_stall;
 
 CTRL_MemC PC_MC_if;
-ProgramCounter progCnt
+IFetch ifetch
 (
     .clk(clk),
-    .en0(stateValid[0] && ifetchEn),
-    .en1(stateValid[1] && ifetchEn),
     .rst(rst),
-    .IN_pc(branch.taken ? branch.dstPC : {DEC_branchDst, 1'b0}),
-    .IN_write(branch.taken || DEC_branch),
-    .IN_branchTaken(branch.taken),
-    .IN_fetchID(branch.taken ? branch.fetchID : DEC_branchFetchID),
-    .IN_instr(instrRaw),
+    .en(ifetchEn),
+    
+    .OUT_instrReadEnable(OUT_instrReadEnable),
+    .OUT_instrAddr(OUT_instrAddr),
+    .IN_instrRaw(IN_instrRaw),
+    
+    .IN_branches(branchProvs),
+    .IN_mispredFlush(mispredFlush),
+    .IN_ROB_curFetchID(ROB_curFetchID),
+    .IN_ROB_curSqN(ROB_curSqN),
+    .IN_RN_nextSqN(RN_nextSqN),
+    .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
+    .OUT_branch(branch),
+    
+    .IN_decBranch(DEC_decBranch),
     
     .IN_clearICache(TH_clearICache),
-    
-    .IN_BP_branchTaken(BP_branchTaken),
-    .IN_BP_isJump(BP_isJump),
-    .IN_BP_branchSrc(BP_branchSrc),
-    .IN_BP_branchDst(BP_branchDst),
-    .IN_BP_history(BP_branchHistory),
-    .IN_BP_info(BP_info),
-    .IN_BP_multipleBranches(BP_multipleBranches),
-    .IN_BP_branchFound(BP_branchFound),
-    .IN_BP_branchCompr(BP_branchCompr),
+    .IN_btUpdates(BP_btUpdates),
+    .IN_bpUpdate(TH_bpUpdate),
     
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
     
-    .IN_ROB_curFetchID(ROB_curFetchID),
-    
-    .OUT_pcRaw(PC_pc),
-    .OUT_instrAddr(OUT_instrAddr),
     .OUT_instrs(IF_instrs),
     
-    .OUT_stall(PC_stall),
-    
     .OUT_memc(PC_MC_if),
-    .IN_memc(IN_memc)
-);
-
-BTUpdate BP_btUpdates[1:0];
-BranchPredictor bp
-(
-    .clk(clk),
-    .rst(rst),
+    .IN_memc(IN_memc),
     
-    .IN_clearICache(TH_clearICache),
-    
-    .IN_mispredFlush(mispredFlush),
-    .IN_branch(branch),
-    
-    .IN_pcValid(stateValid[0] && ifetchEn),
-    .IN_pc(PC_pc),
-    .OUT_branchTaken(BP_branchTaken),
-    .OUT_isJump(BP_isJump),
-    .OUT_branchSrc(BP_branchSrc),
-    .OUT_branchDst(BP_branchDst),
-    .OUT_branchHistory(BP_branchHistory),
-    .OUT_branchInfo(BP_info),
-    .OUT_multipleBranches(BP_multipleBranches),
-    .OUT_branchFound(BP_branchFound),
-    .OUT_branchCompr(BP_branchCompr),
-    
-    .IN_btUpdates(BP_btUpdates),
-    
-    .IN_bpUpdate(TH_bpUpdate)
+    .OUT_stall(PC_stall)
 );
 
 IndirBranchInfo IBP_updates[1:0];
@@ -190,37 +113,24 @@ IndirectBranchPredictor ibp
 SqN RN_nextSqN;
 SqN ROB_curSqN;
 
-always_ff@(posedge clk) begin
-    if (rst)
-        stateValid <= 3'b000;
-    else if (branch.taken || DEC_branch)
-        stateValid <= 3'b000;
-    else if (ifetchEn)
-        stateValid <= {stateValid[1:0], 1'b1};
-end
-
 wire PD_full;
-PD_Instr PD_instrs[3:0];
+PD_Instr PD_instrs[3:0] /*verilator public*/;
 PreDecode preDec
 (
     .clk(clk),
     .rst(rst),
-    .ifetchValid(stateValid[2] && ifetchEn),
+    .ifetchValid(ifetchEn),
     .outEn(!FUSE_full),
     
     .OUT_full(PD_full),
     
-    .mispred(branch.taken || DEC_branch),
+    .mispred(branch.taken || DEC_decBranch.taken),
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
-assign ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
 
-D_UOp DE_uop[3:0];
-
-wire DEC_branch;
-wire[30:0] DEC_branchDst;
-FetchID_t DEC_branchFetchID;
+D_UOp DE_uop[3:0] /*verilator public*/;
+DecodeBranchProv DEC_decBranch;
 InstrDecoder idec
 (
     .clk(clk),
@@ -232,15 +142,13 @@ InstrDecoder idec
     .IN_indirBranchTarget(IBP_predDst),
     .IN_enCustom(1'b1),
     
-    .OUT_decBranch(DEC_branch),
-    .OUT_decBranchDst(DEC_branchDst),
-    .OUT_decBranchFetchID(DEC_branchFetchID),
+    .OUT_decBranch(DEC_decBranch),
     
     .OUT_uop(DE_uop)
 );
 wire FUSE_full = !frontendEn || RN_stall;
 
-R_UOp RN_uop[3:0];
+R_UOp RN_uop[3:0] /*verilator public*/;
 wire RN_uopValid[3:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
@@ -277,8 +185,8 @@ Rename rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-wire RV_uopValid[3:0];
-R_UOp RV_uop[3:0];
+wire RV_uopValid[3:0] /*verilator public*/;
+R_UOp RV_uop[3:0] /*verilator public*/;
 
 wire stall[3:0];
 assign stall[0] = 0;
@@ -439,7 +347,7 @@ RF rf
     .raddr7(RF_readAddress[7]), .rdata7(RF_readData[7])
 );
 
-EX_UOp LD_uop[3:0];
+EX_UOp LD_uop[3:0] /*verilator public*/;
 
 wire[31:0] LD_zcFwdResult[1:0];
 Tag LD_zcFwdTag[1:0];

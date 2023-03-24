@@ -314,10 +314,38 @@ typedef struct packed
 
 typedef struct packed
 {
+    bit[31:0] src;
+    bit[31:0] dst;
+    bit isJump;
+    bit compressed;
+    bit valid;
+} BTUpdate;
+
+typedef struct packed
+{
     bit[30:0] src;
     bit[30:0] dst;
     bit valid;
 } IndirBranchInfo;
+
+typedef struct packed
+{
+    bit[31:0] dstPC;
+    SqN sqN;
+    SqN storeSqN;
+    SqN loadSqN;
+    bit flush;
+    FetchID_t fetchID;
+    BHist_t history;
+    bit taken;
+} BranchProv;
+
+typedef struct packed
+{
+    logic[4:0] fetchID;
+    logic[30:0] dst;
+    logic taken;
+} DecodeBranchProv;
 
 typedef struct packed
 {
@@ -329,10 +357,14 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[15:0] instr;
-    logic[30:0] pc;
+    logic[27:0] pc;
     FetchID_t fetchID;
+    logic[2:0] firstValid;
+    logic[2:0] lastValid;
+    logic[2:0] predPos;
     logic predTaken;
+    logic[7:0][15:0] instrs;
+    
     logic valid;
 } IF_Instr;
 
@@ -347,7 +379,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    //logic[31:0] pc;
     logic[31:0] imm;
     logic[4:0] rs0;
     logic[4:0] rs1;
@@ -415,28 +446,6 @@ typedef struct packed
     logic compressed;
     bit valid;
 } RES_UOp;
-
-typedef struct packed
-{
-    bit[31:0] dstPC;
-    SqN sqN;
-    SqN storeSqN;
-    SqN loadSqN;
-    bit flush;
-    FetchID_t fetchID;
-    BHist_t history;
-    bit taken;
-} BranchProv;
-
-typedef struct packed
-{
-    bit[31:0] src;
-    bit[31:0] dst;
-    bit isJump;
-    bit compressed;
-    bit valid;
-} BTUpdate;
-
 
 typedef enum logic[1:0] 
 {
