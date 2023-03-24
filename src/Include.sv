@@ -363,6 +363,7 @@ typedef struct packed
     logic[2:0] lastValid;
     logic[2:0] predPos;
     logic predTaken;
+    logic[30:0] predTarget;
     logic[7:0][15:0] instrs;
     
     logic valid;
@@ -372,8 +373,10 @@ typedef struct packed
 {
     logic[31:0] instr;
     logic[30:0] pc;
-    FetchID_t fetchID;
+    logic[30:0] predTarget;
     logic predTaken;
+    logic predInvalid;
+    FetchID_t fetchID;
     logic valid;
 } PD_Instr;
 

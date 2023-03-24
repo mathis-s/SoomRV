@@ -1,19 +1,20 @@
 [*]
 [*] GTKWave Analyzer v3.3.113 (w)1999-2022 BSI
-[*] Fri Mar 24 13:40:06 2023
+[*] Fri Mar 24 19:47:47 2023
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Fri Mar 24 13:39:44 2023"
-[dumpfile_size] 1373859
+[dumpfile_mtime] "Fri Mar 24 19:38:53 2023"
+[dumpfile_size] 387618352
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 9533
+[timestart] 34031
 [size] 3840 2118
 [pos] -1 -1
-*-4.330974 9789 974 1250 1072 1358 9809 9528 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-2.530973 34063 10012 34044 35586 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
 [treeopen] TOP.Top.core.aguLD.
+[treeopen] TOP.Top.core.aguLD.OUT_aguOp.
 [treeopen] TOP.Top.core.aguLD.OUT_memc.
 [treeopen] TOP.Top.core.aguLD.OUT_uop.
 [treeopen] TOP.Top.core.aguST.
@@ -28,6 +29,7 @@
 [treeopen] TOP.Top.core.cc.IN_uopSt.
 [treeopen] TOP.Top.core.cc.OUT_uopLd.
 [treeopen] TOP.Top.core.cr.
+[treeopen] TOP.Top.core.DEC_decBranch.
 [treeopen] TOP.Top.core.div.
 [treeopen] TOP.Top.core.div.IN_uop.
 [treeopen] TOP.Top.core.div.uop.
@@ -41,6 +43,13 @@
 [treeopen] TOP.Top.core.ialu1.OUT_branch.
 [treeopen] TOP.Top.core.ialu1.OUT_uop.
 [treeopen] TOP.Top.core.idec.
+[treeopen] TOP.Top.core.idec.IN_instrs[0].
+[treeopen] TOP.Top.core.idec.IN_instrs[1].
+[treeopen] TOP.Top.core.idec.IN_instrs[2].
+[treeopen] TOP.Top.core.idec.IN_instrs[3].
+[treeopen] TOP.Top.core.idec.OUT_decBranch.
+[treeopen] TOP.Top.core.ifetch.
+[treeopen] TOP.Top.core.ifetch.OUT_instrs.
 [treeopen] TOP.Top.core.iq0.
 [treeopen] TOP.Top.core.iq0.queue[0].
 [treeopen] TOP.Top.core.iq2.
@@ -77,6 +86,7 @@
 [treeopen] TOP.Top.core.preDec.OUT_instrs[0].
 [treeopen] TOP.Top.core.preDec.OUT_instrs[1].
 [treeopen] TOP.Top.core.preDec.OUT_instrs[2].
+[treeopen] TOP.Top.core.preDec.OUT_instrs[3].
 [treeopen] TOP.Top.core.rn.
 [treeopen] TOP.Top.core.rn.OUT_uop[0].
 [treeopen] TOP.Top.core.rn.rt.
@@ -96,6 +106,7 @@
 [treeopen] TOP.Top.core.sq.entries[4].
 [treeopen] TOP.Top.core.sq.OUT_uopSt.
 [treeopen] TOP.Top.core.trapHandler.
+[treeopen] TOP.Top.core.trapHandler.OUT_trapInfo.
 [treeopen] TOP.Top.dcache.
 [treeopen] TOP.Top.extMem.
 [treeopen] TOP.Top.MC_DC_if[0].
@@ -111,11 +122,19 @@
 TOP.Top.clk
 TOP.Top.en
 TOP.Top.rst
+TOP.Top.core.ifetch.dbgMisspec
 TOP.Top.core.mispredFlush
 TOP.Top.core.branch.taken
 @22
 TOP.Top.core.branch.dstPC[31:0]
-TOP.Top.core.branch.fetchID[4:0]
+@28
+TOP.Top.core.DEC_decBranch.taken
+@22
+TOP.Top.core.DEC_decBranch.dst[30:0]
+@28
+TOP.Top.core.DEC_decBranch.taken
+@22
+TOP.Top.core.DEC_decBranch.fetchID[4:0]
 @28
 TOP.Top.core.SQ_empty
 @200
@@ -140,6 +159,77 @@ TOP.Top.core.IQ3_full
 @22
 TOP.Top.core.ROB_maxSqN[6:0]
 TOP.Top.core.RN_nextSqN[6:0]
+@200
+-ifetch
+@28
+TOP.Top.core.ifetch.BP_branchTaken
+TOP.Top.core.ifetch.OUT_stall
+@22
+TOP.Top.core.ifetch.fetchID[4:0]
+TOP.Top.core.ifetch.IN_ROB_curFetchID[4:0]
+@28
+TOP.Top.core.ifetch.BP_isJump
+@22
+TOP.Top.core.ifetch.BP_branchSrc[31:0]
+TOP.Top.core.ifetch.BP_branchDst[31:0]
+TOP.Top.core.ifetch.pc[30:0]
+@200
+-
+@28
+TOP.Top.core.ifetch.en
+TOP.Top.core.ifetch.en0
+TOP.Top.core.ifetch.en1
+@200
+-
+@28
+TOP.Top.core.ifetch.OUT_instrs.valid
+@22
+TOP.Top.core.ifetch.OUT_instrs.pc[27:0]
+@28
+TOP.Top.core.ifetch.OUT_instrs.predTaken
+@22
+TOP.Top.core.ifetch.OUT_instrs.predTarget[30:0]
+@200
+-idec
+@28
+TOP.Top.core.idec.OUT_decBranch.taken
+TOP.Top.core.idec.IN_invalidate
+@200
+-
+@22
+TOP.Top.core.idec.IN_instrs[0].pc[30:0]
+TOP.Top.core.idec.IN_instrs[0].predTarget[30:0]
+TOP.Top.core.idec.IN_instrs[0].instr[31:0]
+@28
+TOP.Top.core.idec.IN_instrs[0].predTaken
+TOP.Top.core.idec.IN_instrs[0].valid
+@200
+-
+@22
+TOP.Top.core.idec.IN_instrs[1].pc[30:0]
+TOP.Top.core.idec.IN_instrs[1].predTarget[30:0]
+TOP.Top.core.idec.IN_instrs[1].instr[31:0]
+@28
+TOP.Top.core.idec.IN_instrs[1].predTaken
+TOP.Top.core.idec.IN_instrs[1].valid
+@200
+-
+@22
+TOP.Top.core.idec.IN_instrs[2].pc[30:0]
+TOP.Top.core.idec.IN_instrs[2].predTarget[30:0]
+TOP.Top.core.idec.IN_instrs[2].instr[31:0]
+@28
+TOP.Top.core.idec.IN_instrs[2].predTaken
+TOP.Top.core.idec.IN_instrs[2].valid
+@200
+-
+@22
+TOP.Top.core.idec.IN_instrs[3].pc[30:0]
+TOP.Top.core.idec.IN_instrs[3].predTarget[30:0]
+TOP.Top.core.idec.IN_instrs[3].instr[31:0]
+@28
+TOP.Top.core.idec.IN_instrs[3].predTaken
+TOP.Top.core.idec.IN_instrs[3].valid
 @200
 -dcache
 @28
@@ -196,7 +286,7 @@ TOP.Top.memc.OUT_stat.result[31:0]
 -
 @22
 TOP.Top.core.cc.IN_uopSt.addr[31:0]
-@29
+@28
 TOP.Top.core.cc.IN_uopSt.valid
 @200
 -
@@ -214,6 +304,8 @@ TOP.Top.core.preDec.OUT_instrs[0].valid
 TOP.Top.core.preDec.OUT_instrs[0].fetchID[4:0]
 TOP.Top.core.preDec.OUT_instrs[0].pc[30:0]
 TOP.Top.core.preDec.OUT_instrs[0].instr[31:0]
+@28
+TOP.Top.core.preDec.OUT_instrs[0].predTaken
 @200
 -
 @28
@@ -222,6 +314,8 @@ TOP.Top.core.preDec.OUT_instrs[1].valid
 TOP.Top.core.preDec.OUT_instrs[1].fetchID[4:0]
 TOP.Top.core.preDec.OUT_instrs[1].pc[30:0]
 TOP.Top.core.preDec.OUT_instrs[1].instr[31:0]
+@28
+TOP.Top.core.preDec.OUT_instrs[1].predTaken
 @200
 -
 @28
@@ -266,6 +360,8 @@ TOP.Top.core.preDec.OUT_instrs[2].instr[31:0]
 (31)TOP.Top.core.preDec.OUT_instrs[2].instr[31:0]
 @1401200
 -group_end
+@28
+TOP.Top.core.preDec.OUT_instrs[2].predTaken
 @200
 -
 @28
@@ -274,6 +370,8 @@ TOP.Top.core.preDec.OUT_instrs[3].valid
 TOP.Top.core.preDec.OUT_instrs[3].fetchID[4:0]
 TOP.Top.core.preDec.OUT_instrs[3].pc[30:0]
 TOP.Top.core.preDec.OUT_instrs[3].instr[31:0]
+@28
+TOP.Top.core.preDec.OUT_instrs[3].predTaken
 @200
 -RN_uop[0]
 @28
@@ -405,10 +503,12 @@ TOP.Top.core.ialu.OUT_uop.sqN[6:0]
 @200
 -AGU_LD
 @22
-TOP.Top.core.aguLD.OUT_uop.sqN[6:0]
-TOP.Top.core.aguLD.OUT_uop.pc[31:0]
-TOP.Top.core.aguLD.OUT_uop.nmDst[4:0]
-TOP.Top.core.aguLD.OUT_uop.tagDst[6:0]
+TOP.Top.core.aguLD.OUT_aguOp.sqN[6:0]
+TOP.Top.core.aguLD.OUT_aguOp.addr[31:0]
+TOP.Top.core.aguLD.OUT_aguOp.pc[31:0]
+@28
+TOP.Top.core.aguLD.OUT_aguOp.valid
+TOP.Top.core.aguLD.IN_stall
 @200
 -
 @28
@@ -456,6 +556,9 @@ TOP.Top.core.lsu.OUT_uopLd.result[31:0]
 -IALU1
 @28
 TOP.Top.core.ialu1.OUT_branch.taken
+@22
+TOP.Top.core.ialu1.OUT_branch.dstPC[31:0]
+@28
 TOP.Top.core.ialu1.isBranch
 TOP.Top.core.ialu1.branchTaken
 TOP.Top.core.ialu1.IN_uop.valid
@@ -588,5 +691,9 @@ TOP.Top.core.trapHandler.OUT_trapInfo.valid
 TOP.Top.core.trapHandler.OUT_trapInfo.isInterrupt
 @22
 TOP.Top.core.trapHandler.OUT_trapInfo.trapPC[31:0]
+@23
+TOP.Top.core.trapHandler.OUT_pcReadAddr[4:0]
+@22
+TOP.Top.core.trapHandler.IN_trapInstr.sqN[6:0]
 [pattern_trace] 1
 [pattern_trace] 0

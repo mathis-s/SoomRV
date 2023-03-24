@@ -26,7 +26,7 @@ typedef struct packed
     logic[2:0] lastValid;
     logic[2:0] predPos;
     logic predTaken;
-    
+    logic[30:0] predTarget;
     logic[7:0][15:0] instr;
 } PDEntry;
 
@@ -54,16 +54,22 @@ always_ff@(posedge clk) begin
         if (outEn) begin
             for (i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
                 
-                if (bufIndexOut != bufIndexIn || freeEntries == 0) begin
+                if ((bufIndexOut != bufIndexIn || freeEntries == 0)) begin
                     
                     PDEntry cur = buffer[bufIndexOut];
                     reg[15:0] instr = cur.instr[subIndexOut];
+                    
+                    // TRICKY: IFetch marks predicted branches in the second halfword (such that the branch is taken
+                    // only after the entire instruction has been fetched). If we find a predicted branch in the first
+                    // halfword of an instruction, there has been a branch source misspeculation.
+                    reg invalidBranch = (instr[1:0] == 2'b11) && buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     
-                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid)) begin
+                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && !invalidBranch) begin
                         
-                        OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
                         OUT_instrs[i].valid <= 1;
+                        OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
+                        OUT_instrs[i].predInvalid <= 0;
                         
                         if (subIndexOut == cur.lastValid) begin
                             bufIndexOut = bufIndexOut + 1;
@@ -74,7 +80,9 @@ always_ff@(posedge clk) begin
                         
                         OUT_instrs[i].instr <= {buffer[bufIndexOut].instr[subIndexOut], instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
-                        OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
+                        OUT_instrs[i].predTaken <= (buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut);
+                        OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
+                        
                         
                         if (subIndexOut == buffer[bufIndexOut].lastValid) begin
                             bufIndexOut = bufIndexOut + 1;
@@ -84,12 +92,14 @@ always_ff@(posedge clk) begin
                         else subIndexOut = subIndexOut + 1;
                         
                     end
-                    else if (instr[1:0] != 2'b11) begin
+                    else if (instr[1:0] != 2'b11 || invalidBranch) begin
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
                         OUT_instrs[i].instr <= {16'bx, instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
+                        OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
                         OUT_instrs[i].valid <= 1;
+                        OUT_instrs[i].predInvalid <= invalidBranch;
                         
                         
                         if (subIndexOut == cur.lastValid) begin
@@ -115,6 +125,7 @@ always_ff@(posedge clk) begin
             buffer[bufIndexIn].predPos <= IN_instrs.predPos;
             buffer[bufIndexIn].predTaken <= IN_instrs.predTaken;
             buffer[bufIndexIn].instr <= IN_instrs.instrs;
+            buffer[bufIndexIn].predTarget <= IN_instrs.predTarget;
             
             if (bufIndexIn == bufIndexOut) 
                 subIndexOut = IN_instrs.firstValid;

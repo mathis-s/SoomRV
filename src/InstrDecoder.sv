@@ -279,6 +279,10 @@ always_comb begin
         endcase
         
         if (IN_instrs[i].valid && en && !OUT_decBranch.taken) begin
+            
+            reg isBranch = 0;
+            reg[30:0] branchTarget = 'x;
+            
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
@@ -390,6 +394,9 @@ always_comb begin
                         uop.opcode = INT_JAL;
                         invalidEnc = 0;
                         
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         // Return
                         if (uop.rd == 1) begin
                             RS_inValid = 1;
@@ -479,7 +486,10 @@ always_comb begin
                         
                         invalidEnc =
                             (uop.opcode == 2) || (uop.opcode == 3);
-                            
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         /* verilator lint_off ALWCOMBORDER */
                         if (!invalidEnc && DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
@@ -1135,7 +1145,10 @@ always_comb begin
                         // certainly one of the encodings of all time
                         uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4], 
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
-                            
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         if (!IN_instrs[i].predTaken) begin
                             OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                             OUT_decBranch.taken = 1;
@@ -1155,6 +1168,9 @@ always_comb begin
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                         uop.immB = 1;
                         uop.rd = 1; // ra
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
                         RS_inValid = 1;
                         RS_inData = IN_instrs[i].pc + 1;
@@ -1176,6 +1192,9 @@ always_comb begin
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
                         
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
                             uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
@@ -1196,6 +1215,9 @@ always_comb begin
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
@@ -1398,8 +1420,27 @@ always_comb begin
                     end
                 end
             end
+            
+            if (IN_instrs[i].predTaken) begin
+                if (!isBranch || IN_instrs[i].predTarget != branchTarget || IN_instrs[i].predInvalid) begin
+                    
+                    OUT_decBranch.taken = 1;
+                    if (isBranch)
+                        OUT_decBranch.dst = branchTarget;
+                    else /*if (IN_instrs[i].predInvalid)*/ begin
+                        OUT_decBranch.dst = IN_instrs[i].pc;
+                        invalidEnc = 1;
+                        uop.valid = 0;
+                    end
+                    //else
+                    //    OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
+                        
+                    $display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
+                        
+                    OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                end
+            end
         end
-        
         
         if (invalidEnc) begin
             uop.opcode = TRAP_ILLEGAL_INSTR;
@@ -1409,7 +1450,7 @@ always_comb begin
     end
 end
 
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
     if (rst || IN_invalidate) begin
         for (i = 0; i < NUM_UOPS; i=i+1)
             OUT_uop[i].valid <= 0;

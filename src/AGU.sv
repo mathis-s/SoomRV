@@ -225,7 +225,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.nmDst <= IN_uop.nmDst;
                 OUT_uop.sqN <= IN_uop.sqN;
                 OUT_uop.pc <= IN_uop.pc;
-                OUT_uop.flags <= FLAGS_NONE;
                 OUT_uop.compressed <= IN_uop.compressed;
                 OUT_uop.result <= addr;
                 OUT_uop.doNotCommit <= 0;
@@ -309,6 +308,8 @@ always_ff@(posedge clk) begin
                     ATOMIC_AMOMAXU_W: OUT_aguOp.data <= !(IN_uop.srcB < IN_uop.srcC) ? IN_uop.srcB : IN_uop.srcC;
                     default: assert(0);
                 endcase
+                
+                OUT_uop.flags <= exceptFlags;
             end
         end
         else if (!IN_stall || (OUT_aguOp.valid && IN_branch.taken && $signed(OUT_aguOp.sqN - IN_branch.sqN) > 0))

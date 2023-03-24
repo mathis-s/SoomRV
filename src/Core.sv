@@ -47,7 +47,6 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire frontendEn;
 wire ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
 
 BranchProv branchProvs[3:0];
@@ -121,7 +120,7 @@ PreDecode preDec
     .rst(rst),
     .ifetchValid(ifetchEn),
     .outEn(!FUSE_full),
-    
+
     .OUT_full(PD_full),
     
     .mispred(branch.taken || DEC_decBranch.taken),
@@ -146,6 +145,14 @@ InstrDecoder idec
     
     .OUT_uop(DE_uop)
 );
+
+wire frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
+    ($signed(RN_nextSqN - ROB_maxSqN) <= -3) && 
+    !branch.taken &&
+    en &&
+    !mispredFlush &&
+    !SQ_flush;
+
 wire FUSE_full = !frontendEn || RN_stall;
 
 R_UOp RN_uop[3:0] /*verilator public*/;
@@ -771,16 +778,4 @@ ControlRegs cr
     .OUT_IO_busy(IO_busy)
 );
 
-assign frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
-    ($signed(RN_nextSqN - ROB_maxSqN) <= -3) && 
-    !branch.taken &&
-    en &&
-    !mispredFlush &&
-    !SQ_flush;
-
-`ifdef IVERILOG_DEBUG
-`include "src/Debug.svi"
-`endif
-
 endmodule
-
