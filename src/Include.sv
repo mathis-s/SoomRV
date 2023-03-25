@@ -318,6 +318,7 @@ typedef struct packed
     bit[31:0] dst;
     bit isJump;
     bit compressed;
+    bit clean;
     bit valid;
 } BTUpdate;
 

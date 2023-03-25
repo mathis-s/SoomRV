@@ -55,7 +55,7 @@ wire mispredFlush;
 wire BS_PERFC_branchMispr;
 
 IF_Instr IF_instrs;
-BTUpdate BP_btUpdates[1:0];
+BTUpdate BP_btUpdates[2:0];
 
 FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
@@ -142,6 +142,7 @@ InstrDecoder idec
     .IN_enCustom(1'b1),
     
     .OUT_decBranch(DEC_decBranch),
+    .OUT_btUpdate(BP_btUpdates[2]),
     
     .OUT_uop(DE_uop)
 );

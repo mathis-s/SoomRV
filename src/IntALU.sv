@@ -195,6 +195,7 @@ always_ff@(posedge clk) begin
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                     OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
                     OUT_btUpdate.compressed <= IN_uop.compressed;
+                    OUT_btUpdate.clean <= 0;
                     OUT_btUpdate.valid <= 1;
                 end
                 

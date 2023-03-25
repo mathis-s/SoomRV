@@ -63,6 +63,7 @@ always_ff@(posedge clk) begin
                     // only after the entire instruction has been fetched). If we find a predicted branch in the first
                     // halfword of an instruction, there has been a branch source misspeculation.
                     reg invalidBranch = (instr[1:0] == 2'b11) && buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
+                    
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     
                     if (instr[1:0] == 2'b11 && (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && !invalidBranch) begin

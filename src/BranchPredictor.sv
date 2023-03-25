@@ -1,8 +1,6 @@
 module BranchPredictor
 #(
-    parameter NUM_IN=2,
-    parameter NUM_ENTRIES=32,
-    parameter ID_BITS=16
+    parameter NUM_IN=2
 )
 (
     input wire clk,
@@ -18,7 +16,7 @@ module BranchPredictor
     input wire[31:0] IN_pc,
     output wire OUT_branchTaken,
     output wire OUT_isJump,
-    output wire[31:0] OUT_branchSrc,
+    output FetchOff_t OUT_branchSrcOffs,
     output wire[31:0] OUT_branchDst,
     output BHist_t OUT_branchHistory,
     output BranchPredInfo OUT_branchInfo,
@@ -42,7 +40,7 @@ BHist_t gHistoryCom;
 // Try to find valid branch target update
 BTUpdate btUpdate;
 always_comb begin
-    btUpdate = 67'bx;
+    btUpdate = 'x;
     btUpdate.valid = 0;
     for (i = 0; i < NUM_IN; i=i+1) begin
         if (IN_btUpdates[i].valid)
@@ -60,7 +58,6 @@ assign OUT_branchInfo.isJump = OUT_isJump;
 assign OUT_branchTaken = OUT_branchFound && (OUT_isJump ? 1 : tageTaken);
 
 assign OUT_branchDst[0] = 1'b0;
-assign OUT_branchSrc[0] = 1'b0;
 BranchTargetBuffer btb
 (
     .clk(clk),
@@ -69,7 +66,7 @@ BranchTargetBuffer btb
     .IN_pc(IN_pc[31:1]),
     .OUT_branchFound(OUT_branchFound),
     .OUT_branchDst(OUT_branchDst[31:1]),
-    .OUT_branchSrc(OUT_branchSrc[31:1]),
+    .OUT_branchSrcOffs(OUT_branchSrcOffs),
     .OUT_branchIsJump(OUT_isJump),
     .OUT_branchCompr(OUT_branchCompr),
     .OUT_multipleBranches(OUT_multipleBranches),

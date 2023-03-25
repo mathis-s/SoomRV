@@ -2,7 +2,7 @@ module IFetch
 #(
     parameter NUM_UOPS=3,
     parameter NUM_BLOCKS=8,
-    parameter NUM_BP_UPD=2,
+    parameter NUM_BP_UPD=3,
     parameter NUM_BRANCH_PROVS=4
 )
 (
@@ -61,7 +61,7 @@ BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 
 wire BP_branchTaken;
 wire BP_isJump;
-wire[31:0] BP_branchSrc;
+FetchOff_t BP_branchSrcOffs;
 wire[31:0] BP_branchDst;
 BHist_t BP_branchHistory;
 BranchPredInfo BP_info;
@@ -82,7 +82,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_pc({pc, 1'b0}),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_isJump(BP_isJump),
-    .OUT_branchSrc(BP_branchSrc),
+    .OUT_branchSrcOffs(BP_branchSrcOffs),
     .OUT_branchDst(BP_branchDst),
     .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
@@ -163,12 +163,10 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
 
-reg dbgMisspec;
 reg en0;
 reg en1;
 always_ff@(posedge clk) begin
     
-    dbgMisspec <= 0;
     if (rst) begin
         pc <= 0;
         fetchID <= 0;
@@ -202,7 +200,7 @@ always_ff@(posedge clk) begin
             outInstrs_r.predTaken <= infoLast.taken;
             outInstrs_r.predPos <= branchPosLast;
             outInstrs_r.firstValid <= pcLast[2:0];
-            outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : ('1);
+            outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : (3'b111);
             outInstrs_r.predTarget <= infoLast.taken ? pc : 'x;
         
             fetchID <= fetchID + 1;
@@ -217,24 +215,24 @@ always_ff@(posedge clk) begin
             histLast <= BP_branchHistory;
             infoLast <= BP_info;
             pcLast <= pc;
-            branchPosLast <= BP_branchSrc[3:1];
+            branchPosLast <= BP_branchSrcOffs;
             multipleLast <= BP_multipleBranches;
             
             if (BP_branchFound) begin
                 if (BP_isJump || BP_branchTaken) begin
                     pc <= BP_branchDst[31:1];
                     
-                    if (BP_branchSrc[31:4] != pc[30:3]) begin
-                        $display("BTB PC Misspeculation: spec=%x, actual=%x\n", BP_branchSrc, pc << 1);
-                        dbgMisspec <= 1;
-                    end
+                    //if (BP_branchSrc[31:4] != pc[30:3]) begin
+                        //$display("BTB PC Misspeculation: spec=%x, actual=%x\n", BP_branchSrc, pc << 1);
+                    //    dbgMisspec <= 1;
+                    //end
                 end
                 // Branch found, not taken
                 else begin                    
                     // There is a second branch in this block,
                     // go there.
-                    if (BP_multipleBranches) begin
-                        pc <= BP_branchSrc[31:1] + 1;
+                    if (BP_multipleBranches && BP_branchSrcOffs != 3'b111) begin
+                        pc <=  {pc[30:3], BP_branchSrcOffs + 3'b1};
                     end
                     else begin
                         pc <= {pc[30:3] + 28'b1, 3'b000};

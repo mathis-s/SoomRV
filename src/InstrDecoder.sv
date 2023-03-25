@@ -206,8 +206,7 @@ module InstrDecoder
     input wire IN_enCustom,
     
     output DecodeBranchProv OUT_decBranch,
-    //output reg[30:0] OUT_decBranchDst,
-    //output FetchID_t OUT_decBranchFetchID,
+    output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -239,10 +238,15 @@ Instr32 instr;
 Instr16 i16;
 I32 i32;
 
+BTUpdate btUpdate_c;
+
 D_UOp uopsComb[NUM_UOPS-1:0];
 reg[3:0] validMask;
 
 always_comb begin
+    
+    btUpdate_c = 'x;
+    btUpdate_c.valid = 0;
     
     RS_inValid = 0;
     RS_inData = 31'bx;
@@ -1421,17 +1425,26 @@ always_comb begin
                 if (!isBranch || IN_instrs[i].predTarget != branchTarget || IN_instrs[i].predInvalid) begin
                     
                     OUT_decBranch.taken = 1;
-                    if (isBranch)
-                        OUT_decBranch.dst = branchTarget;
-                    else /*if (IN_instrs[i].predInvalid)*/ begin
+                    
+                    btUpdate_c.valid = 1;
+                    btUpdate_c.clean = 1;
+                    
+                    if (!IN_instrs[i].predInvalid)
+                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                    else
+                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
+                    
+                    if (IN_instrs[i].predInvalid) begin
                         OUT_decBranch.dst = IN_instrs[i].pc;
                         invalidEnc = 1;
                         uop.valid = 0;
                     end
-                    //else
-                    //    OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
+                    else if (isBranch)
+                        OUT_decBranch.dst = branchTarget;
+                    else
+                        OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
                         
-                    $display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
+                    //$display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
                         
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                 end
@@ -1447,6 +1460,9 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
+    
+    OUT_btUpdate <= btUpdate_c;
+
     if (rst || IN_invalidate) begin
         for (i = 0; i < NUM_UOPS; i=i+1)
             OUT_uop[i].valid <= 0;
