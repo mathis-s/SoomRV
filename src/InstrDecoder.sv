@@ -205,11 +205,8 @@ module InstrDecoder
     input wire[30:0] IN_indirBranchTarget,
     input wire IN_enCustom,
     
-    output reg OUT_decBranch,
-    output reg[30:0] OUT_decBranchDst,
-    output FetchID_t OUT_decBranchFetchID,
-    
-    //output BTUpdate OUT_btUpdate,
+    output DecodeBranchProv OUT_decBranch,
+    output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -241,18 +238,22 @@ Instr32 instr;
 Instr16 i16;
 I32 i32;
 
+BTUpdate btUpdate_c;
+
 D_UOp uopsComb[NUM_UOPS-1:0];
 reg[3:0] validMask;
 
 always_comb begin
     
+    btUpdate_c = 'x;
+    btUpdate_c.valid = 0;
+    
     RS_inValid = 0;
     RS_inData = 31'bx;
     RS_inPop = 0;
-    OUT_decBranch = 0;
-    OUT_decBranchDst = 31'bx;
+    OUT_decBranch = 'x;
+    OUT_decBranch.taken = 0;
     validMask = 4'b1111;
-    OUT_decBranchFetchID = 0;
     
     for (i = 0; i < NUM_UOPS; i=i+1) begin
         
@@ -263,7 +264,7 @@ always_comb begin
         uop = 0;
         invalidEnc = 1;
         //uop.pc = {IN_instrs[i].pc, 1'b0};
-        uop.valid = IN_instrs[i].valid && en && !OUT_decBranch;
+        uop.valid = IN_instrs[i].valid && en && !OUT_decBranch.taken;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[2:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
@@ -281,7 +282,11 @@ always_comb begin
             default:      uop.imm = 0;
         endcase
         
-        if (IN_instrs[i].valid && en && !OUT_decBranch) begin
+        if (IN_instrs[i].valid && en && !OUT_decBranch.taken) begin
+            
+            reg isBranch = 0;
+            reg[30:0] branchTarget = 'x;
+            
             // Regular Instructions
             if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
@@ -393,6 +398,9 @@ always_comb begin
                         uop.opcode = INT_JAL;
                         invalidEnc = 0;
                         
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         // Return
                         if (uop.rd == 1) begin
                             RS_inValid = 1;
@@ -400,13 +408,13 @@ always_comb begin
                         end
                         // Handle unpredicted jumps right away
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
                         // Predicted jumps don't need to be executed if they don't write anything
                         else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
-                            uop.valid = 0;
+                            uop.fu = FU_RN;
                         end
                         
                     end
@@ -482,7 +490,10 @@ always_comb begin
                         
                         invalidEnc =
                             (uop.opcode == 2) || (uop.opcode == 3);
-                            
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         /* verilator lint_off ALWCOMBORDER */
                         if (!invalidEnc && DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
@@ -656,8 +667,7 @@ always_comb begin
                             uop.imm[11] == uop.imm[7] &&
                             uop.imm[11] == uop.imm[6] &&
                             uop.imm[11] == uop.imm[5]) begin
-                            if (uop.rd == 0) uop.valid = 0;
-                            else uop.fu = FU_RN;
+                            uop.fu = FU_RN;
                         end
                     end
                     `OPC_REG_REG: begin
@@ -1138,14 +1148,17 @@ always_comb begin
                         // certainly one of the encodings of all time
                         uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4], 
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
-                            
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                        
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
                         else
-                            uop.valid = 0;
+                            uop.fu = FU_RN;
                         
                         uop.immB = 1;
                         invalidEnc = 0;
@@ -1158,14 +1171,17 @@ always_comb begin
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                         uop.immB = 1;
                         uop.rd = 1; // ra
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
                         RS_inValid = 1;
                         RS_inData = IN_instrs[i].pc + 1;
                         
                         if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranchDst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch = 1;
-                            OUT_decBranchFetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
 
                         invalidEnc = 0;
@@ -1178,6 +1194,9 @@ always_comb begin
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
@@ -1199,6 +1218,9 @@ always_comb begin
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
                         uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        
+                        isBranch = 1;
+                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
@@ -1304,10 +1326,7 @@ always_comb begin
                     end
                     // c.nop
                     else if (i16.ci.funct3 == 3'b000 && i16.ci.imm2 == 1'b0 && i16.ci.rd_rs1 == 5'b0 && i16.ci.imm == 5'b0) begin
-                        // don't execute nops
-                        uop.valid = 0;
-                        uop.opcode = INT_ADD;
-                        uop.fu = FU_INT;
+                        uop.fu = FU_RN;
                         invalidEnc = 0;
                     end
                 end
@@ -1343,18 +1362,18 @@ always_comb begin
                             uop.imm = {RS_outData, 1'b0};
                             uop.immB = 1;
                             
-                            OUT_decBranch = 1;
-                            OUT_decBranchDst = RS_outData;
-                            OUT_decBranchFetchID = uop.fetchID;
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.dst = RS_outData;
+                            OUT_decBranch.fetchID = uop.fetchID;
                         end
                         else begin
                             uop.opcode = INT_V_JR;
                             uop.imm = {IN_indirBranchTarget, 1'b0};
                             uop.immB = 1;
                             
-                            OUT_decBranch = 1;
-                            OUT_decBranchDst = IN_indirBranchTarget;
-                            OUT_decBranchFetchID = uop.fetchID;
+                            OUT_decBranch.taken = 1;
+                            OUT_decBranch.dst = IN_indirBranchTarget;
+                            OUT_decBranch.fetchID = uop.fetchID;
                         end
                         invalidEnc = 0;
                     end
@@ -1401,8 +1420,36 @@ always_comb begin
                     end
                 end
             end
+            
+            if (IN_instrs[i].predTaken) begin
+                if (!isBranch || IN_instrs[i].predTarget != branchTarget || IN_instrs[i].predInvalid) begin
+                    
+                    OUT_decBranch.taken = 1;
+                    
+                    btUpdate_c.valid = 1;
+                    btUpdate_c.clean = 1;
+                    
+                    if (!IN_instrs[i].predInvalid)
+                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                    else
+                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
+                    
+                    if (IN_instrs[i].predInvalid) begin
+                        OUT_decBranch.dst = IN_instrs[i].pc;
+                        invalidEnc = 1;
+                        uop.valid = 0;
+                    end
+                    else if (isBranch)
+                        OUT_decBranch.dst = branchTarget;
+                    else
+                        OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
+                        
+                    //$display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
+                        
+                    OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                end
+            end
         end
-        
         
         if (invalidEnc) begin
             uop.opcode = TRAP_ILLEGAL_INSTR;
@@ -1412,7 +1459,10 @@ always_comb begin
     end
 end
 
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
+    
+    OUT_btUpdate <= btUpdate_c;
+
     if (rst || IN_invalidate) begin
         for (i = 0; i < NUM_UOPS; i=i+1)
             OUT_uop[i].valid <= 0;

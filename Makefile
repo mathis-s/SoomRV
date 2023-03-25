@@ -9,11 +9,11 @@ decoder_tb:
 	src/Core.sv  \
 	src/IssueQueue.sv  \
 	src/IntALU.sv  \
-	src/ProgramCounter.sv \
+	src/IFetch.sv \
 	src/RF.sv \
 	src/Load.sv \
 	src/ROB.sv \
-	src/LoadAGU.sv \
+	src/AGU.sv \
 	src/BranchPredictor.sv \
 	src/IndirectBranchPredictor.sv \
 	src/LoadBuffer.sv \
@@ -44,7 +44,6 @@ decoder_tb:
 	src/TagePredictor.sv \
 	src/LoadStoreUnit.sv \
 	src/ICacheTable.sv \
-	src/StoreAGU.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
 	src/CacheInterface.sv \

@@ -69,7 +69,7 @@ always_ff@(posedge clk) begin
         if (IN_lookupValid && cacheEntryFound)
             icacheTable[cacheEntryIndex].used <= 1;
         
-        if (loading && IN_memc.cacheID != 1 && IN_memc.busy) begin
+        if (loading && IN_memc.rqID != 1 && IN_memc.busy) begin
             loading <= 0;
         end
         // Finish current load
@@ -86,6 +86,7 @@ always_ff@(posedge clk) begin
             OUT_memc.sramAddr <= {lruPointer, 7'b0};
             OUT_memc.extAddr <= {IN_lookupPC[30:8], 7'b0};
             OUT_memc.cacheID <= 1;
+            OUT_memc.rqID <= 1;
             icacheTable[lruPointer].valid <= 0;
             loadAddr <= IN_lookupPC;
             loading <= 1;
