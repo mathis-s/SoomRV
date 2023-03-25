@@ -389,8 +389,19 @@ assign OUT_trapControl.interruptDelegate = interruptDelegate;
 
 assign OUT_fRoundMode = frm;
 
-assign OUT_vmem.sv32en = satp.mode;
-assign OUT_vmem.rootPPN = satp.ppn;
+always_comb begin
+
+    PrivLevel epm = mstatus.mprv ? mstatus.mpp : priv; 
+    
+    OUT_vmem.rootPPN = satp.ppn;
+    OUT_vmem.sv32en_ifetch = satp.mode;
+    OUT_vmem.sv32en = satp.mode;
+
+    if (epm == PRIV_MACHINE) begin
+        OUT_vmem.sv32en_ifetch = 0;
+        OUT_vmem.sv32en = 0;
+    end
+end
 
 reg[31:0] rdata;
 reg invalidCSR;

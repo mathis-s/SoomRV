@@ -28,7 +28,9 @@ module Core
 integer i;
 
 always_comb begin
-    if (STAGU_memc.cmd != MEMC_NONE)
+    if (IF_memc2.cmd != MEMC_NONE)
+        OUT_memc = IF_memc2;
+    else if (STAGU_memc.cmd != MEMC_NONE)
         OUT_memc = STAGU_memc;
     else if (LDAGU_memc.cmd != MEMC_NONE)
         OUT_memc = LDAGU_memc;
@@ -62,6 +64,7 @@ PCFileEntry PC_readData[4:0];
 wire PC_stall;
 
 CTRL_MemC PC_MC_if;
+CTRL_MemC IF_memc2;
 IFetch ifetch
 (
     .clk(clk),
@@ -91,6 +94,8 @@ IFetch ifetch
     
     .OUT_instrs(IF_instrs),
     
+    .IN_vmem(CSR_vmem),
+    .OUT_memc2(IF_memc2),
     .OUT_memc(PC_MC_if),
     .IN_memc(IN_memc),
     

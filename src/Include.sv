@@ -15,7 +15,7 @@ typedef struct packed
     logic[9:0] sramAddr;
     logic[29:0] extAddr;
     logic[0:0] cacheID;
-    logic[1:0] rqID;
+    logic[2:0] rqID;
 } CTRL_MemC;
 
 typedef struct packed
@@ -26,7 +26,7 @@ typedef struct packed
     logic[31:0] result;
     logic resultValid;
     
-    logic[1:0] rqID;
+    logic[2:0] rqID;
     logic busy;
 } STAT_MemC;
 
@@ -570,6 +570,7 @@ typedef struct packed
 typedef struct
 {
     logic sv32en;
+    logic sv32en_ifetch;
     logic[21:0] rootPPN;
 } STAT_VMem;
 

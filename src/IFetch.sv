@@ -34,6 +34,9 @@ module IFetch
     
     output IF_Instr OUT_instrs,
     
+    input STAT_VMem IN_vmem,
+    
+    output CTRL_MemC OUT_memc2,
     output CTRL_MemC OUT_memc,
     input STAT_MemC IN_memc,
     
@@ -42,7 +45,7 @@ module IFetch
 
 integer i;
 
-assign OUT_instrReadEnable = !(en0 && en);
+assign OUT_instrReadEnable = !en;
 
 BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 (
@@ -78,7 +81,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_mispredFlush(IN_mispredFlush),
     .IN_branch(OUT_branch),
     
-    .IN_pcValid(en0 && en),
+    .IN_pcValid(en),
     .IN_pc({pc, 1'b0}),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_isJump(BP_isJump),
@@ -94,13 +97,14 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_bpUpdate(IN_bpUpdate)
 );
 
+wire pageWalkRequired = IN_vmem.sv32en_ifetch && (pcVPN != lastVPN || !lastVPN_valid);
 wire icacheStall;
 ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
-    .IN_lookupValid(en0 && en),
-    .IN_lookupPC(pc),
+    .IN_lookupValid(en && !pageWalkRequired),
+    .IN_lookupPC(IN_vmem.sv32en_ifetch ? {pcPPN, pc[10:0]} : pc),
     
     .OUT_lookupAddress(OUT_instrAddr),
     .OUT_stall(icacheStall),
@@ -117,7 +121,7 @@ reg useInstrRawBackup;
 always_ff@(posedge clk) begin
     if (rst)
         useInstrRawBackup <= 0;
-    else if (!(en && en0)) begin
+    else if (!en) begin
         instrRawBackup <= instrRaw;
         useInstrRawBackup <= 1;
     end
@@ -133,9 +137,20 @@ always_comb begin
         OUT_instrs.instrs[i] = instrRaw[(16*i)+:16];
 end
 
-
+// these are virtual addresses when address translation is active
 reg[30:0] pc;
 reg[30:0] pcLast;
+
+// virtual page number
+// If this has changed, we do a page walk to find the new PPN
+wire[19:0] pcVPN = pc[30:11];
+reg lastVPN_valid;
+reg[19:0] lastVPN;
+
+// physical page number
+// used for instruction lookup
+reg[19:0] pcPPN;
+
 FetchID_t fetchID;
 FetchID_t fetchIDlast;
 BHist_t histLast;
@@ -163,17 +178,23 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
 
-reg en0;
+reg pageWalkActive;
+reg pageWalkAccepted;
+reg[19:0] pageWalkVPN;
+
 reg en1;
 always_ff@(posedge clk) begin
+    
+    OUT_memc2.cmd <= MEMC_NONE;
     
     if (rst) begin
         pc <= 0;
         fetchID <= 0;
-        en0 <= 0;
         en1 <= 0;
         outInstrs_r <= 'x;
         outInstrs_r.valid <= 0;
+        lastVPN_valid <= 0;
+        pageWalkActive <= 0;
     end
     else if (OUT_branch.taken || IN_decBranch.taken) begin
         if (OUT_branch.taken) begin
@@ -184,15 +205,12 @@ always_ff@(posedge clk) begin
             pc <= IN_decBranch.dst;
             fetchID <= IN_decBranch.fetchID + 1;
         end
-        en0 <= 0;
         en1 <= 0;
         outInstrs_r <= 'x;
         outInstrs_r.valid <= 0;
     end
     else if (en) begin
-        
-        en0 <= 1;
-        
+    
         if (en1) begin
             outInstrs_r.valid <= 1;
             outInstrs_r.pc <= pcLast[30:3];
@@ -210,14 +228,39 @@ always_ff@(posedge clk) begin
             outInstrs_r.valid <= 0;
         end
         
-        if (en0) begin
+        if (pageWalkRequired) begin
+            if (!pageWalkActive) begin
+                pageWalkActive <= 1;
+                pageWalkVPN <= pcVPN;
+            end
+            else if (!pageWalkAccepted) begin
+                if (IN_memc.busy && IN_memc.rqID == 4)
+                    pageWalkAccepted <= 1;
+                else begin
+                    OUT_memc2.cmd <= MEMC_PAGE_WALK;
+                    OUT_memc2.rootPPN <= IN_vmem.rootPPN;
+                    OUT_memc2.extAddr[29:10] <= pageWalkVPN;
+                    OUT_memc2.cacheID <= 'x;
+                    OUT_memc2.sramAddr <= 'x;
+                    OUT_memc2.rqID <= 4;
+                end
+            end
+            else if (IN_memc.resultValid) begin
+                pageWalkActive <= 0;
+                pageWalkAccepted <= 'x;
+                lastVPN <= pageWalkVPN;
+                pcPPN <= IN_memc.result[29:10];
+                lastVPN_valid <= 1;
+                // TODO: Check permissions/exceptions
+            end
+        end
+        else begin
             en1 <= 1;
             histLast <= BP_branchHistory;
             infoLast <= BP_info;
             pcLast <= pc;
             branchPosLast <= BP_branchSrcOffs;
             multipleLast <= BP_multipleBranches;
-            
             if (BP_branchFound) begin
                 if (BP_isJump || BP_branchTaken) begin
                     pc <= BP_branchDst[31:1];
@@ -243,7 +286,6 @@ always_ff@(posedge clk) begin
                 pc <= {pc[30:3] + 28'b1, 3'b000};
             end
         end
-        else en1 <= 0;
     end
 end
 
