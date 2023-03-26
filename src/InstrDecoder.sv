@@ -304,8 +304,8 @@ always_comb begin
                 case (instr.opcode)
                     `OPC_ENV: begin
                         case (instr.funct3)
-                            0: begin 
-                                if (uop.imm == 0 || uop.imm == 1) begin
+                            0: begin
+                                if ((uop.imm == 0 || uop.imm == 1) && instr.rs0 == 0 && instr.rd == 0) begin
                                     case (uop.imm)
                                         0: uop.opcode = TRAP_ECALL_M;
                                         1: uop.opcode = TRAP_BREAK;
@@ -317,7 +317,7 @@ always_comb begin
                                     uop.immB = 1;
                                     invalidEnc = 0;
                                 end
-                                else if (instr.rs1 == 5'b00010) begin
+                                else if (instr.rs1 == 5'b00010 && instr.rs0 == 0 && instr.rd == 0) begin
                                     if (instr.funct7 == 7'b0001000) begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_SRET;
@@ -328,6 +328,32 @@ always_comb begin
                                         uop.opcode = CSR_MRET;
                                         invalidEnc = 0;
                                     end
+                                end
+                                else if (instr.funct7 == 7'b0001000 && instr.rs1 == 5'b00101 && instr.rs0 == 0 && instr.rd == 0) begin
+                                    
+                                    // WFI (currently nop)
+                                    uop.fu = FU_RN;
+                                    invalidEnc = 0;
+                                end
+                                else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
+                                    // sfence.vma
+                                    uop.rs0 = instr.rs0;
+                                    uop.rs1 = instr.rs1;
+                                    //invalidEnc = 0;
+                                end
+                                else if (instr.funct7 == 7'b0001011 && instr.rd == 0) begin
+                                    // sinval.vma
+                                    uop.rs0 = instr.rs0;
+                                    uop.rs1 = instr.rs1;
+                                    //invalidEnc = 0;
+                                end
+                                else if (instr.funct7 == 7'b0001100 && instr.rs1 == 0 && instr.rs0 == 0 && instr.rd == 0) begin
+                                    // sfence.w.inval
+                                    //invalidEnc = 0;
+                                end
+                                else if (instr.funct7 == 7'b0001100 && instr.rs1 == 5'b1 && instr.rs0 == 0 && instr.rd == 0) begin
+                                    // sfence.inval.ir
+                                    //invalidEnc = 0;
                                 end
                             end
                             
