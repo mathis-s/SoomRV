@@ -242,8 +242,12 @@ always_ff@(posedge clk) begin
                     /*rwx*/ 3'b111: begin end
             endcase
             
-            if ((IN_memc.isSuperPage && IN_memc.result[19:10] != 0) || // misaligned superpage
-                (!IN_memc.result[0])) 
+            if ((IN_memc.isSuperPage && IN_memc.result[19:10] != 0) ||
+                (!IN_memc.result[0]) ||
+                (IN_vmem.priv == PRIV_USER && !IN_memc.result[4]) ||
+                (IN_vmem.priv == PRIV_SUPERVISOR && IN_memc.result[4]) ||
+                (!IN_memc.result[6])) 
+                
                 pcPPNfault <= IF_PAGE_FAULT;
         end
     

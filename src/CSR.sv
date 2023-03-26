@@ -397,10 +397,15 @@ always_comb begin
     OUT_vmem.rootPPN = satp.ppn;
     OUT_vmem.sv32en_ifetch = satp.mode;
     OUT_vmem.sv32en = satp.mode;
+    OUT_vmem.priv = epm;
+    OUT_vmem.makeExecReadable = mstatus.mxr;
 
     if (epm == PRIV_MACHINE) begin
         OUT_vmem.sv32en_ifetch = 0;
         OUT_vmem.sv32en = 0;
+    end
+    else if (epm == PRIV_SUPERVISOR) begin
+        OUT_vmem.supervUserMemory = mstatus.sum;
     end
 end
 

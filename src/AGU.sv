@@ -97,10 +97,13 @@ always_ff@(posedge clk) begin
                 else if (IN_memc.resultValid) begin
                     if (LOAD_AGU) begin
                         case (IN_memc.result[3:1])
-                            /*xo*/  3'b100,
                             /*inv*/ 3'b000,
                             /*rfu*/ 3'b010,
                             /*rfu*/ 3'b110: OUT_aguOp.exception <= AGU_PAGE_FAULT;
+                            /*xo*/  3'b100: begin
+                                if (!IN_vmem.makeExecReadable) 
+                                    OUT_aguOp.exception <= AGU_PAGE_FAULT;
+                            end
                             /*ro*/  3'b001,
                             /*rw*/  3'b011,
                             /*rx*/  3'b101,
@@ -133,7 +136,12 @@ always_ff@(posedge clk) begin
                     else
                         OUT_aguOp.addr[31:12] <= IN_memc.result[29:10];
                     
-                    if (!IN_memc.result[0]) begin
+                    if (!IN_memc.result[0] ||
+                        (IN_vmem.priv == PRIV_USER && !IN_memc.result[4]) ||
+                        (IN_vmem.priv == PRIV_SUPERVISOR && IN_memc.result[4] && !IN_vmem.supervUserMemory) ||
+                        (!IN_memc.result[6]) || // access but accessed not set
+                        (!LOAD_AGU && !IN_memc.result[7]) // write but dirty not set
+                    ) begin
                         OUT_aguOp.exception <= AGU_PAGE_FAULT;
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_PF;
                     end

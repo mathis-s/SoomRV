@@ -579,6 +579,10 @@ typedef struct
     logic sv32en;
     logic sv32en_ifetch;
     logic[21:0] rootPPN;
+    logic makeExecReadable;
+    logic supervUserMemory;
+    PrivLevel priv;
+    
 } STAT_VMem;
 
 interface IF_CSR_MMIO;
