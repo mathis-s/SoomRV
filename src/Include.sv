@@ -303,6 +303,11 @@ typedef enum logic[1:0]
 
 typedef logic[7:0] ModeFlags;
 
+typedef enum logic[1:0]
+{
+    IF_FAULT_NONE = 0, IF_FAULT_MISALIGN, IF_ACCESS_FAULT, IF_PAGE_FAULT
+} IFetchFault;
+
 typedef struct packed
 {
     bit predicted;
@@ -360,6 +365,7 @@ typedef struct packed
 {
     logic[27:0] pc;
     FetchID_t fetchID;
+    IFetchFault fetchFault;
     logic[2:0] firstValid;
     logic[2:0] lastValid;
     logic[2:0] predPos;
@@ -378,6 +384,7 @@ typedef struct packed
     logic predTaken;
     logic predInvalid;
     FetchID_t fetchID;
+    IFetchFault fetchFault;
     logic valid;
 } PD_Instr;
 

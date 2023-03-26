@@ -287,8 +287,20 @@ always_comb begin
             reg isBranch = 0;
             reg[30:0] branchTarget = 'x;
             
+            if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
+                
+                uop.fu = FU_TRAP;
+                invalidEnc = 0;
+                
+                case (IN_instrs[i].fetchFault)
+                    IF_FAULT_MISALIGN: uop.opcode = TRAP_I_ACC_MISAL;
+                    IF_ACCESS_FAULT: uop.opcode = TRAP_I_ACC_FAULT;
+                    IF_PAGE_FAULT: uop.opcode = TRAP_I_PAGE_FAULT;
+                    default: assert(0);
+                endcase
+            end
             // Regular Instructions
-            if (instr.opcode[1:0] == 2'b11) begin
+            else if (instr.opcode[1:0] == 2'b11) begin
                 case (instr.opcode)
                     `OPC_ENV: begin
                         case (instr.funct3)

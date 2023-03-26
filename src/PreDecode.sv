@@ -22,6 +22,7 @@ typedef struct packed
 {
     logic[27:0] pc;
     FetchID_t fetchID;
+    IFetchFault fetchFault;
     logic[2:0] firstValid;
     logic[2:0] lastValid;
     logic[2:0] predPos;
@@ -66,7 +67,11 @@ always_ff@(posedge clk) begin
                     
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     
-                    if (instr[1:0] == 2'b11 && (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && !invalidBranch) begin
+                    if (instr[1:0] == 2'b11 && 
+                        (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && 
+                        !invalidBranch &&
+                        cur.fetchFault == IF_FAULT_NONE
+                        ) begin
                         
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
@@ -83,6 +88,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= (buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut);
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
+                        OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
                         
                         
                         if (subIndexOut == buffer[bufIndexOut].lastValid) begin
@@ -93,7 +99,7 @@ always_ff@(posedge clk) begin
                         else subIndexOut = subIndexOut + 1;
                         
                     end
-                    else if (instr[1:0] != 2'b11 || invalidBranch) begin
+                    else if (instr[1:0] != 2'b11 || invalidBranch || cur.fetchFault != IF_FAULT_NONE) begin
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
                         OUT_instrs[i].instr <= {16'bx, instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
@@ -101,6 +107,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].predInvalid <= invalidBranch;
+                        OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
                         
                         
                         if (subIndexOut == cur.lastValid) begin
@@ -121,6 +128,7 @@ always_ff@(posedge clk) begin
 
             buffer[bufIndexIn].pc <= IN_instrs.pc;
             buffer[bufIndexIn].fetchID <= IN_instrs.fetchID;
+            buffer[bufIndexIn].fetchFault <= IN_instrs.fetchFault;
             buffer[bufIndexIn].firstValid <= IN_instrs.firstValid;
             buffer[bufIndexIn].lastValid <= IN_instrs.lastValid;
             buffer[bufIndexIn].predPos <= IN_instrs.predPos;

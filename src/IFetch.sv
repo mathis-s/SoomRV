@@ -97,14 +97,18 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_bpUpdate(IN_bpUpdate)
 );
 
-wire pageWalkRequired = IN_vmem.sv32en_ifetch && (pcVPN != lastVPN || !lastVPN_valid);
+wire pageWalkRequired = IN_vmem.sv32en_ifetch && 
+    ((pcPPNsuperpage ? (pcVPN[19:10] != lastVPN[19:10]) : (pcVPN != lastVPN)) || !lastVPN_valid);
+
+wire[30:0] physicalPC = IN_vmem.sv32en_ifetch ? {pcPPN[19:10], (pcPPNsuperpage ? pc[20:11] : pcPPN[9:0]), pc[10:0]} : pc;
+
 wire icacheStall;
 ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
-    .IN_lookupValid(en && !pageWalkRequired),
-    .IN_lookupPC(IN_vmem.sv32en_ifetch ? {pcPPN, pc[10:0]} : pc),
+    .IN_lookupValid(en && !pageWalkRequired && fault == IF_FAULT_NONE),
+    .IN_lookupPC(physicalPC),
     
     .OUT_lookupAddress(OUT_instrAddr),
     .OUT_stall(icacheStall),
@@ -113,7 +117,7 @@ ICacheTable ict
     .IN_memc(IN_memc)
 );
 
-assign OUT_stall = (IN_ROB_curFetchID == fetchID) || icacheStall;
+assign OUT_stall = (IN_ROB_curFetchID == fetchID) || (icacheStall && fault == IF_FAULT_NONE);
 
 
 reg[127:0] instrRawBackup;
@@ -150,6 +154,9 @@ reg[19:0] lastVPN;
 // physical page number
 // used for instruction lookup
 reg[19:0] pcPPN;
+reg pcPPNsuperpage;
+
+IFetchFault fault;
 
 FetchID_t fetchID;
 FetchID_t fetchIDlast;
@@ -195,6 +202,7 @@ always_ff@(posedge clk) begin
         outInstrs_r.valid <= 0;
         lastVPN_valid <= 0;
         pageWalkActive <= 0;
+        fault <= IF_FAULT_NONE;
     end
     else if (OUT_branch.taken || IN_decBranch.taken) begin
         if (OUT_branch.taken) begin
@@ -205,16 +213,19 @@ always_ff@(posedge clk) begin
             pc <= IN_decBranch.dst;
             fetchID <= IN_decBranch.fetchID + 1;
         end
+        fault <= IF_FAULT_NONE;
         en1 <= 0;
         outInstrs_r <= 'x;
         outInstrs_r.valid <= 0;
     end
     else if (en) begin
-    
-        if (en1) begin
+        
+        // Output fetched package (or fault) to pre-dec
+        if (en1 || fault != IF_FAULT_NONE) begin
             outInstrs_r.valid <= 1;
             outInstrs_r.pc <= pcLast[30:3];
             outInstrs_r.fetchID <= fetchID;
+            outInstrs_r.fetchFault <= fault;
             outInstrs_r.predTaken <= infoLast.taken;
             outInstrs_r.predPos <= branchPosLast;
             outInstrs_r.firstValid <= pcLast[2:0];
@@ -228,64 +239,92 @@ always_ff@(posedge clk) begin
             outInstrs_r.valid <= 0;
         end
         
-        if (pageWalkRequired) begin
-            if (!pageWalkActive) begin
-                pageWalkActive <= 1;
-                pageWalkVPN <= pcVPN;
-            end
-            else if (!pageWalkAccepted) begin
-                if (IN_memc.busy && IN_memc.rqID == 4)
-                    pageWalkAccepted <= 1;
-                else begin
-                    OUT_memc2.cmd <= MEMC_PAGE_WALK;
-                    OUT_memc2.rootPPN <= IN_vmem.rootPPN;
-                    OUT_memc2.extAddr[29:10] <= pageWalkVPN;
-                    OUT_memc2.cacheID <= 'x;
-                    OUT_memc2.sramAddr <= 'x;
-                    OUT_memc2.rqID <= 4;
+        // Fetch package (if no fault)
+        if (fault == IF_FAULT_NONE) begin
+            //if (pc == 0) begin
+            //    fault <= IF_ACCESS_FAULT;
+            //end else
+            if (pageWalkRequired) begin
+                if (!pageWalkActive) begin
+                    pageWalkActive <= 1;
+                    pageWalkAccepted <= 0;
+                    pageWalkVPN <= pcVPN;
                 end
-            end
-            else if (IN_memc.resultValid) begin
-                pageWalkActive <= 0;
-                pageWalkAccepted <= 'x;
-                lastVPN <= pageWalkVPN;
-                pcPPN <= IN_memc.result[29:10];
-                lastVPN_valid <= 1;
-                // TODO: Check permissions/exceptions
-            end
-        end
-        else begin
-            en1 <= 1;
-            histLast <= BP_branchHistory;
-            infoLast <= BP_info;
-            pcLast <= pc;
-            branchPosLast <= BP_branchSrcOffs;
-            multipleLast <= BP_multipleBranches;
-            if (BP_branchFound) begin
-                if (BP_isJump || BP_branchTaken) begin
-                    pc <= BP_branchDst[31:1];
-                    
-                    //if (BP_branchSrc[31:4] != pc[30:3]) begin
-                        //$display("BTB PC Misspeculation: spec=%x, actual=%x\n", BP_branchSrc, pc << 1);
-                    //    dbgMisspec <= 1;
-                    //end
-                end
-                // Branch found, not taken
-                else begin                    
-                    // There is a second branch in this block,
-                    // go there.
-                    if (BP_multipleBranches && BP_branchSrcOffs != 3'b111) begin
-                        pc <=  {pc[30:3], BP_branchSrcOffs + 3'b1};
-                    end
+                else if (!pageWalkAccepted) begin
+                    if (IN_memc.busy && IN_memc.rqID == 4)
+                        pageWalkAccepted <= 1;
                     else begin
-                        pc <= {pc[30:3] + 28'b1, 3'b000};
+                        OUT_memc2.cmd <= MEMC_PAGE_WALK;
+                        OUT_memc2.rootPPN <= IN_vmem.rootPPN;
+                        OUT_memc2.extAddr[29:10] <= pageWalkVPN;
+                        OUT_memc2.cacheID <= 'x;
+                        OUT_memc2.sramAddr <= 'x;
+                        OUT_memc2.rqID <= 4;
                     end
+                end
+                // FIXME: result cycle could be missed on incoming branch
+                else if (IN_memc.resultValid) begin
+                    pageWalkActive <= 0;
+                    pageWalkAccepted <= 'x;
+                    lastVPN <= pageWalkVPN;
+                    
+                    pcPPN <= IN_memc.result[29:10];
+                    pcPPNsuperpage <= IN_memc.isSuperPage;
+                    lastVPN_valid <= 1;
+                    
+                    // FIXME: fault might be set here even if this fetch address was a misspeculation
+                    
+                    case (IN_memc.result[3:1])
+                            /*inv*/ 3'b000,
+                            /*ro*/  3'b001,
+                            /*rfu*/ 3'b010,
+                            /*rw*/  3'b011,
+                            /*rfu*/ 3'b110: fault <= IF_PAGE_FAULT;
+                            
+                            /*xo*/  3'b100,
+                            /*rx*/  3'b101,
+                            /*rwx*/ 3'b111: begin end
+                    endcase
+                    
+                    if ((IN_memc.isSuperPage && IN_memc.result[19:10] != 0) || // misaligned superpage
+                        (!IN_memc.result[0])) 
+                        fault <= IF_PAGE_FAULT;
                 end
             end
             else begin
-                pc <= {pc[30:3] + 28'b1, 3'b000};
+                en1 <= 1;
+                histLast <= BP_branchHistory;
+                infoLast <= BP_info;
+                pcLast <= pc;
+                branchPosLast <= BP_branchSrcOffs;
+                multipleLast <= BP_multipleBranches;
+                if (BP_branchFound) begin
+                    if (BP_isJump || BP_branchTaken) begin
+                        pc <= BP_branchDst[31:1];
+                        
+                        //if (BP_branchSrc[31:4] != pc[30:3]) begin
+                            //$display("BTB PC Misspeculation: spec=%x, actual=%x\n", BP_branchSrc, pc << 1);
+                        //    dbgMisspec <= 1;
+                        //end
+                    end
+                    // Branch found, not taken
+                    else begin                    
+                        // There is a second branch in this block,
+                        // go there.
+                        if (BP_multipleBranches && BP_branchSrcOffs != 3'b111) begin
+                            pc <=  {pc[30:3], BP_branchSrcOffs + 3'b1};
+                        end
+                        else begin
+                            pc <= {pc[30:3] + 28'b1, 3'b000};
+                        end
+                    end
+                end
+                else begin
+                    pc <= {pc[30:3] + 28'b1, 3'b000};
+                end
             end
         end
+        
     end
 end
 
