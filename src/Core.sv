@@ -470,6 +470,7 @@ CSR csr
     .IN_commitValid(ROB_validRetire),
     .IN_commitBranch(ROB_retireBranch),
     .IN_branchMispr(BS_PERFC_branchMispr),
+    .IN_mispredFlush(mispredFlush),
     
     .IF_mmio(if_CSR_MMIO.CSR),
     

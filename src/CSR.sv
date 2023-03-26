@@ -13,6 +13,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input wire[3:0] IN_commitValid,
     input wire[3:0] IN_commitBranch,
     input wire IN_branchMispr,
+    input wire IN_mispredFlush,
     
     IF_CSR_MMIO.CSR IF_mmio,
     
@@ -406,6 +407,9 @@ end
 reg[31:0] rdata;
 reg invalidCSR;
 always_comb begin
+    
+    MStatus_t temp = 0;
+
     invalidCSR = 0;
     rdata = 32'bx;
     
@@ -505,6 +509,20 @@ always_comb begin
         CSR_mcause: rdata = mcause;
         CSR_mtval: rdata = mtval;
         CSR_menvcfg: rdata = {31'b0, menvcfg_fiom};
+        
+        CSR_sstatus: begin
+            temp.sie = mstatus.sie;
+            temp.spie = mstatus.spie;
+            temp.ube = mstatus.ube;
+            temp.spp = mstatus.spp;
+            temp.vs = mstatus.vs;
+            temp.fs_ = mstatus.fs_;
+            temp.xs = mstatus.xs;
+            temp.sum = mstatus.sum;
+            temp.mxr = mstatus.mxr;
+            temp.sd = mstatus.sd;
+            rdata = temp;
+        end
         
         CSR_scounteren: rdata = {26'b0, scounteren};
         CSR_sepc: rdata = sepc;
@@ -765,7 +783,6 @@ always_ff@(posedge clk) begin
                                 mstatus.mpie <= temp.mpie;
                                 mstatus.spp <= temp.spp;
                                 mstatus.mpp <= temp.mpp;
-                                mstatus.mprv <= temp.mprv;
                             end
                             
                             CSR_mcycle: mcycle[31:0] <= wdata;
@@ -823,8 +840,18 @@ always_ff@(posedge clk) begin
                             end
                             CSR_mtval: mtval <= wdata;
                             
-                            CSR_scounteren: scounteren[5:0] <= wdata[5:0];
+                            CSR_sstatus: begin
+                                MStatus_t temp = wdata;
+                                
+                                mstatus.mxr <= temp.mxr;
+                                mstatus.sum <= temp.sum;
+                                
+                                mstatus.sie <= temp.sie;
+                                mstatus.spie <= temp.spie;
+                                mstatus.spp <= temp.spp;
+                            end
                             
+                            CSR_scounteren: scounteren[5:0] <= wdata[5:0];
                             CSR_sepc: sepc[31:1] <= wdata[31:1];
                             CSR_sscratch: sscratch <= wdata;
                             CSR_scause: begin
