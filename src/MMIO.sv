@@ -56,7 +56,7 @@ reg[31:0] cRegs[3:0];
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
 
-wire ioWriteBusy = (spiCnt > 0) || (!IF_mem.we) || !weReg;
+wire ioWriteBusy = (spiCnt > 0) || !weReg;
 assign IF_mem.rbusy = 0;
 assign IF_mem.wbusy = ioWriteBusy;
 

@@ -2,7 +2,9 @@ module LoadStoreUnit
 (
     input wire clk,
     input wire rst,
+    
     input BranchProv IN_branch,
+    output reg OUT_stStall,
     
     input AGU_UOp IN_uopLd,
     input ST_UOp IN_uopSt,
@@ -41,6 +43,8 @@ end
 
 always_comb begin
     
+    OUT_stStall = 0;
+    
     IF_mmio.raddr = IN_uopLd.addr[31:2];
     IF_mmio.waddr = IN_uopSt.addr[31:2];
     
@@ -48,6 +52,9 @@ always_comb begin
     IF_mem.waddr = IN_uopSt.addr[31:2];
     IF_mem.wdata = IN_uopSt.data;
     IF_mem.wmask = IN_uopSt.wmask;
+    
+    IF_mem.we = 1;
+    IF_mmio.we = 1;
         
     // Load
     if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111) begin
@@ -57,19 +64,14 @@ always_comb begin
     
     // Store
     if (IN_uopSt.valid) begin
-        
         if (IN_uopSt.addr[31:24] == 8'hFF) begin
-            IF_mem.we = 1;
-            IF_mmio.we = 0;
+            OUT_stStall = IF_mmio.wbusy;
+            IF_mmio.we = OUT_stStall;
         end
         else begin
-            IF_mem.we = 0;
-            IF_mmio.we = 1;
+            OUT_stStall = IF_mem.wbusy;
+            IF_mem.we = OUT_stStall;
         end
-    end
-    else begin
-        IF_mem.we = 1;
-        IF_mmio.we = 1;
     end
 end
 

@@ -35,8 +35,7 @@ module StoreQueue
     output reg[3:0] OUT_lookupMask,
     
     output wire OUT_flush,
-    output SqN OUT_maxStoreSqN,
-    input wire IN_IO_busy
+    output SqN OUT_maxStoreSqN
     
 );
 
@@ -132,7 +131,7 @@ always_ff@(posedge clk) begin
         // Dequeue
         if (!IN_disable && entries[0].valid && !IN_branch.taken && entries[0].ready &&
             // Don't issue Memory Mapped IO ops while IO is not ready
-            (!(IN_IO_busy || didCSRwrite) || entries[0].addr[29:22] != 8'hFF)) begin
+            (!(didCSRwrite) || entries[0].addr[29:22] != 8'hFF)) begin
                 
             entries[NUM_ENTRIES-1].valid <= 0;
             

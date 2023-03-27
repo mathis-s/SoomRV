@@ -20,6 +20,7 @@ module CacheController
     input BranchProv IN_branch,
     input wire IN_SQ_empty,
     
+    input wire IN_stall[NUM_UOPS-1:0],
     output wire OUT_stall[NUM_UOPS-1:0],
     
     input AGU_UOp IN_uopLd,
@@ -47,8 +48,8 @@ reg[$clog2(SIZE)-1:0] freeEntryID;
 reg[$clog2(SIZE)-1:0] lruPointer;
 reg[$clog2(SIZE)-1:0] evictingID;
 
-assign OUT_stall[0] = cmissUOpLd.valid || waitCycle;
-assign OUT_stall[1] = cmissUOpSt.valid || loading || evicting || waitCycle || evictionRq != EV_RQ_NONE;
+assign OUT_stall[0] = IN_stall[0] || cmissUOpLd.valid || waitCycle;
+assign OUT_stall[1] = IN_stall[1] || cmissUOpSt.valid || waitCycle;// || loading || evicting || waitCycle || evictionRq != EV_RQ_NONE;
 
 // Cache Table Lookups
 reg cacheTableEntryFound[NUM_UOPS-1:0];
@@ -258,7 +259,7 @@ always_ff@(posedge clk) begin
                 OUT_uopLd.addr <= {20'b0, freeEntryID, cmissUOpLd.addr[7:0]};
                 cmissUOpLd.valid <= 0;
         end
-        else OUT_uopLd.valid <= 0;
+        else if (!IN_stall[0]) OUT_uopLd.valid <= 0;
         
         
         // Store Pipeline
@@ -302,7 +303,7 @@ always_ff@(posedge clk) begin
                 cmissUOpSt.valid <= 0;
                 setDirty = 1;
         end
-        else OUT_uopSt.valid <= 0;
+        else if (!IN_stall[1]) OUT_uopSt.valid <= 0;
         
         // Handle cache misses
         if (loading && IN_memc.rqID != 0 && IN_memc.busy) begin
