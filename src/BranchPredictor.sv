@@ -9,7 +9,8 @@ module BranchPredictor
     input wire IN_clearICache,
     
     input wire IN_mispredFlush,
-    input BranchProv IN_branch,
+    input wire IN_mispr,
+    input BHist_t IN_misprHist,
     
     // IF interface
     input wire IN_pcValid,
@@ -111,8 +112,8 @@ always_ff@(posedge clk) begin
         end
     end
     
-    if (!rst && IN_branch.taken) begin
-        gHistory <= IN_branch.history;
+    if (!rst && IN_mispr) begin
+        gHistory <= IN_misprHist;
     end
 end
 

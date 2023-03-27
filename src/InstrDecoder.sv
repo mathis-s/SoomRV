@@ -451,6 +451,7 @@ always_comb begin
                         // Handle unpredicted jumps right away
                         if (!IN_instrs[i].predTaken) begin
                             OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.taken = 1;
                             OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
@@ -1196,6 +1197,7 @@ always_comb begin
                         
                         if (!IN_instrs[i].predTaken) begin
                             OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.taken = 1;
                             OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
@@ -1222,6 +1224,7 @@ always_comb begin
                         
                         if (!IN_instrs[i].predTaken) begin
                             OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+                            OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.taken = 1;
                             OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                         end
@@ -1408,6 +1411,7 @@ always_comb begin
                             
                             OUT_decBranch.taken = 1;
                             OUT_decBranch.dst = RS_outData;
+                            OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.fetchID = uop.fetchID;
                         end
                         else begin
@@ -1480,6 +1484,7 @@ always_comb begin
                     IN_instrs[i].predInvalid) begin
                     
                     OUT_decBranch.taken = 1;
+                    OUT_decBranch.history = IN_instrs[i].history;
                     
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 1;

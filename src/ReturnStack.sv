@@ -44,7 +44,6 @@ always@(posedge clk) begin
             numFilled = numFilled - 1;
         end
     end
-
 end
 
 

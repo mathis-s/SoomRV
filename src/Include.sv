@@ -350,6 +350,7 @@ typedef struct packed
 {
     logic[4:0] fetchID;
     logic[30:0] dst;
+    BHist_t history;
     logic taken;
 } DecodeBranchProv;
 
@@ -371,6 +372,7 @@ typedef struct packed
     logic[2:0] predPos;
     logic predTaken;
     logic[30:0] predTarget;
+    BHist_t history;
     logic[7:0][15:0] instrs;
     
     logic valid;
@@ -381,6 +383,7 @@ typedef struct packed
     logic[31:0] instr;
     logic[30:0] pc;
     logic[30:0] predTarget;
+    BHist_t history;
     logic predTaken;
     logic predInvalid;
     FetchID_t fetchID;
