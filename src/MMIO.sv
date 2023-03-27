@@ -1,5 +1,5 @@
 
-module ControlRegs
+module MMIO
 (
     input wire clk,
     input wire rst,

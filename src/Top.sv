@@ -127,7 +127,7 @@ MemRTL#(64, 512) icache
     .OUT_data1(CORE_instrReadData[63:0])
 );
 
-ControlRegs cr
+MMIO mmio
 (
     .clk(clk),
     .rst(rst),

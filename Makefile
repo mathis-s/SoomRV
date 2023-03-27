@@ -23,7 +23,7 @@ SRC_FILES = \
 	src/MultiplySmall.sv \
 	src/Multiply.sv \
 	src/Divide.sv \
-	src/ControlRegs.sv \
+	src/MMIO.sv \
 	src/LZCnt.sv \
 	src/PopCnt.sv \
 	src/BranchSelector.sv \
