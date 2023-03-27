@@ -62,11 +62,6 @@ always_comb begin
         end
         endcase
     end
-        
-    if (addr == 0) begin
-        except = AGU_ACCESS_FAULT;
-        if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
-    end
 end
 
 always_ff@(posedge clk) begin

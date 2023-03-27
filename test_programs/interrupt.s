@@ -47,8 +47,8 @@ main:
     unimp
     unimp
     
-	# null pointer read
-    lw a0, 0(zero)
+	# unaligned read
+    lw a0, -1(zero)
     
     # unaligned write
     sw a0, 2(zero)
