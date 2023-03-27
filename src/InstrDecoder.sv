@@ -336,10 +336,14 @@ always_comb begin
                                     invalidEnc = 0;
                                 end
                                 else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
-                                    // sfence.vma
-                                    uop.rs0 = instr.rs0;
-                                    uop.rs1 = instr.rs1;
-                                    //invalidEnc = 0;
+                                    //uop.rs0 = instr.rs0;
+                                    //uop.rs1 = instr.rs1;
+                                    
+                                    // sfence.vma (currently does a normal fence, this is very slow)
+                                    uop.fu = FU_INT;
+                                    uop.opcode = INT_SYS;
+                                    uop.imm = {28'bx, FLAGS_FENCE};
+                                    invalidEnc = 0;
                                 end
                                 else if (instr.funct7 == 7'b0001011 && instr.rd == 0) begin
                                     // sinval.vma

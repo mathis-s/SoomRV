@@ -250,6 +250,12 @@ always_ff@(posedge clk) begin
                 
                 pcPPNfault <= IF_PAGE_FAULT;
         end
+        
+        if (IN_clearICache) begin
+            lastVPN_valid <= 0;
+            pageWalkAccepted <= 0;
+            pageWalkActive <= 0;
+        end
     
         if (OUT_branch.taken || IN_decBranch.taken) begin
             if (OUT_branch.taken) begin
@@ -292,7 +298,7 @@ always_ff@(posedge clk) begin
                 //    fault <= IF_ACCESS_FAULT;
                 //end else
                 if (pageWalkRequired) begin
-                    if (!pageWalkActive) begin
+                    if (!pageWalkActive && !IN_memc.busy) begin
                         pageWalkActive <= 1;
                         pageWalkAccepted <= 0;
                         pageWalkVPN <= pcVPN;
