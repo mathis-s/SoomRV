@@ -98,7 +98,7 @@ typedef enum logic[5:0]
     INT_F_ADDI_BLTU,
     INT_F_ADDI_BGEU,
     INT_V_RET,
-    INT_V_JR
+    INT_V_JALR
 } OPCode_INT;
 
 typedef enum logic[5:0]

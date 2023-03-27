@@ -77,6 +77,7 @@ always_comb begin
         INT_SUB: resC = srcA - srcB;
         INT_SRA: resC = srcA >>> srcB[4:0];
         INT_LUI: resC = srcB;
+        INT_V_JALR,
         INT_JALR,
         INT_JAL: resC = (IN_uop.compressed ? pcPlus2 : pcPlus4);
         INT_SYS: resC = 32'bx;
@@ -222,26 +223,31 @@ always_ff@(posedge clk) begin
                     OUT_branch.taken <= 1;
 
             end
-            // Register jumps are not predicted currently
             else if (IN_uop.opcode == INT_JALR) begin
                 OUT_branch.dstPC <= srcA + srcB;
-                OUT_btUpdate.dst <= srcA + srcB;
                 OUT_branch.taken <= 1;
             end
             // Check speculated return address
-            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JR) begin
+            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR) begin
                 if (srcA != srcB) begin
                     //$display("Ret misspeculation %x %x", srcA, srcB);
                     OUT_branch.dstPC <= srcA;
                     OUT_branch.taken <= 1;
+                    
+                    if (IN_uop.opcode == INT_V_JALR) begin
+                        OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
+                        OUT_btUpdate.dst <= srcA[31:0];
+                        OUT_btUpdate.isJump <= 1;
+                        OUT_btUpdate.compressed <= IN_uop.compressed;
+                        OUT_btUpdate.clean <= 0;
+                        OUT_btUpdate.valid <= 1;
+                    end
                 end
-                
-                if (IN_uop.opcode == INT_V_JR) begin
+                /*if (IN_uop.opcode == INT_V_JALR) begin
                     OUT_ibInfo.src <= IN_uop.pc[31:1];
                     OUT_ibInfo.dst <= srcA[31:1];
                     OUT_ibInfo.valid <= 1;
-                end
-                //else $display("Ret correct");
+                end*/
             end
                         
             OUT_uop.compressed <= IN_uop.compressed;

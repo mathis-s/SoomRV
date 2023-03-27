@@ -138,7 +138,6 @@ InstrDecoder idec
     .en(!FUSE_full),
     .IN_instrs(PD_instrs),
     
-    .IN_indirBranchTarget(IBP_predDst),
     .IN_enCustom(1'b1),
     
     .OUT_decBranch(DEC_decBranch),

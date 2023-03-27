@@ -202,7 +202,6 @@ module InstrDecoder
     input wire IN_invalidate,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
     
-    input wire[30:0] IN_indirBranchTarget,
     input wire IN_enCustom,
     
     output DecodeBranchProv OUT_decBranch,
@@ -285,6 +284,7 @@ always_comb begin
         if (IN_instrs[i].valid && en && !OUT_decBranch.taken) begin
             
             reg isBranch = 0;
+            reg isIndirBranch = 0;
             reg[30:0] branchTarget = 'x;
             
             if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
@@ -1404,27 +1404,38 @@ always_comb begin
                             uop.imm = {RS_outData, 1'b0};
                             uop.immB = 1;
                             
+                            isIndirBranch = 1;
+                            
                             OUT_decBranch.taken = 1;
                             OUT_decBranch.dst = RS_outData;
                             OUT_decBranch.fetchID = uop.fetchID;
                         end
                         else begin
-                            uop.opcode = INT_V_JR;
-                            uop.imm = {IN_indirBranchTarget, 1'b0};
+                            isIndirBranch = 1;
+                            uop.opcode = INT_V_JALR;
                             uop.immB = 1;
                             
-                            OUT_decBranch.taken = 1;
-                            OUT_decBranch.dst = IN_indirBranchTarget;
-                            OUT_decBranch.fetchID = uop.fetchID;
+                            if (IN_instrs[i].predTaken)
+                                uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                            else
+                                uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
                         end
                         invalidEnc = 0;
                     end
                     // c.jalr
                     else if (i16.cr.funct4 == 4'b1001 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
-                        uop.opcode = INT_JALR;
                         uop.fu = FU_INT;
                         uop.rs0 = i16.cr.rd_rs1;
                         uop.rd = 1;
+                        
+                        isIndirBranch = 1;
+                        uop.opcode = INT_V_JALR;
+                        uop.immB = 1;
+                        
+                        if (IN_instrs[i].predTaken)
+                            uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                        else
+                            uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
                         
                         invalidEnc = 0;
                     end
@@ -1464,7 +1475,9 @@ always_comb begin
             end
             
             if (IN_instrs[i].predTaken) begin
-                if (!isBranch || IN_instrs[i].predTarget != branchTarget || IN_instrs[i].predInvalid) begin
+                if (!(isBranch || isIndirBranch) || 
+                    (IN_instrs[i].predTarget != branchTarget && !isIndirBranch) || 
+                    IN_instrs[i].predInvalid) begin
                     
                     OUT_decBranch.taken = 1;
                     
