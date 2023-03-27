@@ -85,8 +85,6 @@ Core core
     .OUT_instrReadEnable(CORE_instrReadEnable),
     .IN_instrRaw(CORE_instrReadData),
     
-    .OUT_halt(OUT_halt),
-    
     .OUT_memc(MemC_ctrl),
     .IN_memc(MemC_stat)
 );
@@ -138,6 +136,9 @@ MMIO mmio
     .OUT_SPI_clk(),
     .OUT_SPI_mosi(),
     .IN_SPI_miso(1'b0),
+    
+    .OUT_powerOff(OUT_halt),
+    .OUT_reboot(),
     
     .OUT_csrIf(IF_csr_mmio.MMIO)
 );

@@ -14,14 +14,11 @@ module TrapHandler
     output BPUpdate OUT_bpUpdate,
     output BranchProv OUT_branch,
 
-    input wire IN_irq,
     input wire IN_MEM_busy,
-    input wire IN_allowBreak,
 
     output reg OUT_fence,
     output reg OUT_clearICache,
-    output wire OUT_disableIFetch,
-    output reg OUT_halt
+    output wire OUT_disableIFetch
 );
 
 reg memoryWait;
@@ -49,7 +46,6 @@ end
 
 always_ff@(posedge clk) begin
     
-    OUT_halt <= 0;
     OUT_fence <= 0;
     OUT_clearICache <= 0;
     
@@ -79,14 +75,9 @@ always_ff@(posedge clk) begin
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
         
-            if ((IN_trapInstr.flags == FLAGS_TRAP && IN_allowBreak && IN_trapInstr.name == 5'(TRAP_BREAK)) || 
-                IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING || IN_trapInstr.flags == FLAGS_XRET) begin
+            if (IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING || IN_trapInstr.flags == FLAGS_XRET) begin
                 
                 case (IN_trapInstr.flags)
-                    FLAGS_TRAP: begin
-                        OUT_halt <= 1;
-                        OUT_branch.dstPC <= nextInstr;
-                    end
                     FLAGS_ORDERING: begin
                         memoryWait <= 1;
                         OUT_branch.dstPC <= nextInstr;

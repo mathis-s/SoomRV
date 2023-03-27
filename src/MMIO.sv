@@ -11,6 +11,9 @@ module MMIO
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
+    output reg OUT_powerOff,
+    output reg OUT_reboot,
+    
     IF_CSR_MMIO.MMIO OUT_csrIf
 );
 
@@ -63,6 +66,8 @@ assign OUT_csrIf.mtimecmp = cRegs64[1];
 always_ff@(posedge clk) begin
     
     cRegs64[0] <= cRegs64[0] + 1;
+    OUT_powerOff <= 0;
+    OUT_reboot <= 0;
     
     if (rst) begin
         weReg <= 1;
@@ -116,7 +121,8 @@ always_ff@(posedge clk) begin
                 if (wmReg[1]) cRegs[writeAddrReg[1:0]][15:8] <= dataReg[15:8];
                 if (wmReg[2]) cRegs[writeAddrReg[1:0]][23:16] <= dataReg[23:16];
                 if (wmReg[3]) cRegs[writeAddrReg[1:0]][31:24] <= dataReg[31:24];
-                    
+                
+                // SPI
                 if (writeAddrReg[1:0] == 0) begin
                     case (wmReg)
                         4'b1111: spiCnt <= 32;
@@ -126,6 +132,12 @@ always_ff@(posedge clk) begin
                     endcase
                     OUT_SPI_mosi <= dataReg[31];
                     OUT_SPI_cs <= 0;
+                end
+                
+                // SysCon
+                if (writeAddrReg[1:0] == 1 && wmReg[0]) begin
+                    if (dataReg[7:0] == 8'h77) OUT_reboot <= 1;
+                    if (dataReg[7:0] == 8'h55) OUT_powerOff <= 1;
                 end
             end
         end

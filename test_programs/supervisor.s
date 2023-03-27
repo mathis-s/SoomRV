@@ -35,8 +35,9 @@ machine_trap:
     csrr a1, mcause
     li a0, 2
     bne a0, a1, .not_ii
-        # invalid instruction terminates
-        ebreak
+        li a0, 0xff000000
+        li a1, 0x55
+        sb a1, 4(a0)
     .not_ii:
     csrr a1, mepc
     addi a1, a1, 4

@@ -21,11 +21,16 @@ _start:
     #mul a0, a0, a2
     #divu a0, a0, a1
     #call printdecu
-    ebreak
+    li a0, 0xff000000
+    li a1, 0x55
+    sb a1, 4(a0)
+    
 
 .align 2
 _exception:
-    ebreak
+    li a0, 0xff000000
+    li a1, 0x55
+    sb a1, 4(a0)
 
     
 .globl strcpy

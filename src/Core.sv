@@ -15,9 +15,7 @@ module Core
     output wire[27:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     input wire[127:0] IN_instrRaw,
-    
-    output wire OUT_halt,
-    
+        
     output CTRL_MemC OUT_memc,
     input STAT_MemC IN_memc
 );
@@ -751,14 +749,11 @@ TrapHandler trapHandler
     .OUT_bpUpdate(TH_bpUpdate),
     .OUT_branch(branchProvs[3]),
     
-    .IN_irq(1'b0),
     .IN_MEM_busy(MEMSUB_busy),
-    .IN_allowBreak(1'b1),
     
     .OUT_fence(TH_startFence),
     .OUT_clearICache(TH_clearICache),
-    .OUT_disableIFetch(TH_disableIFetch),
-    .OUT_halt(OUT_halt)
+    .OUT_disableIFetch(TH_disableIFetch)
 );
 
 endmodule
