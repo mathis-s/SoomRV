@@ -1,10 +1,5 @@
 
 module ControlRegs
-#
-(
-    parameter NUM_UOPS=4,
-    parameter NUM_WBS=4
-)
 (
     input wire clk,
     input wire rst,
@@ -16,12 +11,21 @@ module ControlRegs
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
     
-    IF_CSR_MMIO.MMIO OUT_csrIf,
-    
-    output wire OUT_IO_busy
+    IF_CSR_MMIO.MMIO OUT_csrIf
 );
 
 integer i;
+
+integer spiCntI = 0;
+reg[7:0] spiByte = 0;
+always@(posedge OUT_SPI_clk) begin
+    spiByte = {spiByte[6:0], OUT_SPI_mosi};
+    spiCntI = spiCntI + 1;
+    if (spiCntI == 8) begin
+        $write("%c", spiByte);
+        spiCntI = 0;
+    end
+end
 
 // Registered Inputs
 reg reReg;
@@ -32,26 +36,26 @@ reg[6:0] readAddrReg;
 reg[31:0] dataReg;
 
 
-// 64-bit Regs
+// 64-bit Memory Mapped Regs
 // 0 mtime 80
 // 1 mtimecmp 88
 reg[63:0] cRegs64[1:0];
 
 
-// 32-bit Control Regs
+// 32-bit Memory Mapped Regs
 //  0 SPI out/in
-//  1 IRQ handler (4)
-//  2 IRQ src (8)
-//  3 8 mode (15) | 8 IRQ flags (14) | 16 TIMER IRQ count (12) 
+//  1 unused
+//  2 unused
+//  3 unused
 
 reg[31:0] cRegs[3:0];
 
 // Nonzero during SPI transfer
 reg[5:0] spiCnt;
 
-assign OUT_IO_busy = (spiCnt > 0) || (!IF_mem.we) || !weReg;
-assign IF_mem.rbusy = OUT_IO_busy;
-assign IF_mem.wbusy = OUT_IO_busy;
+wire ioWriteBusy = (spiCnt > 0) || (!IF_mem.we) || !weReg;
+assign IF_mem.rbusy = 0;
+assign IF_mem.wbusy = ioWriteBusy;
 
 assign OUT_csrIf.mtime = cRegs64[0];
 assign OUT_csrIf.mtimecmp = cRegs64[1];
@@ -106,6 +110,7 @@ always_ff@(posedge clk) begin
                     if (wmReg[3]) cRegs64[writeAddrReg[1:1]][31:24] <= dataReg[31:24];
                 end
             end
+            // 32-bit
             else begin
                 if (wmReg[0]) cRegs[writeAddrReg[1:0]][7:0] <= dataReg[7:0];
                 if (wmReg[1]) cRegs[writeAddrReg[1:0]][15:8] <= dataReg[15:8];

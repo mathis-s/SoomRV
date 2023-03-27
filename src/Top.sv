@@ -40,8 +40,8 @@ MemoryController memc
     .OUT_EXT_bus(EXTMEM_busOut),
     .IN_EXT_bus(EXTMEM_bus)
 );
-assign MC_DC_if[0].addr[29:10] = 0;
 
+assign MC_DC_if[0].addr[29:10] = 0;
 
 wire EXTMEM_oen;
 wire[31:0] EXTMEM_busOut;
@@ -55,6 +55,9 @@ ExternalMemorySim extMem
 );
 
 IF_Mem IF_mem();
+IF_Mem IF_mmio();
+IF_CSR_MMIO IF_csr_mmio();
+
 CacheIF CORE_DC_if;
 always_comb begin
     CORE_DC_if.ce = IF_mem.we;
@@ -68,9 +71,6 @@ wire CORE_instrReadEnable;
 wire[27:0] CORE_instrReadAddress;
 wire[127:0] CORE_instrReadData;
 
-wire SPI_mosi;
-wire SPI_clk;
-
 Core core
 (
     .clk(clk),
@@ -78,6 +78,8 @@ Core core
     .en(en),
     
     .IF_mem(IF_mem),
+    .IF_mmio(IF_mmio),
+    .IF_csr_mmio(IF_csr_mmio),
     
     .OUT_instrAddr(CORE_instrReadAddress),
     .OUT_instrReadEnable(CORE_instrReadEnable),
@@ -85,25 +87,9 @@ Core core
     
     .OUT_halt(OUT_halt),
     
-    .OUT_SPI_cs(),
-    .OUT_SPI_clk(SPI_clk),
-    .OUT_SPI_mosi(SPI_mosi),
-    .IN_SPI_miso(1'b0),
-    
     .OUT_memc(MemC_ctrl),
     .IN_memc(MemC_stat)
 );
-
-integer spiCnt = 0;
-reg[7:0] spiByte = 0;
-always@(posedge SPI_clk) begin
-    spiByte = {spiByte[6:0], SPI_mosi};
-    spiCnt = spiCnt + 1;
-    if (spiCnt == 8) begin
-        $write("%c", spiByte);
-        spiCnt = 0;
-    end
-end
 
 wire[31:0] DC_dataOut;
 
@@ -139,6 +125,21 @@ MemRTL#(64, 512) icache
     .IN_nce1(CORE_instrReadEnable),
     .IN_addr1({CORE_instrReadAddress[7:0], 1'b0}),
     .OUT_data1(CORE_instrReadData[63:0])
+);
+
+ControlRegs cr
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IF_mem(IF_mmio),
+
+    .OUT_SPI_cs(),
+    .OUT_SPI_clk(),
+    .OUT_SPI_mosi(),
+    .IN_SPI_miso(1'b0),
+    
+    .OUT_csrIf(IF_csr_mmio.MMIO)
 );
 
 endmodule

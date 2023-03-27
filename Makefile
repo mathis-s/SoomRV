@@ -1,8 +1,10 @@
-VERILATOR_FLAGS = --cc --trace-structs --build --trace --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --public --trace-max-width 128 --trace-max-array 512 --x-assign unique --x-initial unique -O3 -CFLAGS -O2 -MAKEFLAGS -j16
+VERILATOR_FLAGS = --cc  --build --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --public --x-assign unique --x-initial unique -O3 -CFLAGS -O2 -MAKEFLAGS -j16
 
+VERILATOR_CFG = --exe Decode_tb.cpp --top-module Top -Ihardfloat
 
-decoder_tb:
-	verilator $(VERILATOR_FLAGS) --exe Decode_tb.cpp --top-module Top -Ihardfloat \
+VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 512 -CFLAGS -DTRACE
+
+SRC_FILES = \
 	src/Include.sv  \
 	src/InstrDecoder.sv  \
 	src/Rename.sv  \
@@ -57,6 +59,12 @@ decoder_tb:
 	hardfloat/recFNToFN.v \
 	hardfloat/mulRecFN.v \
 	hardfloat/HardFloat_rawFN.v
+
+decoder_tb:
+	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
+
+trace:
+	verilator $(VERILATOR_FLAGS) $(VERILATOR_TRACE_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
 clean:
 	rm -r obj_dir

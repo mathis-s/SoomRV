@@ -9,17 +9,14 @@ module Core
     input wire en,
 
     IF_Mem.HOST IF_mem,
+    IF_Mem.HOST IF_mmio,
+    IF_CSR_MMIO.CSR IF_csr_mmio,
     
     output wire[27:0] OUT_instrAddr,
     output wire OUT_instrReadEnable,
     input wire[127:0] IN_instrRaw,
     
     output wire OUT_halt,
-    
-    output wire OUT_SPI_cs,
-    output wire OUT_SPI_clk,
-    output wire OUT_SPI_mosi,
-    input wire IN_SPI_miso,
     
     output CTRL_MemC OUT_memc,
     input STAT_MemC IN_memc
@@ -456,7 +453,6 @@ FPU fpu
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl;
 wire[2:0] CSR_fRoundMode;
-IF_CSR_MMIO if_CSR_MMIO();
 STAT_VMem CSR_vmem;
 CSR csr
 (
@@ -472,7 +468,7 @@ CSR csr
     .IN_branchMispr(BS_PERFC_branchMispr),
     .IN_mispredFlush(mispredFlush),
     
-    .IF_mmio(if_CSR_MMIO.CSR),
+    .IF_mmio(IF_csr_mmio),
     
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
@@ -604,13 +600,12 @@ StoreQueue sq
     
     .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_IO_busy(IO_busy || SQ_uop.valid || CC_uopSt.valid)
+    .IN_IO_busy(IF_mmio.wbusy || SQ_uop.valid || CC_uopSt.valid)
 );
 
 wire LSU_loadFwdValid;
 Tag LSU_loadFwdTag;
 
-IF_Mem IF_mmio();
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -764,25 +759,6 @@ TrapHandler trapHandler
     .OUT_clearICache(TH_clearICache),
     .OUT_disableIFetch(TH_disableIFetch),
     .OUT_halt(OUT_halt)
-);
-
-wire IO_busy;
-
-ControlRegs cr
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IF_mem(IF_mmio),
-
-    .OUT_SPI_cs(OUT_SPI_cs),
-    .OUT_SPI_clk(OUT_SPI_clk),
-    .OUT_SPI_mosi(OUT_SPI_mosi),
-    .IN_SPI_miso(IN_SPI_miso),
-    
-    .OUT_csrIf(if_CSR_MMIO.MMIO),
-
-    .OUT_IO_busy(IO_busy)
 );
 
 endmodule

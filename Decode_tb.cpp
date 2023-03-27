@@ -1,3 +1,6 @@
+//#define TRACE
+
+#include "VTop_Core.h"
 #include "VTop.h"
 #include "VTop_Top.h"
 #include "VTop_ExternalMemorySim.h"
@@ -7,7 +10,9 @@
 #include <iostream>    // Need std::cout
 #include <unistd.h>
 #include <verilated.h> // Defines common routines
+#ifdef TRACE
 #include "verilated_vcd_c.h"
+#endif
 #include <array>
 
 VTop* top; // Instantiation of model
@@ -22,6 +27,84 @@ double sc_time_stamp()
 uint32_t ram[65536];
 uint32_t pram[65536];
 
+template<std::size_t N>
+uint32_t ExtractField (VlWide<N> wide, uint32_t startBit, uint32_t len)
+{
+        uint32_t wlen = (sizeof(EData) * 8);
+        uint32_t endBit = startBit + len - 1;
+        uint32_t startI = startBit / wlen;
+        uint32_t endI = endBit / wlen;
+        if (startI != endI)
+        {
+            uint32_t indexInFirst = startBit - startI * wlen;
+            uint32_t indexInLast = endBit - endI * wlen;
+            
+            uint32_t maskLast = (1UL << (indexInLast + 1)) - 1;
+            
+            uint32_t maskFirst = ~((1UL << indexInFirst) - 1);
+            
+            return ((wide.at(startI) & maskFirst) >> indexInFirst) |
+                ((wide.at(endI) & maskLast) << ((32 - startBit % 32)));
+        }
+        else
+        {
+            uint32_t indexInFirst = startBit - startI * wlen;
+            uint32_t indexInLast = endBit - endI * wlen;
+             
+            uint32_t maskFirst = ~((1UL << indexInFirst) - 1);
+            uint32_t maskLast = (1UL << (indexInLast + 1)) - 1;
+            
+            return ((wide.at(startI) & maskFirst & maskLast) >> indexInFirst);
+        }
+}
+
+uint32_t id = 0;   
+struct Inst
+{
+    uint32_t pc;
+    uint32_t inst;
+    uint32_t id;
+    uint32_t sqn;
+};
+Inst pd[4];
+Inst de[4];
+Inst rn[4];
+    
+/*void LogInstructions ()
+{
+    auto core = top->rootp->Top->core;
+    
+    // Rename
+    if (!core->RN_stall && core->rn__DOT__frontEn)
+        for (size_t i = 0; i < 4; i++)
+            if (core->RN_uopValid[i])
+            {
+                rn[i] = de[i];
+                rn[i].sqn = ExtractField<4>(core->RN_uop[i], 45, 7);
+                printf("%.2x ", rn[i].sqn);
+            }
+    
+    // Decoded
+    if (core->rn__DOT__frontEn)
+        for (size_t i = 0; i < 4; i++)
+            if (top->rootp->Top->core->DE_uop[i].at(0) & (1<<0))
+            {
+                de[i] = pd[i];
+            }
+    // Predec
+    if (!core->FUSE_full)
+        for (size_t i = 0; i < 4; i++)
+            if (core->PD_instrs[i].at(0) & 1)
+            {
+                pd[i].id = id++;
+                pd[i].pc = ExtractField<3>(core->PD_instrs[i], 7, 31) << 1;
+                pd[i].inst = ExtractField<3>(core->PD_instrs[i], 38, 32);
+                
+                if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
+            }
+    
+    printf("\n");
+}*/
 
 int main(int argc, char** argv)
 {
@@ -75,9 +158,11 @@ int main(int argc, char** argv)
         fclose(f);
     }
 
+#ifdef TRACE
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
+#endif
     
     for (size_t i = 0; i < dataStart/4; i++)
     {
@@ -102,7 +187,9 @@ int main(int argc, char** argv)
     {
         top->clk = !top->clk;
         top->eval();
+#ifdef TRACE
         tfp->dump(main_time);
+#endif
         main_time++;
         top->rst = (j < 2);
     }
@@ -120,7 +207,10 @@ int main(int argc, char** argv)
 
         top->clk = !top->clk;
         top->eval();              // Evaluate model
-        //tfp->dump(main_time);
+        //if (top->clk == 1) LogInstructions ();
+#ifdef TRACE
+        tfp->dump(main_time);
+#endif
         main_time++;              // Time passes...
         
         //if (!(main_time & 0xffff)) printf("pc %.8x\n", instrAddrReg);
@@ -131,14 +221,18 @@ int main(int argc, char** argv)
     {
         top->clk = !top->clk;
         top->eval();              // Evaluate model
+#ifdef TRACE
         tfp->dump(main_time);
+#endif
         main_time++;              // Time passes...
     }
     
     printf("%lu cycles\n", main_time / 2);
 
     top->final(); // Done simulating
+#ifdef TRACE
     tfp->close();
-    delete top;
     delete tfp;
+#endif
+    delete top;
 }
