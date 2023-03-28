@@ -124,6 +124,7 @@ MemoryInterface memoryIF
     .IN_EXT_bus(IN_EXT_bus)
 );
 
+reg[3:0] lastProgress;
 always_ff@(posedge clk) begin
     
     OUT_stat.resultValid <= 0;
@@ -159,6 +160,8 @@ always_ff@(posedge clk) begin
                     OUT_stat.rqID <= IN_ctrl.rqID;
                     rqExtAddr <= IN_ctrl.extAddr;
                     OUT_stat.busy <= 1;
+                    OUT_stat.progress <= 0;
+                    lastProgress <= 0;
                 end
                 else begin
                     OUT_stat.busy <= 0;
@@ -170,6 +173,11 @@ always_ff@(posedge clk) begin
             1: begin
                 if (!MEMIF_busy && !CACHEIF_busy) 
                     state <= 0;
+                
+                //lastProgress <= {lastProgress[$bits(lastProgress)-2:0], MEM_IF_advance};
+                //if (lastProgress[$bits(lastProgress)-1])
+                if (MEM_IF_advance)
+                    OUT_stat.progress <= OUT_stat.progress + 1;
             end
             
             // Page Walk: Wait for lookup

@@ -60,7 +60,15 @@ reg[3:0] lookupMask;
 reg[31:0] lookupData;
 always_comb begin
     // Store queue lookup
-    lookupMask = 0;
+    
+    // Bytes that are not read by this op are set to available in the lookup mask
+    // (could also do this in LSU)
+    case (IN_uopLd.size)
+        0: lookupMask = ~(4'b1 << IN_uopLd.shamt);
+        1: lookupMask = ~((IN_uopLd.shamt == 2) ? 4'b1100 : 4'b0011);
+        default: lookupMask = 0;
+    endcase
+    
     lookupData = 32'bx;
     
     for (i = 0; i < 2; i=i+1) begin

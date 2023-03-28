@@ -21,15 +21,19 @@ integer i;
 
 reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0] /*verilator public*/;
 
-reg ce_reg;
-reg ce1_reg;
+reg ce_reg = 1;
+reg ce1_reg = 1;
 reg we_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr1_reg;
 reg[WORD_SIZE-1:0] data_reg;
 reg[(WORD_SIZE/8)-1:0] wm_reg;
 
+reg dbgMultiple;
+
 always@(posedge clk) begin
+
+    dbgMultiple <= 0;
     
     ce_reg <= IN_nce;
     ce1_reg <= IN_nce1;
@@ -57,8 +61,10 @@ always@(posedge clk) begin
         OUT_data1 <= mem[addr1_reg];
     end
     
-    //if (!ce1_reg && !ce_reg && addr1_reg == addr_reg)
-    //    $display("Warning: Multiple %m accesses at same address %x", addr_reg);
+    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg) begin
+        $display("Warning: Multiple %m accesses at same address %x", addr_reg);
+        dbgMultiple <= 1;
+    end
 end
 
 endmodule

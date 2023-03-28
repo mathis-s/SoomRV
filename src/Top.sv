@@ -89,26 +89,62 @@ Core core
     .IN_memc(MemC_stat)
 );
 
+
 wire[31:0] DC_dataOut;
 
-CacheIF DC_if;
-assign DC_if = MC_DC_used[0] ? MC_DC_if[0] : CORE_DC_if;
-MemRTL dcache
+wire CacheIF DC_if0 = (MC_DC_used[0] && MC_DC_if[0].addr[0] == 0) ? MC_DC_if[0] : CORE_DC_if;
+wire CacheIF DC_if1 = (MC_DC_used[0] && MC_DC_if[0].addr[0] == 1) ? MC_DC_if[0] : CORE_DC_if;
+
+reg[1:0] dcache_readSelect0;
+reg[1:0] dcache_readSelect1;
+always_ff@(posedge clk) begin
+    dcache_readSelect0 <= {dcache_readSelect0[0], MC_DC_if[0].addr[0]};
+    dcache_readSelect1 <= {dcache_readSelect1[0], IF_mem.raddr[0]};
+end
+
+wire[31:0] dcache_out0 = dcache_readSelect0[1] ? dcache1_out0 : dcache0_out0;
+wire[31:0] dcache_out1 = dcache_readSelect1[1] ? dcache1_out1 : dcache0_out1;
+
+wire[31:0] dcache0_out0;
+wire[31:0] dcache0_out1;
+MemRTL#(32, 512) dcache0
 (
     .clk(clk),
-    .IN_nce(!(!DC_if.ce && DC_if.addr < 1024)),
-    .IN_nwe(DC_if.we),
-    .IN_addr(DC_if.addr[9:0]),
-    .IN_data(DC_if.data),
-    .IN_wm(DC_if.wm),
-    .OUT_data(DC_dataOut),
+    .IN_nce(!(!DC_if0.ce && DC_if0.addr[0] == 1'b0)),
+    .IN_nwe(DC_if0.we),
+    .IN_addr(DC_if0.addr[9:1]),
+    .IN_data(DC_if0.data),
+    .IN_wm(DC_if0.wm),
+    .OUT_data(dcache0_out0),
     
-    .IN_nce1(!(!IF_mem.re)),
-    .IN_addr1(IF_mem.raddr[9:0]),
-    .OUT_data1(IF_mem.rdata)
+    .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 0)),
+    .IN_addr1(IF_mem.raddr[9:1]),
+    .OUT_data1(dcache0_out1)
 );
+
+wire[31:0] dcache1_out0;
+wire[31:0] dcache1_out1;
+MemRTL#(32, 512) dcache1
+(
+    .clk(clk),
+    .IN_nce(!(!DC_if1.ce && DC_if1.addr[0] == 1'b1)),
+    .IN_nwe(DC_if1.we),
+    .IN_addr(DC_if1.addr[9:1]),
+    .IN_data(DC_if1.data),
+    .IN_wm(DC_if1.wm),
+    .OUT_data(dcache1_out0),
+    
+    .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 1)),
+    .IN_addr1(IF_mem.raddr[9:1]),
+    .OUT_data1(dcache1_out1)
+);
+
+
+assign DC_dataOut = dcache_out0;
+assign IF_mem.rdata = dcache_out1;
+
 assign IF_mem.rbusy = 1'b0;
-assign IF_mem.wbusy = MC_DC_used[0];
+assign IF_mem.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
 
 MemRTL#(64, 512) icache
 (

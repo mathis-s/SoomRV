@@ -70,7 +70,7 @@ always_comb begin
         end
         else begin
             OUT_stStall = IF_mem.wbusy;
-            IF_mem.we = OUT_stStall;
+            IF_mem.we = 0;
         end
     end
 end
