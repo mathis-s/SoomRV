@@ -1,4 +1,4 @@
-module BranchTargetBuffer#(parameter NUM_ENTRIES=128, parameter ASSOC=8, parameter SOURCE_BITS=16)
+module BranchTargetBuffer
 (
     input wire clk,
     input wire rst,
@@ -24,20 +24,20 @@ typedef struct packed
     bit used;
     bit valid;
     bit[30:0] dst;
-    bit[SOURCE_BITS-1:0] src;
+    bit[`BTB_TAG_SIZE-1:0] src;
 } BTBEntry;
 
-localparam LENGTH = NUM_ENTRIES / ASSOC;
+localparam LENGTH = `BTB_ENTRIES / `BTB_ASSOC;
 integer i;
 integer j;
 
-BTBEntry[ASSOC-1:0] entries[LENGTH-1:0];
+BTBEntry[`BTB_ASSOC-1:0] entries[LENGTH-1:0];
 
-reg[$clog2(ASSOC)-1:0] usedID;
+reg[$clog2(`BTB_ASSOC)-1:0] usedID;
 
 always_comb begin
     
-    BTBEntry[ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+2:3]];
+    BTBEntry[`BTB_ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+2:3]];
     
     OUT_branchFound = 0;
     OUT_multipleBranches = 0;
@@ -49,9 +49,9 @@ always_comb begin
     
     if (IN_pcValid) begin
         
-        for (i = 0; i < ASSOC; i=i+1) begin
+        for (i = 0; i < `BTB_ASSOC; i=i+1) begin
             
-            if (fetched[i].valid && fetched[i].src[SOURCE_BITS-1:3] == IN_pc[SOURCE_BITS-1:3] && fetched[i].src[2:0] >= IN_pc[2:0] &&
+            if (fetched[i].valid && fetched[i].src[`BTB_TAG_SIZE-1:3] == IN_pc[`BTB_TAG_SIZE-1:3] && fetched[i].src[2:0] >= IN_pc[2:0] &&
                 (!OUT_branchFound || fetched[i].src[2:0] < OUT_branchSrcOffs)) begin
                 
                 if (OUT_branchFound)
@@ -61,7 +61,7 @@ always_comb begin
                 OUT_branchDst = fetched[i].dst;
                 OUT_branchSrcOffs = fetched[i].src[$bits(FetchOff_t)-1:0];
                 OUT_branchCompr = fetched[i].compr;
-                usedID = i[$clog2(ASSOC)-1:0];
+                usedID = i[$clog2(`BTB_ASSOC)-1:0];
             end
         end
     end
@@ -71,7 +71,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         for (i = 0; i < LENGTH; i=i+1)
-            for (j = 0; j < ASSOC; j=j+1)
+            for (j = 0; j < `BTB_ASSOC; j=j+1)
                 entries[i][j].valid <= 0;
     end
     else begin
@@ -82,7 +82,7 @@ always_ff@(posedge clk) begin
             
             if (!IN_btUpdate.clean) begin
                 // Try to find invalid fields
-                for (i = 0; i < ASSOC; i=i+1) begin
+                for (i = 0; i < `BTB_ASSOC; i=i+1) begin
                     if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid)) begin
                         
                         inserted = 1;
@@ -91,13 +91,13 @@ always_ff@(posedge clk) begin
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[SOURCE_BITS:1];
+                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
                     end
                     else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
                 end
                 
                 // Try to find unused fields
-                for (i = 0; i < ASSOC; i=i+1) begin
+                for (i = 0; i < `BTB_ASSOC; i=i+1) begin
                     if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used)) begin
                         
                         inserted = 1;
@@ -106,14 +106,14 @@ always_ff@(posedge clk) begin
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[SOURCE_BITS:1];
+                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
                     end
                     else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
                 end
             end
             else begin
                 // Delete all entries in block on branch target mispredict for now.
-                for (i = 0; i < ASSOC; i=i+1)
+                for (i = 0; i < `BTB_ASSOC; i=i+1)
                     entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 0;
             end
         end

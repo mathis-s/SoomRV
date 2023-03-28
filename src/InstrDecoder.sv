@@ -190,7 +190,7 @@ typedef union packed
 
 module InstrDecoder
 #(
-    parameter NUM_UOPS=4,
+    parameter NUM_UOPS=`DEC_WIDTH,
     parameter DO_FUSE=0,
     parameter FUSE_LUI=0,
     parameter FUSE_STORE_DATA=0

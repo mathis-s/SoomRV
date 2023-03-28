@@ -1,21 +1,18 @@
 module BranchPredictionTable
-#(
-    parameter INDEX_LEN = 8,
-    parameter NUM_COUNTERS = (1 << INDEX_LEN)
-)
 (
     input wire clk,
     input wire rst,
     
-    input wire[INDEX_LEN-1:0] IN_readAddr,
+    input wire[`BP_BASEP_ID_LEN-1:0] IN_readAddr,
     output wire OUT_taken,
     
     input wire IN_writeEn,
-    input wire[INDEX_LEN-1:0] IN_writeAddr,
+    input wire[`BP_BASEP_ID_LEN-1:0] IN_writeAddr,
     input wire IN_writeTaken
 );
 integer i;
 
+localparam NUM_COUNTERS = (1 << `BP_BASEP_ID_LEN);
 reg[1:0] counters[NUM_COUNTERS-1:0];
 
 assign OUT_taken = counters[IN_readAddr][1];

@@ -1,7 +1,7 @@
 module PreDecode
 #(
     parameter NUM_INSTRS_IN=8,
-    parameter NUM_INSTRS_OUT=4,
+    parameter NUM_INSTRS_OUT=`DEC_WIDTH,
     parameter BUF_SIZE=4
 )
 (

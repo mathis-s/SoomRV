@@ -5,6 +5,7 @@ VERILATOR_CFG = --exe Decode_tb.cpp --top-module Top -Ihardfloat
 VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 512 -CFLAGS -DTRACE
 
 SRC_FILES = \
+	src/Config.sv \
 	src/Include.sv  \
 	src/InstrDecoder.sv  \
 	src/Rename.sv  \
