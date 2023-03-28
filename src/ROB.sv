@@ -16,8 +16,8 @@ module ROB
 #(
     // how many entries, ie how many instructions can we
     // speculatively execute?
-    parameter LENGTH = 64,
-
+    parameter ID_LEN = `ROB_SIZE_EXP,
+    parameter WIDTH_RN = `DEC_WIDTH,
     parameter WIDTH = 4,
     parameter WIDTH_WB = 4
 )
@@ -25,8 +25,8 @@ module ROB
     input wire clk,
     input wire rst,
 
-    input R_UOp IN_uop[WIDTH-1:0],
-    input wire IN_uopValid[WIDTH-1:0],
+    input R_UOp IN_uop[WIDTH_RN-1:0],
+    input wire IN_uopValid[WIDTH_RN-1:0],
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
     input wire IN_interruptPending,
@@ -52,18 +52,18 @@ module ROB
 integer i;
 integer j;
 
-localparam ID_LEN = $clog2(LENGTH);
+localparam LENGTH = 1 << ID_LEN;
 
-R_UOp rnUOpSorted[WIDTH-1:0];
-reg rnUOpValidSorted[WIDTH-1:0];
+R_UOp rnUOpSorted[WIDTH_RN-1:0];
+reg rnUOpValidSorted[WIDTH_RN-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH; i=i+1) begin
+    for (i = 0; i < WIDTH_RN; i=i+1) begin
         rnUOpValidSorted[i] = 0;
         rnUOpSorted[i] = 'x;
         
-        for (j = 0; j < WIDTH; j=j+1) begin
+        for (j = 0; j < WIDTH_RN; j=j+1) begin
             // This could be one-hot...
-            if (IN_uopValid[j] && IN_uop[j].sqN[1:0] == i[1:0]) begin
+            if (IN_uopValid[j] && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
                 rnUOpValidSorted[i] = 1;
                 rnUOpSorted[i] = IN_uop[j];
             end
@@ -93,7 +93,7 @@ end
 /* verilator lint_off UNOPTFLAT */
 // All commits/reads from the ROB are sequential.
 // This should convince synthesis of that too.
-reg[3:0] deqAddresses[WIDTH-1:0];
+reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddresses[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
 always_comb begin
     for (i = 0; i < WIDTH; i=i+1) begin
@@ -102,7 +102,7 @@ always_comb begin
 end
 ROBEntry deqEntries[WIDTH-1:0];
 always_comb begin
-    reg[5:0] addr = (misprReplay && !IN_branch.taken) ? misprReplayIter[5:0] : baseIndex[5:0];
+    reg[ID_LEN-1:0] addr = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
     
     // So synthesis doesn't generate latches... (actually, 16 latches seems worth it vs. 1k std cells)
     //for (i = 0; i < WIDTH; i=i+1)
@@ -110,9 +110,9 @@ always_comb begin
     
     for (i = 0; i < WIDTH; i=i+1) begin
     
-        deqAddresses[addr[1:0]] = addr[5:2];
+        deqAddresses[addr[1:0]] = addr[ID_LEN-1:$clog2(WIDTH)];
         deqEntries[i] = deqPorts[addr[1:0]];
-        addr = addr + 6'b1;
+        addr = addr + 1;
     end
 end
 
@@ -141,7 +141,7 @@ always_ff@(posedge clk) begin
     end
     else if (IN_branch.taken) begin
         for (i = 0; i < LENGTH; i=i+1) begin
-            if ($signed(({entries[i].sqN_msb, i[5:0]}) - IN_branch.sqN) > 0) begin
+            if ($signed(({entries[i].sqN_msb, i[ID_LEN-1:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
             end
         end
@@ -197,13 +197,13 @@ always_ff@(posedge clk) begin
             
             for (i = 0; i < WIDTH; i=i+1) begin
             
-                reg[$clog2(LENGTH)-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
+                reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
                 if (!temp && deqEntries[i].valid && deqEntries[i].flags != FLAGS_NX && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
                 
                     OUT_comUOp[i].nmDst <= deqEntries[i].name;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                    OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                    OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id};
                     OUT_comUOp[i].isBranch <= deqEntries[i].flags == FLAGS_BRANCH || 
                         deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN;
                         
@@ -222,7 +222,7 @@ always_ff@(posedge clk) begin
                         
                         OUT_trapUOp.flags <= deqEntries[i].flags;
                         OUT_trapUOp.tag <= deqEntries[i].tag;
-                        OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id[5:0]};
+                        OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id};
                         OUT_trapUOp.name <= deqEntries[i].name;
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
@@ -271,15 +271,15 @@ always_ff@(posedge clk) begin
         end
         
         // Enqueue ops directly from Rename
-        for (i = 0; i < WIDTH; i=i+1) begin
+        for (i = 0; i < WIDTH_RN; i=i+1) begin
             if (rnUOpValidSorted[i] && (!IN_branch.taken)) begin
                 
-                reg[5:0] id = {rnUOpSorted[i].sqN[5:2], i[1:0]};
+                reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
                 
                 entries[id].valid <= 1;
                 entries[id].tag <= rnUOpSorted[i].tagDst;
                 entries[id].name <= rnUOpSorted[i].nmDst;
-                entries[id].sqN_msb <= rnUOpSorted[i].sqN[6];
+                entries[id].sqN_msb <= rnUOpSorted[i].sqN[ID_LEN];
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;
                 entries[id].isFP <= rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;

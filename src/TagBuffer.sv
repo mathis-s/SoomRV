@@ -7,7 +7,8 @@ typedef struct packed
 module TagBuffer
 #
 (
-    parameter NUM_UOPS=4
+    parameter NUM_ISSUE=4,
+    parameter NUM_COMMIT=4
 )
 (
     input wire clk,
@@ -15,33 +16,34 @@ module TagBuffer
     input wire IN_mispr,
     input wire IN_mispredFlush,
     
-    input wire IN_issueValid[NUM_UOPS-1:0],
-    output reg[5:0] OUT_issueTags[NUM_UOPS-1:0],
-    output reg OUT_issueTagsValid[NUM_UOPS-1:0],
+    input wire IN_issueValid[NUM_ISSUE-1:0],
+    output reg[5:0] OUT_issueTags[NUM_ISSUE-1:0],
+    output reg OUT_issueTagsValid[NUM_ISSUE-1:0],
     
     
-    input wire IN_commitValid[NUM_UOPS-1:0],
-    input wire IN_commitNewest[NUM_UOPS-1:0],
-    input wire[6:0] IN_RAT_commitPrevTags[NUM_UOPS-1:0],
-    input wire[6:0] IN_commitTagDst[NUM_UOPS-1:0]
+    input wire IN_commitValid[NUM_COMMIT-1:0],
+    input wire IN_commitNewest[NUM_COMMIT-1:0],
+    input wire[6:0] IN_RAT_commitPrevTags[NUM_COMMIT-1:0],
+    input wire[6:0] IN_commitTagDst[NUM_COMMIT-1:0]
 );
 integer i;
 integer j;
+integer k;
 
 TagBufEntry tags[63:0];
 
 always_comb begin
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
+    for (i = 0; i < NUM_ISSUE; i=i+1) begin
         OUT_issueTags[i] = 6'bx;
-        //OUT_issueTagsValid[i] = 0;
         for (j = 0; j < 64; j=j+1) begin
-            if (!tags[j].used && 
-                (i <= 0 || OUT_issueTags[0] != j[5:0]) &&
-                (i <= 1 || OUT_issueTags[1] != j[5:0]) &&
-                (i <= 2 || OUT_issueTags[2] != j[5:0])
-                ) begin
+            
+            reg usedByPrev = 0;
+            for (k = 0; k < i; k=k+1)
+                if (OUT_issueTags[k] == j[5:0]) 
+                    usedByPrev = 1;
+        
+            if (!tags[j].used && !usedByPrev) begin
                 OUT_issueTags[i] = j[5:0];
-                //OUT_issueTagsValid[i] = 1;
             end
         end
     end
@@ -82,7 +84,7 @@ always_comb begin
         free = temp[3] ? 3'b100 : temp[2:0];
     end*/
     
-    for (i = 0; i < NUM_UOPS; i=i+1)
+    for (i = 0; i < NUM_ISSUE; i=i+1)
         OUT_issueTagsValid[i] = free > i[6:0];
 end
 
@@ -119,7 +121,7 @@ always_ff@(posedge clk) begin
             end
         end
         else begin
-            for (i = 0; i < NUM_UOPS; i=i+1) begin
+            for (i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i]) begin
                     assert(OUT_issueTagsValid[i]);
                     tags[OUT_issueTags[i]].used <= 1;
@@ -129,7 +131,7 @@ always_ff@(posedge clk) begin
         end
         
         // Commit
-        for (i = 0; i < NUM_UOPS; i=i+1) begin
+        for (i = 0; i < NUM_COMMIT; i=i+1) begin
             if (IN_commitValid[i]) begin
                 
                 if (IN_mispredFlush) begin

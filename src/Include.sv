@@ -32,7 +32,7 @@ typedef struct packed
 
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
-typedef logic[6:0] SqN;
+typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;

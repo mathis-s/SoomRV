@@ -8,7 +8,7 @@ typedef struct packed
 module LoadBuffer
 #(
     parameter NUM_PORTS=2,
-    parameter NUM_ENTRIES=16
+    parameter NUM_ENTRIES=`LB_SIZE
 )
 (
     input wire clk,
@@ -33,8 +33,6 @@ LBEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
 SqN indexIn;
 
-reg mispredict[NUM_PORTS-1:0];
-
 always_ff@(posedge clk) begin
 
     if (rst) begin
@@ -43,7 +41,7 @@ always_ff@(posedge clk) begin
         end
         baseIndex = 0;
         OUT_branch.taken <= 0;
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
+        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
     end
     else begin
     
@@ -76,8 +74,6 @@ always_ff@(posedge clk) begin
                 if (i == 0) begin
                     reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
                     assert(IN_uop[i].loadSqN <= baseIndex + NUM_ENTRIES - 1);
-                    
-                    //mispredict[i] <= 0;
 
                     entries[index].sqN <= IN_uop[i].sqN;
                     entries[index].addr <= IN_uop[i].addr[31:2];
@@ -111,7 +107,7 @@ always_ff@(posedge clk) begin
             end
         end
         
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
+        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
     end
 
 end

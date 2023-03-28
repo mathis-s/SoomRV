@@ -1,8 +1,4 @@
 module Core
-#(
-    parameter NUM_UOPS=2,
-    parameter NUM_WBS=4
-)
 (
     input wire clk,
     input wire rst,
@@ -35,6 +31,7 @@ always_comb begin
         OUT_memc = CC_MC_if;
 end
 
+localparam NUM_WBS = 4;
 RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
 reg wbHasResult[NUM_WBS-1:0];
 always_comb begin
@@ -113,7 +110,7 @@ SqN RN_nextSqN;
 SqN ROB_curSqN;
 
 wire PD_full;
-PD_Instr PD_instrs[3:0] /*verilator public*/;
+PD_Instr PD_instrs[`DEC_WIDTH-1:0] /*verilator public*/;
 PreDecode preDec
 (
     .clk(clk),
@@ -128,7 +125,7 @@ PreDecode preDec
     .OUT_instrs(PD_instrs)
 );
 
-D_UOp DE_uop[3:0] /*verilator public*/;
+D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
 DecodeBranchProv DEC_decBranch;
 InstrDecoder idec
 (
@@ -147,7 +144,7 @@ InstrDecoder idec
 );
 
 wire frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
-    ($signed(RN_nextSqN - ROB_maxSqN) <= -3) && 
+    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) && 
     !branch.taken &&
     en &&
     !mispredFlush &&
@@ -155,12 +152,12 @@ wire frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
 
 wire FUSE_full = !frontendEn || RN_stall;
 
-R_UOp RN_uop[3:0] /*verilator public*/;
-wire RN_uopValid[3:0];
+R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
+wire RN_uopValid[`DEC_WIDTH-1:0];
+wire RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall;
-wire RN_uopOrdering[3:0];
 Rename rn 
 (
     .clk(clk),
@@ -200,7 +197,7 @@ assign stall[0] = 0;
 assign stall[1] = 0;
 
 wire IQ0_full;
-IssueQueue#(8,2,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
+IssueQueue#(`IQ_0_SIZE,2,`DEC_WIDTH,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -233,7 +230,7 @@ IssueQueue#(8,2,4,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
-IssueQueue#(8,2,4,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
+IssueQueue#(`IQ_1_SIZE,2,`DEC_WIDTH,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -266,7 +263,7 @@ IssueQueue#(8,2,4,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
-IssueQueue#(8,1,4,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
+IssueQueue#(`IQ_2_SIZE,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -299,7 +296,7 @@ IssueQueue#(8,1,4,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(10,3,4,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(`IQ_3_SIZE,3,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),

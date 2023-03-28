@@ -11,7 +11,7 @@ typedef struct packed
 module CacheController
 #(
     parameter SIZE=16,
-    parameter NUM_UOPS=2
+    localparam NUM_UOPS = 2
 )
 (
     input wire clk,
@@ -229,9 +229,9 @@ always_ff@(posedge clk) begin
         // Load Pipeline
         if (!OUT_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             // Cache hit
-            if (IN_uopLd.exception != AGU_NO_EXCEPTION || cacheTableEntryFound[0] || IN_uopLd.addr[31:24] >= 8'hff) begin
+            if (IN_uopLd.exception != AGU_NO_EXCEPTION || cacheTableEntryFound[0] || `IS_MMIO_PMA(IN_uopLd.addr)) begin
                 OUT_uopLd <= IN_uopLd;
-                if (IN_uopLd.addr[31:24] < 8'hff && IN_uopLd.exception == AGU_NO_EXCEPTION) begin
+                if (!`IS_MMIO_PMA(IN_uopLd.addr) && IN_uopLd.exception == AGU_NO_EXCEPTION) begin
                     OUT_uopLd.addr <= {20'b0, cacheTableEntry[0], IN_uopLd.addr[7:0]};
                     ctable[cacheTableEntry[0]].used <= 1;
                 end
@@ -280,9 +280,9 @@ always_ff@(posedge clk) begin
                 OUT_uopSt.valid <= 0;
             end
             // Cache hit
-            else if (cacheTableEntryFound[1] || IN_uopSt.addr[31:24] >= 8'hfe) begin
+            else if (cacheTableEntryFound[1] || `IS_MMIO_PMA(IN_uopSt.addr)) begin
                 OUT_uopSt <= IN_uopSt;
-                if (IN_uopSt.addr[31:24] < 8'hfe) begin
+                if (!`IS_MMIO_PMA(IN_uopSt.addr)) begin
                     OUT_uopSt.addr <= {20'b0, cacheTableEntry[1], IN_uopSt.addr[7:0]};
                     ctable[cacheTableEntry[1]].used <= 1;
                     ctable[cacheTableEntry[1]].dirty <= 1;

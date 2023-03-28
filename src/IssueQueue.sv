@@ -37,8 +37,8 @@ module IssueQueue
     
     // All ops that are being issued (including OUT_uop)
     // For operand forwarding
-    input wire IN_issueValid[NUM_UOPS-1:0],
-    input R_UOp IN_issueUOps[NUM_UOPS-1:0],
+    input wire IN_issueValid[RESULT_BUS_COUNT-1:0],
+    input R_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
     
     input SqN IN_maxStoreSqN,
     input SqN IN_maxLoadSqN,

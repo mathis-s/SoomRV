@@ -11,9 +11,7 @@ typedef struct packed
 
 module StoreQueue
 #(
-    parameter NUM_PORTS=2,
-    parameter NUM_PORTS_LD=1,
-    parameter NUM_ENTRIES=24
+    parameter NUM_ENTRIES=`SQ_SIZE
 )
 (
     input wire clk,
@@ -114,7 +112,7 @@ always_ff@(posedge clk) begin
         evicted[1].valid <= 0;
         
         baseIndex = 0;
-        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
+        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         OUT_empty <= 1;
         OUT_uopSt.valid <= 0;
         flushing <= 0;
@@ -131,11 +129,11 @@ always_ff@(posedge clk) begin
         // Dequeue
         if (!IN_disable && entries[0].valid && !IN_branch.taken && entries[0].ready &&
             // Don't issue Memory Mapped IO ops while IO is not ready
-            (!(didCSRwrite) || entries[0].addr[29:22] != 8'hFF)) begin
+            (!(didCSRwrite) || `IS_MMIO_PMA_W(entries[0].addr))) begin
                 
             entries[NUM_ENTRIES-1].valid <= 0;
             
-            didCSRwrite <= entries[0].addr[29:22] == 8'hFF;
+            didCSRwrite <= `IS_MMIO_PMA_W(entries[0].addr);
             if (!flushing)
                 baseIndex = baseIndex + 1;
             
@@ -171,7 +169,7 @@ always_ff@(posedge clk) begin
         // Enqueue
         if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0) && IN_uopSt.exception == AGU_NO_EXCEPTION) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
-            assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[6:0] - 1);
+            assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
             entries[index].valid <= 1;
             entries[index].ready <= 0;
             entries[index].sqN <= IN_uopSt.sqN;
@@ -187,7 +185,7 @@ always_ff@(posedge clk) begin
 
         OUT_empty <= empty && !doingEnqueue;
         if (OUT_empty) flushing <= 0;
-        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[6:0] - 1;
+        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
         if (!IN_stallLd) begin
             OUT_lookupData <= lookupData;

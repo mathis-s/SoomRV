@@ -1,6 +1,7 @@
 module Rename
 #(
-    parameter WIDTH_UOPS = 4,
+    parameter WIDTH_ISSUE = `DEC_WIDTH,
+    parameter WIDTH_COMMIT = 4,
     parameter WIDTH_WR = 4
 )
 (
@@ -12,10 +13,10 @@ module Rename
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
-    input D_UOp IN_uop[WIDTH_UOPS-1:0],
+    input D_UOp IN_uop[WIDTH_ISSUE-1:0],
 
     // Committed changes from ROB
-    input CommitUOp IN_comUOp[WIDTH_UOPS-1:0],
+    input CommitUOp IN_comUOp[WIDTH_COMMIT-1:0],
 
     // WB for uncommitted but speculatively available values
     input wire IN_wbHasResult[WIDTH_WR-1:0],
@@ -29,11 +30,11 @@ module Rename
     input SqN IN_branchStoreSqN,
     input wire IN_mispredFlush,
     
-    output reg OUT_uopValid[WIDTH_UOPS-1:0],
-    output R_UOp OUT_uop[WIDTH_UOPS-1:0],
+    output reg OUT_uopValid[WIDTH_ISSUE-1:0],
+    output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
     // This is just an alternating bit that switches with each regular int op,
     // for assignment to issue queues.
-    output reg OUT_uopOrdering[WIDTH_UOPS-1:0],
+    output reg OUT_uopOrdering[WIDTH_ISSUE-1:0],
     output SqN OUT_nextSqN,
     output SqN OUT_nextLoadSqN,
     output SqN OUT_nextStoreSqN
@@ -48,27 +49,26 @@ typedef struct packed
 integer i;
 integer j;
 
-wire RAT_lookupAvail[2*WIDTH_UOPS-1:0];
-wire[6:0] RAT_lookupSpecTag[2*WIDTH_UOPS-1:0];
-reg[4:0] RAT_lookupIDs[2*WIDTH_UOPS-1:0];
+wire RAT_lookupAvail[2*WIDTH_ISSUE-1:0];
+wire[6:0] RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
+reg[4:0] RAT_lookupIDs[2*WIDTH_ISSUE-1:0];
 
-reg[4:0] RAT_issueIDs[WIDTH_UOPS-1:0];
-reg RAT_issueValid[WIDTH_UOPS-1:0];
-reg RAT_issueAvail[WIDTH_UOPS-1:0];
-SqN RAT_issueSqNs[WIDTH_UOPS-1:0];
+reg[4:0] RAT_issueIDs[WIDTH_ISSUE-1:0];
+reg RAT_issueValid[WIDTH_ISSUE-1:0];
+reg RAT_issueAvail[WIDTH_ISSUE-1:0];
+SqN RAT_issueSqNs[WIDTH_ISSUE-1:0];
+reg TB_issueValid[WIDTH_ISSUE-1:0];
 
-reg RAT_commitValid[WIDTH_UOPS-1:0];
-reg TB_commitValid[WIDTH_UOPS-1:0];
+reg RAT_commitValid[WIDTH_COMMIT-1:0];
+reg TB_commitValid[WIDTH_COMMIT-1:0];
 
-reg[4:0] RAT_commitIDs[WIDTH_UOPS-1:0];
-reg[6:0] RAT_commitTags[WIDTH_UOPS-1:0];
-wire[6:0] RAT_commitPrevTags[WIDTH_UOPS-1:0];
-reg RAT_commitAvail[WIDTH_UOPS-1:0];
+reg[4:0] RAT_commitIDs[WIDTH_COMMIT-1:0];
+reg[6:0] RAT_commitTags[WIDTH_COMMIT-1:0];
+wire[6:0] RAT_commitPrevTags[WIDTH_COMMIT-1:0];
+reg RAT_commitAvail[WIDTH_COMMIT-1:0];
 
-reg[4:0] RAT_wbIDs[WIDTH_UOPS-1:0];
-reg[6:0] RAT_wbTags[WIDTH_UOPS-1:0];
-
-reg TB_issueValid[WIDTH_UOPS-1:0];
+reg[4:0] RAT_wbIDs[WIDTH_WR-1:0];
+reg[6:0] RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
 
@@ -84,16 +84,15 @@ always_comb begin
     
     if ($signed(lrScRsv.sqN - counterSqN) >= 0)
         nextLrScRsv.valid = 0;
+        
+    // Issue/Lookup
+    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
     
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
-    end
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
         
         isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
         
-        // Issue/Lookup
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
@@ -126,8 +125,16 @@ always_comb begin
         
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
-        
-        // Commit
+    end
+    
+    // Writeback
+    for (i = 0; i < WIDTH_WR; i=i+1) begin
+        RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
+        RAT_wbTags[i] = IN_wbUOp[i].tagDst;
+    end
+    
+    // Commit
+    for (i = 0; i < WIDTH_COMMIT; i=i+1) begin
         RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
             //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         TB_commitValid[i] = IN_comUOp[i].valid;
@@ -137,13 +144,17 @@ always_comb begin
         // Only using during mispredict replay
         RAT_commitAvail[i] = IN_comUOp[i].compressed;
 
-        // Writeback
-        RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
-        RAT_wbTags[i] = IN_wbUOp[i].tagDst;
     end
 end
 
-RenameTable rt
+RenameTable
+#(
+    .NUM_LOOKUP(WIDTH_ISSUE*2),
+    .NUM_ISSUE(WIDTH_ISSUE),
+    .NUM_COMMIT(WIDTH_COMMIT),
+    .NUM_WB(WIDTH_WR)
+)
+rt
 (
     .clk(clk),
     .rst(rst),
@@ -170,18 +181,18 @@ RenameTable rt
     .IN_wbTag(RAT_wbTags)
 );
 
-reg[5:0] TB_tags[WIDTH_UOPS-1:0];
-reg[6:0] newTags[WIDTH_UOPS-1:0];
-reg TB_tagsValid[WIDTH_UOPS-1:0];
+reg[5:0] TB_tags[WIDTH_ISSUE-1:0];
+reg[6:0] newTags[WIDTH_ISSUE-1:0];
+reg TB_tagsValid[WIDTH_ISSUE-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
         if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
         else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
         else if (isSc[i]) newTags[i] = {1'b1, 5'b0, !scSuccessful[i]};
         else newTags[i] = 7'h40;
     end
 end
-TagBuffer tb
+TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
 (
     .clk(clk),
     .rst(rst),
@@ -200,7 +211,7 @@ TagBuffer tb
 
 always_comb begin
     OUT_stall = 0;
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
         if ((!TB_tagsValid[i]) && IN_uop[i].valid && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN)
             OUT_stall = 1;
     end
@@ -212,15 +223,15 @@ SqN counterStoreSqN;
 SqN counterLoadSqN;
 assign OUT_nextSqN = counterSqN;
 
-reg isNewestCommit[WIDTH_UOPS-1:0];
+reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+    for (i = 0; i < WIDTH_COMMIT; i=i+1) begin
         
         // When nmDst == 0, the register is (also) discarded immediately instead of being committed.
         // This is currently only used for rmw atomics with rd=x0.
         isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].nmDst != 0;
         if (IN_comUOp[i].valid)
-            for (j = i + 1; j < WIDTH_UOPS; j=j+1)
+            for (j = i + 1; j < WIDTH_COMMIT; j=j+1)
                 if (IN_comUOp[j].valid && (IN_comUOp[j].nmDst == IN_comUOp[i].nmDst))
                     isNewestCommit[i] = 0;
     end
@@ -238,7 +249,7 @@ always_ff@(posedge clk) begin
         intOrder = 0;
         lrScRsv.valid <= 0;
     
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -250,7 +261,7 @@ always_ff@(posedge clk) begin
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
         
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -259,7 +270,7 @@ always_ff@(posedge clk) begin
     else if (en && frontEn && !OUT_stall) begin
 
         // Look up tags and availability of operands for new instructions
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             //OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
@@ -284,7 +295,7 @@ always_ff@(posedge clk) begin
         end
         
         // Set seqnum/tags for next instruction(s)
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if (IN_uop[i].valid) begin
                 
                 OUT_uopValid[i] <= 1;
@@ -327,7 +338,7 @@ always_ff@(posedge clk) begin
         lrScRsv <= nextLrScRsv;
     end
     else if (!en) begin
-        for (i = 0; i < WIDTH_UOPS; i=i+1) begin
+        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -339,7 +350,7 @@ always_ff@(posedge clk) begin
         // read later.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
             if (en && (!frontEn || OUT_stall) && IN_wbHasResult[i]) begin
-                for (j = 0; j < WIDTH_UOPS; j=j+1) begin
+                for (j = 0; j < WIDTH_ISSUE; j=j+1) begin
                     if (OUT_uopValid[j]) begin
                         if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availA <= 1;
