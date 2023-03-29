@@ -41,6 +41,8 @@ always_comb begin
     
 end
 
+wire doRead = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111;
+
 always_comb begin
     
     OUT_stStall = 0;
@@ -57,20 +59,28 @@ always_comb begin
     IF_mmio.we = 1;
         
     // Load
-    if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111) begin
+    if (doRead) begin
         IF_mem.re = 0;
     end
     else IF_mem.re = 1;
     
     // Store
     if (IN_uopSt.valid) begin
-        if (IN_uopSt.addr[31:24] == 8'hFF) begin
+        if (`IS_MMIO_PMA(IN_uopSt.addr)) begin
             OUT_stStall = IF_mmio.wbusy;
             IF_mmio.we = OUT_stStall;
         end
         else begin
-            OUT_stStall = IF_mem.wbusy;
-            IF_mem.we = 0;
+            
+            // do not issue two ops at the same address at once
+            // FIXME: compare only as many bits as required
+            if (doRead && IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2]) begin
+                OUT_stStall = 1;
+            end
+            else begin
+                OUT_stStall = IF_mem.wbusy;
+                IF_mem.we = 0;
+            end
         end
     end
 end
@@ -140,7 +150,7 @@ always_ff@(posedge clk) begin
         
         if (uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) begin
             uopLd_1 <= uopLd_0;
-            isCSRread_1 <= uopLd_0.addr[31:24] == 8'hFF;
+            isCSRread_1 <= `IS_MMIO_PMA(uopLd_0.addr);
         end
         
         if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin

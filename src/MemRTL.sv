@@ -47,7 +47,7 @@ always@(posedge clk) begin
         if (!we_reg) begin
             for (i = 0; i < WORD_SIZE/8; i=i+1) begin
                 if (wm_reg[i])
-                    mem[addr_reg][(8*i)+:8] = data_reg[(8*i)+:8];
+                    mem[addr_reg][(8*i)+:8] <= data_reg[(8*i)+:8];
             end
             //$display("write %x to %x (%b)", data_reg, addr_reg, wm_reg);
             // OUT_data <= 0;
@@ -62,8 +62,22 @@ always@(posedge clk) begin
     end
     
     if (!ce1_reg && !ce_reg && addr1_reg == addr_reg) begin
-        $display("Warning: Multiple %m accesses at same address %x", addr_reg);
+        $display("Warning: Multiple %m accesses at same address %x, we=%b", addr_reg, we_reg);
         dbgMultiple <= 1;
+        OUT_data1 <= 'x;
+        
+        if (!we_reg) begin
+            for (i = 0; i < WORD_SIZE/8; i=i+1) begin
+                if (wm_reg[i])
+                    mem[addr_reg][(8*i)+:8] <= 'x;
+            end
+        end
+        else begin
+            OUT_data <= 'x;
+        end
+        
+        assert(0);
+        
     end
 end
 

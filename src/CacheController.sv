@@ -57,6 +57,9 @@ reg[$clog2(SIZE)-1:0] evictingID;
 assign OUT_stall[0] = IN_stall[0] || cmissUOpLd.valid;
 assign OUT_stall[1] = IN_stall[1] || cmissUOpSt.valid || evictionRq != EV_RQ_NONE;
 
+wire doNotEvict = (IN_uopLd.valid && !cmissUOpLd.valid) || OUT_uopLd.valid ||
+                  (IN_uopSt.valid && !cmissUOpSt.valid && evictionRq == EV_RQ_NONE) || OUT_uopSt.valid; 
+
 // Cache Table Lookups
 reg cacheTableEntryFound[NUM_UOPS-1:0];
 reg[$clog2(SIZE)-1:0] cacheTableEntry[NUM_UOPS-1:0];
@@ -128,7 +131,7 @@ always_ff@(posedge clk) begin
         evictionRq <= EV_RQ_NONE;
     end
     else begin
-        reg temp = 0;
+        reg evictStart_c = 0;
 
         if (fenceActive) begin
             // During fence, we search for used entries using lruPointer to evict them
@@ -167,12 +170,10 @@ always_ff@(posedge clk) begin
             else begin
                 // Requested eviction
                 if (!IN_memc.busy && evictionRq != EV_RQ_NONE) begin
-                    
                     if (!ctable[evictionRqID].valid) begin
                         evictionRq <= EV_RQ_NONE;
                     end
-                    else if ((!IN_uopLd.valid || OUT_stall[0]) && !OUT_uopLd.valid && 
-                        (!IN_uopSt.valid || OUT_stall[1]) && !OUT_uopSt.valid) begin
+                    else if (!doNotEvict) begin
                         
                         // Clean only pushes new contents of entry back to memory
                         if (evictionRq != EV_RQ_CLEAN) begin
@@ -198,7 +199,7 @@ always_ff@(posedge clk) begin
                             evictionRq <= EV_RQ_NONE;
                         end
                     end
-                    temp = 1;
+                    evictStart_c = 1;
                 end
                 // Regular eviction or fence
                 else if ((!freeEntryAvail || fenceActive) && !IN_memc.busy) begin
@@ -207,9 +208,7 @@ always_ff@(posedge clk) begin
                         freeEntryAvail <= 1;
                         freeEntryID <= lruPointer;
                     end
-
-                    else if ((!ctable[lruPointer].used || fenceActive) && (!IN_uopLd.valid || OUT_stall[0]) && !OUT_uopLd.valid
-                    && (!IN_uopSt.valid || OUT_stall[1]) && !OUT_uopSt.valid) begin
+                    else if ((!ctable[lruPointer].used || fenceActive) && !doNotEvict) begin
                         
                         ctable[lruPointer].valid <= 0;
                         ctable[lruPointer].used <= 0;
@@ -229,7 +228,7 @@ always_ff@(posedge clk) begin
                         end
                         else freeEntryAvail <= 1;
                     end
-                    temp = 1;
+                    evictStart_c = 1;
                 end
             end
         end
@@ -344,7 +343,7 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else if (!temp && freeEntryAvail && !evictReq && !IN_branch.taken && evictionRq == EV_RQ_NONE) begin
+        else if (!evictStart_c && freeEntryAvail && !evictReq && !IN_branch.taken && evictionRq == EV_RQ_NONE) begin
             if (cmissUOpLd.valid) begin
                 OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                 OUT_memc.sramAddr <= {freeEntryID, 6'b0};

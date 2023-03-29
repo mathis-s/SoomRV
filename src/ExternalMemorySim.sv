@@ -1,6 +1,6 @@
 
 
-module ExternalMemorySim#(parameter SIZE=1048576)
+module ExternalMemorySim#(parameter SIZE=(1<<26))
 (
     input wire clk,
     input wire en,
@@ -43,7 +43,7 @@ always_ff@(posedge clk) begin
         // write
         2: begin
             if (en) begin
-                mem[addr[19:0]] <= bus;
+                mem[addr[$clog2(SIZE)-1:0]] <= bus;
                 addr[29:0] <= addr[29:0] + 1;
             end
             else state <= 0;
@@ -52,7 +52,7 @@ always_ff@(posedge clk) begin
         // read
         3: begin
             if (en) begin
-                outBus <= mem[addr[19:0]];
+                outBus <= mem[addr[$clog2(SIZE)-1:0]];
                 addr[29:0] <= addr[29:0] + 1;
                 oen <= 1;
             end

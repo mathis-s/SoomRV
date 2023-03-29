@@ -197,7 +197,7 @@ always_ff@(posedge clk) begin
     
     OUT_memc2.cmd <= MEMC_NONE;
     if (rst) begin
-        pc <= 0;
+        pc <= 31'(`ENTRY_POINT >> 1);
         fetchID <= 0;
         en1 <= 0;
         outInstrs_r <= 'x;
