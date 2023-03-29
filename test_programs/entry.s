@@ -1,4 +1,4 @@
-.set IO_ADDR, 0xff000003
+.set IO_ADDR, 0xff000000
 
 .globl _start
 _start:

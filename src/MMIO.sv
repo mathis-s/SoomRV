@@ -33,7 +33,7 @@ assign IF_mem.wbusy = aclintBusy || spiBusy || sysConBusy || weReg;
 wire[31:0] aclintData;
 wire aclintBusy;
 wire aclintRValid;
-ACLINT aclint
+ACLINT#(.MTIME_ADDR(`MTIME_ADDR), .MTIMECMP_ADDR(`MTIMECMP_ADDR)) aclint
 (
     .clk(clk),
     .rst(rst),
@@ -56,7 +56,7 @@ ACLINT aclint
 wire[31:0] spiData;
 wire spiBusy;
 wire spiRValid;
-SPI spi
+SPI#(.ADDR(`SERIAL_ADDR)) spi
 (
     .clk(clk),
     .rst(rst),
@@ -81,7 +81,7 @@ SPI spi
 wire[31:0] sysConData;
 wire sysConBusy;
 wire sysConRValid;
-SysCon sysCon
+SysCon#(.ADDR(`SYSCON_ADDR)) sysCon
 (
     .clk(clk),
     .rst(rst),

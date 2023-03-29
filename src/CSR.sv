@@ -395,7 +395,7 @@ always_comb begin
     PrivLevel epm = mstatus.mprv ? mstatus.mpp : priv; 
     
     OUT_vmem.rootPPN = satp.ppn;
-    OUT_vmem.sv32en_ifetch = satp.mode;
+    OUT_vmem.sv32en_ifetch = satp.mode && priv != PRIV_MACHINE;
     OUT_vmem.sv32en = satp.mode;
     OUT_vmem.priv = epm;
     OUT_vmem.makeExecReadable = mstatus.mxr;
