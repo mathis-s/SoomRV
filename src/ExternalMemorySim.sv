@@ -1,6 +1,6 @@
 
 
-module ExternalMemorySim#(parameter SIZE=(1<<26))
+module ExternalMemorySim#(parameter SIZE=(1<<24))
 (
     input wire clk,
     input wire en,

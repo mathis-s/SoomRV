@@ -25,6 +25,9 @@ _start:
     li a1, 0x55
     sb a1, 4(a0)
     
+    .end_loop:
+        j .end_loop
+    
 
 .align 2
 _exception:

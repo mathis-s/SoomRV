@@ -14,6 +14,7 @@
 #include "verilated_vcd_c.h"
 #endif
 #include <array>
+#include <cstring>
 
 VTop* top; // Instantiation of model
 
@@ -24,8 +25,7 @@ double sc_time_stamp()
     return main_time;
 }
 
-uint32_t ram[65536];
-uint32_t pram[65536];
+uint32_t pram[1<<24];
 
 template<std::size_t N>
 uint32_t ExtractField (VlWide<N> wide, uint32_t startBit, uint32_t len)
@@ -106,6 +106,7 @@ Inst rn[4];
     printf("\n");
 }*/
 
+
 int main(int argc, char** argv)
 {
     Verilated::commandArgs(argc, argv); // Remember args
@@ -123,38 +124,19 @@ int main(int argc, char** argv)
     system("riscv32-elf-objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
     
     size_t numInstrBytes = 0;
-    size_t dataStart, dataIndex;
     {
-        FILE* f = fopen("text.bin", "rb");
         uint8_t* pramBytes = (uint8_t*)pram;
-        while (numInstrBytes < 65536 * 4)
-        {
-            uint8_t data;
-            if (fread(&data, sizeof(uint8_t), 1, f) <= 0)
-                break;
-            pramBytes[numInstrBytes] = data;
-            numInstrBytes++;
-        }
+        
+        FILE* f = fopen("text.bin", "rb");
+        numInstrBytes = fread(pramBytes, sizeof(uint8_t), sizeof(pram), f);
         fclose(f);
         printf("Read %zu bytes of instructions\n", numInstrBytes);
-        if (numInstrBytes & 3)
-            numInstrBytes = (numInstrBytes & -4) + 4;
         
+        if (numInstrBytes & 3) numInstrBytes = (numInstrBytes & ~3) + 4;
         
-        dataIndex = numInstrBytes;
-        dataStart = dataIndex;
-        uint8_t* ramBytes = (uint8_t*)ram;
         f = fopen("data.bin", "rb");
-        while (dataIndex < 65536 * 4)
-        {
-            uint8_t data;
-            if (fread(&data, 1, sizeof(uint8_t), f) == 0)
-                break;
-            ramBytes[dataIndex] = data;
-            
-            dataIndex++;
-        }
-        // printf("Wrote data from %.8zx to %.8zx\n", dataStart, dataIndex);
+        numInstrBytes += fread(&pramBytes[numInstrBytes], sizeof(uint8_t), sizeof(pram) - numInstrBytes, f);
+    
         fclose(f);
     }
 
@@ -164,23 +146,16 @@ int main(int argc, char** argv)
     tfp->open("Decode_tb.vcd");
 #endif
     
-    for (size_t i = 0; i < dataStart/4; i++)
+    for (size_t i = 0; i < (1<<24); i++)
     {
-        //printf("%.8x\n", pram[i]);
-        top->rootp->Top->extMem->mem[i] = pram[i];
-    }
-    for (size_t i = dataStart/4; i < dataIndex; i++)
-    {
-        /*if (ram[i] != 0) *///printf("%.8x\n", ram[i]);
-        top->rootp->Top->extMem->mem[i] = ram[i];
-        //top->rootp->Top->dcache->mem[i] = ram[i];
+        top->rootp->Top->extMem->mem[i] = 0;
     }
     
-    /*for (size_t i = 0; i < dataIndex/4+1; i++)
+    for (size_t i = 0; i < (numInstrBytes/4)+1; i++)
     {
-        printf("%.8x\n", top->rootp->Top->extMem->mem[i]);
-    }*/
-
+        top->rootp->Top->extMem->mem[i] = pram[i];
+    }
+    
     // Reset
     top->rst = 1;
     for (size_t j = 0; j < 4; j++)
