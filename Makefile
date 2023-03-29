@@ -51,6 +51,7 @@ SRC_FILES = \
 	src/TrapHandler.sv \
 	src/CacheInterface.sv \
 	src/MemoryInterface.sv \
+	src/Peripherals.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
