@@ -85,7 +85,7 @@ void run ()
                 
             case LEFT: tape[i] = cur; i--; cur = tape[i]; pc++; break;
             case RIGHT: tape[i] = cur; i++; cur = tape[i]; pc++; break;
-            case PUTC: *(volatile uint8_t*)0xff000003 = cur; pc++; break;
+            case PUTC: *(volatile uint8_t*)0x10000000 = cur; pc++; break;
             case GETC: cur = 0; pc++; break;
         }
 }

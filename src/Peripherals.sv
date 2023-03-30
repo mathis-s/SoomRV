@@ -39,6 +39,8 @@ assign OUT_rbusy = 0;
 reg[63:0] mtime;
 reg[63:0] mtimecmp;
 
+reg[19:0] divCnt;
+
 assign OUT_mtime = mtime;
 assign OUT_mtimecmp = mtimecmp;
 
@@ -48,10 +50,15 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mtime <= 0;
         mtimecmp <= 0;
+        divCnt <= 49;
     end
     else begin
         
-        mtime <= mtime + 1;
+        if (divCnt == 0) begin
+            mtime <= mtime + 1;
+            divCnt <= 49;
+        end
+        else divCnt <= divCnt - 1;
         
         if (IN_re) begin
             case ({IN_raddr, 2'b0})
@@ -128,8 +135,8 @@ always_ff@(posedge clk) begin
                 OUT_rdata <= buffer;
                 OUT_rvalid <= 1;
             end
-            if ({IN_raddr, 2'b0} == ADDR+1) begin
-                OUT_rdata <= 32'h60;
+            if ({IN_raddr, 2'b0} == ADDR+4) begin
+                OUT_rdata <= 32'h6000;
                 OUT_rvalid <= 1;
             end
         end
@@ -139,18 +146,21 @@ always_ff@(posedge clk) begin
                     default: begin
                         spiCnt <= 32;
                         buffer <= IN_wdata;
+                        OUT_SPI_mosi <= IN_wdata[31];
                     end
                     4'b0011: begin
                         spiCnt <= 16;
                         buffer <= {IN_wdata[15:0], 16'b0};
+                        OUT_SPI_mosi <= IN_wdata[15];
                     end
                     4'b0001: begin
                         spiCnt <= 8;
                         buffer <= {IN_wdata[7:0], 24'b0};
+                        OUT_SPI_mosi <= IN_wdata[7];
                     end
                 endcase
-                OUT_SPI_mosi <= IN_wdata[31];
                 OUT_SPI_cs <= 0;
+                OUT_SPI_clk <= 0;
             end
         end
                 

@@ -51,7 +51,7 @@ module RF
 
 integer i;
 
-reg[WIDTH-1:0] mem[SIZE-1:0];
+reg[WIDTH-1:0] mem[SIZE-1:0] /*verilator public*/;
 
 always_comb begin
     rdata0 = mem[raddr0];

@@ -58,6 +58,7 @@ reg RAT_issueValid[WIDTH_ISSUE-1:0];
 reg RAT_issueAvail[WIDTH_ISSUE-1:0];
 SqN RAT_issueSqNs[WIDTH_ISSUE-1:0];
 reg TB_issueValid[WIDTH_ISSUE-1:0];
+reg TB_tagNeeded[WIDTH_ISSUE-1:0];
 
 reg RAT_commitValid[WIDTH_COMMIT-1:0];
 reg TB_commitValid[WIDTH_COMMIT-1:0];
@@ -79,19 +80,33 @@ LrScRsv lrScRsv;
 LrScRsv nextLrScRsv;
 
 always_comb begin
+    OUT_stall = 0;
     nextCounterSqN = counterSqN;
     nextLrScRsv = lrScRsv;
     
     if ($signed(lrScRsv.sqN - counterSqN) >= 0)
         nextLrScRsv.valid = 0;
         
+    // Stall
+    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        
+        isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
+        
+        // Only need new tag if instruction writes to a register.
+        // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
+        TB_tagNeeded[i] = (IN_uop[i].rd != 0 || IN_uop[i].fu == FU_ATOMIC) &&
+            // these don't write or writes are eliminated
+            IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
+        
+        if ((!TB_tagsValid[i]) && IN_uop[i].valid && frontEn && en && TB_tagNeeded[i])
+            OUT_stall = 1;
+    end
+        
     // Issue/Lookup
     for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
     
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
-        
-        isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
         
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
@@ -116,12 +131,8 @@ always_comb begin
                 nextLrScRsv.valid = 0;
             end
         end
-        
-        // Only need new tag if instruction writes to a register.
-        // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
-        TB_issueValid[i] = RAT_issueValid[i] && (IN_uop[i].rd != 0 || IN_uop[i].fu == FU_ATOMIC) &&
-            // these don't write or writes are eliminated
-            IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
+            
+        TB_issueValid[i] = RAT_issueValid[i] && TB_tagNeeded[i];
         
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
@@ -208,14 +219,6 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
     .IN_commitTagDst(RAT_commitTags)
 );
-
-always_comb begin
-    OUT_stall = 0;
-    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
-        if ((!TB_tagsValid[i]) && IN_uop[i].valid && IN_uop[i].rd != 0 && IN_uop[i].fu != FU_RN)
-            OUT_stall = 1;
-    end
-end
 
 reg intOrder;
 SqN counterSqN;

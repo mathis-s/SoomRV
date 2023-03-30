@@ -43,7 +43,7 @@ module RenameTable
 integer i;
 integer j;
 
-RATEntry rat[NUM_REGS-1:0];
+RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
 
 always_comb begin
     for (i = 0; i < NUM_LOOKUP; i=i+1) begin

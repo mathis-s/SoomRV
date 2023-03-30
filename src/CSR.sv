@@ -156,6 +156,7 @@ typedef enum logic[11:0]
     CSR_pmpaddr0=12'h3B0,
     CSR_pmpaddr1=12'h3B1,
     CSR_pmpaddr2=12'h3B2,
+    CSR_pmpaddr3=12'h3B3,
     // ...
     CSR_pmpaddr63=12'h3EF,
     
@@ -563,6 +564,10 @@ always_comb begin
         CSR_mstatush,
         CSR_mhartid: rdata = 0;
         
+        //CSR_pmpcfg0,
+        //CSR_pmpaddr0,
+        12'h139: rdata = 0;
+        
         // all unused perf counter stuff, also r/o zero
         CSR_hpmcounter6, CSR_hpmcounter7, CSR_hpmcounter8, CSR_hpmcounter9,
         CSR_hpmcounter10, CSR_hpmcounter11, CSR_hpmcounter12, CSR_hpmcounter13, CSR_hpmcounter14, CSR_hpmcounter15,
@@ -628,6 +633,8 @@ always_ff@(posedge clk) begin
                 
                 priv <= PRIV_MACHINE;
             end
+            
+            //$display("trap: pc=%x, dst=%x, cause=%x", IN_trapInfo.trapPC, {mtvec.base, 2'b0}, IN_trapInfo.cause);
         end
         
         // Other implicit writes
@@ -885,6 +892,8 @@ always_ff@(posedge clk) begin
                                 satp <= wdata;
                                 satp.asid <= 0;
                             end
+                            
+                            12'h139: $write("%c", wdata[7:0]);
                             
                             default: begin end
                         endcase

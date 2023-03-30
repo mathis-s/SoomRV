@@ -22,34 +22,34 @@ printhex:
 	lbu	t1,0(a4)
 	srli	a1,a0,12
 	andi	a3,a3,15
-	li	a4,-16777216
+	li	a4,268435456
 	add	a3,a5,a3
 	lbu	a7,0(a2)
 	andi	a1,a1,15
 	srli	a2,a0,8
-	sb	a6,3(a4)
+	sb	a6,0(a4)
 	add	a1,a5,a1
 	lbu	a6,0(a3)
 	andi	a2,a2,15
 	srli	a3,a0,4
-	sb	t1,3(a4)
+	sb	t1,0(a4)
 	add	a2,a5,a2
 	lbu	a1,0(a1)
 	andi	a3,a3,15
-	sb	a7,3(a4)
+	sb	a7,0(a4)
 	add	a3,a5,a3
 	lbu	a2,0(a2)
 	andi	a0,a0,15
-	sb	a6,3(a4)
+	sb	a6,0(a4)
 	lbu	a3,0(a3)
 	add	a5,a5,a0
-	sb	a1,3(a4)
+	sb	a1,0(a4)
 	lbu	a5,0(a5)
-	sb	a2,3(a4)
-	sb	a3,3(a4)
-	sb	a5,3(a4)
+	sb	a2,0(a4)
+	sb	a3,0(a4)
+	sb	a5,0(a4)
 	li	a5,10
-	sb	a5,3(a4)
+	sb	a5,0(a4)
 	ret
 	.size	printhex, .-printhex
 	.align	1
@@ -77,10 +77,10 @@ printf:
 	sw	a6,24(sp)
 	sw	a7,28(sp)
 	beq	t1,zero,.L4
-	li	a5,-16777216
+	li	a5,268435456
 .L6:
 	addi	a0,a0,1
-	sb	t1,3(a5)
+	sb	t1,0(a5)
 	lbu	t1,0(a0)
 	bne	t1,zero,.L6
 .L4:
@@ -208,7 +208,7 @@ main:
 	lui	a5,%hi(.LC34)
 	addi	a5,a5,%lo(.LC34)
 	sw	s0,168(sp)
-	li	a3,126976
+	li	a3,-2147356672
 	lui	s0,%hi(Next_Ptr_Glob)
 	sw	a3,%lo(Next_Ptr_Glob)(s0)
 	lw	a7,20(a5)
@@ -221,7 +221,7 @@ main:
 	lw	t3,16(a5)
 	lw	t5,8(a5)
 	lui	s0,%hi(Ptr_Glob)
-	li	a5,131072
+	li	a5,-2147352576
 	sw	s3,156(sp)
 	sw	a5,%lo(Ptr_Glob)(s0)
 	sw	ra,172(sp)
@@ -268,58 +268,58 @@ main:
 	sh	a3,76(sp)
 	sb	a4,78(sp)
 	sw	a5,1628(s3)
-	li	a4,-16777216
+	li	a4,268435456
 	sw	t1,52(sp)
 	sw	a7,56(sp)
 	sw	a6,60(sp)
 	sw	a0,64(sp)
 	sw	a1,68(sp)
 	sw	a2,72(sp)
-	sb	a5,3(a4)
+	sb	a5,0(a4)
 	lui	a5,%hi(.LC0)
 	li	a4,68
 	addi	a5,a5,%lo(.LC0)
-	li	a3,-16777216
+	li	a3,268435456
 .L13:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L13
 	li	a5,10
-	sb	a5,3(a3)
+	sb	a5,0(a3)
 	lui	a5,%hi(Reg)
 	lw	a5,%lo(Reg)(a5)
 	li	a4,80
 	bne	a5,zero,.L79
 	lui	a5,%hi(.LC2)
 	addi	a5,a5,%lo(.LC2)
-	li	a3,-16777216
+	li	a3,268435456
 .L17:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L17
 .L134:
 	li	a5,10
-	sb	a5,3(a3)
+	sb	a5,0(a3)
 	lui	a5,%hi(.LC3)
 	li	a4,80
 	addi	a5,a5,%lo(.LC3)
-	li	a3,-16777216
+	li	a3,268435456
 .L19:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L19
 	li	a5,10
-	sb	a5,3(a3)
+	sb	a5,0(a3)
 	lui	a5,%hi(.LC4)
 	li	a4,69
 	addi	a5,a5,%lo(.LC4)
-	li	a3,-16777216
+	li	a3,268435456
 .L21:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L21
 	lui	a5,%hi(.LC36)
@@ -365,7 +365,7 @@ main:
 	sw	a5,36(sp)
 #APP
 # 49 "test_programs/dhry_1.c" 1
-	csrr a5, time
+	csrr a5, cycle
 # 0 "" 2
 #NO_APP
 	sw	a5,%lo(Begin_Time)(a4)
@@ -485,14 +485,14 @@ main:
 	lw	s2,44(sp)
 #APP
 # 49 "test_programs/dhry_1.c" 1
-	csrr a4, time
+	csrr a4, cycle
 # 0 "" 2
 #NO_APP
 	sw	a4,%lo(End_Time)(s1)
 	lui	a4,%hi(.LC5)
 	li	a3,69
 	addi	a4,a4,%lo(.LC5)
-	li	a2,-16777216
+	li	a2,268435456
 #APP
 # 43 "test_programs/dhry_1.c" 1
 	csrr s0, instret
@@ -500,29 +500,29 @@ main:
 #NO_APP
 .L29:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L29
 	li	a4,10
-	sb	a4,3(a2)
+	sb	a4,0(a2)
 	lui	a4,%hi(.LC6)
 	li	a3,70
 	addi	a4,a4,%lo(.LC6)
-	li	a2,-16777216
+	li	a2,268435456
 .L30:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L30
 	li	a4,10
-	sb	a4,3(a2)
+	sb	a4,0(a2)
 	lui	a4,%hi(.LC7)
 	li	a3,73
 	addi	a4,a4,%lo(.LC7)
-	li	a2,-16777216
+	li	a2,268435456
 .L31:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L31
 	sw	a5,4(sp)
@@ -533,10 +533,10 @@ main:
 	lui	a4,%hi(.LC8)
 	li	a3,66
 	addi	a4,a4,%lo(.LC8)
-	li	a2,-16777216
+	li	a2,268435456
 .L32:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L32
 	sw	a5,4(sp)
@@ -547,10 +547,10 @@ main:
 	lui	a4,%hi(.LC9)
 	li	a3,67
 	addi	a4,a4,%lo(.LC9)
-	li	a2,-16777216
+	li	a2,268435456
 .L33:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L33
 	lbu	a0,%lo(Ch_1_Glob)(s6)
@@ -560,10 +560,10 @@ main:
 	lui	a4,%hi(.LC10)
 	li	a3,67
 	addi	a4,a4,%lo(.LC10)
-	li	a2,-16777216
+	li	a2,268435456
 .L34:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L34
 	sw	a5,4(sp)
@@ -574,10 +574,10 @@ main:
 	lui	a4,%hi(.LC11)
 	li	a3,65
 	addi	a4,a4,%lo(.LC11)
-	li	a2,-16777216
+	li	a2,268435456
 .L35:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L35
 	lw	a0,32(s5)
@@ -587,10 +587,10 @@ main:
 	lui	a4,%hi(.LC12)
 	li	a3,65
 	addi	a4,a4,%lo(.LC12)
-	li	a2,-16777216
+	li	a2,268435456
 .L36:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L36
 	lw	a0,1628(s3)
@@ -600,20 +600,20 @@ main:
 	lui	a4,%hi(.LC13)
 	li	a3,80
 	addi	a4,a4,%lo(.LC13)
-	li	a2,-16777216
+	li	a2,268435456
 .L37:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L37
 	lui	a4,%hi(.LC14)
 	addi	s7,a4,%lo(.LC14)
 	li	a3,80
 	addi	a4,a4,%lo(.LC14)
-	li	a2,-16777216
+	li	a2,268435456
 .L38:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L38
 	sw	a5,4(sp)
@@ -626,10 +626,10 @@ main:
 	addi	s6,a4,%lo(.LC15)
 	li	a3,32
 	addi	a4,a4,%lo(.LC15)
-	li	a2,-16777216
+	li	a2,268435456
 .L39:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L39
 	sw	a5,4(sp)
@@ -642,10 +642,10 @@ main:
 	addi	s5,a4,%lo(.LC16)
 	li	a3,32
 	addi	a4,a4,%lo(.LC16)
-	li	a2,-16777216
+	li	a2,268435456
 .L40:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L40
 	sw	a5,4(sp)
@@ -658,10 +658,10 @@ main:
 	addi	s4,a4,%lo(.LC17)
 	li	a3,32
 	addi	a4,a4,%lo(.LC17)
-	li	a2,-16777216
+	li	a2,268435456
 .L41:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L41
 	sw	a5,4(sp)
@@ -674,41 +674,41 @@ main:
 	addi	s3,a4,%lo(.LC18)
 	li	a3,32
 	addi	a4,a4,%lo(.LC18)
-	li	a2,-16777216
+	li	a2,268435456
 .L42:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L42
 	lui	a4,%hi(Ptr_Glob)
 	lw	a4,%lo(Ptr_Glob)(a4)
-	li	a2,-16777216
+	li	a2,268435456
 	lbu	a3,16(a4)
 	addi	a4,a4,16
 	beq	a3,zero,.L45
 .L43:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L43
 .L45:
-	li	a4,-16777216
+	li	a4,268435456
 	li	a3,10
-	sb	a3,3(a4)
+	sb	a3,0(a4)
 	lui	a4,%hi(.LC19)
 	li	a3,78
 	addi	a4,a4,%lo(.LC19)
-	li	a2,-16777216
+	li	a2,268435456
 .L44:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L44
 	li	a4,80
-	li	a3,-16777216
+	li	a3,268435456
 .L46:
 	addi	s7,s7,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(s7)
 	bne	a4,zero,.L46
 	sw	a5,4(sp)
@@ -718,10 +718,10 @@ main:
 	call	printhex
 	lw	a5,4(sp)
 	li	a4,32
-	li	a3,-16777216
+	li	a3,268435456
 .L47:
 	addi	s6,s6,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(s6)
 	bne	a4,zero,.L47
 	sw	a5,4(sp)
@@ -731,10 +731,10 @@ main:
 	call	printhex
 	lw	a5,4(sp)
 	li	a4,32
-	li	a3,-16777216
+	li	a3,268435456
 .L48:
 	addi	s5,s5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(s5)
 	bne	a4,zero,.L48
 	sw	a5,4(sp)
@@ -744,10 +744,10 @@ main:
 	call	printhex
 	lw	a5,4(sp)
 	li	a4,32
-	li	a3,-16777216
+	li	a3,268435456
 .L49:
 	addi	s4,s4,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(s4)
 	bne	a4,zero,.L49
 	sw	a5,4(sp)
@@ -757,43 +757,43 @@ main:
 	call	printhex
 	lw	a5,4(sp)
 	li	a4,32
-	li	a3,-16777216
+	li	a3,268435456
 .L50:
 	addi	s3,s3,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(s3)
 	bne	a4,zero,.L50
 	lui	a4,%hi(Next_Ptr_Glob)
 	lw	a4,%lo(Next_Ptr_Glob)(a4)
-	li	a2,-16777216
+	li	a2,268435456
 	lbu	a3,16(a4)
 	addi	a4,a4,16
 	beq	a3,zero,.L53
 .L51:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L51
 .L53:
-	li	a4,-16777216
+	li	a4,268435456
 	li	a3,10
-	sb	a3,3(a4)
+	sb	a3,0(a4)
 	lui	a4,%hi(.LC20)
 	li	a3,32
 	addi	a4,a4,%lo(.LC20)
-	li	a2,-16777216
+	li	a2,268435456
 .L52:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L52
 	lui	a4,%hi(.LC21)
 	li	a3,73
 	addi	a4,a4,%lo(.LC21)
-	li	a2,-16777216
+	li	a2,268435456
 .L54:
 	addi	a4,a4,1
-	sb	a3,3(a2)
+	sb	a3,0(a2)
 	lbu	a3,0(a4)
 	bne	a3,zero,.L54
 	mv	a0,a5
@@ -801,10 +801,10 @@ main:
 	lui	a5,%hi(.LC22)
 	li	a4,73
 	addi	a5,a5,%lo(.LC22)
-	li	a3,-16777216
+	li	a3,268435456
 .L55:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L55
 	li	a0,13
@@ -812,10 +812,10 @@ main:
 	lui	a5,%hi(.LC23)
 	li	a4,73
 	addi	a5,a5,%lo(.LC23)
-	li	a3,-16777216
+	li	a3,268435456
 .L56:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L56
 	li	a0,7
@@ -823,10 +823,10 @@ main:
 	lui	a5,%hi(.LC24)
 	li	a4,69
 	addi	a5,a5,%lo(.LC24)
-	li	a3,-16777216
+	li	a3,268435456
 .L57:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L57
 	li	a0,1
@@ -834,63 +834,63 @@ main:
 	lui	a5,%hi(.LC25)
 	li	a4,83
 	addi	a5,a5,%lo(.LC25)
-	li	a3,-16777216
+	li	a3,268435456
 .L58:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L58
 	lbu	a4,48(sp)
 	addi	a5,sp,48
-	li	a3,-16777216
+	li	a3,268435456
 	beq	a4,zero,.L61
 .L59:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L59
 .L61:
-	li	a5,-16777216
+	li	a5,268435456
 	li	a4,10
-	sb	a4,3(a5)
+	sb	a4,0(a5)
 	lui	a5,%hi(.LC26)
 	li	a4,32
 	addi	a5,a5,%lo(.LC26)
-	li	a3,-16777216
+	li	a3,268435456
 .L60:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L60
 	lui	a5,%hi(.LC27)
 	li	a4,83
 	addi	a5,a5,%lo(.LC27)
-	li	a3,-16777216
+	li	a3,268435456
 .L62:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L62
 	lbu	a4,80(sp)
 	addi	a5,sp,80
-	li	a3,-16777216
+	li	a3,268435456
 	beq	a4,zero,.L65
 .L63:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L63
 .L65:
-	li	a5,-16777216
+	li	a5,268435456
 	li	a4,10
-	sb	a4,3(a5)
+	sb	a4,0(a5)
 	lui	a5,%hi(.LC28)
 	li	a4,32
 	addi	a5,a5,%lo(.LC28)
-	li	a3,-16777216
+	li	a3,268435456
 .L64:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L64
 	lui	a5,%hi(Begin_Time)
@@ -901,19 +901,19 @@ main:
 	sub	s1,s1,a5
 	lui	a5,%hi(.LC29)
 	addi	a5,a5,%lo(.LC29)
-	li	a3,-16777216
+	li	a3,268435456
 .L66:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L66
 	lui	a5,%hi(.LC30)
 	li	a4,82
 	addi	a5,a5,%lo(.LC30)
-	li	a3,-16777216
+	li	a3,268435456
 .L67:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L67
 	mv	a0,s1
@@ -921,10 +921,10 @@ main:
 	lui	a5,%hi(.LC31)
 	li	a4,69
 	addi	a5,a5,%lo(.LC31)
-	li	a3,-16777216
+	li	a3,268435456
 .L68:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L68
 	mv	a0,s0
@@ -934,11 +934,11 @@ main:
 	lui	a5,%hi(.LC32)
 	li	a4,109
 	addi	a5,a5,%lo(.LC32)
-	li	a3,-16777216
+	li	a3,268435456
 	divu	a0,s0,s1
 .L69:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L69
 	call	printdecu
@@ -950,13 +950,13 @@ main:
 	lui	a5,%hi(.LC33)
 	li	a4,109
 	addi	a5,a5,%lo(.LC33)
-	li	a3,-16777216
+	li	a3,268435456
 	mul	a2,s1,a2
 	divu	a2,a2,a1
 	divu	a0,a0,a2
 .L70:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L70
 	call	printdecu
@@ -1001,10 +1001,10 @@ main:
 .L79:
 	lui	a5,%hi(.LC1)
 	addi	a5,a5,%lo(.LC1)
-	li	a3,-16777216
+	li	a3,268435456
 .L15:
 	addi	a5,a5,1
-	sb	a4,3(a3)
+	sb	a4,0(a3)
 	lbu	a4,0(a5)
 	bne	a4,zero,.L15
 	j	.L134

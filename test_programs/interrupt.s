@@ -70,9 +70,9 @@ main:
         addi s0, s0, -1
         bnez s0, .loop
     
-    li a0, 0xff000000
+    li a0, 0x11100000
     li a1, 0x55
-    sb a1, 4(a0)
+    sb a1, 0(a0)
 
     
     

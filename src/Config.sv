@@ -28,21 +28,29 @@
 
 
 // PC at reset
-`define ENTRY_POINT 32'h0000_0000
+`define ENTRY_POINT (32'h8000_0000 + 3361880)
 
 // PMAs
 `define IS_MMIO_PMA(addr) \
-    ((addr[31:24]) == 8'hFF)
+    ((addr[31]) == 0)
     
 `define IS_MMIO_PMA_W(addr) \
-    ((addr[29:22]) == 8'hFF)
+    ((addr[29]) == 0)
 
-//`define SERIAL_ADDR 32'h1000_0000
-//`define SYSCON_ADDR 32'h1110_0000
-//`define MTIME_ADDR 32'h1100_bff8
-//`define MTIMECMP_ADDR 32'h1100_4000
+`define SERIAL_ADDR 32'h1000_0000
+`define SYSCON_ADDR 32'h1110_0000
+`define MTIME_ADDR 32'h1100_bff8
+`define MTIMECMP_ADDR 32'h1100_4000
 
-`define SERIAL_ADDR   32'hFF00_0000
-`define SYSCON_ADDR   32'hFF00_0004
-`define MTIME_ADDR    32'hFF00_0080
-`define MTIMECMP_ADDR 32'hFF00_0088
+//`define ENTRY_POINT (32'h000_0000)
+// PMAs
+//`define IS_MMIO_PMA(addr) \
+//    ((addr[31:24]) == 8'hFF)
+  
+//`define IS_MMIO_PMA_W(addr) \
+//    ((addr[29:22]) == 8'hFF)
+  
+//`define SERIAL_ADDR   32'hFF00_0000
+//`define SYSCON_ADDR   32'hFF00_0004
+//`define MTIME_ADDR    32'hFF00_0080
+//`define MTIMECMP_ADDR 32'hFF00_0088

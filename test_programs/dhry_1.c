@@ -46,7 +46,7 @@ inline  int __attribute__((always_inline)) read_cycles() {
 
 inline  int __attribute__((always_inline)) read_time() {
     int result;
-    asm("csrr %0, time" : "=r"(result));
+    asm("csrr %0, cycle" : "=r"(result));
     return result; 
 }
 
@@ -54,7 +54,7 @@ inline  int __attribute__((always_inline)) read_time() {
     
 void printf (const char* c, ...)
 {
-    volatile char* out = (char*) 0xff000003;
+    volatile char* out = (char*) 0x10000000;
     while (*c != 0)
         *out = *c++;
 }
@@ -62,7 +62,7 @@ void printf (const char* c, ...)
 static const char hexLut[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 static void printhex (uint32_t num)
 {
-    volatile char* out = (char*) 0xff000003;
+    volatile char* out = (char*) 0x10000000;
     
     *out = hexLut[(num >> 28) & 0xf];
     *out = hexLut[(num >> 24) & 0xf];
@@ -127,8 +127,8 @@ int main ()
 
   /* Initializations */
 
-  Next_Ptr_Glob = (void*)0x1F000;
-  Ptr_Glob = (void*)0x20000;
+  Next_Ptr_Glob = (void*)0x8001F000;
+  Ptr_Glob = (void*)0x80020000;
 
   Ptr_Glob->Ptr_Comp                    = Next_Ptr_Glob;
   Ptr_Glob->Discr                       = Ident_1;

@@ -1,4 +1,4 @@
-.set IO_ADDR, 0xff000000
+.set IO_ADDR, 0x10000000
 
 .globl _start
 _start:
@@ -8,7 +8,7 @@ _start:
     csrrw x0, mtvec, a0
     csrrw x0, stvec, a0
     
-    li sp, 0x20000
+    li sp, 0x80100000
     call main
     
     # print IPC
@@ -21,9 +21,9 @@ _start:
     #mul a0, a0, a2
     #divu a0, a0, a1
     #call printdecu
-    li a0, 0xff000000
+    li a0, 0x11100000
     li a1, 0x55
-    sb a1, 4(a0)
+    sb a1, 0(a0)
     
     .end_loop:
         j .end_loop
@@ -31,9 +31,12 @@ _start:
 
 .align 2
 _exception:
-    li a0, 0xff000000
+    li a0, 0x11100000
     li a1, 0x55
-    sb a1, 4(a0)
+    sb a1, 0(a0)
+    
+    j .end_loop
+    
 
     
 .globl strcpy

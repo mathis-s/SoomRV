@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.113 (w)1999-2022 BSI
-[*] Wed Mar 29 13:00:04 2023
+[*] Thu Mar 30 11:18:24 2023
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Wed Mar 29 12:55:57 2023"
-[dumpfile_size] 6211414898
+[dumpfile_mtime] "Thu Mar 30 11:03:25 2023"
+[dumpfile_size] 5471081
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 561230
+[timestart] 1016
 [size] 3840 2118
-[pos] -40 -40
-*-4.930973 561668 10012 34044 35586 10026 68556 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-2.830973 1040 10012 34044 35586 10026 68556 1048 898 896 1040 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -36,6 +36,7 @@
 [treeopen] TOP.Top.core.fdiv.IN_uop.
 [treeopen] TOP.Top.core.ialu.
 [treeopen] TOP.Top.core.ialu.IN_uop.
+[treeopen] TOP.Top.core.ialu.OUT_branch.
 [treeopen] TOP.Top.core.ialu.OUT_uop.
 [treeopen] TOP.Top.core.ialu1.
 [treeopen] TOP.Top.core.ialu1.IN_uop.
@@ -82,6 +83,7 @@
 [treeopen] TOP.Top.core.LD_uop[3].
 [treeopen] TOP.Top.core.lsu.
 [treeopen] TOP.Top.core.lsu.IN_uopLd.
+[treeopen] TOP.Top.core.lsu.OUT_uopLd.
 [treeopen] TOP.Top.core.mul.
 [treeopen] TOP.Top.core.mul.OUT_uop.
 [treeopen] TOP.Top.core.PC_MC_if.
@@ -267,8 +269,9 @@ TOP.Top.core.idec.OUT_uop[0].valid
 TOP.Top.core.idec.OUT_uop[1].valid
 TOP.Top.core.idec.OUT_uop[2].valid
 TOP.Top.core.idec.OUT_uop[3].valid
-@200
+@201
 -dcache
+@200
 -ExtMem
 @22
 TOP.Top.extMem.addr[31:0]
@@ -444,6 +447,7 @@ TOP.Top.core.ld.OUT_uop[1].valid
 TOP.Top.core.ialu.isBranch
 TOP.Top.core.ialu.OUT_branch.taken
 @22
+TOP.Top.core.ialu.OUT_branch.dstPC[31:0]
 TOP.Top.core.ialu.IN_uop.srcA[31:0]
 TOP.Top.core.ialu.IN_uop.srcB[31:0]
 @28
@@ -480,29 +484,28 @@ TOP.Top.core.aguST.OUT_memc.cmd[2:0]
 TOP.Top.core.aguST.en
 @200
 -CC
-@28
-TOP.Top.core.cc.freeEntryAvail
-@22
-TOP.Top.core.cc.freeEntryID[3:0]
-TOP.Top.core.cc.evictionRqID[3:0]
-@28
-TOP.Top.core.cc.evictionRq[1:0]
-@200
 -
 @28
 TOP.Top.core.cc.OUT_uopLd.valid
 @22
+TOP.Top.core.cc.OUT_uopLd.sqN[6:0]
 TOP.Top.core.cc.OUT_uopLd.addr[31:0]
+@28
+TOP.Top.core.cc.loadActive
+@22
+TOP.Top.core.cc.OUT_memc.extAddr[29:0]
+TOP.Top.core.cc.OUT_memc.sramAddr[9:0]
 @200
 -LSU
-@28
-TOP.Top.core.lsu.IN_uopLd.valid
 @22
-TOP.Top.core.lsu.IN_uopLd.sqN[6:0]
+TOP.Top.core.lsu.IN_uopLd.addr[31:0]
 @28
 TOP.Top.core.lsu.OUT_uopLd.valid
 @22
+TOP.Top.core.lsu.OUT_uopLd.sqN[6:0]
 TOP.Top.core.lsu.OUT_uopLd.result[31:0]
+@28
+TOP.Top.core.lsu.OUT_uopLd.valid
 @200
 -IALU1
 @28

@@ -146,6 +146,7 @@ end
 reg[30:0] pc;
 reg[30:0] pcLast;
 wire[31:0] pcFull = {pc, 1'b0};
+wire[31:0] phyPCFull = {physicalPC, 1'b0};
 
 // virtual page number
 // If this has changed, we do a page walk to find the new PPN
@@ -297,7 +298,7 @@ always_ff@(posedge clk) begin
             
             // Fetch package (if no fault)
             if (fault == IF_FAULT_NONE) begin
-                if (`IS_MMIO_PMA(pcFull)) begin
+                if (`IS_MMIO_PMA(phyPCFull) && !pageWalkRequired && pcPPNfault == IF_FAULT_NONE) begin
                     fault <= IF_ACCESS_FAULT;
                 end else
                 if (pageWalkRequired) begin
