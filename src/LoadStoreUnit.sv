@@ -31,8 +31,6 @@ AGU_UOp uopLd_1;
 assign OUT_loadFwdValid = uopLd_0.valid || (IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111);
 assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
 
-reg isCSRread_1;
-
 always_comb begin
     
     IF_mmio.wdata = IF_mem.wdata;
@@ -66,7 +64,7 @@ always_comb begin
     
     // Store
     if (IN_uopSt.valid) begin
-        if (`IS_MMIO_PMA(IN_uopSt.addr)) begin
+        if (IN_uopSt.isMMIO) begin
             OUT_stStall = IF_mmio.wbusy;
             IF_mmio.we = OUT_stStall;
         end
@@ -89,13 +87,13 @@ always_comb begin
     reg[31:0] result = 32'bx;
     reg[31:0] data;
     data[31:24] = uopLd_1.wmask[3] ? uopLd_1.data[31:24] : 
-        (isCSRread_1 ?  IF_mmio.rdata[31:24] : IF_mem.rdata[31:24]);
+        (uopLd_1.isMMIO ?  IF_mmio.rdata[31:24] : IF_mem.rdata[31:24]);
     data[23:16] = uopLd_1.wmask[2] ? uopLd_1.data[23:16] : 
-        (isCSRread_1 ? IF_mmio.rdata[23:16] : IF_mem.rdata[23:16]);
+        (uopLd_1.isMMIO ? IF_mmio.rdata[23:16] : IF_mem.rdata[23:16]);
     data[15:8] = uopLd_1.wmask[1] ? uopLd_1.data[15:8] : 
-        (isCSRread_1 ? IF_mmio.rdata[15:8] : IF_mem.rdata[15:8]);
+        (uopLd_1.isMMIO ? IF_mmio.rdata[15:8] : IF_mem.rdata[15:8]);
     data[7:0] = uopLd_1.wmask[0] ? uopLd_1.data[7:0] : 
-        (isCSRread_1 ? IF_mmio.rdata[7:0] : IF_mem.rdata[7:0]);
+        (uopLd_1.isMMIO ? IF_mmio.rdata[7:0] : IF_mem.rdata[7:0]);
     
     case (uopLd_1.size)
         
@@ -150,7 +148,6 @@ always_ff@(posedge clk) begin
         
         if (uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) begin
             uopLd_1 <= uopLd_0;
-            isCSRread_1 <= `IS_MMIO_PMA(uopLd_0.addr);
         end
         
         if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin

@@ -75,7 +75,7 @@ always_comb begin
         INT_SLT: resC = {31'b0, lessThan};
         INT_SLTU: resC = {31'b0, lessThanU};
         INT_SUB: resC = srcA - srcB;
-        INT_SRA: resC = srcA >>> srcB[4:0];
+        INT_SRA: resC = $signed(srcA) >>> srcB[4:0];
         INT_LUI: resC = srcB;
         INT_V_JALR,
         INT_JALR,

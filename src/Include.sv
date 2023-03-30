@@ -489,6 +489,7 @@ typedef struct packed
     BHist_t history;
     logic doNotCommit;
     AGU_Exception exception;
+    logic isMMIO;
     logic compressed;
     logic valid;
 } AGU_UOp;
@@ -498,6 +499,7 @@ typedef struct packed
     logic[31:0] addr;
     logic[31:0] data;
     logic[3:0] wmask;
+    logic isMMIO;
     logic valid;
 } ST_UOp;
 

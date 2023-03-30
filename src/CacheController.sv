@@ -242,6 +242,8 @@ always_ff@(posedge clk) begin
             // Cache hit
             if (IN_uopLd.exception != AGU_NO_EXCEPTION || cacheTableEntryFound[0] || `IS_MMIO_PMA(IN_uopLd.addr)) begin
                 OUT_uopLd <= IN_uopLd;
+                OUT_uopLd.isMMIO <= `IS_MMIO_PMA(IN_uopLd.addr);
+                
                 if (!`IS_MMIO_PMA(IN_uopLd.addr) && IN_uopLd.exception == AGU_NO_EXCEPTION) begin
                     OUT_uopLd.addr <= {20'b0, cacheTableEntry[0], IN_uopLd.addr[7:0]};
                     ctable[cacheTableEntry[0]].used <= 1;
@@ -252,6 +254,7 @@ always_ff@(posedge clk) begin
                 (!IN_memc.busy || IN_memc.progress[5:0] > IN_uopLd.addr[7:2])) begin
                 
                 OUT_uopLd <= IN_uopLd;
+                OUT_uopLd.isMMIO <= 0;
                 OUT_uopLd.addr[31:0] <= {20'b0, freeEntryID, IN_uopLd.addr[7:0]};
             end
             // Cache miss
@@ -267,6 +270,7 @@ always_ff@(posedge clk) begin
 
                 // Issue the op as soon as the relevant address is available
                 OUT_uopLd <= cmissUOpLd;
+                OUT_uopLd.isMMIO <= 0;
                 OUT_uopLd.addr <= {20'b0, freeEntryID, cmissUOpLd.addr[7:0]};
                 cmissUOpLd.valid <= 0;
         end
@@ -293,6 +297,7 @@ always_ff@(posedge clk) begin
             // Cache hit
             else if (cacheTableEntryFound[1] || `IS_MMIO_PMA(IN_uopSt.addr)) begin
                 OUT_uopSt <= IN_uopSt;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA(IN_uopSt.addr);
                 if (!`IS_MMIO_PMA(IN_uopSt.addr)) begin
                     OUT_uopSt.addr <= {20'b0, cacheTableEntry[1], IN_uopSt.addr[7:0]};
                     ctable[cacheTableEntry[1]].used <= 1;
@@ -303,6 +308,7 @@ always_ff@(posedge clk) begin
             else if (loadActive && IN_uopSt.addr[31:8] == OUT_memc.extAddr[29:6] &&
                 (!IN_memc.busy || IN_memc.progress[5:0] > IN_uopSt.addr[7:2])) begin
                 OUT_uopSt <= IN_uopSt;
+                OUT_uopSt.isMMIO <= 0;
                 OUT_uopSt.addr[31:0] <= {20'b0, freeEntryID, IN_uopSt.addr[7:0]};
                 setDirty = 1;
             end
@@ -318,6 +324,7 @@ always_ff@(posedge clk) begin
             (!IN_memc.busy || IN_memc.progress[5:0] > cmissUOpSt.addr[7:2])) begin
 
                 OUT_uopSt <= cmissUOpSt;
+                OUT_uopSt.isMMIO <= 0;
                 OUT_uopSt.addr <= {20'b0, freeEntryID, cmissUOpSt.addr[7:0]};
                 cmissUOpSt.valid <= 0;
                 setDirty = 1;
