@@ -192,7 +192,7 @@ Rename rn
 wire RV_uopValid[3:0] /*verilator public*/;
 R_UOp RV_uop[3:0] /*verilator public*/;
 
-wire stall[3:0];
+wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 

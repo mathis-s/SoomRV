@@ -176,7 +176,7 @@ always_ff@(posedge clk) begin
                     OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
                     OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
                 end
-                else assert(IN_trapInstr.flags == FLAGS_NONE);
+                else assert(IN_trapInstr.flags == FLAGS_NONE || IN_trapInstr.flags == FLAGS_BRANCH);
                 
                 if (IN_trapControl.interruptPending && IN_trapInstr.allowInterrupt) begin
                     OUT_trapInfo.valid <= 1;
