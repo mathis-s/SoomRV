@@ -334,7 +334,7 @@ main:
 	lui	s5,%hi(.LANCHOR1)
 #APP
 # 43 "test_programs/dhry_1.c" 1
-	csrr s2, instret
+	csrr s2, minstret
 # 0 "" 2
 #NO_APP
 	sw	a4,8(sp)
@@ -365,7 +365,7 @@ main:
 	sw	a5,36(sp)
 #APP
 # 49 "test_programs/dhry_1.c" 1
-	csrr a5, cycle
+	csrr a5, mcycle
 # 0 "" 2
 #NO_APP
 	sw	a5,%lo(Begin_Time)(a4)
@@ -485,7 +485,7 @@ main:
 	lw	s2,44(sp)
 #APP
 # 49 "test_programs/dhry_1.c" 1
-	csrr a4, cycle
+	csrr a4, mcycle
 # 0 "" 2
 #NO_APP
 	sw	a4,%lo(End_Time)(s1)
@@ -495,7 +495,7 @@ main:
 	li	a2,268435456
 #APP
 # 43 "test_programs/dhry_1.c" 1
-	csrr s0, instret
+	csrr s0, minstret
 # 0 "" 2
 #NO_APP
 .L29:

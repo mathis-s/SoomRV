@@ -2,9 +2,9 @@
 .globl main
 
 main:
-    li s0, 256
-    li s1, 256
-    li s2, 42
+    li s0, 0x80000000+256
+    li s1, 0x80000000+256
+    li s2, 0x80000000+42
     
     sw zero, 0(s0)
     

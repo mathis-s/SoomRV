@@ -29,6 +29,7 @@
 #include "riscv/log_file.h"
 #include "riscv/processor.h"
 #include "riscv/simif.h"
+#include "riscv/disasm.h"
 
 struct Inst
 {
@@ -40,10 +41,12 @@ struct Inst
     uint32_t srcC;
     uint32_t imm;
     uint32_t result;
+    uint8_t fetchID;
     uint8_t sqn;
     uint8_t fu;
+    uint8_t rd;
     uint8_t tag;
-    uint8_t fetchID;
+    uint8_t flags;
     bool valid;
 };
 
@@ -55,6 +58,8 @@ double sc_time_stamp()
 {
     return main_time;
 }
+
+uint32_t ReadRegister(uint32_t rid);
 
 class SpikeSimif : public simif_t
 {
@@ -68,11 +73,66 @@ class SpikeSimif : public simif_t
     cfg_t* cfg;
     std::map<size_t, processor_t*> harts;
 
+    bool compare_state ()
+    {
+        for (size_t i = 0; i < 32; i++)
+            if ((uint32_t)processor->get_state()->XPR[i] != ReadRegister(i))
+            {
+                //printf("mismatch x%zu\n", i);
+                return false;
+            }
+        return true;
+    }
+
+    static bool is_pass_thru_inst (const Inst& i)
+    {
+        // pass through some HPM counter reads
+        // WARNING: this explicitly stops us from testing
+        // mcounterinhibit for these!
+        if ((i.inst & 0b1111111) == 0b1110011)
+            switch ((i.inst >> 12) & 0b11)
+            {
+                case 0b001:
+                case 0b010:
+                case 0b011:
+                case 0b101:
+                case 0b110:
+                case 0b111:
+                {
+                    uint32_t csrID = i.inst >> 20;
+                    switch (csrID)
+                    {
+                        // FIXME: minstret should be the same, barring
+                        // multiple commits per cycle. This is a bit overzealous.
+                        case CSR_MINSTRETH:
+                        case CSR_MINSTRET:
+                        case CSR_CYCLE:
+                        case CSR_CYCLEH:
+                        case CSR_MCYCLE:
+                        case CSR_MCYCLEH:
+                        case CSR_MHPMCOUNTER3:
+                        case CSR_MHPMCOUNTER4:
+                        case CSR_MHPMCOUNTER5:
+                        case CSR_MHPMCOUNTER3H:
+                        case CSR_MHPMCOUNTER4H:
+                        case CSR_MHPMCOUNTER5H:
+                        {
+                            return true;
+                        }
+                        default: break;
+                    }
+                }
+                default: break;
+            }
+
+        return false;
+    }
+
   public:
     SpikeSimif()
     {
-        cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "m", DEFAULT_VARCH, false, endianness_little, 0,
-                        {mem_cfg_t(0x80000000, 1 << 26)}, {0}, true, 0);
+        cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "M", DEFAULT_VARCH, false, endianness_little, 0,
+                        {mem_cfg_t(0x80000000, 1 << 26)}, {0}, false, 0);
         isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei", "MSU");
         processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stderr, std::cerr);
         harts[0] = processor.get();
@@ -82,7 +142,10 @@ class SpikeSimif : public simif_t
         processor->get_state()->pc = 0x80000000;
         //processor->get_state()->csrmap[CSR_] = 0x80000000;
         processor->set_mmu_capability(IMPL_MMU_SV32);
-        //processor->set_debug(true);
+        processor->set_debug(true);
+        processor->get_state()->XPR.reset();
+        processor->set_privilege(3);
+        processor->enable_log_commits();
     }
 
     virtual char* addr_to_mem(reg_t addr) override
@@ -93,6 +156,8 @@ class SpikeSimif : public simif_t
     {
         if ((addr - 0x80000000) < sizeof(pram))
             memcpy(bytes, (uint8_t*)pram + (addr - 0x80000000), len);
+        else
+            memset(bytes, 0, len);
         return true;
     }
     virtual bool mmio_store(reg_t addr, size_t len, const uint8_t* bytes) override
@@ -115,15 +180,68 @@ class SpikeSimif : public simif_t
 
     virtual bool cosim_instr (const Inst& inst)
     {
-        uint32_t initialSpicePC = processor->get_state()->pc & 0xffff'ffff;
-        bool retval = inst.pc == initialSpicePC;
+
+        uint32_t initialSpikePC = processor->get_state()->pc & 0xffff'ffff;
+        uint32_t instSIM;
+        mmio_load(initialSpikePC, 4, (uint8_t*)&instSIM);
+
         processor->step(1);
-        return retval;
+        
+        // TODO: Use this for adjusting WARL behaviour
+        /*auto writes = processor->get_state()->log_reg_write;
+        bool gprWritten = false;
+        for (auto write : writes)
+        {
+            
+        }*/
+        
+        bool mem_pass_thru = false;
+        auto mem_reads = processor->get_state()->log_mem_read;
+        for (auto read : mem_reads)
+        {
+            uint32_t addr = std::get<0>(read);
+            addr &= ~3;
+            
+            switch (addr)
+            {
+                case 0x10000000:
+                case 0x11100000:
+                case 0x1100bff8:
+                case 0x11004000:
+                    mem_pass_thru = true;
+            }
+        }
+
+        if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
+        {
+            processor->get_state()->XPR.write(inst.rd, inst.result);
+        }
+
+        bool instrEqual = ((instSIM & 3) == 3) ?
+            instSIM == inst.inst :
+            (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
+        return instrEqual && inst.pc == initialSpikePC && compare_state();
     }
 
     const std::map<size_t, processor_t *> & get_harts() const override
     {
         return harts;
+    }
+
+    void dump_state (uint32_t ppc) const
+    {
+        fprintf(stderr, "ir=%.8lx ppc=%.8x pc=%.8x\n", processor->get_state()->minstret->read() - 1, ppc, get_pc());
+        for (size_t j = 0; j < 4; j++)
+        {
+            for (size_t k = 0; k < 8; k++)
+                fprintf(stderr, "x%.2zu=%.8x ", j*8+k, (uint32_t)processor->get_state()->XPR[j*8+k]);
+            fprintf(stderr, "\n");
+        }
+    }
+
+    uint32_t get_pc () const
+    {
+        return processor->get_state()->pc;
     }
 };
 
@@ -165,12 +283,17 @@ Inst pd[4];
 Inst de[4];
 Inst insts[128];
 
-uint32_t readRegister(uint32_t rid)
+std::array<uint8_t, 32> regTagOverride;
+uint32_t ReadRegister(uint32_t rid)
 {
     auto core = top->rootp->Top->core;
-    uint32_t comTag = (core->rn->rt->rat[rid] >> 7) & 127;
+    
+    uint8_t comTag = regTagOverride[rid];
+    if (comTag == 0xff) 
+        comTag = (core->rn->rt->rat[rid] >> 7) & 127;
+
     if (comTag & 64)
-        return comTag & 63;
+        return ((int32_t)(comTag & 63) << (32-6)) >> (32-6);
     else
         return core->rf->mem[comTag];
 }
@@ -180,11 +303,11 @@ SpikeSimif simif;
 void DumpState (uint32_t pc)
 {
     auto core = top->rootp->Top->core;
-    fprintf(stderr, "ir=%.8lx pc=%.8x\n", core->csr__DOT__minstret, pc);
+    fprintf(stderr, "ir=%.8lx ppc=%.8x\n", core->csr__DOT__minstret, pc);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
-            fprintf(stderr, "x%.2zu=%.8x ", j*8+k, readRegister(j*8+k));
+            fprintf(stderr, "x%.2zu=%.8x ", j*8+k, ReadRegister(j*8+k));
         fprintf(stderr, "\n");
     }
     fprintf(stderr, "\n");
@@ -192,11 +315,19 @@ void DumpState (uint32_t pc)
 
 void LogCommit(Inst& inst)
 {
+
+    if (inst.rd != 0 && inst.flags < 6)
+        regTagOverride[inst.rd] = inst.tag;
+    
+    uint32_t startPC = simif.get_pc();
     if (!simif.cosim_instr(inst))
     {
         fprintf(stdout, "ERROR\n");
-        //DumpState(inst.pc);
-        //exit(-1);
+        DumpState(inst.pc);
+
+        fprintf(stdout, "\nSHOULD BE\n");
+        simif.dump_state(startPC);
+        exit(-1);
         #ifdef KANATA
             fprintf(stderr, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
         #endif
@@ -206,7 +337,7 @@ void LogCommit(Inst& inst)
     fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "COM");
     fprintf(stderr, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
 #else
-    DumpState(inst.pc);
+    //DumpState(inst.pc);
 #endif
 }
 
@@ -276,6 +407,7 @@ void LogIssue(Inst& inst)
 
 void LogCycle()
 {
+    memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
 #ifdef KANATA
     fprintf(stderr, "C\t1\n");
 #endif
@@ -295,7 +427,6 @@ void LogInstructions()
         if (!core->stall[i] && core->RV_uopValid[i])
         {
             uint32_t sqn = ExtractField<4>(core->RV_uop[i], 108 - (32 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
-            // assert(insts[sqn].valid);
             LogIssue(insts[sqn]);
         }
     }
@@ -323,9 +454,13 @@ void LogInstructions()
         {
             uint32_t sqn = ExtractField(core->wbUOp[i], 90 - 32 - 7 - 5 - 7, 7);
             uint32_t result = ExtractField(core->wbUOp[i], 90 - 32, 32);
-            uint32_t tagDst = ExtractField(core->wbUOp[i], 90 - 32 - 7, 7);
             insts[sqn].result = result;
-            insts[sqn].tag = tagDst;
+            insts[sqn].flags = ExtractField(core->wbUOp[i], 3, 4);
+
+            // FP ops use a different flag encoding. These are not traps, so ignore them.
+            if ((insts[sqn].fu == 5 || insts[sqn].fu == 6 || insts[sqn].fu == 7) && insts[sqn].flags >= 8 && insts[sqn].flags <= 13)
+                insts[sqn].flags = 0;
+                
             LogResult(insts[sqn]);
         }
     }
@@ -368,7 +503,6 @@ void LogInstructions()
     }
     else
     {
-
         // Rename
         if (core->rn->frontEn && !core->csr__DOT__IN_mispredFlush && !core->RN_stall)
             for (size_t i = 0; i < 4; i++)
@@ -376,11 +510,13 @@ void LogInstructions()
                 {
                     int sqn = ExtractField<4>(core->RN_uop[i], 45, 7);
                     int fu = ExtractField<4>(core->RN_uop[i], 1, 4);
+                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 45-7, 7);
 
                     insts[sqn].valid = 1;
                     insts[sqn] = de[i];
                     insts[sqn].sqn = sqn;
                     insts[sqn].fu = fu;
+                    insts[sqn].tag = tagDst;
                     nextSqN = (sqn + 1) & 127;
 
                     LogRename(insts[sqn]);
@@ -393,6 +529,7 @@ void LogInstructions()
                 if (top->rootp->Top->core->DE_uop[i].at(0) & (1 << 0))
                 {
                     de[i] = pd[i];
+                    de[i].rd = ExtractField(core->DE_uop[i], 68-32-5-5-1-5, 5);
                     LogDecode(de[i]);
                 }
                 else
@@ -408,6 +545,7 @@ void LogInstructions()
                 if (core->PD_instrs[i].at(0) & 1)
                 {
                     pd[i].valid = true;
+                    pd[i].flags = 0;
                     pd[i].id = id++;
                     pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 31 - 32, 31) << 1;
                     pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 32, 32);
@@ -427,6 +565,8 @@ void LogInstructions()
 
 int main(int argc, char** argv)
 {
+    memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
+    
     Verilated::commandArgs(argc, argv); // Remember args
     Verilated::traceEverOn(true);
 

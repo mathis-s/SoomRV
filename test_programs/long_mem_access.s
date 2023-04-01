@@ -4,9 +4,9 @@ main:
     
     sw ra, -4(sp)
     
-    li a0, 0x1000
+    li a0, 0x80001000
     li a1, 0
-    li a2, 0x5004
+    li a2, 0x80005004
     
     .loop_store:
         sw a1, 0(a0)
@@ -14,7 +14,7 @@ main:
         addi a0, a0, 4
         blt a0, a2, .loop_store
     
-    li a0, 0x1000
+    li a0, 0x80001000
     li a1, 0
     .loop_load:
         lw a3, 0(a0)

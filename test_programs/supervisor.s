@@ -73,8 +73,8 @@ user:
     call printhex
     
     # read only alias to counters should be accessible
-    csrr a0, hpmcounter4
-    call printhex
+    #csrr a0, hpmcounter4
+    #call printhex
     
     # r/w counter is inaccessible in u mode,
     # invalid instruction causes ebreak, thus terminating the program
