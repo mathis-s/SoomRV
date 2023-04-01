@@ -8,3 +8,4 @@ text.bin
 *.bin
 src_v
 !test_programs/entry.o
+*.txt

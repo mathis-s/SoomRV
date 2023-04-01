@@ -74,7 +74,7 @@ class SpikeSimif : public simif_t
         cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "m", DEFAULT_VARCH, false, endianness_little, 0,
                         {mem_cfg_t(0x80000000, 1 << 26)}, {0}, true, 0);
         isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei", "MSU");
-        processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stdout, std::cerr);
+        processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stderr, std::cerr);
         harts[0] = processor.get();
 
         processor->set_pmp_num(0);
@@ -82,7 +82,7 @@ class SpikeSimif : public simif_t
         processor->get_state()->pc = 0x80000000;
         //processor->get_state()->csrmap[CSR_] = 0x80000000;
         processor->set_mmu_capability(IMPL_MMU_SV32);
-        processor->set_debug(true);
+        //processor->set_debug(true);
     }
 
     virtual char* addr_to_mem(reg_t addr) override
@@ -177,20 +177,10 @@ uint32_t readRegister(uint32_t rid)
 
 SpikeSimif simif;
 
-void LogCommit(Inst& inst)
+void DumpState (uint32_t pc)
 {
-    if (!simif.cosim_instr(inst))
-    {
-        printf("ERROR\n");
-        exit(-1);
-    }
-    
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "COM");
-    fprintf(stderr, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
-#else
     auto core = top->rootp->Top->core;
-    fprintf(stderr, "id=%.8lx pc=%.8x\n", core->csr__DOT__minstret, inst.pc);
+    fprintf(stderr, "ir=%.8lx pc=%.8x\n", core->csr__DOT__minstret, pc);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
@@ -198,13 +188,31 @@ void LogCommit(Inst& inst)
         fprintf(stderr, "\n");
     }
     fprintf(stderr, "\n");
+}
+
+void LogCommit(Inst& inst)
+{
+    if (!simif.cosim_instr(inst))
+    {
+        fprintf(stdout, "ERROR\n");
+        //DumpState(inst.pc);
+        //exit(-1);
+        #ifdef KANATA
+            fprintf(stderr, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+        #endif
+    }
+    
+#ifdef KANATA
+    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "COM");
+    fprintf(stderr, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
+#else
+    DumpState(inst.pc);
 #endif
 }
 
 void LogPredec(Inst& inst)
 {
 #ifdef KANATA
-    return;
     char buf[128];
     if (inst.inst == 0x2872d293)
         strcpy(buf, "2872d293          orc.b         t0,t0");
@@ -220,7 +228,6 @@ void LogPredec(Inst& inst)
 void LogDecode(Inst& inst)
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "RN");
 #endif
 }
@@ -228,7 +235,6 @@ void LogDecode(Inst& inst)
 void LogFlush(Inst& inst)
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "R\t%u\t0\t1\n", inst.id);
 #endif
 }
@@ -236,7 +242,6 @@ void LogFlush(Inst& inst)
 void LogRename(Inst& inst)
 {
 #ifdef KANATA
-    return;
     if (inst.fu == 8 || inst.fu == 11)
         fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "WFC");
     else
@@ -247,7 +252,6 @@ void LogRename(Inst& inst)
 void LogResult(Inst& inst)
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "WFC");
     if (!(inst.tag & 0x40)) fprintf(stderr, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
 #endif
@@ -256,7 +260,6 @@ void LogResult(Inst& inst)
 void LogExec(Inst& inst)
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "EX");
     fprintf(stderr, "L\t%u\t%u\topA=%.8x \n", inst.id, 1, inst.srcA);
     fprintf(stderr, "L\t%u\t%u\topB=%.8x \n", inst.id, 1, inst.srcB);
@@ -267,7 +270,6 @@ void LogExec(Inst& inst)
 void LogIssue(Inst& inst)
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "LD");
 #endif
 }
@@ -275,7 +277,6 @@ void LogIssue(Inst& inst)
 void LogCycle()
 {
 #ifdef KANATA
-    return;
     fprintf(stderr, "C\t1\n");
 #endif
 }
@@ -338,7 +339,7 @@ void LogInstructions()
             {
                 int sqn = (core->comUOps[i] >> 4) & 127;
 
-                // assert(insts[sqn].valid);
+                assert(insts[sqn].valid);
                 assert(insts[sqn].sqn == (uint32_t)sqn);
                 LogCommit(insts[sqn]);
                 mostRecentPC = insts[sqn].pc;
@@ -386,7 +387,7 @@ void LogInstructions()
                 }
 
         // Decoded (TODO: decBranch)
-        if (core->rn->frontEn)
+        if (core->rn->frontEn && !core->RN_stall)
         {
             for (size_t i = 0; i < 4; i++)
                 if (top->rootp->Top->core->DE_uop[i].at(0) & (1 << 0))
