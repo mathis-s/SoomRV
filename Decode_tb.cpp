@@ -1,5 +1,6 @@
 // #define TRACE
-// #define KANATA
+// #define KONATA
+#define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
 #include "VTop_Core.h"
@@ -228,14 +229,14 @@ class SpikeSimif : public simif_t
         return harts;
     }
 
-    void dump_state (uint32_t ppc) const
+    void dump_state (FILE* stream, uint32_t ppc) const
     {
-        fprintf(stderr, "ir=%.8lx ppc=%.8x pc=%.8x\n", processor->get_state()->minstret->read() - 1, ppc, get_pc());
+        fprintf(stream, "ir=%.8lx ppc=%.8x pc=%.8x\n", processor->get_state()->minstret->read() - 1, ppc, get_pc());
         for (size_t j = 0; j < 4; j++)
         {
             for (size_t k = 0; k < 8; k++)
-                fprintf(stderr, "x%.2zu=%.8x ", j*8+k, (uint32_t)processor->get_state()->XPR[j*8+k]);
-            fprintf(stderr, "\n");
+                fprintf(stream, "x%.2zu=%.8x ", j*8+k, (uint32_t)processor->get_state()->XPR[j*8+k]);
+            fprintf(stream, "\n");
         }
     }
 
@@ -300,18 +301,20 @@ uint32_t ReadRegister(uint32_t rid)
 
 SpikeSimif simif;
 
-void DumpState (uint32_t pc)
+void DumpState (FILE* stream, uint32_t pc)
 {
     auto core = top->rootp->Top->core;
-    fprintf(stderr, "ir=%.8lx ppc=%.8x\n", core->csr__DOT__minstret, pc);
+    fprintf(stream, "ir=%.8lx ppc=%.8x\n", core->csr__DOT__minstret, pc);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
-            fprintf(stderr, "x%.2zu=%.8x ", j*8+k, ReadRegister(j*8+k));
-        fprintf(stderr, "\n");
+            fprintf(stream, "x%.2zu=%.8x ", j*8+k, ReadRegister(j*8+k));
+        fprintf(stream, "\n");
     }
-    fprintf(stderr, "\n");
+    fprintf(stream, "\n");
 }
+
+FILE* konataFile;
 
 void LogCommit(Inst& inst)
 {
@@ -323,19 +326,19 @@ void LogCommit(Inst& inst)
     if (!simif.cosim_instr(inst))
     {
         fprintf(stdout, "ERROR\n");
-        DumpState(inst.pc);
+        DumpState(stdout, inst.pc);
 
         fprintf(stdout, "\nSHOULD BE\n");
-        simif.dump_state(startPC);
+        simif.dump_state(stdout, startPC);
         exit(-1);
-        #ifdef KANATA
-            fprintf(stderr, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+        #ifdef KONATA
+            fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
         #endif
     }
     
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "COM");
-    fprintf(stderr, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
+#ifdef KONATA
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "COM");
+    fprintf(konataFile, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
 #else
     //DumpState(inst.pc);
 #endif
@@ -343,73 +346,73 @@ void LogCommit(Inst& inst)
 
 void LogPredec(Inst& inst)
 {
-#ifdef KANATA
+#ifdef KONATA
     char buf[128];
     if (inst.inst == 0x2872d293)
         strcpy(buf, "2872d293          orc.b         t0,t0");
     else
         disasm_inst(buf, sizeof(buf), rv32, inst.pc, inst.inst);
 
-    fprintf(stderr, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
-    fprintf(stderr, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, buf);
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "DEC");
+    fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
+    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, buf);
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
 
 void LogDecode(Inst& inst)
 {
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "RN");
+#ifdef KONATA
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "RN");
 #endif
 }
 
 void LogFlush(Inst& inst)
 {
-#ifdef KANATA
-    fprintf(stderr, "R\t%u\t0\t1\n", inst.id);
+#ifdef KONATA
+    fprintf(konataFile, "R\t%u\t0\t1\n", inst.id);
 #endif
 }
 
 void LogRename(Inst& inst)
 {
-#ifdef KANATA
+#ifdef KONATA
     if (inst.fu == 8 || inst.fu == 11)
-        fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "WFC");
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
     else
-        fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "IS");
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IS");
 #endif
 }
 
 void LogResult(Inst& inst)
 {
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "WFC");
-    if (!(inst.tag & 0x40)) fprintf(stderr, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
+#ifdef KONATA
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
+    if (!(inst.tag & 0x40)) fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
 #endif
 }
 
 void LogExec(Inst& inst)
 {
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "EX");
-    fprintf(stderr, "L\t%u\t%u\topA=%.8x \n", inst.id, 1, inst.srcA);
-    fprintf(stderr, "L\t%u\t%u\topB=%.8x \n", inst.id, 1, inst.srcB);
-    fprintf(stderr, "L\t%u\t%u\timm=%.8x \n", inst.id, 1, inst.imm);
+#ifdef KONATA
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "EX");
+    fprintf(konataFile, "L\t%u\t%u\topA=%.8x \n", inst.id, 1, inst.srcA);
+    fprintf(konataFile, "L\t%u\t%u\topB=%.8x \n", inst.id, 1, inst.srcB);
+    fprintf(konataFile, "L\t%u\t%u\timm=%.8x \n", inst.id, 1, inst.imm);
 #endif
 }
 
 void LogIssue(Inst& inst)
 {
-#ifdef KANATA
-    fprintf(stderr, "S\t%u\t0\t%s\n", inst.id, "LD");
+#ifdef KONATA
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "LD");
 #endif
 }
 
 void LogCycle()
 {
     memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
-#ifdef KANATA
-    fprintf(stderr, "C\t1\n");
+#ifdef KONATA
+    fprintf(konataFile, "C\t1\n");
 #endif
 }
 
@@ -568,7 +571,9 @@ int main(int argc, char** argv)
     memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
     
     Verilated::commandArgs(argc, argv); // Remember args
+#ifdef TRACE
     Verilated::traceEverOn(true);
+#endif
 
     top = new VTop;
     top->clk = 0;
@@ -576,13 +581,13 @@ int main(int argc, char** argv)
     if (argc != 1 && argv[1][0] != '+')
     {
         system(
-            (std::string("riscv32-elf-as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei -o temp.o ") +
+            (std::string(TOOLCHAIN "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei -o temp.o ") +
              std::string(argv[1]))
                 .c_str());
-        system("riscv32-elf-ld --no-warn-rwx-segments -Tlinker.ld test_programs/entry.o temp.o");
+        system(TOOLCHAIN "ld --no-warn-rwx-segments -Tlinker.ld test_programs/entry.o temp.o");
     }
-    system("riscv32-elf-objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
-    system("riscv32-elf-objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
+    system(TOOLCHAIN "objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
+    system(TOOLCHAIN "objcopy -I elf32-little -j .data -O binary ./a.out data.bin");
 
     size_t numInstrBytes = 0;
     {
@@ -601,8 +606,9 @@ int main(int argc, char** argv)
         fclose(f);
     }
 
-#ifdef KANATA
-    fprintf(stderr, "Kanata	0004\n");
+#ifdef KONATA
+    konataFile = fopen("trace_konata.txt", "w");
+    fprintf(konataFile, "Kanata	0004\n");
 #endif
 
 #ifdef TRACE

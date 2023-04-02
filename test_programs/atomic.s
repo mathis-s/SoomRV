@@ -7,7 +7,6 @@ main:
     # zero will be the actual value at a0
     li t0, 0
     sw t0, 0(a0)
-    cbo.flush 0(a0)
     li t1, 1
     
     # 42 is the cached value at a0
