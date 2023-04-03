@@ -32,6 +32,12 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
+    if (!`IS_LEGAL_ADDR(addr)) begin
+        except = AGU_ACCESS_FAULT;
+        if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
+    end
+
+    // Misalign has higher priority than access fault
     if (LOAD_AGU) begin
         case (IN_uop.opcode)
             LSU_LB, LSU_LBU: begin end

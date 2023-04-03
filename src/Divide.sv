@@ -16,7 +16,7 @@ module Divide
 EX_UOp uop;
 reg[5:0] cnt;
 // could use single register for r/q
-reg[63:0] r;
+reg[64:0] r;
 reg[31:0] q;
 reg[31:0] d;
 reg invert;
@@ -39,17 +39,17 @@ always_ff@(posedge clk) begin
             
             if (IN_uop.opcode == DIV_DIV) begin
                 invert <= IN_uop.srcA[31] ^ IN_uop.srcB[31];
-                r <= {32'b0, (IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA)};
+                r <= {33'b0, (IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA)};
                 d <= IN_uop.srcB[31] ? (-IN_uop.srcB) : IN_uop.srcB;
             end
             else if (IN_uop.opcode == DIV_REM) begin
                 invert <= IN_uop.srcA[31];
-                r <= {32'b0, (IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA)};
+                r <= {33'b0, (IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA)};
                 d <= IN_uop.srcB[31] ? (-IN_uop.srcB) : IN_uop.srcB;
             end
             else begin
                 invert <= 0;
-                r <= {32'b0, IN_uop.srcA};
+                r <= {33'b0, IN_uop.srcA};
                 d <= IN_uop.srcB;
             end
             OUT_uop.valid <= 0;
@@ -65,20 +65,20 @@ always_ff@(posedge clk) begin
             else if (cnt != 63) begin
                 running <= 1;
             
-                if (!r[63]) begin
+                if (!r[64]) begin
                     q[cnt[4:0]] <= 1;
-                    r <= 2 * r - {d, 32'b0};
+                    r <= 2 * r - {1'b0, d, 32'b0};
                 end
                 else begin
                     q[cnt[4:0]] <= 0;
-                    r <= 2 * r + {d, 32'b0};
+                    r <= 2 * r + {1'b0, d, 32'b0};
                 end
                 cnt <= cnt - 1;
                 OUT_uop.valid <= 0;
             end
             else begin
-                reg[31:0] qRestored = (q - (~q)) - (r[63] ? 1 : 0);
-                reg[31:0] remainder = (r[63] ? (r[63:32] + d) : r[63:32]);
+                reg[31:0] qRestored = (q - (~q)) - (r[64] ? 1 : 0);
+                reg[31:0] remainder = (r[64] ? (r[63:32] + d) : r[63:32]);
                 
                 running <= 0;
                 

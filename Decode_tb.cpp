@@ -1,5 +1,6 @@
 // #define TRACE
 // #define KONATA
+// #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -27,10 +28,11 @@
 #include "riscv/cfg.h"
 #include "riscv/decode.h"
 #include "riscv/devices.h"
+#include "riscv/disasm.h"
 #include "riscv/log_file.h"
+#include "riscv/mmu.h"
 #include "riscv/processor.h"
 #include "riscv/simif.h"
-#include "riscv/disasm.h"
 
 struct Inst
 {
@@ -73,19 +75,21 @@ class SpikeSimif : public simif_t
     std::vector<std::string> errors;
     cfg_t* cfg;
     std::map<size_t, processor_t*> harts;
+    uint64_t mtime;
+    uint64_t mtimecmp;
 
-    bool compare_state ()
+    bool compare_state()
     {
         for (size_t i = 0; i < 32; i++)
             if ((uint32_t)processor->get_state()->XPR[i] != ReadRegister(i))
             {
-                //printf("mismatch x%zu\n", i);
+                // printf("mismatch x%zu\n", i);
                 return false;
             }
         return true;
     }
 
-    static bool is_pass_thru_inst (const Inst& i)
+    static bool is_pass_thru_inst(const Inst& i)
     {
         // pass through some HPM counter reads
         // WARNING: this explicitly stops us from testing
@@ -117,6 +121,9 @@ class SpikeSimif : public simif_t
                         case CSR_MHPMCOUNTER3H:
                         case CSR_MHPMCOUNTER4H:
                         case CSR_MHPMCOUNTER5H:
+
+                        case CSR_MTVAL:
+                        case CSR_MIP:
                         {
                             return true;
                         }
@@ -127,6 +134,37 @@ class SpikeSimif : public simif_t
             }
 
         return false;
+    }
+
+    void take_trap(bool interrupt, reg_t cause, reg_t epc)
+    {
+        // taken from spike riscv/processor.cc: take_trap (which is private ...)
+
+        auto& state = *processor->get_state();
+        processor->set_virt(false);
+        const reg_t vector = (state.mtvec->read() & 1) && interrupt ? 4 * cause : 0;
+        const reg_t trap_handler_address = (state.mtvec->read() & ~(reg_t)1) + vector;
+        // RNMI exception vector is implementation-defined.  Since we don't model
+        // RNMI sources, the feature isn't very useful, so pick an invalid address.
+        const reg_t rnmi_trap_handler_address = 0;
+        const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
+        state.pc = !nmie ? rnmi_trap_handler_address : trap_handler_address;
+        state.mepc->write(epc);
+        state.mcause->write(cause);
+        state.mtval->write(0);
+        // state.mtval2->write(0);
+        // state.mtinst->write(t.get_tinst());
+
+        reg_t s = state.mstatus->read();
+        s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
+        s = set_field(s, MSTATUS_MPP, state.prv);
+        s = set_field(s, MSTATUS_MIE, 0);
+        // s = set_field(s, MSTATUS_MPV, curr_virt);
+        // s = set_field(s, MSTATUS_GVA, t.has_gva());
+        state.mstatus->write(s);
+        if (state.mstatush)
+            state.mstatush->write(s >> 32); // log mstatush change
+        processor->set_privilege(PRV_M);
     }
 
   public:
@@ -140,17 +178,28 @@ class SpikeSimif : public simif_t
 
         processor->set_pmp_num(0);
 
-        processor->get_state()->pc = 0x80000000;
-        //processor->get_state()->csrmap[CSR_] = 0x80000000;
+        processor->get_state()->csrmap[0x139] = 0;
+        processor->get_state()->pc = 0x80000000; // + 3361880;
         processor->set_mmu_capability(IMPL_MMU_SV32);
         processor->set_debug(true);
         processor->get_state()->XPR.reset();
         processor->set_privilege(3);
         processor->enable_log_commits();
+
+        std::array csrs_to_reset = {
+            CSR_MSTATUS,    CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MTVEC, CSR_MEPC, CSR_MCAUSE, CSR_MTVAL,
+            CSR_MIDELEG,    CSR_MIDELEGH, CSR_MEDELEG,    CSR_MIP,           CSR_MIPH,  CSR_MIE,  CSR_MIEH,
+
+            CSR_SCOUNTEREN, CSR_SEPC,     CSR_SCAUSE,     CSR_STVEC,         CSR_STVAL, CSR_SATP};
+
+        for (auto csr : csrs_to_reset)
+            processor->put_csr(csr, 0);
     }
 
     virtual char* addr_to_mem(reg_t addr) override
     {
+        if (addr >= 0x80000000)
+            return (char*)pram + (addr - 0x80000000);
         return nullptr;
     }
     virtual bool mmio_load(reg_t addr, size_t len, uint8_t* bytes) override
@@ -159,12 +208,25 @@ class SpikeSimif : public simif_t
             memcpy(bytes, (uint8_t*)pram + (addr - 0x80000000), len);
         else
             memset(bytes, 0, len);
+
+        printf("MMIO ld %.8zx\n", addr);
+
+        if (addr == 0x2000000 + 0xbff8)
+            memcpy(bytes, &mtime, len);
+        if (addr == 0x2000000 + 0xbffc)
+            memcpy(bytes, (uint8_t*)&mtime + 4, len);
+        if (addr == 0x2000000 + 0x4000)
+            memcpy(bytes, (uint8_t*)&mtimecmp, len);
+        if (addr == 0x2000000 + 0x4004)
+            memcpy(bytes, (uint8_t*)&mtimecmp + 4, len);
+
         return true;
     }
     virtual bool mmio_store(reg_t addr, size_t len, const uint8_t* bytes) override
     {
         if ((addr - 0x80000000) < sizeof(pram))
             memcpy((uint8_t*)pram + (addr - 0x80000000), bytes, len);
+        printf("MMIO st %.8zx\n", addr);
         return true;
     }
     virtual void proc_reset(unsigned id) override
@@ -174,12 +236,12 @@ class SpikeSimif : public simif_t
     {
         return nullptr;
     }
-    virtual const cfg_t & get_cfg() const override
+    virtual const cfg_t& get_cfg() const override
     {
         return *cfg;
     }
 
-    virtual bool cosim_instr (const Inst& inst)
+    virtual bool cosim_instr(const Inst& inst, bool isInterrupt)
     {
 
         uint32_t initialSpikePC = processor->get_state()->pc & 0xffff'ffff;
@@ -187,29 +249,32 @@ class SpikeSimif : public simif_t
         mmio_load(initialSpikePC, 4, (uint8_t*)&instSIM);
 
         processor->step(1);
-        
+
         // TODO: Use this for adjusting WARL behaviour
         /*auto writes = processor->get_state()->log_reg_write;
         bool gprWritten = false;
         for (auto write : writes)
         {
-            
+
         }*/
-        
+
         bool mem_pass_thru = false;
         auto mem_reads = processor->get_state()->log_mem_read;
         for (auto read : mem_reads)
         {
             uint32_t addr = std::get<0>(read);
             addr &= ~3;
-            
+
             switch (addr)
             {
-                case 0x10000000:
-                case 0x11100000:
+
                 case 0x1100bff8:
+                case 0x1100bffc:
                 case 0x11004000:
-                    mem_pass_thru = true;
+                case 0x11004004:
+                case 0x10000000:
+                case 0x10000004:
+                case 0x11100000: mem_pass_thru = true;
             }
         }
 
@@ -218,29 +283,30 @@ class SpikeSimif : public simif_t
             processor->get_state()->XPR.write(inst.rd, inst.result);
         }
 
-        bool instrEqual = ((instSIM & 3) == 3) ?
-            instSIM == inst.inst :
-            (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
+        if (isInterrupt)
+            take_trap(true, 7, processor->get_state()->pc);
+
+        bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
         return instrEqual && inst.pc == initialSpikePC && compare_state();
     }
 
-    const std::map<size_t, processor_t *> & get_harts() const override
+    const std::map<size_t, processor_t*>& get_harts() const override
     {
         return harts;
     }
 
-    void dump_state (FILE* stream, uint32_t ppc) const
+    void dump_state(FILE* stream, uint32_t ppc) const
     {
         fprintf(stream, "ir=%.8lx ppc=%.8x pc=%.8x\n", processor->get_state()->minstret->read() - 1, ppc, get_pc());
         for (size_t j = 0; j < 4; j++)
         {
             for (size_t k = 0; k < 8; k++)
-                fprintf(stream, "x%.2zu=%.8x ", j*8+k, (uint32_t)processor->get_state()->XPR[j*8+k]);
+                fprintf(stream, "x%.2zu=%.8x ", j * 8 + k, (uint32_t)processor->get_state()->XPR[j * 8 + k]);
             fprintf(stream, "\n");
         }
     }
 
-    uint32_t get_pc () const
+    uint32_t get_pc() const
     {
         return processor->get_state()->pc;
     }
@@ -288,27 +354,27 @@ std::array<uint8_t, 32> regTagOverride;
 uint32_t ReadRegister(uint32_t rid)
 {
     auto core = top->rootp->Top->core;
-    
+
     uint8_t comTag = regTagOverride[rid];
-    if (comTag == 0xff) 
+    if (comTag == 0xff)
         comTag = (core->rn->rt->rat[rid] >> 7) & 127;
 
     if (comTag & 64)
-        return ((int32_t)(comTag & 63) << (32-6)) >> (32-6);
+        return ((int32_t)(comTag & 63) << (32 - 6)) >> (32 - 6);
     else
         return core->rf->mem[comTag];
 }
 
 SpikeSimif simif;
 
-void DumpState (FILE* stream, uint32_t pc)
+void DumpState(FILE* stream, uint32_t pc)
 {
     auto core = top->rootp->Top->core;
     fprintf(stream, "ir=%.8lx ppc=%.8x\n", core->csr__DOT__minstret, pc);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
-            fprintf(stream, "x%.2zu=%.8x ", j*8+k, ReadRegister(j*8+k));
+            fprintf(stream, "x%.2zu=%.8x ", j * 8 + k, ReadRegister(j * 8 + k));
         fprintf(stream, "\n");
     }
     fprintf(stream, "\n");
@@ -316,31 +382,37 @@ void DumpState (FILE* stream, uint32_t pc)
 
 FILE* konataFile;
 
-void LogCommit(Inst& inst)
+void LogCommit(Inst& inst, bool isInterrupt)
 {
 
     if (inst.rd != 0 && inst.flags < 6)
         regTagOverride[inst.rd] = inst.tag;
-    
+
+    if (isInterrupt)
+        printf("interrupt\n");
+
+#ifdef COSIM
     uint32_t startPC = simif.get_pc();
-    if (!simif.cosim_instr(inst))
+    if (!simif.cosim_instr(inst, isInterrupt))
     {
         fprintf(stdout, "ERROR\n");
         DumpState(stdout, inst.pc);
 
         fprintf(stdout, "\nSHOULD BE\n");
         simif.dump_state(stdout, startPC);
+
         exit(-1);
-        #ifdef KONATA
-            fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
-        #endif
+#ifdef KONATA
+        fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+#endif
     }
-    
+#endif
+
 #ifdef KONATA
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "COM");
     fprintf(konataFile, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
 #else
-    //DumpState(inst.pc);
+        // DumpState(inst.pc);
 #endif
 }
 
@@ -387,7 +459,8 @@ void LogResult(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
-    if (!(inst.tag & 0x40)) fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
+    if (!(inst.tag & 0x40))
+        fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
 #endif
 }
 
@@ -461,9 +534,10 @@ void LogInstructions()
             insts[sqn].flags = ExtractField(core->wbUOp[i], 3, 4);
 
             // FP ops use a different flag encoding. These are not traps, so ignore them.
-            if ((insts[sqn].fu == 5 || insts[sqn].fu == 6 || insts[sqn].fu == 7) && insts[sqn].flags >= 8 && insts[sqn].flags <= 13)
+            if ((insts[sqn].fu == 5 || insts[sqn].fu == 6 || insts[sqn].fu == 7) && insts[sqn].flags >= 8 &&
+                insts[sqn].flags <= 13)
                 insts[sqn].flags = 0;
-                
+
             LogResult(insts[sqn]);
         }
     }
@@ -477,9 +551,17 @@ void LogInstructions()
             {
                 int sqn = (core->comUOps[i] >> 4) & 127;
 
-                assert(insts[sqn].valid);
-                assert(insts[sqn].sqn == (uint32_t)sqn);
-                LogCommit(insts[sqn]);
+                // assert(insts[sqn].valid);
+                // assert(insts[sqn].sqn == (uint32_t)sqn);
+
+                bool isInterrupt = false;
+                if (core->ROB_trapUOp & 1)
+                {
+                    int trapSQN = (core->ROB_trapUOp >> 15) & 127;
+                    int flags = (core->ROB_trapUOp >> 29) & 15;
+                    isInterrupt = (trapSQN == sqn) && flags == 0;
+                }
+                LogCommit(insts[sqn], isInterrupt);
                 mostRecentPC = insts[sqn].pc;
                 insts[sqn].valid = false;
             }
@@ -494,14 +576,17 @@ void LogInstructions()
         uint32_t i = (brSqN + 1) & 127;
         while (i != nextSqN)
         {
-            if (insts[i].valid) LogFlush(insts[i]);
+            if (insts[i].valid)
+                LogFlush(insts[i]);
             i = (i + 1) & 127;
         }
 
         for (size_t i = 0; i < 4; i++)
         {
-            if (de[i].valid) LogFlush(de[i]);
-            if (pd[i].valid) LogFlush(pd[i]);
+            if (de[i].valid)
+                LogFlush(de[i]);
+            if (pd[i].valid)
+                LogFlush(pd[i]);
         }
     }
     else
@@ -513,7 +598,7 @@ void LogInstructions()
                 {
                     int sqn = ExtractField<4>(core->RN_uop[i], 45, 7);
                     int fu = ExtractField<4>(core->RN_uop[i], 1, 4);
-                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 45-7, 7);
+                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 45 - 7, 7);
 
                     insts[sqn].valid = 1;
                     insts[sqn] = de[i];
@@ -532,12 +617,13 @@ void LogInstructions()
                 if (top->rootp->Top->core->DE_uop[i].at(0) & (1 << 0))
                 {
                     de[i] = pd[i];
-                    de[i].rd = ExtractField(core->DE_uop[i], 68-32-5-5-1-5, 5);
+                    de[i].rd = ExtractField(core->DE_uop[i], 68 - 32 - 5 - 5 - 1 - 5, 5);
                     LogDecode(de[i]);
                 }
                 else
                 {
-                    if (pd[i].valid) LogFlush(pd[i]);
+                    if (pd[i].valid)
+                        LogFlush(pd[i]);
                     de[i].valid = false;
                 }
         }
@@ -553,7 +639,8 @@ void LogInstructions()
                     pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 31 - 32, 31) << 1;
                     pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 32, 32);
                     pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 3, 5);
-                    if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
+                    if ((pd[i].inst & 3) != 3)
+                        pd[i].inst &= 0xffff;
 
                     LogPredec(pd[i]);
                 }
@@ -564,12 +651,12 @@ void LogInstructions()
     LogCycle();
 }
 
-//#include "default64mbdtc.h"
+#include "default64mbdtc.h"
 
 int main(int argc, char** argv)
 {
     memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
-    
+
     Verilated::commandArgs(argc, argv); // Remember args
 #ifdef TRACE
     Verilated::traceEverOn(true);
@@ -580,10 +667,9 @@ int main(int argc, char** argv)
 
     if (argc != 1 && argv[1][0] != '+')
     {
-        system(
-            (std::string(TOOLCHAIN "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei -o temp.o ") +
-             std::string(argv[1]))
-                .c_str());
+        system((std::string(TOOLCHAIN "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei -o temp.o ") +
+                std::string(argv[1]))
+                   .c_str());
         system(TOOLCHAIN "ld --no-warn-rwx-segments -Tlinker.ld test_programs/entry.o temp.o");
     }
     system(TOOLCHAIN "objcopy -I elf32-little -j .text -O binary ./a.out text.bin");
@@ -597,7 +683,8 @@ int main(int argc, char** argv)
         numInstrBytes = fread(pramBytes, sizeof(uint8_t), sizeof(pram), f);
         fclose(f);
 
-        if (numInstrBytes & 3) numInstrBytes = (numInstrBytes & ~3) + 4;
+        if (numInstrBytes & 3)
+            numInstrBytes = (numInstrBytes & ~3) + 4;
         printf("Read %zu bytes of instructions\n", numInstrBytes);
 
         f = fopen("data.bin", "rb");
@@ -617,7 +704,7 @@ int main(int argc, char** argv)
     tfp->open("Decode_tb.vcd");
 #endif
 
-    //memcpy(&pram[(0x800000) / 4], default64mbdtb, sizeof(default64mbdtb));
+    memcpy(&pram[(0x800000) / 4], default64mbdtb, sizeof(default64mbdtb));
 
     for (size_t i = 0; i < (1 << 24); i++)
     {
@@ -650,10 +737,11 @@ int main(int argc, char** argv)
         top->clk = !top->clk;
         top->eval(); // Evaluate model
 
-        if (top->clk == 1) LogInstructions();
+        if (top->clk == 1)
+            LogInstructions();
 
-        //if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC);
-        
+            // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC);
+
 #ifdef TRACE
         tfp->dump(main_time);
 #endif
