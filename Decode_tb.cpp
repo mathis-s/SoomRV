@@ -12,8 +12,6 @@
 #include "VTop_RenameTable__N8.h"
 #include "VTop_Top.h"
 #include "VTop___024root.h"
-#include "riscv-disassembler/src/riscv-disas.h"
-#include "riscv/cfg.h"
 #include <cstdio>
 #include <iostream> // Need std::cout
 #include <unistd.h>
@@ -432,12 +430,8 @@ void LogCommit(Inst& inst)
 void LogPredec(Inst& inst)
 {
 #ifdef KONATA
-    char buf[128];
-    if (inst.inst == 0x2872d293)
-        strcpy(buf, "2872d293          orc.b         t0,t0");
-    else
-        disasm_inst(buf, sizeof(buf), rv32, inst.pc, inst.inst);
-
+    char buf[128] = {0};
+    // TODO: re-add disassembly using Spike
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
     fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, buf);
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
