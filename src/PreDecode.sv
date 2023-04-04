@@ -90,6 +90,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].predTaken <= (buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut);
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
+                        OUT_instrs[i].is16bit <= 0;
                         
                         if (subIndexOut > buffer[bufIndexOut].predPos)
                             // predTaken is zero as this is a post-branch instruction in the same fetch package
@@ -115,6 +116,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].predInvalid <= invalidBranch;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
+                        OUT_instrs[i].is16bit <= 1;
                         
                         if (subIndexOut > buffer[bufIndexOut].predPos)
                             OUT_instrs[i].history <= {buffer[bufIndexOut].history[$bits(BHist_t)-2:0], 1'b0 /*buffer[bufIndexOut].predTaken*/};

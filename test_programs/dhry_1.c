@@ -40,13 +40,13 @@ extern int strcmp(const char* l, const char* r);
 
 inline  int __attribute__((always_inline)) read_cycles() {
     int result;
-    asm("csrr %0, instret" : "=r"(result));
+    asm("csrr %0, minstret" : "=r"(result));
     return result; 
 }
 
 inline  int __attribute__((always_inline)) read_time() {
     int result;
-    asm("csrr %0, cycle" : "=r"(result));
+    asm("csrr %0, mcycle" : "=r"(result));
     return result; 
 }
 

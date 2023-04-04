@@ -36,9 +36,6 @@ main:
     la a0, irq_handler
     csrrw x0, mtvec, a0
     
-    li a0, 1
-    sb a0, 15(a1)
-    
     # print first 
     li a0, 1
     call printhex

@@ -293,11 +293,13 @@ always_comb begin
                 invalidEnc = 0;
                 
                 case (IN_instrs[i].fetchFault)
-                    IF_FAULT_MISALIGN: uop.opcode = TRAP_I_ACC_MISAL;
+                    IF_INTERRUPT: uop.opcode = TRAP_V_INTERRUPT;
                     IF_ACCESS_FAULT: uop.opcode = TRAP_I_ACC_FAULT;
                     IF_PAGE_FAULT: uop.opcode = TRAP_I_PAGE_FAULT;
                     default: assert(0);
                 endcase
+
+                uop.compressed = IN_instrs[i].is16bit;
             end
             // Regular Instructions
             else if (instr.opcode[1:0] == 2'b11) begin

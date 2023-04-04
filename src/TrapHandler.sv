@@ -119,11 +119,11 @@ always_ff@(posedge clk) begin
                 
                 reg[3:0] trapCause;
                 reg delegate;
-                reg isInterrupt = !(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
+                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_INTERRUPT);//!(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
                         
                 // TODO: add all trap reasons
                 if (isInterrupt) begin
-                    trapCause = 0;
+                    trapCause = IN_trapControl.interruptCause;
                 end
                 else begin
                     case (IN_trapInstr.flags)
@@ -176,7 +176,7 @@ always_ff@(posedge clk) begin
                     OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
                     OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
                 end
-                else assert(IN_trapInstr.flags == FLAGS_NONE || IN_trapInstr.flags == FLAGS_BRANCH);
+                /*else assert(IN_trapInstr.flags == FLAGS_NONE || IN_trapInstr.flags == FLAGS_BRANCH);
                 
                 if (IN_trapControl.interruptPending && IN_trapInstr.allowInterrupt) begin
                     OUT_trapInfo.valid <= 1;
@@ -194,7 +194,7 @@ always_ff@(posedge clk) begin
                     OUT_branch.storeSqN <= 0;
                     OUT_branch.loadSqN <= 0;
                     OUT_branch.fetchID <= 0;
-                end
+                end*/
             end
         end
     end

@@ -29,6 +29,8 @@
 
 // PC at reset
 `define ENTRY_POINT (32'h8000_0000)
+//`define ENTRY_POINT (32'h8000_0000 + 3361880)
+
 
 // PMAs
 `define IS_MMIO_PMA(addr) \
@@ -41,6 +43,20 @@
 `define SYSCON_ADDR 32'h1110_0000
 `define MTIME_ADDR 32'h1100_bff8
 `define MTIMECMP_ADDR 32'h1100_4000
+
+// 64 MiB main memory (TODO: make adjustable!)
+`define IS_LEGAL_ADDR(addr) \
+    ((addr >= 32'h80000000 && addr < 32'h84000000) || \
+    (`IS_MMIO_PMA(addr) && addr >= 32'h10000000 && addr < 32'h12000000))
+    //(addr[31:2] == 30'((`SERIAL_ADDR + 4) >> 2)) || \
+    //(addr[31:2] == 30'(`SERIAL_ADDR >> 2)) || \
+    //(addr[31:2] == 30'(`SYSCON_ADDR >> 2)) || \
+    //(addr[31:2] == 30'((`MTIME_ADDR + 4) >> 2)) || \
+    //(addr[31:2] == 30'(`MTIME_ADDR >> 2)) || \
+    //(addr[31:2] == 30'((`MTIMECMP_ADDR + 4) >> 2)) || \
+    //(addr[31:2] == 30'(`MTIMECMP_ADDR >> 2)))
+    
+
 
 //`define ENTRY_POINT (32'h000_0000)
 // PMAs

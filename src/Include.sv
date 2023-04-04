@@ -240,7 +240,9 @@ typedef enum logic[5:0]
     TRAP_ECALL_U = 8,
     TRAP_ECALL_S = 9,
     TRAP_ECALL_M = 11,
-    TRAP_I_PAGE_FAULT = 12
+    TRAP_I_PAGE_FAULT = 12,
+
+    TRAP_V_INTERRUPT = 16
     
 } OPCode_FU_TRAP;
 
@@ -305,7 +307,7 @@ typedef logic[7:0] ModeFlags;
 
 typedef enum logic[1:0]
 {
-    IF_FAULT_NONE = 0, IF_FAULT_MISALIGN, IF_ACCESS_FAULT, IF_PAGE_FAULT
+    IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
 typedef struct packed
@@ -388,6 +390,7 @@ typedef struct packed
     logic predInvalid;
     FetchID_t fetchID;
     IFetchFault fetchFault;
+    logic is16bit;
     logic valid;
 } PD_Instr;
 

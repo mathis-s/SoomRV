@@ -62,6 +62,8 @@ IFetch ifetch
     .clk(clk),
     .rst(rst),
     .en(ifetchEn),
+
+    .IN_interruptPending(CSR_trapControl.interruptPending),
     
     .OUT_instrReadEnable(OUT_instrReadEnable),
     .OUT_instrAddr(OUT_instrAddr),
