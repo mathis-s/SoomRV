@@ -218,7 +218,7 @@ always_ff@(posedge clk) begin
                     
                     deqMask[id[1:0]] = 1;
                                    
-                    if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR)) || IN_interruptPending) begin
+                    if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR))) begin
                         
                         OUT_trapUOp.flags <= deqEntries[i].flags;
                         OUT_trapUOp.tag <= deqEntries[i].tag;
@@ -227,18 +227,18 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
-                        OUT_trapUOp.allowInterrupt <= IN_interruptPending;
+                        OUT_trapUOp.allowInterrupt <= 0;//IN_interruptPending;
                         OUT_trapUOp.valid <= 1;
                         
                         if (deqEntries[i].flags >= FLAGS_PRED_TAKEN)
                             pred = 1;
                         
-                        if (deqEntries[i].flags >= FLAGS_FENCE || (IN_interruptPending && deqEntries[i].flags != FLAGS_NONE)) begin
+                        if (deqEntries[i].flags >= FLAGS_FENCE) begin
                             // Redirect result of exception to x0
                             // The exception causes an invalidation to committed state,
                             // so changing these is fine (does not leave us with inconsistent RAT/TB)
-                            if (deqEntries[i].flags >= FLAGS_ILLEGAL_INSTR &&
-                                deqEntries[i].flags <= FLAGS_ST_PF) begin
+                            if ((deqEntries[i].flags >= FLAGS_ILLEGAL_INSTR &&
+                                deqEntries[i].flags <= FLAGS_ST_PF)) begin
                                 OUT_comUOp[i].nmDst <= 0;
                                 OUT_comUOp[i].tagDst <= 7'h40;
                             end
@@ -246,9 +246,6 @@ always_ff@(posedge clk) begin
                             stop <= 1;
                             temp = 1;
                         end
-                        
-                        if (IN_interruptPending) stop <= 1;
-                            
                     end
                     else if (deqEntries[i].isFP && deqEntries[i].flags >= Flags'(FLAGS_FP_NX) && deqEntries[i].flags <= Flags'(FLAGS_FP_NV)) begin
                         OUT_fpNewFlags[deqEntries[i].flags[2:0] - 3'(FLAGS_FP_NX)] <= 1;

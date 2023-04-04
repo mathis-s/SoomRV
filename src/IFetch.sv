@@ -9,6 +9,8 @@ module IFetch
     input wire clk,
     input wire rst,
     input wire en,
+
+    input wire IN_interruptPending,
     
     output wire OUT_instrReadEnable,
     output wire[27:0] OUT_instrAddr,
@@ -139,7 +141,7 @@ IF_Instr outInstrs_r;
 always_comb begin
     OUT_instrs = outInstrs_r;
     for (i = 0; i < NUM_BLOCKS; i=i+1)
-        OUT_instrs.instrs[i] = instrRaw[(16*i)+:16];
+        OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
 end
 
 // these are virtual addresses when address translation is active
@@ -195,7 +197,6 @@ reg[19:0] pageWalkVPN;
 
 reg en1;
 always_ff@(posedge clk) begin
-    
     OUT_memc2.cmd <= MEMC_NONE;
     if (rst) begin
         pc <= 31'(`ENTRY_POINT >> 1);
@@ -298,16 +299,35 @@ always_ff@(posedge clk) begin
             
             // Fetch package (if no fault)
             if (fault == IF_FAULT_NONE) begin
-                if (`IS_MMIO_PMA(phyPCFull) && !pageWalkRequired && pcPPNfault == IF_FAULT_NONE) begin
-                    fault <= IF_ACCESS_FAULT;
-                end else
                 if (pageWalkRequired) begin
+                    en1 <= 0;
                     if (!pageWalkActive && !IN_memc.busy) begin
                         pageWalkActive <= 1;
                         pageWalkAccepted <= 0;
                         pageWalkVPN <= pcVPN;
                     end
                 end
+                // Handle Page Fault, Access Fault and Interrupts
+                else if ((IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE) ||
+                    `IS_MMIO_PMA(phyPCFull) ||
+                    IN_interruptPending) begin
+
+                    en1 <= 1;
+                    pcLast <= pc;
+                    // this might be polluted with predictions from squashed insts
+                    histLast <= BP_branchHistory;
+                    infoLast <= 0;
+                    multipleLast <= 1;
+                    branchPosLast <= pc[2:0];
+
+                    if (IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE)
+                        fault <= pcPPNfault;
+                    else if (`IS_MMIO_PMA(phyPCFull))
+                        fault <= IF_ACCESS_FAULT;
+                    else // if (IN_interruptPending)
+                        fault <= IF_INTERRUPT;
+                end
+                // Valid Fetch
                 else begin
                     en1 <= 1;
                     histLast <= BP_branchHistory;
@@ -316,17 +336,9 @@ always_ff@(posedge clk) begin
                     branchPosLast <= BP_branchSrcOffs;
                     multipleLast <= BP_multipleBranches;
                     
-                    if (IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE) begin
-                        fault <= pcPPNfault;
-                    end
-                    else if (BP_branchFound) begin
+                    if (BP_branchFound) begin
                         if (BP_isJump || BP_branchTaken) begin
                             pc <= BP_branchDst[31:1];
-                            
-                            //if (BP_branchSrc[31:4] != pc[30:3]) begin
-                                //$display("BTB PC Misspeculation: spec=%x, actual=%x\n", BP_branchSrc, pc << 1);
-                            //    dbgMisspec <= 1;
-                            //end
                         end
                         // Branch found, not taken
                         else begin                    
@@ -343,8 +355,10 @@ always_ff@(posedge clk) begin
                     else begin
                         pc <= {pc[30:3] + 28'b1, 3'b000};
                     end
+
                 end
             end
+            else en1 <= 0;
         end
     end
 end

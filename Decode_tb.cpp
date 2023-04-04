@@ -50,6 +50,7 @@ struct Inst
     uint8_t rd;
     uint8_t tag;
     uint8_t flags;
+    enum InterruptType { IR_NONE, IR_SQUASH, IR_KEEP } interrupt;
     bool valid;
 };
 
@@ -121,9 +122,14 @@ class SpikeSimif : public simif_t
                         case CSR_MHPMCOUNTER3H:
                         case CSR_MHPMCOUNTER4H:
                         case CSR_MHPMCOUNTER5H:
+                        
 
                         case CSR_MTVAL:
                         case CSR_MIP:
+                        
+                        case CSR_MVENDORID:
+                        case CSR_MARCHID:
+                        case CSR_MIMPID:
                         {
                             return true;
                         }
@@ -134,37 +140,6 @@ class SpikeSimif : public simif_t
             }
 
         return false;
-    }
-
-    void take_trap(bool interrupt, reg_t cause, reg_t epc)
-    {
-        // taken from spike riscv/processor.cc: take_trap (which is private ...)
-
-        auto& state = *processor->get_state();
-        processor->set_virt(false);
-        const reg_t vector = (state.mtvec->read() & 1) && interrupt ? 4 * cause : 0;
-        const reg_t trap_handler_address = (state.mtvec->read() & ~(reg_t)1) + vector;
-        // RNMI exception vector is implementation-defined.  Since we don't model
-        // RNMI sources, the feature isn't very useful, so pick an invalid address.
-        const reg_t rnmi_trap_handler_address = 0;
-        const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
-        state.pc = !nmie ? rnmi_trap_handler_address : trap_handler_address;
-        state.mepc->write(epc);
-        state.mcause->write(cause);
-        state.mtval->write(0);
-        // state.mtval2->write(0);
-        // state.mtinst->write(t.get_tinst());
-
-        reg_t s = state.mstatus->read();
-        s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
-        s = set_field(s, MSTATUS_MPP, state.prv);
-        s = set_field(s, MSTATUS_MIE, 0);
-        // s = set_field(s, MSTATUS_MPV, curr_virt);
-        // s = set_field(s, MSTATUS_GVA, t.has_gva());
-        state.mstatus->write(s);
-        if (state.mstatush)
-            state.mstatush->write(s >> 32); // log mstatush change
-        processor->set_privilege(PRV_M);
     }
 
   public:
@@ -179,9 +154,9 @@ class SpikeSimif : public simif_t
         processor->set_pmp_num(0);
 
         processor->get_state()->csrmap[0x139] = 0;
-        processor->get_state()->pc = 0x80000000; // + 3361880;
+        processor->get_state()->pc = 0x80000000;// + 3361880;
         processor->set_mmu_capability(IMPL_MMU_SV32);
-        processor->set_debug(true);
+        processor->set_debug(false);
         processor->get_state()->XPR.reset();
         processor->set_privilege(3);
         processor->enable_log_commits();
@@ -209,8 +184,6 @@ class SpikeSimif : public simif_t
         else
             memset(bytes, 0, len);
 
-        printf("MMIO ld %.8zx\n", addr);
-
         if (addr == 0x2000000 + 0xbff8)
             memcpy(bytes, &mtime, len);
         if (addr == 0x2000000 + 0xbffc)
@@ -226,7 +199,7 @@ class SpikeSimif : public simif_t
     {
         if ((addr - 0x80000000) < sizeof(pram))
             memcpy((uint8_t*)pram + (addr - 0x80000000), bytes, len);
-        printf("MMIO st %.8zx\n", addr);
+
         return true;
     }
     virtual void proc_reset(unsigned id) override
@@ -241,7 +214,7 @@ class SpikeSimif : public simif_t
         return *cfg;
     }
 
-    virtual bool cosim_instr(const Inst& inst, bool isInterrupt)
+    virtual bool cosim_instr(const Inst& inst)
     {
 
         uint32_t initialSpikePC = processor->get_state()->pc & 0xffff'ffff;
@@ -283,8 +256,11 @@ class SpikeSimif : public simif_t
             processor->get_state()->XPR.write(inst.rd, inst.result);
         }
 
-        if (isInterrupt)
+        if (inst.interrupt == Inst::IR_KEEP)
+        {
+            printf("INTERRUPT %.8x (keep)", (uint32_t)processor->get_state()->pc);
             take_trap(true, 7, processor->get_state()->pc);
+        }
 
         bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
         return instrEqual && inst.pc == initialSpikePC && compare_state();
@@ -309,6 +285,37 @@ class SpikeSimif : public simif_t
     uint32_t get_pc() const
     {
         return processor->get_state()->pc;
+    }
+
+    void take_trap(bool interrupt, reg_t cause, reg_t epc)
+    {
+        // taken from spike riscv/processor.cc: take_trap (which is private ...)
+
+        auto& state = *processor->get_state();
+        processor->set_virt(false);
+        const reg_t vector = (state.mtvec->read() & 1) && interrupt ? 4 * cause : 0;
+        const reg_t trap_handler_address = (state.mtvec->read() & ~(reg_t)1) + vector;
+        // RNMI exception vector is implementation-defined.  Since we don't model
+        // RNMI sources, the feature isn't very useful, so pick an invalid address.
+        const reg_t rnmi_trap_handler_address = 0;
+        const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
+        state.pc = !nmie ? rnmi_trap_handler_address : trap_handler_address;
+        state.mepc->write(epc);
+        state.mcause->write(cause | (interrupt ? 0x80000000 : 0));
+        state.mtval->write(0);
+        // state.mtval2->write(0);
+        // state.mtinst->write(t.get_tinst());
+
+        reg_t s = state.mstatus->read();
+        s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
+        s = set_field(s, MSTATUS_MPP, state.prv);
+        s = set_field(s, MSTATUS_MIE, 0);
+        // s = set_field(s, MSTATUS_MPV, curr_virt);
+        // s = set_field(s, MSTATUS_GVA, t.has_gva());
+        state.mstatus->write(s);
+        if (state.mstatush)
+            state.mstatush->write(s >> 32); // log mstatush change
+        processor->set_privilege(PRV_M);
     }
 };
 
@@ -367,10 +374,10 @@ uint32_t ReadRegister(uint32_t rid)
 
 SpikeSimif simif;
 
-void DumpState(FILE* stream, uint32_t pc)
+void DumpState(FILE* stream, uint32_t pc, uint32_t inst)
 {
     auto core = top->rootp->Top->core;
-    fprintf(stream, "ir=%.8lx ppc=%.8x\n", core->csr__DOT__minstret, pc);
+    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x\n", core->csr__DOT__minstret, pc, inst);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
@@ -382,38 +389,44 @@ void DumpState(FILE* stream, uint32_t pc)
 
 FILE* konataFile;
 
-void LogCommit(Inst& inst, bool isInterrupt)
+void LogCommit(Inst& inst)
 {
-
-    if (inst.rd != 0 && inst.flags < 6)
-        regTagOverride[inst.rd] = inst.tag;
-
-    if (isInterrupt)
-        printf("interrupt\n");
-
-#ifdef COSIM
-    uint32_t startPC = simif.get_pc();
-    if (!simif.cosim_instr(inst, isInterrupt))
+    if (inst.interrupt == Inst::IR_SQUASH)
     {
-        fprintf(stdout, "ERROR\n");
-        DumpState(stdout, inst.pc);
-
-        fprintf(stdout, "\nSHOULD BE\n");
-        simif.dump_state(stdout, startPC);
-
-        exit(-1);
-#ifdef KONATA
-        fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+#ifdef COSIM
+        printf("INTERRUPT %.8x\n", inst.pc);
+        simif.take_trap(true, 7, inst.pc);
 #endif
     }
+    else
+    {
+        if (inst.rd != 0 && inst.flags < 6)
+            regTagOverride[inst.rd] = inst.tag;
+
+#ifdef COSIM
+        uint32_t startPC = simif.get_pc();
+        if (!simif.cosim_instr(inst))
+        {
+            fprintf(stdout, "ERROR\n");
+            DumpState(stdout, inst.pc, inst.inst);
+
+            fprintf(stdout, "\nSHOULD BE\n");
+            simif.dump_state(stdout, startPC);
+
+            exit(-1);
+#ifdef KONATA
+            fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+#endif
+        }
 #endif
 
 #ifdef KONATA
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "COM");
-    fprintf(konataFile, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "COM");
+        fprintf(konataFile, "R\t%u\t%u\t0\n", inst.id, inst.sqn);
 #else
         // DumpState(inst.pc);
 #endif
+    }
 }
 
 void LogPredec(Inst& inst)
@@ -555,13 +568,19 @@ void LogInstructions()
                 // assert(insts[sqn].sqn == (uint32_t)sqn);
 
                 bool isInterrupt = false;
+                bool isXRETinterrupt = false;
                 if (core->ROB_trapUOp & 1)
                 {
                     int trapSQN = (core->ROB_trapUOp >> 15) & 127;
                     int flags = (core->ROB_trapUOp >> 29) & 15;
-                    isInterrupt = (trapSQN == sqn) && flags == 0;
+                    int rd = (core->ROB_trapUOp >> 10) & 31;
+                    isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
+                    isXRETinterrupt = (trapSQN == sqn) && ((flags == 5 || flags == 14) && core->rob__DOT__IN_interruptPending);
                 }
-                LogCommit(insts[sqn], isInterrupt);
+                insts[sqn].interrupt = isInterrupt ? Inst::IR_SQUASH : Inst::IR_NONE;
+                if (isXRETinterrupt) insts[sqn].interrupt = Inst::IR_KEEP;
+
+                LogCommit(insts[sqn]);
                 mostRecentPC = insts[sqn].pc;
                 insts[sqn].valid = false;
             }
@@ -636,9 +655,9 @@ void LogInstructions()
                     pd[i].valid = true;
                     pd[i].flags = 0;
                     pd[i].id = id++;
-                    pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 31 - 32, 31) << 1;
-                    pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 122 - 32, 32);
-                    pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 3, 5);
+                    pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 31 - 32, 31) << 1;
+                    pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 32, 32);
+                    pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 4, 5);
                     if ((pd[i].inst & 3) != 3)
                         pd[i].inst &= 0xffff;
 
@@ -651,7 +670,7 @@ void LogInstructions()
     LogCycle();
 }
 
-#include "default64mbdtc.h"
+//#include "default64mbdtc.h"
 
 int main(int argc, char** argv)
 {
@@ -704,7 +723,7 @@ int main(int argc, char** argv)
     tfp->open("Decode_tb.vcd");
 #endif
 
-    memcpy(&pram[(0x800000) / 4], default64mbdtb, sizeof(default64mbdtb));
+    //memcpy(&pram[(0x800000) / 4], default64mbdtb, sizeof(default64mbdtb));
 
     for (size_t i = 0; i < (1 << 24); i++)
     {

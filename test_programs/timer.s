@@ -3,7 +3,7 @@
 
 
 main:
-    
+
     li a0, 0
     csrrw x0, mideleg, a0
     li a0, 0
@@ -22,11 +22,12 @@ main:
     csrrw x0, mtvec, a0
     
     # set up timer interrupt in 1000 cycles
-    li a1, 0xff000080
-    li a2, 1000
+    li a1, 0x1100bff8
+    li a2, 100
     lw a0, 0(a1)
     add a0, a0, a2
-    sw a0, 8(a1)
+    li a1, 0x11004000
+    sw a0, 0(a1)
 
     la a0, user
     csrrw x0, mepc, a0
@@ -40,7 +41,7 @@ machine_trap:
     
     csrw mscratch, a0
     
-    li a0, 0x20000
+    li a0, 0x80040000
     sw x1, 0(a0)
     sw x2, 4(a0)
     sw x3, 8(a0)
@@ -75,15 +76,26 @@ machine_trap:
     #call printdecu
     csrr a0, mepc
     call printhex
+
+    csrr a0, mcause
+    bltz a0, .continue
+        li a0, 0x11100000
+        li a1, 0x55
+        sb a1, 0(a0)
+    
+        .end_loop:
+            j .end_loop
+    .continue:
     
     # schedule timer interrupt in 1000 cycles
-    li a1, 0xff000080
-    li a2, 1000
+    li a1, 0x1100bff8
+    li a2, 100
     lw a0, 0(a1)
     add a0, a0, a2
-    sw a0, 8(a1)
+    li a1, 0x11004000
+    sw a0, 0(a1)
     
-    li a0, 0x20000
+    li a0, 0x80040000
     lw x1, 0(a0)
     lw x2, 4(a0)
     lw x3, 8(a0)
@@ -126,6 +138,13 @@ machine_trap:
     
 user:
     li a0, 0
+
+    #.loop:
+    #    j .loop
+    #nop
+    #nop
+    #nop
+    #ebreak
     
     .loop:
         addi a0, a0, 1
