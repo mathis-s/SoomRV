@@ -1,6 +1,6 @@
 VERILATOR_FLAGS = --cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-UNDRIVEN -Wno-BLKSEQ -Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-MULTIDRIVEN --x-assign unique --x-initial unique -O3 -CFLAGS "-march=native" -MAKEFLAGS -j16
 
-VERILATOR_CFG = --exe Decode_tb.cpp ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
+VERILATOR_CFG = --exe Top_tb.cpp ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
 VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 64 -CFLAGS -DTRACE
 
