@@ -29,7 +29,7 @@ module ROB
     input wire IN_uopValid[WIDTH_RN-1:0],
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
-    input wire IN_interruptPending,
+    input wire IN_interruptPending /*verilator public*/,
     
     // for perf counters
     output reg[WIDTH-1:0] OUT_PERFC_validRetire,

@@ -582,7 +582,7 @@ typedef struct packed
     logic valid;
 } FloatFlagsUpdate;
 
-typedef struct
+typedef struct packed
 {
     logic sv32en;
     logic sv32en_ifetch;
@@ -590,7 +590,6 @@ typedef struct
     logic makeExecReadable;
     logic supervUserMemory;
     PrivLevel priv;
-    
 } STAT_VMem;
 
 interface IF_CSR_MMIO;

@@ -6,11 +6,14 @@
 #include "VTop.h"
 #include "VTop_Core.h"
 #include "VTop_ExternalMemorySim.h"
-#include "VTop_MemRTL.h"
+#include "VTop_MemRTL__N200.h"
+#include "VTop_MemRTL__W40_N200.h"
 #include "VTop_RF.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable__N8.h"
 #include "VTop_Top.h"
+#include "VTop_CSR.h"
+#include "VTop_ROB.h"
 #include "VTop___024root.h"
 #include <cstdio>
 #include <iostream> // Need std::cout
@@ -32,6 +35,11 @@
 #include "riscv/processor.h"
 #include "riscv/simif.h"
 
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <signal.h>
+
 struct Inst
 {
     uint32_t inst;
@@ -48,7 +56,12 @@ struct Inst
     uint8_t rd;
     uint8_t tag;
     uint8_t flags;
-    enum InterruptType { IR_NONE, IR_SQUASH, IR_KEEP } interrupt;
+    enum InterruptType
+    {
+        IR_NONE,
+        IR_SQUASH,
+        IR_KEEP
+    } interrupt;
     bool valid;
 };
 
@@ -93,48 +106,46 @@ class SpikeSimif : public simif_t
         // pass through some HPM counter reads
         // WARNING: this explicitly stops us from testing
         // mcounterinhibit for these!
-        if ((i.inst & 0b1111111) == 0b1110011)
-            switch ((i.inst >> 12) & 0b11)
+        if ((i.inst & 0b1111111) == 0b1110011) switch ((i.inst >> 12) & 0b11)
             {
-                case 0b001:
-                case 0b010:
-                case 0b011:
-                case 0b101:
-                case 0b110:
-                case 0b111:
+            case 0b001:
+            case 0b010:
+            case 0b011:
+            case 0b101:
+            case 0b110:
+            case 0b111: {
+                uint32_t csrID = i.inst >> 20;
+                switch (csrID)
                 {
-                    uint32_t csrID = i.inst >> 20;
-                    switch (csrID)
-                    {
-                        // FIXME: minstret should be the same, barring
-                        // multiple commits per cycle. This is a bit overzealous.
-                        case CSR_MINSTRETH:
-                        case CSR_MINSTRET:
-                        case CSR_CYCLE:
-                        case CSR_CYCLEH:
-                        case CSR_MCYCLE:
-                        case CSR_MCYCLEH:
-                        case CSR_MHPMCOUNTER3:
-                        case CSR_MHPMCOUNTER4:
-                        case CSR_MHPMCOUNTER5:
-                        case CSR_MHPMCOUNTER3H:
-                        case CSR_MHPMCOUNTER4H:
-                        case CSR_MHPMCOUNTER5H:
-                        
+                // FIXME: minstret should be the same, barring
+                // multiple commits per cycle. This is a bit overzealous.
+                case CSR_MINSTRETH:
+                case CSR_MINSTRET:
+                case CSR_CYCLE:
+                case CSR_CYCLEH:
+                case CSR_MCYCLE:
+                case CSR_MCYCLEH:
+                case CSR_MHPMCOUNTER3:
+                case CSR_MHPMCOUNTER4:
+                case CSR_MHPMCOUNTER5:
+                case CSR_MHPMCOUNTER3H:
+                case CSR_MHPMCOUNTER4H:
+                case CSR_MHPMCOUNTER5H:
 
-                        case CSR_MTVAL:
-                        case CSR_MIP:
-                        
-                        case CSR_MVENDORID:
-                        case CSR_MARCHID:
-                        case CSR_MIMPID:
-                        {
-                            return true;
-                        }
-                        default: break;
-                    }
+                case CSR_MTVAL:
+                case CSR_MIP:
+
+                case CSR_MVENDORID:
+                case CSR_MARCHID:
+                case CSR_MIMPID: {
+                    return true;
                 }
-                default: break;
+                default:
+                    break;
+                }
+            }
+            default:
+                break;
             }
 
         return false;
@@ -171,8 +182,7 @@ class SpikeSimif : public simif_t
 
     virtual char* addr_to_mem(reg_t addr) override
     {
-        if (addr >= 0x80000000)
-            return (char*)pram + (addr - 0x80000000);
+        if (addr >= 0x80000000) return (char*)pram + (addr - 0x80000000);
         return nullptr;
     }
     virtual bool mmio_load(reg_t addr, size_t len, uint8_t* bytes) override
@@ -182,21 +192,16 @@ class SpikeSimif : public simif_t
         else
             memset(bytes, 0, len);
 
-        if (addr == 0x2000000 + 0xbff8)
-            memcpy(bytes, &mtime, len);
-        if (addr == 0x2000000 + 0xbffc)
-            memcpy(bytes, (uint8_t*)&mtime + 4, len);
-        if (addr == 0x2000000 + 0x4000)
-            memcpy(bytes, (uint8_t*)&mtimecmp, len);
-        if (addr == 0x2000000 + 0x4004)
-            memcpy(bytes, (uint8_t*)&mtimecmp + 4, len);
+        if (addr == 0x2000000 + 0xbff8) memcpy(bytes, &mtime, len);
+        if (addr == 0x2000000 + 0xbffc) memcpy(bytes, (uint8_t*)&mtime + 4, len);
+        if (addr == 0x2000000 + 0x4000) memcpy(bytes, (uint8_t*)&mtimecmp, len);
+        if (addr == 0x2000000 + 0x4004) memcpy(bytes, (uint8_t*)&mtimecmp + 4, len);
 
         return true;
     }
     virtual bool mmio_store(reg_t addr, size_t len, const uint8_t* bytes) override
     {
-        if ((addr - 0x80000000) < sizeof(pram))
-            memcpy((uint8_t*)pram + (addr - 0x80000000), bytes, len);
+        if ((addr - 0x80000000) < sizeof(pram)) memcpy((uint8_t*)pram + (addr - 0x80000000), bytes, len);
 
         return true;
     }
@@ -219,7 +224,24 @@ class SpikeSimif : public simif_t
         uint32_t instSIM;
         mmio_load(initialSpikePC, 4, (uint8_t*)&instSIM);
 
-        processor->step(1);
+        // failed sc.w (TODO: what if address is invalid?)
+        if (((instSIM & 0b11111'00'00000'00000'111'00000'1111111) == 0b00011'00'00000'00000'010'00000'0101111) &&
+            ReadRegister(inst.rd) != 0)
+        {
+            processor->get_mmu()->yield_load_reservation();
+        }
+        
+        // WFI is currently a nop.
+        if (instSIM == 0x10500073)
+        {
+            processor->get_state()->pc += 4;
+            processor->get_state()->minstret->bump(1);
+        }
+        else
+        {
+            processor->step(1);
+        }
+        
 
         // TODO: Use this for adjusting WARL behaviour
         /*auto writes = processor->get_state()->log_reg_write;
@@ -238,14 +260,14 @@ class SpikeSimif : public simif_t
 
             switch (addr)
             {
-
-                case 0x1100bff8:
-                case 0x1100bffc:
-                case 0x11004000:
-                case 0x11004004:
-                case 0x10000000:
-                case 0x10000004:
-                case 0x11100000: mem_pass_thru = true;
+            case 0x1100bff8:
+            case 0x1100bffc:
+            case 0x11004000:
+            case 0x11004004:
+            case 0x10000000:
+            case 0x10000004:
+            case 0x11100000:
+                mem_pass_thru = true;
             }
         }
 
@@ -256,7 +278,7 @@ class SpikeSimif : public simif_t
 
         if (inst.interrupt == Inst::IR_KEEP)
         {
-            printf("INTERRUPT %.8x (keep)", (uint32_t)processor->get_state()->pc);
+            //printf("INTERRUPT %.8x (keep)", (uint32_t)processor->get_state()->pc);
             take_trap(true, 7, processor->get_state()->pc);
         }
 
@@ -311,8 +333,7 @@ class SpikeSimif : public simif_t
         // s = set_field(s, MSTATUS_MPV, curr_virt);
         // s = set_field(s, MSTATUS_GVA, t.has_gva());
         state.mstatus->write(s);
-        if (state.mstatush)
-            state.mstatush->write(s >> 32); // log mstatush change
+        if (state.mstatush) state.mstatush->write(s >> 32); // log mstatush change
         processor->set_privilege(PRV_M);
     }
 };
@@ -361,8 +382,7 @@ uint32_t ReadRegister(uint32_t rid)
     auto core = top->rootp->Top->core;
 
     uint8_t comTag = regTagOverride[rid];
-    if (comTag == 0xff)
-        comTag = (core->rn->rt->rat[rid] >> 7) & 127;
+    if (comTag == 0xff) comTag = (core->rn->rt->rat[rid] >> 7) & 127;
 
     if (comTag & 64)
         return ((int32_t)(comTag & 63) << (32 - 6)) >> (32 - 6);
@@ -375,7 +395,7 @@ SpikeSimif simif;
 void DumpState(FILE* stream, uint32_t pc, uint32_t inst)
 {
     auto core = top->rootp->Top->core;
-    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x\n", core->csr__DOT__minstret, pc, inst);
+    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x\n", core->csr->minstret, pc, inst);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
@@ -392,14 +412,13 @@ void LogCommit(Inst& inst)
     if (inst.interrupt == Inst::IR_SQUASH)
     {
 #ifdef COSIM
-        printf("INTERRUPT %.8x\n", inst.pc);
+        // printf("INTERRUPT %.8x\n", inst.pc);
         simif.take_trap(true, 7, inst.pc);
 #endif
     }
     else
     {
-        if (inst.rd != 0 && inst.flags < 6)
-            regTagOverride[inst.rd] = inst.tag;
+        if (inst.rd != 0 && inst.flags < 6) regTagOverride[inst.rd] = inst.tag;
 
 #ifdef COSIM
         uint32_t startPC = simif.get_pc();
@@ -466,8 +485,7 @@ void LogResult(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
-    if (!(inst.tag & 0x40))
-        fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
+    if (!(inst.tag & 0x40)) fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
 #endif
 }
 
@@ -554,7 +572,7 @@ void LogInstructions()
         uint32_t curComSqN = core->ROB_curSqN;
         for (size_t i = 0; i < 4; i++)
         {
-            if ((core->comUOps[i] & 1) && !core->csr__DOT__IN_mispredFlush)
+            if ((core->comUOps[i] & 1) && !core->mispredFlush)
             {
                 int sqn = (core->comUOps[i] >> 4) & 127;
 
@@ -569,7 +587,8 @@ void LogInstructions()
                     int flags = (core->ROB_trapUOp >> 29) & 15;
                     int rd = (core->ROB_trapUOp >> 10) & 31;
                     isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
-                    isXRETinterrupt = (trapSQN == sqn) && ((flags == 5 || flags == 14) && core->rob__DOT__IN_interruptPending);
+                    isXRETinterrupt =
+                        (trapSQN == sqn) && ((flags == 5 || flags == 14) && core->rob->IN_interruptPending);
                 }
                 insts[sqn].interrupt = isInterrupt ? Inst::IR_SQUASH : Inst::IR_NONE;
                 if (isXRETinterrupt) insts[sqn].interrupt = Inst::IR_KEEP;
@@ -589,23 +608,20 @@ void LogInstructions()
         uint32_t i = (brSqN + 1) & 127;
         while (i != nextSqN)
         {
-            if (insts[i].valid)
-                LogFlush(insts[i]);
+            if (insts[i].valid) LogFlush(insts[i]);
             i = (i + 1) & 127;
         }
 
         for (size_t i = 0; i < 4; i++)
         {
-            if (de[i].valid)
-                LogFlush(de[i]);
-            if (pd[i].valid)
-                LogFlush(pd[i]);
+            if (de[i].valid) LogFlush(de[i]);
+            if (pd[i].valid) LogFlush(pd[i]);
         }
     }
     else
     {
         // Rename
-        if (core->rn->frontEn && !core->csr__DOT__IN_mispredFlush && !core->RN_stall)
+        if (core->frontendEn && !core->mispredFlush && !core->RN_stall)
             for (size_t i = 0; i < 4; i++)
                 if (core->RN_uopValid[i])
                 {
@@ -624,7 +640,7 @@ void LogInstructions()
                 }
 
         // Decoded (TODO: decBranch)
-        if (core->rn->frontEn && !core->RN_stall)
+        if (core->frontendEn && !core->RN_stall)
         {
             for (size_t i = 0; i < 4; i++)
                 if (top->rootp->Top->core->DE_uop[i].at(0) & (1 << 0))
@@ -635,8 +651,7 @@ void LogInstructions()
                 }
                 else
                 {
-                    if (pd[i].valid)
-                        LogFlush(pd[i]);
+                    if (pd[i].valid) LogFlush(pd[i]);
                     de[i].valid = false;
                 }
         }
@@ -652,8 +667,7 @@ void LogInstructions()
                     pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 31 - 32, 31) << 1;
                     pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 32, 32);
                     pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 4, 5);
-                    if ((pd[i].inst & 3) != 3)
-                        pd[i].inst &= 0xffff;
+                    if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
 
                     LogPredec(pd[i]);
                 }
@@ -663,8 +677,6 @@ void LogInstructions()
     }
     LogCycle();
 }
-
-//#include "default64mbdtc.h"
 
 int main(int argc, char** argv)
 {
@@ -696,8 +708,7 @@ int main(int argc, char** argv)
         numInstrBytes = fread(pramBytes, sizeof(uint8_t), sizeof(pram), f);
         fclose(f);
 
-        if (numInstrBytes & 3)
-            numInstrBytes = (numInstrBytes & ~3) + 4;
+        if (numInstrBytes & 3) numInstrBytes = (numInstrBytes & ~3) + 4;
         printf("Read %zu bytes of instructions\n", numInstrBytes);
 
         f = fopen("data.bin", "rb");
@@ -716,8 +727,6 @@ int main(int argc, char** argv)
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
 #endif
-
-    //memcpy(&pram[(0x800000) / 4], default64mbdtb, sizeof(default64mbdtb));
 
     for (size_t i = 0; i < (1 << 24); i++)
     {
@@ -750,10 +759,12 @@ int main(int argc, char** argv)
         top->clk = !top->clk;
         top->eval(); // Evaluate model
 
-        if (top->clk == 1)
+        if (top->clk == 1) 
+        {
             LogInstructions();
+        }
 
-            // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC);
+        // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC);
 
 #ifdef TRACE
         tfp->dump(main_time);

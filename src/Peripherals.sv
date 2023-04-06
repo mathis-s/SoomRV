@@ -50,13 +50,13 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mtime <= 0;
         mtimecmp <= 0;
-        divCnt <= 49;
+        divCnt <= 99;
     end
     else begin
         
         if (divCnt == 0) begin
             mtime <= mtime + 1;
-            divCnt <= 49;
+            divCnt <= 99;
         end
         else divCnt <= divCnt - 1;
         
@@ -111,6 +111,7 @@ always@(posedge OUT_SPI_clk) begin
     spiCntI = spiCntI + 1;
     if (spiCntI == 8) begin
         $write("%c", spiByte);
+        $fflush(32'h80000001);
         spiCntI = 0;
     end
 end

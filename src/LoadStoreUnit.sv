@@ -35,7 +35,6 @@ always_comb begin
     
     IF_mmio.wdata = IF_mem.wdata;
     IF_mmio.wmask = IF_mem.wmask;
-    IF_mmio.re = IF_mem.re;
     
 end
 
@@ -55,13 +54,18 @@ always_comb begin
     
     IF_mem.we = 1;
     IF_mmio.we = 1;
+
+    IF_mem.re = 1;
+    IF_mmio.re = 1;
         
     // Load
     if (doRead) begin
-        IF_mem.re = 0;
+        if (IN_uopLd.isMMIO)
+            IF_mmio.re = 0;
+        else
+            IF_mem.re = 0;
     end
-    else IF_mem.re = 1;
-    
+
     // Store
     if (IN_uopSt.valid) begin
         if (IN_uopSt.isMMIO) begin
@@ -72,7 +76,7 @@ always_comb begin
             
             // do not issue two ops at the same address at once
             // FIXME: compare only as many bits as required
-            if (doRead && IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2]) begin
+            if (doRead && !IN_uopLd.isMMIO && IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2]) begin
                 OUT_stStall = 1;
             end
             else begin

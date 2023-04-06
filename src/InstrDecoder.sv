@@ -572,9 +572,9 @@ always_comb begin
                     end
                     `OPC_FENCE: begin
                         if (instr.funct3 == 0) begin
-                            uop.fu = FU_INT;
-                            uop.opcode = INT_SYS;
-                            uop.imm = {28'bx, FLAGS_FENCE};
+                            uop.fu = FU_RN;
+                            //uop.opcode = INT_SYS;
+                            //uop.imm = {28'bx, FLAGS_FENCE};
                             invalidEnc = 0;
                         end
                         else if (instr.funct3 == 1) begin

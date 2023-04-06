@@ -44,8 +44,8 @@ CommitUOp comUOps[3:0] /*verilator public*/;
 wire ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
 
 BranchProv branchProvs[3:0];
-BranchProv branch;
-wire mispredFlush;
+BranchProv branch /*verilator public*/;
+wire mispredFlush /*verilator public*/;
 wire BS_PERFC_branchMispr;
 
 IF_Instr IF_instrs;
@@ -109,7 +109,7 @@ IndirectBranchPredictor ibp
 );
 
 SqN RN_nextSqN;
-SqN ROB_curSqN;
+SqN ROB_curSqN /*verilator public*/;
 
 wire PD_full;
 PD_Instr PD_instrs[`DEC_WIDTH-1:0] /*verilator public*/;
@@ -145,21 +145,21 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 
-wire frontendEn = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
+wire frontendEn /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
     ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) && 
     !branch.taken &&
     en &&
     !mispredFlush &&
     !SQ_flush;
 
-wire FUSE_full = !frontendEn || RN_stall;
+wire FUSE_full /*verilator public*/ = !frontendEn || RN_stall;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
-wire RN_uopValid[`DEC_WIDTH-1:0];
+wire RN_uopValid[`DEC_WIDTH-1:0] /*verilator public*/;
 wire RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
-wire RN_stall;
+wire RN_stall /*verilator public*/;
 Rename rn 
 (
     .clk(clk),
@@ -704,7 +704,7 @@ FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
 wire[3:0] ROB_validRetire;
 wire[3:0] ROB_retireBranch;
-Trap_UOp ROB_trapUOp;
+Trap_UOp ROB_trapUOp /*verilator public*/;
 ROB rob
 (
     .clk(clk),
