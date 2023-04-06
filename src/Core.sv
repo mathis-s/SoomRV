@@ -145,7 +145,8 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 
-wire frontendEn /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full &&
+wire frontendEn /*verilator public*/ = 
+    IQS_ready &&
     ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) && 
     !branch.taken &&
     en &&
@@ -163,7 +164,6 @@ wire RN_stall /*verilator public*/;
 Rename rn 
 (
     .clk(clk),
-    .en(!branch.taken && !mispredFlush),
     .frontEn(frontendEn),
     .rst(rst),
     
@@ -198,12 +198,13 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
+wire IQS_ready = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
 wire IQ0_full;
 IssueQueue#(`IQ_0_SIZE,2,`DEC_WIDTH,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
+    .frontEn(IQS_ready),
     
     .IN_stall(stall[0]),
     .IN_doNotIssueFU1(DIV_doNotIssue),
@@ -236,7 +237,7 @@ IssueQueue#(`IQ_1_SIZE,2,`DEC_WIDTH,4,32,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) 
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
+    .frontEn(IQS_ready),
     
     .IN_stall(stall[1]),
     .IN_doNotIssueFU1(MUL_doNotIssue),
@@ -269,7 +270,7 @@ IssueQueue#(`IQ_2_SIZE,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
+    .frontEn(IQS_ready),
     
     .IN_stall(stall[2]),
     .IN_doNotIssueFU1(1'b0),
@@ -302,7 +303,7 @@ IssueQueue#(`IQ_3_SIZE,3,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(frontendEn && !branch.taken && !mispredFlush && !RN_stall),
+    .frontEn(IQS_ready),
     
     .IN_stall(stall[3]),
     .IN_doNotIssueFU1(1'b0),

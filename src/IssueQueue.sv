@@ -240,7 +240,7 @@ always_ff@(posedge clk) begin
         end
         
         // Enqueue
-        if (frontEn) begin
+        if (frontEn && !IN_branch.taken) begin
             for (i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_uopValid[i] && 
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 

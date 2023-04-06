@@ -6,7 +6,6 @@ module Rename
 )
 (
     input wire clk,
-    input wire en,
     input wire frontEn,
     input wire rst,
     
@@ -98,7 +97,7 @@ always_comb begin
             // these don't write or writes are eliminated
             IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
         
-        if ((!TB_tagsValid[i]) && IN_uop[i].valid && frontEn && en && TB_tagNeeded[i])
+        if ((!TB_tagsValid[i]) && IN_uop[i].valid && frontEn && TB_tagNeeded[i])
             OUT_stall = 1;
     end
         
@@ -110,7 +109,7 @@ always_comb begin
         
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
-        RAT_issueValid[i] = !rst && !IN_branchTaken && en && frontEn && !OUT_stall && IN_uop[i].valid;
+        RAT_issueValid[i] = !rst && !IN_branchTaken && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
         
         // LR/SC Handling
@@ -270,7 +269,7 @@ always_ff@(posedge clk) begin
         end
     end
 
-    else if (en && frontEn && !OUT_stall) begin
+    else if (frontEn && !OUT_stall) begin
 
         // Look up tags and availability of operands for new instructions
         for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
@@ -340,19 +339,19 @@ always_ff@(posedge clk) begin
         counterSqN <= nextCounterSqN;
         lrScRsv <= nextLrScRsv;
     end
-    else if (!en) begin
+    else if (frontEn) begin
         for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
     end
     
-    if (!rst) begin
+    if (!rst && !IN_branchTaken && !frontEn) begin
         // If frontend is stalled right now we need to make sure 
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
         for (i = 0; i < WIDTH_WR; i=i+1) begin
-            if (en && (!frontEn || OUT_stall) && IN_wbHasResult[i]) begin
+            if (IN_wbHasResult[i]) begin
                 for (j = 0; j < WIDTH_ISSUE; j=j+1) begin
                     if (OUT_uopValid[j]) begin
                         if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
