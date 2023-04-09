@@ -1,13 +1,3 @@
-
-
-typedef struct packed
-{
-    logic[23:0] addr;
-    logic valid;
-    logic dirty;
-    logic used;
-} CacheTableEntry;
-
 module CacheController
 #(
     parameter SIZE=16,
@@ -39,6 +29,13 @@ module CacheController
 integer i;
 integer j;
 
+typedef struct packed
+{
+    logic[23:0] addr;
+    logic valid;
+    logic dirty;
+    logic used;
+} CacheTableEntry;
 
 CacheTableEntry ctable[SIZE-1:0];
 

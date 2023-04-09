@@ -21,11 +21,11 @@ main:
         add a1, a1, a3
         addi a0, a0, 4
         blt a0, a2, .loop_load
-    
+
     li a0, 8390656
     sub a0, a1, a0
     call printdecu
-    
+
     lw ra, -4(sp)
     ret
 
