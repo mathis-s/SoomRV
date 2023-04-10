@@ -88,7 +88,7 @@ always_comb begin
         cacheFreeAvail[i] = 0;
         cacheHitIdx[i] = 'x;
         cacheFreeIdx[i] = 'x;
-        cacheEvictIdx[i] = 'x;
+        cacheEvictIdx[i] = 0;
 
         cacheIdx[i] = uops[i].addr[CLSIZE_E+$clog2(LEN)-1:CLSIZE_E];
 
@@ -128,7 +128,7 @@ reg isCachePassthru[TOTAL_UOPS-1:0];
 always_comb begin
     for (i = 0; i < TOTAL_UOPS; i=i+1) begin
         
-        isMMIO[i] = uops[i].valid && `IS_MMIO_PMA(uops[i].addr);
+        isMMIO[i] = uops[i].valid && (`IS_MMIO_PMA(uops[i].addr) || uops[i].exception != AGU_NO_EXCEPTION);
 
         isCacheHit[i] = uops[i].valid && !`IS_MMIO_PMA(uops[i].addr) && cacheHit[i];
 
@@ -182,7 +182,6 @@ always_ff@(posedge clk) begin
                 if (!IN_memc.busy) begin
                     state <= IDLE;
                     ctable[evictIdx][evictAssocIdx].valid <= 1;
-                    ctable[evictIdx][evictAssocIdx].used <= 0;
                     ctable[evictIdx][evictAssocIdx].addr <= OUT_memc.extAddr[29:$clog2(LEN)+CLSIZE_E-2];
                 end
             end
@@ -250,20 +249,28 @@ always_ff@(posedge clk) begin
                     temp = 1;
                 end
                 else if (!cacheHit[i] && state == IDLE && !temp) begin
-                    state <= EVICT_RQ;
+
+                    reg dirty = ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty;
+                    for (j = 0; j < TOTAL_UOPS; j=j+1)
+                        if (j != i && isCacheHit[j] && 
+                            cacheIdx[j] == cacheIdx[i] &&
+                            cacheHitIdx[j] == cacheEvictIdx[i] &&
+                            !uops[j].isLoad) 
+                            dirty = 1;
                     
-                    // there might be accesses that come through in the same cycle...
                     ctable[cacheIdx[i]][cacheEvictIdx[i]].valid <= 0;
                     ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty <= 0;
+                    ctable[cacheIdx[i]][cacheEvictIdx[i]].used <= 0;
 
-                    // TODO: do not evict if not dirty
-                    OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                    OUT_memc.sramAddr <= {cacheEvictIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
-                    OUT_memc.extAddr <= {ctable[cacheIdx[i]][cacheEvictIdx[i]].addr, cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
-                    OUT_memc.cacheID <= 0;
-                    OUT_memc.rqID <= 0;
-
-                    temp = 1;
+                    if (dirty) begin
+                        state <= EVICT_RQ;
+                        OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                        OUT_memc.sramAddr <= {cacheEvictIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
+                        OUT_memc.extAddr <= {ctable[cacheIdx[i]][cacheEvictIdx[i]].addr, cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
+                        OUT_memc.cacheID <= 0;
+                        OUT_memc.rqID <= 0;
+                        temp = 1;
+                    end
                 end
             end
         end
