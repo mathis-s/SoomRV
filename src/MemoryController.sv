@@ -60,7 +60,7 @@ always_comb begin
             enableCache = 1;
             enableExt = 1;
             extAddr = IN_ctrl.extAddr;
-            accessLength = IN_ctrl.cacheID ? 128 : 64;
+            accessLength = IN_ctrl.cacheID ? 128 : 32;
         end
     end
     
