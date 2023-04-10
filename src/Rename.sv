@@ -9,6 +9,7 @@ module Rename
     input wire frontEn,
     input wire rst,
     
+    input wire IN_stall,
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
@@ -79,7 +80,8 @@ LrScRsv lrScRsv;
 LrScRsv nextLrScRsv;
 
 always_comb begin
-    OUT_stall = 0;
+    OUT_stall = IN_stall;
+
     nextCounterSqN = counterSqN;
     nextLrScRsv = lrScRsv;
     
@@ -88,6 +90,9 @@ always_comb begin
         
     // Stall
     for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+
+        if (IN_mispredFlush && IN_uop[i].valid)
+            OUT_stall = 1;
         
         isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
         
@@ -339,14 +344,14 @@ always_ff@(posedge clk) begin
         counterSqN <= nextCounterSqN;
         lrScRsv <= nextLrScRsv;
     end
-    else if (frontEn) begin
+    else if (!IN_stall) begin
         for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
     end
     
-    if (!rst && !IN_branchTaken && !frontEn) begin
+    if (!rst && !IN_branchTaken && IN_stall) begin
         // If frontend is stalled right now we need to make sure 
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.

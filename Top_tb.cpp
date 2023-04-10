@@ -1,6 +1,6 @@
 // #define TRACE
 // #define KONATA
-// #define COSIM
+#define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -34,11 +34,6 @@
 #include "riscv/mmu.h"
 #include "riscv/processor.h"
 #include "riscv/simif.h"
-
-#include <sys/ioctl.h>
-#include <termios.h>
-#include <unistd.h>
-#include <signal.h>
 
 struct Inst
 {
@@ -627,7 +622,7 @@ void LogInstructions()
     else
     {
         // Rename
-        if (core->frontendEn && !core->mispredFlush && !core->RN_stall)
+        if (core->IQS_ready)
             for (size_t i = 0; i < 4; i++)
                 if (core->RN_uopValid[i])
                 {
@@ -662,7 +657,7 @@ void LogInstructions()
                 }
         }
         // Predec
-        if (!core->FUSE_full)
+        if (!core->RN_stall && core->frontendEn)
         {
             for (size_t i = 0; i < 4; i++)
                 if (core->PD_instrs[i].at(0) & 1)

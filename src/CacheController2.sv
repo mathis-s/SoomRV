@@ -1,7 +1,7 @@
 module CacheController
 #(
     parameter SIZE=16,
-    parameter ASSOC=2,
+    parameter ASSOC=4,
     parameter CLSIZE_E=8,
     localparam TOTAL_UOPS = 2
 )
@@ -122,9 +122,23 @@ reg cacheMiss[1:0];
 wire[$clog2(LEN)-1:0] evictIdx = OUT_memc.sramAddr[CLSIZE_E-2+:$clog2(LEN)];
 wire[$clog2(ASSOC)-1:0] evictAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2+:$clog2(ASSOC)];
 
+reg isMMIO[TOTAL_UOPS-1:0];
+reg isCacheHit[TOTAL_UOPS-1:0];
+reg isCachePassthru[TOTAL_UOPS-1:0];
 always_comb begin
-    for (i = 0; i < TOTAL_UOPS; i=i+1)
-        OUT_stall[i] = (uops[i].valid && !`IS_MMIO_PMA(uops[i].addr) && !cacheHit[i]) || IN_stall[i];
+    for (i = 0; i < TOTAL_UOPS; i=i+1) begin
+        
+        isMMIO[i] = uops[i].valid && `IS_MMIO_PMA(uops[i].addr);
+
+        isCacheHit[i] = uops[i].valid && !`IS_MMIO_PMA(uops[i].addr) && cacheHit[i];
+
+        isCachePassthru[i] = uops[i].valid && !`IS_MMIO_PMA(uops[i].addr) &&
+            state == LOAD_ACTIVE &&
+            OUT_memc.extAddr[29:CLSIZE_E-2] == uops[i].addr[31:CLSIZE_E] &&
+            IN_memc.progress[CLSIZE_E-3:0] > uops[i].addr[CLSIZE_E-1:2];
+
+        OUT_stall[i] = (uops[i].valid && !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i];
+    end
 end
 
 ST_UOp outStUOp_r;
@@ -144,7 +158,7 @@ end
 
 always_ff@(posedge clk) begin
    
-    reg temp = OUT_uopLd.valid || OUT_uopSt.valid;
+    reg temp = 0;
 
     if (rst) begin
         OUT_memc.cmd <= MEMC_NONE;
@@ -169,7 +183,6 @@ always_ff@(posedge clk) begin
                     state <= IDLE;
                     ctable[evictIdx][evictAssocIdx].valid <= 1;
                     ctable[evictIdx][evictAssocIdx].used <= 0;
-                    ctable[evictIdx][evictAssocIdx].dirty <= 0;
                     ctable[evictIdx][evictAssocIdx].addr <= OUT_memc.extAddr[29:$clog2(LEN)+CLSIZE_E-2];
                 end
             end
@@ -195,22 +208,36 @@ always_ff@(posedge clk) begin
             end
 
             if (uops[i].valid) begin
-                if (`IS_MMIO_PMA(uops[i].addr) && !OUT_stall[i]) begin
+                if (isMMIO[i] && !OUT_stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 1;
                     outUops[i].valid <= 1;
                     if (i == 0) outLdUOp_r <= IN_uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
-                else if (cacheHit[i] && !OUT_stall[i]) begin
+                else if ((isCacheHit[i] || isCachePassthru[i]) && !OUT_stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 0;
                     outUops[i].valid <= 1;
-                    outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, cacheHitIdx[i], cacheIdx[i], uops[i].addr[CLSIZE_E-1:0]};
+
+                    if (isCacheHit[i]) begin
+                        outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, cacheHitIdx[i], cacheIdx[i], uops[i].addr[CLSIZE_E-1:0]};
+                        if (!uops[i].isLoad) ctable[cacheIdx[i]][cacheHitIdx[i]].dirty <= 1;
+                        // maybe manage used in separate array?
+                        for (j = 0; j < ASSOC; j=j+1) 
+                            ctable[cacheIdx[i]][j].used <= 0;
+                        ctable[cacheIdx[i]][cacheHitIdx[i]].used <= 1;
+                    end
+                    else begin // if (isCachePassthru[i])
+                        outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, evictAssocIdx, evictIdx, uops[i].addr[CLSIZE_E-1:0]};
+
+                        if (!uops[i].isLoad) ctable[evictIdx][evictAssocIdx].dirty <= 1;
+                        ctable[evictIdx][evictAssocIdx].used <= 1;
+                    end
+
                     if (i == 0) outLdUOp_r <= IN_uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
-                // TODO: pass through if load progress is high enough
                 else if (!cacheHit[i] && state == IDLE && cacheFreeAvail[i] && !temp) begin
                     state <= LOAD_RQ;
 
@@ -227,6 +254,7 @@ always_ff@(posedge clk) begin
                     
                     // there might be accesses that come through in the same cycle...
                     ctable[cacheIdx[i]][cacheEvictIdx[i]].valid <= 0;
+                    ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty <= 0;
 
                     // TODO: do not evict if not dirty
                     OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
