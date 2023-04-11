@@ -118,7 +118,7 @@ PreDecode preDec
     .clk(clk),
     .rst(rst),
     .ifetchValid(ifetchEn),
-    .outEn(!FUSE_full),
+    .outEn(!RN_stall && frontendEn),
 
     .OUT_full(PD_full),
     
@@ -134,7 +134,7 @@ InstrDecoder idec
     .clk(clk),
     .rst(rst),
     .IN_invalidate(branch.taken),
-    .en(!FUSE_full),
+    .en(!RN_stall && frontendEn),
     .IN_instrs(PD_instrs),
     
     .IN_enCustom(1'b1),
@@ -146,14 +146,10 @@ InstrDecoder idec
 );
 
 wire frontendEn /*verilator public*/ = 
-    IQS_ready &&
     ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) && 
     !branch.taken &&
     en &&
-    !mispredFlush &&
     !SQ_flush;
-
-wire FUSE_full /*verilator public*/ = !frontendEn || RN_stall;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
 wire RN_uopValid[`DEC_WIDTH-1:0] /*verilator public*/;
@@ -167,6 +163,7 @@ Rename rn
     .frontEn(frontendEn),
     .rst(rst),
     
+    .IN_stall(!IQS_ready),
     .OUT_stall(RN_stall),
 
     .IN_uop(DE_uop),
@@ -198,7 +195,7 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire IQS_ready = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
+wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
 wire IQ0_full;
 IssueQueue#(`IQ_0_SIZE,2,`DEC_WIDTH,4,32,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (

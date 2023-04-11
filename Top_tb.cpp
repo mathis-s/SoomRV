@@ -1,6 +1,6 @@
 // #define TRACE
 // #define KONATA
-// #define COSIM
+#define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -35,11 +35,6 @@
 #include "riscv/processor.h"
 #include "riscv/simif.h"
 
-#include <sys/ioctl.h>
-#include <termios.h>
-#include <unistd.h>
-#include <signal.h>
-
 struct Inst
 {
     uint32_t inst;
@@ -66,6 +61,9 @@ struct Inst
 };
 
 VTop* top; // Instantiation of model
+#ifdef TRACE
+VerilatedVcdC* tfp;
+#endif
 uint32_t pram[1 << 24];
 uint64_t main_time = 0;
 
@@ -430,6 +428,9 @@ void LogCommit(Inst& inst)
             fprintf(stdout, "\nSHOULD BE\n");
             simif.dump_state(stdout, startPC);
 
+#ifdef TRACE
+            tfp->flush();
+#endif
             exit(-1);
 #ifdef KONATA
             fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
@@ -621,7 +622,7 @@ void LogInstructions()
     else
     {
         // Rename
-        if (core->frontendEn && !core->mispredFlush && !core->RN_stall)
+        if (core->IQS_ready)
             for (size_t i = 0; i < 4; i++)
                 if (core->RN_uopValid[i])
                 {
@@ -656,7 +657,7 @@ void LogInstructions()
                 }
         }
         // Predec
-        if (!core->FUSE_full)
+        if (!core->RN_stall && core->frontendEn)
         {
             for (size_t i = 0; i < 4; i++)
                 if (core->PD_instrs[i].at(0) & 1)
@@ -723,7 +724,7 @@ int main(int argc, char** argv)
 #endif
 
 #ifdef TRACE
-    VerilatedVcdC* tfp = new VerilatedVcdC;
+    tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
 #endif
@@ -773,7 +774,7 @@ int main(int argc, char** argv)
     }
 
     // Run a few more cycles ...
-    for (int i = 0; i < 1600; i = i + 1)
+    for (int i = 0; i < 3200; i = i + 1)
     {
         top->clk = !top->clk;
         top->eval(); // Evaluate model
