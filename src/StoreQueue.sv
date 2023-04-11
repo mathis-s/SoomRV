@@ -64,8 +64,8 @@ always_comb begin
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
     case (IN_uopLd.size)
-        0: lookupMask = ~(4'b1 << IN_uopLd.shamt);
-        1: lookupMask = ~((IN_uopLd.shamt == 2) ? 4'b1100 : 4'b0011);
+        0: lookupMask = ~(4'b1 << IN_uopLd.addr[1:0]);
+        1: lookupMask = ~((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
         default: lookupMask = 0;
     endcase
     

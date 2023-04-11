@@ -31,7 +31,6 @@ typedef struct packed
     logic[3:0] wmask;
     logic[31:0] addr;
     logic signExtend;
-    logic[1:0] shamt;
     logic[1:0] size;
     Tag tagDst;
     RegNm nmDst;
@@ -125,7 +124,7 @@ always_comb begin
     case (uopLd_1.size)
         
         0: begin
-            case (uopLd_1.shamt)
+            case (uopLd_1.addr[1:0])
                 0: result[7:0] = data[7:0];
                 1: result[7:0] = data[15:8];
                 2: result[7:0] = data[23:16];
@@ -136,7 +135,7 @@ always_comb begin
         end
         
         1: begin
-            case (uopLd_1.shamt)
+            case (uopLd_1.addr[1:0])
                 default: result[15:0] = data[15:0];
                 2: result[15:0] = data[31:16];
             endcase

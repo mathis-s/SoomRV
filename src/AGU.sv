@@ -199,12 +199,10 @@ always_ff@(posedge clk) begin
                 // (Unaligned is handled in software)
                 case (IN_uop.opcode)
                     LSU_LB: begin
-                        OUT_aguOp.shamt <= addr[1:0];
                         OUT_aguOp.size <= 0;
                         OUT_aguOp.signExtend <= 1;
                     end
                     LSU_LH: begin
-                        OUT_aguOp.shamt <= {addr[1], 1'b0};
                         OUT_aguOp.size <= 1;
                         OUT_aguOp.signExtend <= 1;
                     end
@@ -213,17 +211,14 @@ always_ff@(posedge clk) begin
                     ATOMIC_AMOAND_W, ATOMIC_AMOOR_W, ATOMIC_AMOMIN_W, 
                     ATOMIC_AMOMAX_W, ATOMIC_AMOMINU_W, ATOMIC_AMOMAXU_W,
                     LSU_LW: begin
-                        OUT_aguOp.shamt <= 2'b0;
                         OUT_aguOp.size <= 2;
                         OUT_aguOp.signExtend <= 0;
                     end
                     LSU_LBU: begin
-                        OUT_aguOp.shamt <= addr[1:0];
                         OUT_aguOp.size <= 0;
                         OUT_aguOp.signExtend <= 0;
                     end
                     LSU_LHU: begin
-                        OUT_aguOp.shamt <= {addr[1], 1'b0};
                         OUT_aguOp.size <= 1;
                         OUT_aguOp.signExtend <= 0;
                     end

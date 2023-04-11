@@ -21,7 +21,6 @@ SRC_FILES = \
 	src/IndirectBranchPredictor.sv \
 	src/LoadBuffer.sv \
 	src/StoreQueue.sv \
-	src/MultiplySmall.sv \
 	src/Multiply.sv \
 	src/Divide.sv \
 	src/MMIO.sv \

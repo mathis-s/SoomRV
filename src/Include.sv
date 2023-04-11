@@ -477,7 +477,6 @@ typedef struct packed
     // could union some of these fields
     logic[3:0] wmask;
     logic signExtend;
-    logic[1:0] shamt;
     logic[1:0] size;
     logic isLoad;
     logic[31:0] pc;
@@ -499,7 +498,6 @@ typedef struct packed
 {
     logic[31:0] addr;
     logic signExtend;
-    logic[1:0] shamt;
     logic[1:0] size;
     Tag tagDst;
     RegNm nmDst;

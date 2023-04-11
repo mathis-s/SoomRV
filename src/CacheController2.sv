@@ -163,7 +163,6 @@ AGU_UOp outLdUOp_r;
 always_comb begin
 
     OUT_uopLd.signExtend = outLdUOp_r.signExtend;
-    OUT_uopLd.shamt = outLdUOp_r.shamt;
     OUT_uopLd.size = outLdUOp_r.size;
     OUT_uopLd.tagDst = outLdUOp_r.tagDst;
     OUT_uopLd.nmDst = outLdUOp_r.nmDst;
