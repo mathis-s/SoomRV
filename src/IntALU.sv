@@ -249,8 +249,7 @@ always_ff@(posedge clk) begin
                     OUT_ibInfo.valid <= 1;
                 end*/
             end
-                        
-            OUT_uop.compressed <= IN_uop.compressed;
+
             OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.result <= resC;
@@ -265,7 +264,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.flags <= flags;
             
             OUT_uop.valid <= 1;
-            OUT_uop.pc <= IN_uop.pc;
         end
     end
 end

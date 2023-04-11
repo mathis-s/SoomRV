@@ -72,8 +72,6 @@ always_ff@(posedge clk) begin
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
-        OUT_uop.pc <= IN_uop.pc;
-        OUT_uop.compressed <= 0;
         OUT_uop.doNotCommit <= 0;
         if (rm >= 3'b101)
             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;

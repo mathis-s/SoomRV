@@ -275,7 +275,7 @@ reg[4:0] fflags;
 reg[2:0] frm;
 
 reg[63:0] mcycle;
-reg[63:0] minstret;
+reg[63:0] minstret /*verilator public*/;
 reg[63:0] mhpmcounter3; // branches
 reg[63:0] mhpmcounter4; // branch mispredicts
 reg[63:0] mhpmcounter5; // total mispredicts
@@ -564,10 +564,6 @@ always_comb begin
         CSR_mstatush,
         CSR_mhartid: rdata = 0;
         
-        //CSR_pmpcfg0,
-        //CSR_pmpaddr0,
-        12'h139: rdata = 0;
-        
         // all unused perf counter stuff, also r/o zero
         CSR_hpmcounter6, CSR_hpmcounter7, CSR_hpmcounter8, CSR_hpmcounter9,
         CSR_hpmcounter10, CSR_hpmcounter11, CSR_hpmcounter12, CSR_hpmcounter13, CSR_hpmcounter14, CSR_hpmcounter15,
@@ -703,10 +699,8 @@ always_ff@(posedge clk) begin
     else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
     
         OUT_uop.valid <= 1;
-        OUT_uop.compressed <= IN_uop.compressed;
         OUT_uop.doNotCommit <= 0;
         OUT_uop.flags <= FLAGS_NONE;
-        OUT_uop.pc <= IN_uop.pc;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.tagDst <= IN_uop.tagDst;
@@ -892,8 +886,6 @@ always_ff@(posedge clk) begin
                                 satp <= wdata;
                                 satp.asid <= 0;
                             end
-                            
-                            12'h139: $write("%c", wdata[7:0]);
                             
                             default: begin end
                         endcase

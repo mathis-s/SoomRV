@@ -237,8 +237,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.tagDst <= IN_uop.tagDst;
                 OUT_uop.nmDst <= IN_uop.nmDst;
                 OUT_uop.sqN <= IN_uop.sqN;
-                OUT_uop.pc <= IN_uop.pc;
-                OUT_uop.compressed <= IN_uop.compressed;
                 OUT_uop.result <= addr;
                 OUT_uop.doNotCommit <= 0;
                 

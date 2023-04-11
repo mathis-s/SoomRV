@@ -1,7 +1,7 @@
 // #define TRACE
 // #define KONATA
 #include <exception>
-#define COSIM
+// #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -558,12 +558,12 @@ void LogInstructions()
     for (size_t i = 0; i < 4; i++)
     {
         // WB valid
-        if (core->wbUOp[i][0] & 1)
+        if (core->wbUOp[i] & 1)
         {
-            uint32_t sqn = ExtractField(core->wbUOp[i], 90 - 32 - 7 - 5 - 7, 7);
-            uint32_t result = ExtractField(core->wbUOp[i], 90 - 32, 32);
+            uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
+            uint32_t result = (core->wbUOp[i] >> (6+7+5+7)) & 0xffff'ffff;
             insts[sqn].result = result;
-            insts[sqn].flags = ExtractField(core->wbUOp[i], 3, 4);
+            insts[sqn].flags = (core->wbUOp[i] >> 2) & 0xF;
 
             // FP ops use a different flag encoding. These are not traps, so ignore them.
             if ((insts[sqn].fu == 5 || insts[sqn].fu == 6 || insts[sqn].fu == 7) && insts[sqn].flags >= 8 &&

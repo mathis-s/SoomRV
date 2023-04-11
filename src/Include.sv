@@ -457,10 +457,8 @@ typedef struct packed
     Tag tagDst;
     RegNm nmDst;
     SqN sqN;
-    bit[31:0] pc;
     Flags flags;
     logic doNotCommit;
-    logic compressed;
     bit valid;
 } RES_UOp;
 
@@ -500,12 +498,26 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] addr;
+    logic signExtend;
+    logic[1:0] shamt;
+    logic[1:0] size;
+    Tag tagDst;
+    RegNm nmDst;
+    SqN sqN;
+    logic doNotCommit;
+    AGU_Exception exception;
+    logic isMMIO;
+    logic valid;
+} LD_UOp;
+
+typedef struct packed
+{
+    logic[31:0] addr;
     logic[31:0] data;
     logic[3:0] wmask;
     logic isMMIO;
     logic valid;
 } ST_UOp;
-
 
 typedef struct packed
 {

@@ -85,8 +85,6 @@ always_ff@(posedge clk) begin
                 OUT_uop.sqN <= uop.sqN;
                 OUT_uop.tagDst <= uop.tagDst;
                 OUT_uop.nmDst <= uop.nmDst;
-                OUT_uop.pc <= uop.pc;
-                OUT_uop.compressed <= 0;
                 OUT_uop.doNotCommit <= 0;
                 
                 OUT_uop.flags <= FLAGS_NONE;

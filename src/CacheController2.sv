@@ -16,7 +16,7 @@ module CacheController
     output wire OUT_stall[TOTAL_UOPS-1:0],
     
     input AGU_UOp IN_uopLd,
-    output AGU_UOp OUT_uopLd,
+    output LD_UOp OUT_uopLd,
     
     input ST_UOp IN_uopSt,
     output ST_UOp OUT_uopSt,
@@ -161,7 +161,16 @@ ST_UOp outStUOp_r;
 AGU_UOp outLdUOp_r;
 
 always_comb begin
-    OUT_uopLd = outLdUOp_r;
+
+    OUT_uopLd.signExtend = outLdUOp_r.signExtend;
+    OUT_uopLd.shamt = outLdUOp_r.shamt;
+    OUT_uopLd.size = outLdUOp_r.size;
+    OUT_uopLd.tagDst = outLdUOp_r.tagDst;
+    OUT_uopLd.nmDst = outLdUOp_r.nmDst;
+    OUT_uopLd.sqN = outLdUOp_r.sqN;
+    OUT_uopLd.doNotCommit = outLdUOp_r.doNotCommit;
+    OUT_uopLd.exception = outLdUOp_r.exception;
+
     OUT_uopLd.valid = outUops[0].valid;
     OUT_uopLd.addr = outUops[0].addr;
     OUT_uopLd.isMMIO = outUops[0].isMMIO;

@@ -117,9 +117,7 @@ always@(posedge clk) begin
         OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.valid <= 1;
-        OUT_uop.pc <= IN_uop.pc;
         OUT_uop.doNotCommit <= 0;
-        OUT_uop.compressed <= 0;
         
         if (IN_uop.opcode[5:3] == 3'b101) begin
             case (IN_uop.opcode)

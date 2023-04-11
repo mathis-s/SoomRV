@@ -30,7 +30,6 @@ typedef struct packed
     Tag tagDst;
     RegNm nmDst;
     SqN sqN;
-    bit[31:0] pc;
     bit valid;
 } MulPS;
 
@@ -57,7 +56,6 @@ always_ff@(posedge clk) begin
             pl[0].tagDst <= IN_uop.tagDst;
             pl[0].nmDst <= IN_uop.nmDst;
             pl[0].sqN <= IN_uop.sqN;
-            pl[0].pc <= IN_uop.pc;
             pl[0].res <= 0;
             
             case (IN_uop.opcode)
@@ -103,9 +101,7 @@ always_ff@(posedge clk) begin
                 OUT_uop.tagDst <= pl[NUM_STAGES].tagDst;
                 OUT_uop.nmDst <= pl[NUM_STAGES].nmDst;
                 OUT_uop.sqN <= pl[NUM_STAGES].sqN;
-                OUT_uop.pc <= pl[NUM_STAGES].pc;
                 OUT_uop.flags <= FLAGS_NONE;
-                OUT_uop.compressed <= 0;
                 OUT_uop.doNotCommit <= 0;
                 
                 if (pl[NUM_STAGES].high)
