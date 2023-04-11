@@ -32,7 +32,7 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
-    if (!`IS_LEGAL_ADDR(addr)) begin
+    if (!`IS_LEGAL_ADDR(addr) && !IN_vmem.sv32en) begin
         except = AGU_ACCESS_FAULT;
         if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
     end
@@ -136,7 +136,7 @@ always_ff@(posedge clk) begin
                     end
                     else
                         OUT_aguOp.addr[31:12] <= IN_memc.result[29:10];
-                    
+
                     if (!IN_memc.result[0] ||
                         (IN_vmem.priv == PRIV_USER && !IN_memc.result[4]) ||
                         (IN_vmem.priv == PRIV_SUPERVISOR && IN_memc.result[4] && !IN_vmem.supervUserMemory) ||
@@ -145,6 +145,11 @@ always_ff@(posedge clk) begin
                     ) begin
                         OUT_aguOp.exception <= AGU_PAGE_FAULT;
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_PF;
+                    end
+                    
+                    if (IN_memc.result[31:30] != 2'b0 || !`IS_LEGAL_ADDR({IN_memc.result[29:10], 12'b0})) begin
+                        OUT_aguOp.exception <= AGU_ACCESS_FAULT;
+                        if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_AF;
                     end
                     
                     OUT_aguOp.valid <= 1;
