@@ -6,31 +6,31 @@ main:
     li s0, 4
     .loop_main:
         li a0, 42
-        li a1, 0x4000
+        li a1, 0x80004000
         sw a0, 0(a1)
         
         # make sure clean works and value persists
         cbo.clean 0(a1)
         
-        li a1, 0x4000
+        li a1, 0x80004000
         lw a0, 0(a1)
         call printhex
         
-        li a1, 0x4000
+        li a1, 0x80004000
         cbo.clean 0(a1)
         
-        li a1, 0x4000
+        li a1, 0x80004000
         lw a0, 0(a1)
         call printhex
         
         
         # modify value
-        li a1, 0x4000
+        li a1, 0x80004000
         li a0, 0xdeadbeef
         sw a0, 0(a1)
         
         # print modified value
-        li a1, 0x4000
+        li a1, 0x80004000
         lw a0, 0(a1)
         call printhex
         
@@ -38,12 +38,12 @@ main:
         cbo.inval 0(a1)
         
         # print original value
-        li a1, 0x4000
+        li a1, 0x80004000
         lw a0, 0(a1)
         call printhex
         
         # modify value again
-        li a1, 0x4000
+        li a1, 0x80004000
         li a0, 0xdeadbeef
         sw a0, 0(a1)
         
@@ -51,13 +51,13 @@ main:
         cbo.flush 0(a1)
         
         # print modified value
-        li a1, 0x4000
+        li a1, 0x80004000
         lw a0, 0(a1)
         call printhex
         
         
         li a0, 10
-        li a1, 0xff000003
+        li a1, 0x10000000
         sb a0, 0(a1)
         
         addi s0, s0, -1

@@ -71,7 +71,12 @@ always_comb begin
     uops[1].addr = IN_uopSt.addr;
 end
 
-assign OUT_fenceBusy = 0;
+assign OUT_fenceBusy = flushActive || IN_fence;
+reg flushActive;
+reg flushWaiting;
+reg[$clog2(SIZE):0] flushIter;
+wire[$clog2(LEN)-1:0] flushIdx = flushIter[$clog2(SIZE)-1:$clog2(ASSOC)];
+wire[$clog2(ASSOC)-1:0] flushAssocIdx = flushIter[$clog2(ASSOC)-1:0];
 
 CommonUOp outUops[TOTAL_UOPS-1:0];
 
@@ -147,7 +152,8 @@ always_comb begin
             OUT_memc.extAddr[29:CLSIZE_E-2] == uops[i].addr[31:CLSIZE_E] &&
             IN_memc.progress[CLSIZE_E-3:0] > uops[i].addr[CLSIZE_E-1:2];
 
-        OUT_stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE) && !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i];
+        OUT_stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid) && // HACK
+            !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i] || flushActive;
     end
 end
 
@@ -167,18 +173,19 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-   
     reg temp = 0;
 
     if (rst) begin
         OUT_memc.cmd <= MEMC_NONE;
         state <= IDLE;
+        flushActive <= 0;
         for (i = 0; i < TOTAL_UOPS; i=i+1) begin
             outUops[i] <= 'x;
             outUops[i].valid <= 0;
         end
     end
     else begin
+        
         // Evict/Load State Machine
         case (state)
             default: state <= IDLE;
@@ -207,6 +214,51 @@ always_ff@(posedge clk) begin
                 end
             end
         endcase
+        
+        // Flushing Logic
+        if (IN_fence) begin
+            flushActive <= 0;
+            flushWaiting <= 1;
+        end
+        else if (flushWaiting && IN_SQ_empty && !uops[0].valid && !uops[1].valid) begin
+            flushWaiting <= 0;
+            flushActive <= 1;
+            flushIter <= 0;
+        end
+
+        if (flushActive) begin
+            if (flushIter[$bits(flushIter)-1]) begin
+                if (state == IDLE) begin
+                    flushActive <= 0;
+                end
+            end
+            else if (ctable[flushIdx][flushAssocIdx].valid) begin
+                if (ctable[flushIdx][flushAssocIdx].dirty) begin
+                    if (state == IDLE) begin
+                        
+                        state <= EVICT_RQ;
+                        OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                        OUT_memc.sramAddr <= {flushAssocIdx, flushIdx, {(CLSIZE_E-2){1'b0}}};
+                        OUT_memc.extAddr <= {ctable[flushIdx][flushAssocIdx].addr, flushIdx, {(CLSIZE_E-2){1'b0}}};
+                        OUT_memc.cacheID <= 0;
+                        OUT_memc.rqID <= 0;
+                        temp = 1;
+
+                        ctable[flushIdx][flushAssocIdx].valid <= 0;
+                        ctable[flushIdx][flushAssocIdx].dirty <= 0;
+                        ctable[flushIdx][flushAssocIdx].used <= 0;
+                        flushIter <= flushIter + 1;
+                    end
+                end
+                else begin
+                    ctable[flushIdx][flushAssocIdx].valid <= 0;
+                    ctable[flushIdx][flushAssocIdx].dirty <= 0;
+                    ctable[flushIdx][flushAssocIdx].used <= 0;
+                    flushIter <= flushIter + 1;
+                end
+            end
+            else flushIter <= flushIter + 1;
+        end
 
         // Incoming UOps handling
         for (i = 0; i < TOTAL_UOPS; i=i+1) begin
@@ -215,10 +267,11 @@ always_ff@(posedge clk) begin
                 outUops[i] <= 'x;
                 outUops[i].valid <= 0;
             end
-
-            if (uops[i].valid) begin
-
-                if (isMgmt[i] && state == IDLE) begin
+            
+            if (uops[i].valid && !flushActive) begin
+                
+                // FIXME: if temp is set, cbo is ignored...
+                if (isMgmt[i] && state == IDLE && !temp && !OUT_stall[i]) begin
                     
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
                     for (j = 0; j < TOTAL_UOPS; j=j+1)
