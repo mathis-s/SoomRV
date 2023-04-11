@@ -1,5 +1,6 @@
 // #define TRACE
 // #define KONATA
+#include <exception>
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -11,6 +12,7 @@
 #include "VTop_RF.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable__N8.h"
+#include "VTop_RenameTable__N4_NB2.h"
 #include "VTop_Top.h"
 #include "VTop_CSR.h"
 #include "VTop_ROB.h"
@@ -180,7 +182,7 @@ class SpikeSimif : public simif_t
 
     virtual char* addr_to_mem(reg_t addr) override
     {
-        if (addr >= 0x80000000) return (char*)pram + (addr - 0x80000000);
+        if (addr >= 0x80000000 && addr < (0x80000000 + sizeof(pram))) return (char*)pram + (addr - 0x80000000);
         return nullptr;
     }
     virtual bool mmio_load(reg_t addr, size_t len, uint8_t* bytes) override
@@ -218,9 +220,13 @@ class SpikeSimif : public simif_t
     virtual bool cosim_instr(const Inst& inst)
     {
 
-        uint32_t initialSpikePC = processor->get_state()->pc & 0xffff'ffff;
+        uint32_t initialSpikePC = get_pc();
         uint32_t instSIM;
-        mmio_load(initialSpikePC, 4, (uint8_t*)&instSIM);
+        //processor->load(initialSpikePC, 4, (uint8_t*)&instSIM);
+        try
+        {
+            instSIM = processor->get_mmu()->load_insn(initialSpikePC).insn.bits();
+        } catch (mem_trap_t) { instSIM = 0; }
 
         // failed sc.w (TODO: what if address is invalid?)
         if (((instSIM & 0b11111'00'00000'00000'111'00000'1111111) == 0b00011'00'00000'00000'010'00000'0101111) &&
@@ -733,6 +739,7 @@ int main(int argc, char** argv)
     {
         top->rootp->Top->extMem->mem[i] = pram[i];
     }
+    
 
     // Reset
     top->rst = 1;
