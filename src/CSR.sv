@@ -327,7 +327,18 @@ reg[15:0] mip;
 reg[15:0] mie;
 reg[5:0] mcounteren;
 reg[5:0] mcounterinhibit;
-reg menvcfg_fiom;
+
+typedef struct packed
+{
+    logic[23:0] wpri1;
+    logic cbze;
+    logic cbcfe;
+    logic[1:0] cbie;
+    logic[2:0] wpri0;
+    logic fiom;
+} MEnvCfg_t;
+MEnvCfg_t menvcfg;
+MEnvCfg_t senvcfg;
 
 reg[5:0] scounteren;
 reg[31:0] sepc;
@@ -408,6 +419,22 @@ always_comb begin
     else if (epm == PRIV_SUPERVISOR) begin
         OUT_vmem.supervUserMemory = mstatus.sum;
     end
+    
+    OUT_vmem.cbcfe = 
+        !(
+        (priv != PRIV_MACHINE && !menvcfg.cbcfe) ||
+        (priv == PRIV_USER && !senvcfg.cbcfe)
+        );
+        
+    if ((priv != PRIV_MACHINE && menvcfg.cbie == 0) ||
+        (priv == PRIV_USER && senvcfg.cbie == 0))
+        OUT_vmem.cbie = 0;
+    else if ((priv != PRIV_MACHINE && menvcfg.cbie == 1) ||
+        (priv == PRIV_USER && senvcfg.cbie == 1))
+        OUT_vmem.cbie = 1;
+    else 
+        OUT_vmem.cbie = 3;
+
 end
 
 reg[31:0] rdata;
@@ -514,7 +541,7 @@ always_comb begin
         CSR_mepc: rdata = mepc;
         CSR_mcause: rdata = mcause;
         CSR_mtval: rdata = mtval;
-        CSR_menvcfg: rdata = {31'b0, menvcfg_fiom};
+        CSR_menvcfg: rdata = menvcfg;
         
         CSR_sstatus: begin
             temp.sie = mstatus.sie;
@@ -552,6 +579,7 @@ always_comb begin
         end
         
         CSR_satp: rdata = satp;
+        CSR_senvcfg: rdata = senvcfg;
         
         CSR_mhpmevent3: rdata = 3;
         CSR_mhpmevent4: rdata = 4;
@@ -681,14 +709,15 @@ always_ff@(posedge clk) begin
         medeleg <= 0;
         mip <= 0;
         mie <= 0;
+        menvcfg <= 0;
         
         scounteren <= 0;
         sepc <= 0;
         scause <= 0;
         stval <= 0;
         stvec <= 0;
-        
         satp <= 0;
+        senvcfg <= 0;
         
         mhpmcounter3 <= 0;
         mhpmcounter4 <= 0;
@@ -815,7 +844,14 @@ always_ff@(posedge clk) begin
                                 mtvec.base <= wdata[31:2];
                                 mtvec.mode[0] <= wdata[0];
                             end
-                            CSR_menvcfg: menvcfg_fiom <= wdata[0];
+                            CSR_menvcfg: begin
+                                MEnvCfg_t temp = wdata;
+
+                                menvcfg.fiom <= temp.fiom;
+                                menvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
+                                menvcfg.cbcfe <= temp.cbcfe;
+                                menvcfg.cbze <= 0;//wdata.cbze;
+                            end
                             
                             CSR_medeleg: medeleg <= wdata[15:0];
                             CSR_mideleg: mideleg <= wdata[15:0];
@@ -887,6 +923,15 @@ always_ff@(posedge clk) begin
                                 // we only support 32 bits of physical address space.
                                 satp.ppn[21:20] <= 2'b0;
                                 satp.asid <= 0;
+                            end
+
+                            CSR_senvcfg: begin
+                                MEnvCfg_t temp = wdata;
+
+                                senvcfg.fiom <= temp.fiom;
+                                senvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
+                                senvcfg.cbcfe <= temp.cbcfe;
+                                senvcfg.cbze <= 0;//wdata.cbze;
                             end
                             
                             default: begin end

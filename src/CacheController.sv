@@ -158,7 +158,7 @@ always_comb begin
             OUT_memc.extAddr[29:CLSIZE_E-2] == uops[i].addr[31:CLSIZE_E] &&
             IN_memc.progress[CLSIZE_E-3:0] > uops[i].addr[CLSIZE_E-1:2];
 
-        OUT_stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid) && // HACK
+        OUT_stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid /* HACK */) &&
             !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i] || flushActive;
     end
 end
@@ -303,9 +303,8 @@ always_ff@(posedge clk) begin
             if (uops[i].valid && !flushActive) begin
                 
                 // Cache Management Ops
-                // FIXME: if temp is set, cbo is ignored...
-                if (isMgmt[i] && state == IDLE && !temp && !OUT_stall[i]) begin
-                    
+                if (isMgmt[i] && state == IDLE && !OUT_stall[i]) begin
+
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
                     for (j = 0; j < TOTAL_UOPS; j=j+1)
                         if (j != i && isCacheHit[j] && 
@@ -313,6 +312,8 @@ always_ff@(posedge clk) begin
                             cacheHitIdx[j] == cacheHitIdx[i] &&
                             !uops[j].isLoad) 
                             dirty = 1;
+
+                    assert(!temp);
                     
                     if (uops[i].mgmtOp == 0 || uops[i].mgmtOp == 3) begin // cbo.clean
                         if (cacheHit[i] && dirty) begin

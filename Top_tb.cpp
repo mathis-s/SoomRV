@@ -1,6 +1,6 @@
 // #define TRACE
 // #define KONATA
-#define COSIM
+// #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"

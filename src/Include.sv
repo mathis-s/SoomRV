@@ -625,6 +625,8 @@ typedef struct packed
     logic[21:0] rootPPN;
     logic makeExecReadable;
     logic supervUserMemory;
+    logic[1:0] cbie;
+    logic cbcfe;
     PrivLevel priv;
 } STAT_VMem;
 

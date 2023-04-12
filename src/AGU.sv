@@ -286,20 +286,38 @@ always_ff@(posedge clk) begin
                     
                     LSU_CBO_CLEAN: begin
                         OUT_aguOp.wmask <= 0;
-                        OUT_aguOp.data[1:0] <= 0;
+                        OUT_aguOp.data <= {30'bx, 2'd0};
+
+                        if (!IN_vmem.cbcfe) begin
+                            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                            OUT_aguOp.valid <= 0;
+                        end
                     end
                     
                     LSU_CBO_INVAL: begin
                         OUT_aguOp.wmask <= 0;
-                        OUT_aguOp.data[1:0] <= 1;
-                        // FIXME: exception flags for CBO ops
-                        OUT_uop.flags <= FLAGS_ORDERING;
+
+                        OUT_aguOp.data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
+
+                        if (exceptFlags == FLAGS_NONE)
+                            OUT_uop.flags <= FLAGS_ORDERING;
+
+                        if (IN_vmem.cbie == 2'b00) begin
+                            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                            OUT_aguOp.valid <= 0;
+                        end
                     end
                     
                     LSU_CBO_FLUSH: begin
                         OUT_aguOp.wmask <= 0;
-                        OUT_aguOp.data[1:0] <= 2;
-                        OUT_uop.flags <= FLAGS_ORDERING;
+                        OUT_aguOp.data <= {30'bx, 2'd2};
+                        if (exceptFlags == FLAGS_NONE)
+                            OUT_uop.flags <= FLAGS_ORDERING;
+
+                        if (!IN_vmem.cbcfe) begin
+                            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                            OUT_aguOp.valid <= 0;
+                        end
                     end
                     
                     ATOMIC_AMOSWAP_W: OUT_aguOp.data <= IN_uop.srcB;
