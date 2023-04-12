@@ -1,7 +1,6 @@
 // #define TRACE
 // #define KONATA
-#include <exception>
-// #define COSIM
+#define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -24,6 +23,7 @@
 #ifdef TRACE
 #include "verilated_vcd_c.h"
 #endif
+#include <exception>
 #include <array>
 #include <cstring>
 #include <map>

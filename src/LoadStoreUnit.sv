@@ -17,6 +17,7 @@ module LoadStoreUnit
     input wire[31:0] IN_SQ_lookupData,
     
     output RES_UOp OUT_uopLd,
+    output PW_LD_RES_UOp OUT_uopPwLd,
     
     output wire OUT_loadFwdValid,
     output Tag OUT_loadFwdTag
@@ -36,6 +37,7 @@ typedef struct packed
     RegNm nmDst;
     SqN sqN;
     logic doNotCommit;
+    logic external;
     AGU_Exception exception;
     logic isMMIO;
     logic valid;
@@ -150,7 +152,6 @@ always_comb begin
     OUT_uopLd.tagDst = uopLd_1.tagDst;
     OUT_uopLd.nmDst = uopLd_1.nmDst;
     OUT_uopLd.sqN = uopLd_1.sqN;
-    OUT_uopLd.valid = uopLd_1.valid;
     case (uopLd_1.exception)
         AGU_NO_EXCEPTION: OUT_uopLd.flags = FLAGS_NONE;
         AGU_ADDR_MISALIGN: OUT_uopLd.flags = FLAGS_LD_MA;
@@ -158,6 +159,11 @@ always_comb begin
         AGU_PAGE_FAULT: OUT_uopLd.flags = FLAGS_LD_PF;
     endcase
     OUT_uopLd.doNotCommit = uopLd_1.doNotCommit;
+
+    OUT_uopPwLd.data = result;
+
+    OUT_uopLd.valid = uopLd_1.valid && !uopLd_1.external;
+    OUT_uopPwLd.valid = uopLd_1.valid && uopLd_1.external;
 end
 
 always_ff@(posedge clk) begin
@@ -170,21 +176,21 @@ always_ff@(posedge clk) begin
         uopLd_0.valid <= 0;
         uopLd_1.valid <= 0;
         
-        if (uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) begin
+        if (uopLd_0.valid && (uopLd_0.external || !IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) begin
             uopLd_1 <= uopLd_0;
         end
         
-        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
+        if (IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             
             // Loads that are entirely forwarded from the store queue can be written back one cycle earlier.
-            if (IN_SQ_lookupMask == 4'b1111 && !(uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0))) begin
+            if (IN_SQ_lookupMask == 4'b1111 && !(uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) && !IN_uopLd.external) begin
                 uopLd_1 <= ToStage(IN_uopLd);
                 uopLd_1.wmask <= IN_SQ_lookupMask;
                 uopLd_1.data <= IN_SQ_lookupData;
             end
             else begin
                 uopLd_0 <= ToStage(IN_uopLd);
-                uopLd_0.wmask <= IN_SQ_lookupMask;
+                uopLd_0.wmask <= IN_uopLd.external ? 4'b0000 : IN_SQ_lookupMask;
                 uopLd_0.data <= IN_SQ_lookupData;
             end
         end

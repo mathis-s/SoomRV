@@ -37,8 +37,9 @@ module IFetch
     output IF_Instr OUT_instrs,
     
     input STAT_VMem IN_vmem,
+    output PageWalkRq OUT_pw,
+    input PageWalkRes IN_pw,
     
-    output CTRL_MemC OUT_memc2,
     output CTRL_MemC OUT_memc,
     input STAT_MemC IN_memc,
     
@@ -197,7 +198,7 @@ reg[19:0] pageWalkVPN;
 
 reg en1;
 always_ff@(posedge clk) begin
-    OUT_memc2.cmd <= MEMC_NONE;
+    OUT_pw.valid <= 0;
     if (rst) begin
         pc <= 31'(`ENTRY_POINT >> 1);
         fetchID <= 0;
@@ -212,29 +213,27 @@ always_ff@(posedge clk) begin
     else begin
     
         if (!pageWalkAccepted && pageWalkActive) begin
-            if (IN_memc.busy && IN_memc.rqID == 4)
+            if (IN_pw.busy && IN_pw.rqID == 0)
                 pageWalkAccepted <= 1;
             else begin
-                OUT_memc2.cmd <= MEMC_PAGE_WALK;
-                OUT_memc2.rootPPN <= IN_vmem.rootPPN;
-                OUT_memc2.extAddr[29:10] <= pageWalkVPN;
-                OUT_memc2.cacheID <= 'x;
-                OUT_memc2.sramAddr <= 'x;
-                OUT_memc2.rqID <= 4;
+                OUT_pw.valid <= 1;
+                OUT_pw.rootPPN <= IN_vmem.rootPPN;
+                OUT_pw.addr[31:12] <= pageWalkVPN;
+                OUT_pw.addr[11:0] <= 'x;
             end
         end
-        else if (IN_memc.resultValid && pageWalkActive) begin
+        else if (IN_pw.valid && pageWalkActive) begin
             pageWalkActive <= 0;
             pageWalkAccepted <= 'x;
             lastVPN <= pageWalkVPN;
             
-            pcPPN <= IN_memc.result[29:10];
-            pcPPNsuperpage <= IN_memc.isSuperPage;
+            pcPPN <= IN_pw.result[29:10];
+            pcPPNsuperpage <= IN_pw.isSuperPage;
             lastVPN_valid <= 1;
             
             pcPPNfault <= IF_FAULT_NONE;
             
-            case (IN_memc.result[3:1])
+            case (IN_pw.result[3:1])
                     /*inv*/ 3'b000,
                     /*ro*/  3'b001,
                     /*rfu*/ 3'b010,
@@ -246,11 +245,11 @@ always_ff@(posedge clk) begin
                     /*rwx*/ 3'b111: begin end
             endcase
             
-            if ((IN_memc.isSuperPage && IN_memc.result[19:10] != 0) ||
-                (!IN_memc.result[0]) ||
-                (IN_vmem.priv == PRIV_USER && !IN_memc.result[4]) ||
-                (IN_vmem.priv == PRIV_SUPERVISOR && IN_memc.result[4]) ||
-                (!IN_memc.result[6])) 
+            if ((IN_pw.isSuperPage && IN_pw.result[19:10] != 0) ||
+                (!IN_pw.result[0]) ||
+                (IN_vmem.priv == PRIV_USER && !IN_pw.result[4]) ||
+                (IN_vmem.priv == PRIV_SUPERVISOR && IN_pw.result[4]) ||
+                (!IN_pw.result[6])) 
                 
                 pcPPNfault <= IF_PAGE_FAULT;
         end

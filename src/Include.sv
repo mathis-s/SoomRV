@@ -489,10 +489,37 @@ typedef struct packed
     BHist_t history;
     logic doNotCommit;
     AGU_Exception exception;
-    logic isMMIO;
     logic compressed;
     logic valid;
 } AGU_UOp;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic[21:0] rootPPN;
+    logic valid;
+} PageWalkRq;
+
+typedef struct packed
+{
+    logic[31:0] result;
+    logic isSuperPage;
+    logic[1:0] rqID;
+    logic valid;
+    logic busy;
+} PageWalkRes;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic valid;
+} PW_LD_UOp;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic valid;
+} PW_LD_RES_UOp;
 
 typedef struct packed
 {
@@ -503,6 +530,7 @@ typedef struct packed
     RegNm nmDst;
     SqN sqN;
     logic doNotCommit;
+    logic external; // not part of normal execution, ignore sqn, tagDst and nmDst, don't commit
     AGU_Exception exception;
     logic isMMIO;
     logic valid;

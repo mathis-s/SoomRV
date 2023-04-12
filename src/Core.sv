@@ -19,13 +19,7 @@ module Core
 integer i;
 
 always_comb begin
-    if (IF_memc2.cmd != MEMC_NONE)
-        OUT_memc = IF_memc2;
-    else if (STAGU_memc.cmd != MEMC_NONE)
-        OUT_memc = STAGU_memc;
-    else if (LDAGU_memc.cmd != MEMC_NONE)
-        OUT_memc = LDAGU_memc;
-    else if (PC_MC_if.cmd != MEMC_NONE)
+    if (PC_MC_if.cmd != MEMC_NONE)
         OUT_memc = PC_MC_if;
     else
         OUT_memc = CC_MC_if;
@@ -56,7 +50,7 @@ PCFileEntry PC_readData[4:0];
 wire PC_stall;
 
 CTRL_MemC PC_MC_if;
-CTRL_MemC IF_memc2;
+PageWalkRq PC_PW_rq;
 IFetch ifetch
 (
     .clk(clk),
@@ -89,7 +83,9 @@ IFetch ifetch
     .OUT_instrs(IF_instrs),
     
     .IN_vmem(CSR_vmem),
-    .OUT_memc2(IF_memc2),
+    .OUT_pw(PC_PW_rq),
+    .IN_pw(PW_res),
+
     .OUT_memc(PC_MC_if),
     .IN_memc(IN_memc),
     
@@ -475,6 +471,22 @@ CSR csr
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
 
+PageWalkRes PW_res;
+wire CC_PW_LD_stall;
+PW_LD_UOp PW_LD_uop;
+PageWalker pageWalker
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_rqs('{LDAGU_PW_rq, STAGU_PW_rq, PC_PW_rq}),
+    .OUT_res(PW_res),
+
+    .IN_ldStall(CC_PW_LD_stall),
+    .OUT_ldUOp(PW_LD_uop),
+    .IN_ldResUOp(LSU_PW_ldUOp)
+);
+
 LD_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
@@ -493,6 +505,9 @@ CacheController cc
     .IN_stall('{LSU_stStall, 1'b0}),
     .OUT_stall('{CC_storeStall, CC_loadStall}),
     
+    .IN_uopPwLd(PW_LD_uop),
+    .OUT_pwLdStall(CC_PW_LD_stall),
+
     .IN_uopLd(AGU_LD_uop),
     .OUT_uopLd(CC_uopLd),
     
@@ -507,7 +522,7 @@ CacheController cc
 );
 
 AGU_UOp AGU_LD_uop;
-CTRL_MemC LDAGU_memc;
+PageWalkRq LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
@@ -518,8 +533,8 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     
     .IN_branch(branch),
     .IN_vmem(CSR_vmem),
-    .OUT_memc(LDAGU_memc),
-    .IN_memc(IN_memc),
+    .OUT_pw(LDAGU_PW_rq),
+    .IN_pw(PW_res),
 
     .IN_uop(LD_uop[2]),
     .OUT_aguOp(AGU_LD_uop),
@@ -527,8 +542,8 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 );
 
 AGU_UOp AGU_ST_uop;
-CTRL_MemC STAGU_memc;
-AGU#(.LOAD_AGU(0), .RQ_ID(3)) aguST
+PageWalkRq STAGU_PW_rq;
+AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 (
     .clk(clk),
     .rst(rst),
@@ -538,9 +553,8 @@ AGU#(.LOAD_AGU(0), .RQ_ID(3)) aguST
     
     .IN_branch(branch),
     .IN_vmem(CSR_vmem),
-    .OUT_memc(STAGU_memc),
-    .IN_memc(IN_memc),
-
+    .OUT_pw(STAGU_PW_rq),
+    .IN_pw(PW_res),
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
@@ -600,6 +614,7 @@ StoreQueue sq
 wire LSU_loadFwdValid;
 Tag LSU_loadFwdTag;
 wire LSU_stStall;
+PW_LD_RES_UOp LSU_PW_ldUOp;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -618,6 +633,7 @@ LoadStoreUnit lsu
     .IN_SQ_lookupData(SQ_lookupData),
     
     .OUT_uopLd(wbUOp[2]),
+    .OUT_uopPwLd(LSU_PW_ldUOp),
     
     .OUT_loadFwdValid(LSU_loadFwdValid),
     .OUT_loadFwdTag(LSU_loadFwdTag)

@@ -15,6 +15,9 @@ module CacheController
     input wire IN_stall[TOTAL_UOPS-1:0],
     output wire OUT_stall[TOTAL_UOPS-1:0],
     
+    input PW_LD_UOp IN_uopPwLd,
+    output reg OUT_pwLdStall,
+
     input AGU_UOp IN_uopLd,
     output LD_UOp OUT_uopLd,
     
@@ -34,7 +37,6 @@ integer j;
 localparam LEN = SIZE / ASSOC;
 localparam TAG_LEN = 32 - CLSIZE_E - $clog2(LEN);
 
-
 typedef struct packed
 {
     logic[TAG_LEN-1:0] addr;
@@ -50,23 +52,41 @@ typedef struct packed
     logic[1:0] mgmtOp;
     logic isMMIO;
     logic isLoad;
+    logic external;
     AGU_Exception exception;
     logic valid;
 } CommonUOp;
 
+wire inUOpLdValid = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0);
+assign OUT_pwLdStall = OUT_stall[0] || inUOpLdValid;
+
 CommonUOp uops[TOTAL_UOPS-1:0];
 always_comb begin
-    uops[0].valid = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0);
-    uops[0].exception = IN_uopLd.exception;
-    uops[0].isLoad = 1;
-    uops[0].isMgmt = 0;
-    uops[0].mgmtOp = 'x;
-    uops[0].addr = IN_uopLd.addr;
+    // TODO: put this load selection into a separate combinatorial module.
+    if (inUOpLdValid) begin
+        uops[0].valid = 1;
+        uops[0].exception = IN_uopLd.exception;
+        uops[0].isLoad = 1;
+        uops[0].isMgmt = 0;
+        uops[0].external = 0;
+        uops[0].mgmtOp = 'x;
+        uops[0].addr = IN_uopLd.addr;
+    end
+    else begin
+        uops[0].valid = IN_uopPwLd.valid;
+        uops[0].exception = AGU_NO_EXCEPTION;
+        uops[0].isLoad = 1;
+        uops[0].isMgmt = 0;
+        uops[0].external = 1;
+        uops[0].mgmtOp = 'x;
+        uops[0].addr = IN_uopPwLd.addr;
+    end
 
     uops[1].valid = IN_uopSt.valid;
     uops[1].exception = AGU_NO_EXCEPTION;
     uops[1].isLoad = 0;
     uops[1].isMgmt = IN_uopSt.wmask == 0;
+    uops[1].external = 0;
     uops[1].mgmtOp = IN_uopSt.data[1:0];
     uops[1].addr = IN_uopSt.addr;
 end
@@ -78,20 +98,13 @@ reg[$clog2(SIZE):0] flushIter;
 wire[$clog2(LEN)-1:0] flushIdx = flushIter[$clog2(SIZE)-1:$clog2(ASSOC)];
 wire[$clog2(ASSOC)-1:0] flushAssocIdx = flushIter[$clog2(ASSOC)-1:0];
 
-CommonUOp outUops[TOTAL_UOPS-1:0];
-
 CacheTableEntry ctable[LEN-1:0][ASSOC-1:0];
-
 reg cacheHit[1:0];
 reg[$clog2(ASSOC)-1:0] cacheHitIdx[1:0];
-
 reg cacheFreeAvail[1:0];
-
 reg[$clog2(ASSOC)-1:0] cacheFreeIdx[1:0];
 reg[$clog2(ASSOC)-1:0] cacheEvictIdx[1:0];
-
 reg[$clog2(LEN)-1:0] cacheIdx[1:0];
-
 always_comb begin
     
     for (i = 0; i < TOTAL_UOPS; i=i+1) begin
@@ -123,13 +136,6 @@ always_comb begin
     end
 end
 
-enum logic[2:0]
-{
-    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE
-} state;
-
-reg cacheMiss[1:0];
-
 wire[$clog2(LEN)-1:0] evictIdx = OUT_memc.sramAddr[CLSIZE_E-2+:$clog2(LEN)];
 wire[$clog2(ASSOC)-1:0] evictAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2+:$clog2(ASSOC)];
 
@@ -157,28 +163,45 @@ always_comb begin
     end
 end
 
+CommonUOp outUops[TOTAL_UOPS-1:0];
 ST_UOp outStUOp_r;
 AGU_UOp outLdUOp_r;
-
 always_comb begin
 
-    OUT_uopLd.signExtend = outLdUOp_r.signExtend;
-    OUT_uopLd.size = outLdUOp_r.size;
-    OUT_uopLd.tagDst = outLdUOp_r.tagDst;
-    OUT_uopLd.nmDst = outLdUOp_r.nmDst;
-    OUT_uopLd.sqN = outLdUOp_r.sqN;
-    OUT_uopLd.doNotCommit = outLdUOp_r.doNotCommit;
-    OUT_uopLd.exception = outLdUOp_r.exception;
+    if (outUops[0].external) begin
+        // External DMA or page walk accesses have to be handled a bit differently.
+        OUT_uopLd = '0;
+        OUT_uopLd.size = 2;
+        OUT_uopLd.signExtend = 0;
+        OUT_uopLd.doNotCommit = 1;
+        OUT_uopLd.exception = AGU_NO_EXCEPTION;
+    end
+    else begin
+        OUT_uopLd.signExtend = outLdUOp_r.signExtend;
+        OUT_uopLd.size = outLdUOp_r.size;
+        OUT_uopLd.tagDst = outLdUOp_r.tagDst;
+        OUT_uopLd.nmDst = outLdUOp_r.nmDst;
+        OUT_uopLd.sqN = outLdUOp_r.sqN;
+        OUT_uopLd.doNotCommit = outLdUOp_r.doNotCommit;
+        OUT_uopLd.exception = outLdUOp_r.exception;
+    end
 
     OUT_uopLd.valid = outUops[0].valid;
     OUT_uopLd.addr = outUops[0].addr;
     OUT_uopLd.isMMIO = outUops[0].isMMIO;
+    OUT_uopLd.external = outUops[0].external;
 
     OUT_uopSt = outStUOp_r;
     OUT_uopSt.valid = outUops[1].valid;
     OUT_uopSt.addr = outUops[1].addr;
     OUT_uopSt.isMMIO = outUops[1].isMMIO;
+    //OUT_uopSt.external = outUops[1].external;
 end
+
+enum logic[2:0]
+{
+    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE
+} state;
 
 always_ff@(posedge clk) begin
     reg temp = 0;
@@ -233,7 +256,8 @@ always_ff@(posedge clk) begin
             flushActive <= 1;
             flushIter <= 0;
         end
-
+        
+        // Flush: Iterate through all cache lines and evict them if dirty and invalidate them.
         if (flushActive) begin
             if (flushIter[$bits(flushIter)-1]) begin
                 if (state == IDLE) begin
@@ -278,6 +302,7 @@ always_ff@(posedge clk) begin
             
             if (uops[i].valid && !flushActive) begin
                 
+                // Cache Management Ops
                 // FIXME: if temp is set, cbo is ignored...
                 if (isMgmt[i] && state == IDLE && !temp && !OUT_stall[i]) begin
                     
@@ -310,6 +335,8 @@ always_ff@(posedge clk) begin
                         end
                     end
                 end
+
+                // MMIO
                 else if (isMMIO[i] && !OUT_stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 1;
@@ -317,6 +344,8 @@ always_ff@(posedge clk) begin
                     if (i == 0) outLdUOp_r <= IN_uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
+
+                // Regular load/store, cache hit
                 else if ((isCacheHit[i] || isCachePassthru[i]) && !OUT_stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 0;
@@ -340,6 +369,8 @@ always_ff@(posedge clk) begin
                     if (i == 0) outLdUOp_r <= IN_uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
+
+                // Load Cache Line
                 else if (!cacheHit[i] && state == IDLE && cacheFreeAvail[i] && !temp) begin
                     state <= LOAD_RQ;
 
@@ -351,6 +382,8 @@ always_ff@(posedge clk) begin
 
                     temp = 1;
                 end
+
+                // Evict cache line
                 else if (!cacheHit[i] && state == IDLE && !temp) begin
                     
                     reg dirty = ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty;

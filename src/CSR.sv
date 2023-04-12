@@ -884,6 +884,8 @@ always_ff@(posedge clk) begin
                             
                             CSR_satp: begin
                                 satp <= wdata;
+                                // we only support 32 bits of physical address space.
+                                satp.ppn[21:20] <= 2'b0;
                                 satp.asid <= 0;
                             end
                             

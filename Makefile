@@ -51,6 +51,7 @@ SRC_FILES = \
 	src/CacheInterface.sv \
 	src/MemoryInterface.sv \
 	src/Peripherals.sv \
+	src/PageWalker.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

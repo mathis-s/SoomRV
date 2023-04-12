@@ -10,8 +10,8 @@ module AGU
     input BranchProv IN_branch,
     
     input STAT_VMem IN_vmem,
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc,
+    output PageWalkRq OUT_pw,
+    input PageWalkRes IN_pw,
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
@@ -72,7 +72,7 @@ end
 
 always_ff@(posedge clk) begin
     
-    OUT_memc.cmd <= MEMC_NONE;
+    OUT_pw.valid <= 0;
     OUT_uop.valid <= 0;
     
     if (rst) begin
@@ -85,19 +85,16 @@ always_ff@(posedge clk) begin
             if ((!IN_branch.taken || $signed(OUT_aguOp.sqN - IN_branch.sqN) <= 0)) begin
                 
                 if (!pageWalkAccepted) begin
-                    if (IN_memc.busy && IN_memc.rqID == RQ_ID) pageWalkAccepted <= 1;
+                    if (IN_pw.busy && IN_pw.rqID == RQ_ID) pageWalkAccepted <= 1;
                     else begin
-                        OUT_memc.cmd <= MEMC_PAGE_WALK;
-                        OUT_memc.rootPPN <= IN_vmem.rootPPN;
-                        OUT_memc.extAddr <= OUT_aguOp.addr[31:2];
-                        OUT_memc.cacheID <= 'x;
-                        OUT_memc.sramAddr <= 'x;
-                        OUT_memc.rqID <= RQ_ID;
+                        OUT_pw.valid <= 1;
+                        OUT_pw.rootPPN <= IN_vmem.rootPPN;
+                        OUT_pw.addr <= OUT_aguOp.addr;
                     end
                 end
-                else if (IN_memc.resultValid) begin
+                else if (IN_pw.valid) begin
                     if (LOAD_AGU) begin
-                        case (IN_memc.result[3:1])
+                        case (IN_pw.result[3:1])
                             /*inv*/ 3'b000,
                             /*rfu*/ 3'b010,
                             /*rfu*/ 3'b110: OUT_aguOp.exception <= AGU_PAGE_FAULT;
@@ -112,7 +109,7 @@ always_ff@(posedge clk) begin
                         endcase
                     end
                     else begin // StoreAGU
-                        case (IN_memc.result[3:1])
+                        case (IN_pw.result[3:1])
                             /*ro*/  3'b001,
                             /*xo*/  3'b100,
                             /*rx*/  3'b101,
@@ -127,27 +124,27 @@ always_ff@(posedge clk) begin
                         endcase
                     end
                     
-                    if (IN_memc.isSuperPage) begin
-                        OUT_aguOp.addr[31:22] <= IN_memc.result[29:20];
-                        if (IN_memc.result[19:10] != 0) begin // misaligned superpage
+                    if (IN_pw.isSuperPage) begin
+                        OUT_aguOp.addr[31:22] <= IN_pw.result[29:20];
+                        if (IN_pw.result[19:10] != 0) begin // misaligned superpage
                             OUT_aguOp.exception <= AGU_PAGE_FAULT;
                             if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_PF;
                         end
                     end
                     else
-                        OUT_aguOp.addr[31:12] <= IN_memc.result[29:10];
+                        OUT_aguOp.addr[31:12] <= IN_pw.result[29:10];
 
-                    if (!IN_memc.result[0] ||
-                        (IN_vmem.priv == PRIV_USER && !IN_memc.result[4]) ||
-                        (IN_vmem.priv == PRIV_SUPERVISOR && IN_memc.result[4] && !IN_vmem.supervUserMemory) ||
-                        (!IN_memc.result[6]) || // access but accessed not set
-                        (!LOAD_AGU && !IN_memc.result[7]) // write but dirty not set
+                    if (!IN_pw.result[0] ||
+                        (IN_vmem.priv == PRIV_USER && !IN_pw.result[4]) ||
+                        (IN_vmem.priv == PRIV_SUPERVISOR && IN_pw.result[4] && !IN_vmem.supervUserMemory) ||
+                        (!IN_pw.result[6]) || // access but accessed not set
+                        (!LOAD_AGU && !IN_pw.result[7]) // write but dirty not set
                     ) begin
                         OUT_aguOp.exception <= AGU_PAGE_FAULT;
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_PF;
                     end
                     
-                    if (IN_memc.result[31:30] != 2'b0 || !`IS_LEGAL_ADDR({IN_memc.result[29:10], 12'b0})) begin
+                    if (IN_pw.result[31:30] != 2'b0 || !`IS_LEGAL_ADDR({IN_pw.result[29:10], 12'b0})) begin
                         OUT_aguOp.exception <= AGU_ACCESS_FAULT;
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_AF;
                     end
@@ -156,7 +153,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.valid <= !LOAD_AGU;
                     
                     pageWalkActive <= 0;
-                    OUT_memc.cmd <= MEMC_NONE;
+                    OUT_pw.valid <= 0;
                 end
             end
             else begin
