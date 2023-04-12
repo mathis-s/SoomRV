@@ -6,12 +6,9 @@
 #include "VTop.h"
 #include "VTop_Core.h"
 #include "VTop_ExternalMemorySim.h"
-#include "VTop_MemRTL__N200.h"
-#include "VTop_MemRTL__W40_N200.h"
 #include "VTop_RF.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable__N8.h"
-#include "VTop_RenameTable__N4_NB2.h"
 #include "VTop_Top.h"
 #include "VTop_CSR.h"
 #include "VTop_ROB.h"
@@ -164,7 +161,7 @@ class SpikeSimif : public simif_t
 
         processor->get_state()->pc = 0x80000000;// + 3361880;
         processor->set_mmu_capability(IMPL_MMU_SV32);
-        processor->set_debug(true);
+        processor->set_debug(false);
         processor->get_state()->XPR.reset();
         processor->set_privilege(3);
         processor->enable_log_commits();

@@ -149,6 +149,7 @@ always_ff@(posedge clk) begin
             OUT_uopSt.addr <= {entries[0].addr, 2'b0};
             OUT_uopSt.data <= entries[0].data;
             OUT_uopSt.wmask <= entries[0].wmask;
+            OUT_uopSt.isMMIO <= 'x;
             
             for (i = 1; i < NUM_ENTRIES; i=i+1) begin
                 entries[i-1] <= entries[i];

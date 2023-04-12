@@ -16,7 +16,7 @@ module CacheController
     output wire OUT_stall[TOTAL_UOPS-1:0],
     
     input PW_LD_UOp IN_uopPwLd,
-    output reg OUT_pwLdStall,
+    output wire OUT_pwLdStall,
 
     input AGU_UOp IN_uopLd,
     output LD_UOp OUT_uopLd,

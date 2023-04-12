@@ -19,7 +19,7 @@ module MemRTL
 );
 integer i;
 
-reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0] /*verilator public*/;
+reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0];
 
 reg ce_reg = 1;
 reg ce1_reg = 1;
@@ -66,7 +66,7 @@ always@(posedge clk) begin
         dbgMultiple <= 1;
         OUT_data1 <= 'x;
         
-        if (!we_reg) begin
+        /*if (!we_reg) begin
             for (i = 0; i < WORD_SIZE/8; i=i+1) begin
                 if (wm_reg[i])
                     mem[addr_reg][(8*i)+:8] <= 'x;
@@ -76,8 +76,7 @@ always@(posedge clk) begin
             OUT_data <= 'x;
         end
         
-        assert(0);
-        
+        assert(0);*/
     end
 end
 

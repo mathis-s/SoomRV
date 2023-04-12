@@ -145,8 +145,10 @@ always_ff@(posedge clk) begin
             
             // Wait until transaction is done
             1: begin
-                if (!MEMIF_busy && !CACHEIF_busy) 
+                if (!MEMIF_busy && !CACHEIF_busy) begin
                     state <= 0;
+                    OUT_stat.result <= 'x;
+                end
                 
                 //lastProgress <= {lastProgress[$bits(lastProgress)-2:0], MEM_IF_advance};
                 //if (lastProgress[$bits(lastProgress)-1])
