@@ -162,10 +162,9 @@ class SpikeSimif : public simif_t
 
         processor->set_pmp_num(0);
 
-        processor->get_state()->csrmap[0x139] = 0;
         processor->get_state()->pc = 0x80000000;// + 3361880;
         processor->set_mmu_capability(IMPL_MMU_SV32);
-        processor->set_debug(false);
+        processor->set_debug(true);
         processor->get_state()->XPR.reset();
         processor->set_privilege(3);
         processor->enable_log_commits();
@@ -174,7 +173,7 @@ class SpikeSimif : public simif_t
             CSR_MSTATUS,    CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MTVEC, CSR_MEPC, CSR_MCAUSE, CSR_MTVAL,
             CSR_MIDELEG,    CSR_MIDELEGH, CSR_MEDELEG,    CSR_MIP,           CSR_MIPH,  CSR_MIE,  CSR_MIEH,
 
-            CSR_SCOUNTEREN, CSR_SEPC,     CSR_SCAUSE,     CSR_STVEC,         CSR_STVAL, CSR_SATP};
+            CSR_SCOUNTEREN, CSR_SEPC,     CSR_SCAUSE,     CSR_STVEC,         CSR_STVAL, CSR_SATP, CSR_SENVCFG, CSR_MENVCFG};
 
         for (auto csr : csrs_to_reset)
             processor->put_csr(csr, 0);
@@ -182,9 +181,11 @@ class SpikeSimif : public simif_t
 
     virtual char* addr_to_mem(reg_t addr) override
     {
+        //if ((uint32_t)addr == 0) printf("addr_to_mem %.8x\n", (uint32_t)addr);
         if (addr >= 0x80000000 && addr < (0x80000000 + sizeof(pram))) return (char*)pram + (addr - 0x80000000);
         return nullptr;
     }
+    virtual bool reservable(reg_t addr) override { return true; }
     virtual bool mmio_load(reg_t addr, size_t len, uint8_t* bytes) override
     {
         if ((addr - 0x80000000) < sizeof(pram))

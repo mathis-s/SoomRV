@@ -96,11 +96,11 @@ main:
     li a1, 0x00050067
     sw a1, 0(a0)
     
-    
     li a0, 0x80000000 | (0x80020)
     csrw satp, a0
-
-    fence.i
+    
+    li a0, 0x82000000
+    cbo.clean (a0)
     sfence.vma
 
     li a0, 0
