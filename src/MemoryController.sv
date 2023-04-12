@@ -31,9 +31,6 @@ assign OUT_CACHE_wm[1] = 4'b1111;
 
 wire[31:0] outDataCacheIF;
 wire[0:0] idCacheIF;
-reg pageWalkLevel;
-
-reg[29:0] rqExtAddr;
 
 // Generate control signals for cache and external memory interfaces
 reg[7:0] accessLength;
@@ -41,37 +38,20 @@ reg enableCache;
 reg enableExt;
 reg[29:0] extAddr;
 
-reg pageWalkNextLookup;
 always_comb begin
     
     enableCache = 0;
     enableExt = 0;
-    pageWalkNextLookup = 0;
     accessLength = 'x;
     extAddr = 'x;
     
     if (!rst && state == 0) begin
-        if (IN_ctrl.cmd == MEMC_PAGE_WALK) begin
-            extAddr = {IN_ctrl.rootPPN[19:0], IN_ctrl.extAddr[29:20]};
-            accessLength = 1;
-            enableExt = 1;
-        end
-        else if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
+        if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
             enableCache = 1;
             enableExt = 1;
             extAddr = IN_ctrl.extAddr;
             accessLength = IN_ctrl.cacheID ? 128 : 32;
         end
-    end
-    
-    // Page Walk Next Lookup
-    if (!rst && state == 3 && !MEMIF_busy) begin
-        
-        pageWalkNextLookup = 1;
-        accessLength = 1;
-        enableExt = 1;
-        // NOTE: currently ignoring the upper two bits of 34 bit phy addr
-        extAddr = {OUT_stat.result[29:10], rqExtAddr[19:10]};
     end
 end
 
@@ -150,15 +130,9 @@ always_ff@(posedge clk) begin
                             state <= 1;
                         end
                         
-                        MEMC_PAGE_WALK: begin
-                            state <= 2;
-                            pageWalkLevel <= 0;
-                        end
-                        
                         default: assert(0);
                     endcase
                     OUT_stat.rqID <= IN_ctrl.rqID;
-                    rqExtAddr <= IN_ctrl.extAddr;
                     OUT_stat.busy <= 1;
                     OUT_stat.progress <= 0;
                     lastProgress <= 0;
@@ -179,32 +153,6 @@ always_ff@(posedge clk) begin
                 if (MEM_IF_advance)
                     OUT_stat.progress <= OUT_stat.progress + 1;
             end
-            
-            // Page Walk: Wait for lookup
-            2: begin
-                if (MEM_IF_advance) begin
-                    OUT_stat.result <= memoryIFdata;
-                    
-                    // Pointer to next page
-                    if (memoryIFdata[3:1] == 3'b000 && memoryIFdata[0] && pageWalkLevel == 0) begin
-                        state <= 3;
-                        pageWalkLevel <= 1;
-                    end
-                    // Invalid or leaf page
-                    else begin
-                        state <= 0;
-                        OUT_stat.resultValid <= 1;
-                        OUT_stat.isSuperPage <= (pageWalkLevel == 0);
-                    end
-                end
-            end
-            
-            // Page Walk: Begin Next Lookup
-            3: begin
-                if (pageWalkNextLookup)
-                    state <= 2;
-            end
-
         endcase
     
     end

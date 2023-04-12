@@ -11,7 +11,6 @@ typedef enum logic[2:0]
 typedef struct packed
 {
     MemCCmd cmd;
-    logic[21:0] rootPPN;
     logic[9:0] sramAddr;
     logic[29:0] extAddr;
     logic[0:0] cacheID;
@@ -22,7 +21,6 @@ typedef struct packed
 {
     logic[9:0] progress;
     
-    logic isSuperPage;
     logic[31:0] result;
     logic resultValid;
     
