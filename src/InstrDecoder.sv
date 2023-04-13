@@ -205,6 +205,7 @@ module InstrDecoder
     input wire IN_enCustom,
     
     output DecodeBranchProv OUT_decBranch,
+    output ReturnDecUpd OUT_retUpd,
     output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
@@ -213,23 +214,13 @@ module InstrDecoder
 reg RS_inValid;
 reg[30:0] RS_inData;
 
-reg RS_outValid;
+reg RS_outValid = 0;
 reg RS_inPop;
-reg[30:0] RS_outData;
-ReturnStack returnStack
-(
-    .clk(clk),
-    .rst(rst),
-    
-    .IN_valid(RS_inValid),
-    .IN_data(RS_inData),
-    
-    .OUT_valid(RS_outValid),
-    .IN_pop(RS_inPop),
-    .OUT_data(RS_outData)
-);
+reg[30:0] RS_outData = 0;
 
 integer i;
+
+assign OUT_retUpd = '0;
 
 D_UOp uop;
 reg invalidEnc;
@@ -238,6 +229,7 @@ Instr16 i16;
 I32 i32;
 
 BTUpdate btUpdate_c;
+ReturnDecUpd retUpd_c;
 
 D_UOp uopsComb[NUM_UOPS-1:0];
 reg[3:0] validMask;
@@ -285,6 +277,9 @@ always_comb begin
             
             reg isBranch = 0;
             reg isIndirBranch = 0;
+            reg isReturn = 0;
+            reg isCall = 0;
+            reg isJump = 0;
             reg[30:0] branchTarget = 'x;
             
             if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
@@ -443,25 +438,26 @@ always_comb begin
                         invalidEnc = 0;
                         
                         isBranch = 1;
+                        isJump = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
+
+                        // there is the slim chance that this jump's dst was predicted, but it being a call wasn't...
+                        // isCall = (uop.rd == 1);      
                         
-                        // Return
-                        if (uop.rd == 1) begin
-                            RS_inValid = 1;
-                            RS_inData = IN_instrs[i].pc + 2;
-                        end
                         // Handle unpredicted jumps right away
-                        if (!IN_instrs[i].predTaken) begin
+                        /*if (!IN_instrs[i].predTaken) begin
                             OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                             OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.taken = 1;
-                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;                          
                         end
                         // Predicted jumps don't need to be executed if they don't write anything
                         else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
                             uop.fu = FU_RN;
-                        end
-                        
+                        end*/
+
+                        if (uop.rd == 0)
+                            uop.fu = FU_RN;
                     end
                     `OPC_JALR: begin
                         uop.fu = FU_INT;
@@ -1195,16 +1191,9 @@ always_comb begin
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                         
                         isBranch = 1;
+                        isJump = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                        
-                        if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch.history = IN_instrs[i].history;
-                            OUT_decBranch.taken = 1;
-                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
-                        end
-                        else
-                            uop.fu = FU_RN;
+                        uop.fu = FU_RN;
                         
                         uop.immB = 1;
                         invalidEnc = 0;
@@ -1219,17 +1208,11 @@ always_comb begin
                         uop.rd = 1; // ra
                         
                         isBranch = 1;
+                        isJump = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
                         RS_inValid = 1;
                         RS_inData = IN_instrs[i].pc + 1;
-                        
-                        if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch.history = IN_instrs[i].history;
-                            OUT_decBranch.taken = 1;
-                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;
-                        end
 
                         invalidEnc = 0;
                     end
@@ -1403,7 +1386,7 @@ always_comb begin
                         uop.rs0 = i16.cr.rd_rs1;
                         
                         // jr ra
-                        if (i16.cr.rd_rs1 == 1 && RS_outValid) begin
+                        /*if (i16.cr.rd_rs1 == 1 && RS_outValid) begin
                             RS_inPop = 1;
                             uop.opcode = INT_V_RET;
                             uop.imm = {RS_outData, 1'b0};
@@ -1416,7 +1399,8 @@ always_comb begin
                             OUT_decBranch.history = IN_instrs[i].history;
                             OUT_decBranch.fetchID = uop.fetchID;
                         end
-                        else begin
+                        else */
+                        begin
                             isIndirBranch = 1;
                             uop.opcode = INT_V_JALR;
                             uop.immB = 1;
@@ -1480,6 +1464,7 @@ always_comb begin
                 end
             end
             
+            // Handle branch target mispredictions
             if (IN_instrs[i].predTaken) begin
                 if (!(isBranch || isIndirBranch) || 
                     (IN_instrs[i].predTarget != branchTarget && !isIndirBranch) || 
@@ -1487,6 +1472,7 @@ always_comb begin
                     
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
+                    OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                     
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 1;
@@ -1507,8 +1493,23 @@ always_comb begin
                         OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
                         
                     //$display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
-                        
+                end
+            end
+            // Handle non-predicted taken jumps
+            else begin
+                if (isJump) begin
+                    OUT_decBranch.taken = 1;
+                    OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                    OUT_decBranch.dst = branchTarget;
+                    
+                    // Register branch target
+                    btUpdate_c.valid = 1;
+                    btUpdate_c.clean = 0;
+                    btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                    btUpdate_c.dst = {branchTarget, 1'b0};
+                    btUpdate_c.compressed = uop.compressed;
+                    btUpdate_c.isJump = isJump;
                 end
             end
         end

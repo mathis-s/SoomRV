@@ -40,7 +40,7 @@ SRC_FILES = \
 	src/FDiv.sv \
 	src/BranchTargetBuffer.sv \
 	src/BranchPredictionTable.sv \
-	src/ReturnStack.sv \
+	src/ReturnStack2.sv \
 	src/TageTable.sv \
 	src/PCFile.sv \
 	src/TagePredictor.sv \

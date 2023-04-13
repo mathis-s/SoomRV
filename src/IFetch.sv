@@ -25,6 +25,7 @@ module IFetch
     output wire OUT_PERFC_branchMispr,
     output BranchProv OUT_branch,
     
+    input ReturnDecUpd IN_retDecUpd,
     input DecodeBranchProv IN_decBranch,
     
     input wire IN_clearICache,
@@ -66,14 +67,11 @@ BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 );
 
 wire BP_branchTaken;
-wire BP_isJump;
-FetchOff_t BP_branchSrcOffs;
-wire[31:0] BP_branchDst;
 BHist_t BP_branchHistory;
 BranchPredInfo BP_info;
 wire BP_multipleBranches;
-wire BP_branchFound;
-wire BP_branchCompr;
+
+PredBranch predBr;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 (
     .clk(clk),
@@ -88,15 +86,13 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_pcValid(en),
     .IN_pc({pc, 1'b0}),
     .OUT_branchTaken(BP_branchTaken),
-    .OUT_isJump(BP_isJump),
-    .OUT_branchSrcOffs(BP_branchSrcOffs),
-    .OUT_branchDst(BP_branchDst),
     .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
     .OUT_multipleBranches(BP_multipleBranches),
-    .OUT_branchFound(BP_branchFound),
-    .OUT_branchCompr(BP_branchCompr),
     
+    .OUT_predBr(predBr),
+
+    .IN_retDecUpd(IN_retDecUpd),
     .IN_btUpdates(IN_btUpdates),
     .IN_bpUpdate(IN_bpUpdate)
 );
@@ -332,19 +328,19 @@ always_ff@(posedge clk) begin
                     histLast <= BP_branchHistory;
                     infoLast <= BP_info;
                     pcLast <= pc;
-                    branchPosLast <= BP_branchSrcOffs;
+                    branchPosLast <= predBr.offs;
                     multipleLast <= BP_multipleBranches;
                     
-                    if (BP_branchFound) begin
-                        if (BP_isJump || BP_branchTaken) begin
-                            pc <= BP_branchDst[31:1];
+                    if (predBr.valid) begin
+                        if (predBr.isJump || BP_branchTaken) begin
+                            pc <= predBr.dst;
                         end
                         // Branch found, not taken
                         else begin                    
                             // There is a second branch in this block,
                             // go there.
-                            if (BP_multipleBranches && BP_branchSrcOffs != 3'b111) begin
-                                pc <=  {pc[30:3], BP_branchSrcOffs + 3'b1};
+                            if (BP_multipleBranches && predBr.offs != 3'b111) begin
+                                pc <=  {pc[30:3], predBr.offs + 3'b1};
                             end
                             else begin
                                 pc <= {pc[30:3] + 28'b1, 3'b000};

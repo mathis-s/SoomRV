@@ -37,6 +37,26 @@ typedef logic[2:0] FetchOff_t;
 typedef logic[17:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 
+typedef struct packed
+{
+    logic[30:0] addr;
+    logic[1:0] idx;
+    logic isCall;
+    logic isRet;
+    logic compr;
+    logic cleanRet;
+    logic valid;
+} ReturnDecUpd;
+
+typedef struct packed
+{
+    logic[30:0] dst;
+    FetchOff_t offs;
+    logic compr;
+    logic isJump;
+    logic valid;
+} PredBranch;
+
 typedef enum logic[5:0]
 {
     INT_ADD,
@@ -314,6 +334,7 @@ typedef struct packed
     bit taken;
     bit[2:0] tageID;
     TageUseful_t tageUseful;
+    bit[1:0] idx;
     bit isJump;
 } BranchPredInfo;
 
