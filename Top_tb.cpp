@@ -338,6 +338,11 @@ class SpikeSimif : public simif_t
         if (state.mstatush) state.mstatush->write(s >> 32); // log mstatush change
         processor->set_privilege(PRV_M);
     }
+
+    std::string disasm (uint32_t instr)
+    {
+        return processor->get_disassembler()->disassemble(instr);
+    }
 };
 
 template <std::size_t N> uint32_t ExtractField(VlWide<N> wide, uint32_t startBit, uint32_t len)
@@ -454,10 +459,8 @@ void LogCommit(Inst& inst)
 void LogPredec(Inst& inst)
 {
 #ifdef KONATA
-    char buf[128] = {0};
-    // TODO: re-add disassembly using Spike
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
-    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, buf);
+    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
@@ -543,11 +546,11 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 237 - 32 * 5 - 6 - 7 - 5 - 7, 7);
-            insts[sqn].srcA = ExtractField(core->LD_uop[i], 237 - 32, 32);
-            insts[sqn].srcB = ExtractField(core->LD_uop[i], 237 - 32 - 32, 32);
-            insts[sqn].srcC = ExtractField(core->LD_uop[i], 237 - 32 - 32 - 32, 32);
-            insts[sqn].imm = ExtractField(core->LD_uop[i], 237 - 32 - 32 - 32 - 32 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 239 - 32 * 5 - 6 - 7 - 5 - 7, 7);
+            insts[sqn].srcA = ExtractField(core->LD_uop[i], 239 - 32, 32);
+            insts[sqn].srcB = ExtractField(core->LD_uop[i], 239 - 32 - 32, 32);
+            insts[sqn].srcC = ExtractField(core->LD_uop[i], 239 - 32 - 32 - 32, 32);
+            insts[sqn].imm = ExtractField(core->LD_uop[i], 239 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(insts[sqn]);
         }
     }
