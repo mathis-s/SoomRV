@@ -88,10 +88,13 @@ always_ff@(posedge clk) begin
                 else
                     OUT_uop[i].history <= {IN_pcReadData[i].hist[$bits(BHist_t)-2:0], IN_pcReadData[i].bpi.taken};
                 
-                if (IN_uop[i].fetchOffs == IN_pcReadData[i].branchPos)
-                    OUT_uop[i].bpi <= IN_pcReadData[i].bpi;
-                else
-                    OUT_uop[i].bpi <= 0;
+                OUT_uop[i].bpi <= IN_pcReadData[i].bpi;
+
+                if (IN_uop[i].fetchOffs != IN_pcReadData[i].branchPos) begin
+                    OUT_uop[i].bpi.predicted <= 0;
+                    OUT_uop[i].bpi.taken <= 0;
+                    OUT_uop[i].bpi.isJump <= 0;
+                end
                 
                 OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
                 OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;

@@ -36,11 +36,12 @@ typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[17:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
+typedef logic[1:0] RetStackIdx_t;
 
 typedef struct packed
 {
     logic[30:0] addr;
-    logic[1:0] idx;
+    RetStackIdx_t idx;
     logic isCall;
     logic isRet;
     logic compr;
@@ -334,7 +335,7 @@ typedef struct packed
     bit taken;
     bit[2:0] tageID;
     TageUseful_t tageUseful;
-    bit[1:0] idx;
+    RetStackIdx_t rIdx;
     bit isJump;
 } BranchPredInfo;
 
@@ -343,6 +344,7 @@ typedef struct packed
     bit[31:0] src;
     bit[31:0] dst;
     bit isJump;
+    bit isCall;
     bit compressed;
     bit clean;
     bit valid;
@@ -364,14 +366,16 @@ typedef struct packed
     bit flush;
     FetchID_t fetchID;
     BHist_t history;
+    RetStackIdx_t rIdx;
     bit taken;
 } BranchProv;
 
 typedef struct packed
 {
-    logic[4:0] fetchID;
     logic[30:0] dst;
+    logic[4:0] fetchID;
     BHist_t history;
+    RetStackIdx_t rIdx;
     logic taken;
 } DecodeBranchProv;
 
@@ -394,6 +398,7 @@ typedef struct packed
     logic predTaken;
     logic[30:0] predTarget;
     BHist_t history;
+    RetStackIdx_t rIdx;
     logic[7:0][15:0] instrs;
     
     logic valid;
@@ -405,6 +410,7 @@ typedef struct packed
     logic[30:0] pc;
     logic[30:0] predTarget;
     BHist_t history;
+    RetStackIdx_t rIdx;
     logic predTaken;
     logic predInvalid;
     FetchID_t fetchID;
@@ -506,6 +512,7 @@ typedef struct packed
     SqN loadSqN;
     FetchID_t fetchID;
     BHist_t history;
+    RetStackIdx_t rIdx;
     logic doNotCommit;
     AGU_Exception exception;
     logic compressed;

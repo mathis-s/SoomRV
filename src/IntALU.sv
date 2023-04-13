@@ -142,9 +142,7 @@ always_comb begin
     
     // TODO: Optimize order of these in OPCode_INT enum for easy decoding.
     isBranch =
-        (IN_uop.opcode == INT_JAL ||
-        //IN_uop.opcode == INT_JALR || (not predicted by bp)
-        IN_uop.opcode == INT_BEQ ||
+        (IN_uop.opcode == INT_BEQ ||
         IN_uop.opcode == INT_BNE ||
         IN_uop.opcode == INT_BLT ||
         IN_uop.opcode == INT_BGE ||
@@ -182,10 +180,12 @@ always_ff@(posedge clk) begin
             OUT_branch.flush <= 0;
             OUT_ibInfo.valid <= 0;
             
-            if (IN_uop.opcode == INT_JAL)
-                OUT_branch.history <= IN_uop.history;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-            else
+            if (isBranch)
                 OUT_branch.history <= {IN_uop.history[$bits(BHist_t)-2:0], branchTaken};
+            else
+                OUT_branch.history <= IN_uop.history;
+            
+            OUT_branch.rIdx <= IN_uop.bpi.rIdx;
             
             OUT_branch.fetchID <= IN_uop.fetchID;
             
@@ -194,21 +194,16 @@ always_ff@(posedge clk) begin
                 if (branchTaken && !IN_uop.bpi.predicted) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
                     OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
-                    OUT_btUpdate.isJump <= (IN_uop.opcode == INT_JAL);
+                    OUT_btUpdate.isJump <= 0;
+                    OUT_btUpdate.isCall <= 0;
                     OUT_btUpdate.compressed <= IN_uop.compressed;
                     OUT_btUpdate.clean <= 0;
                     OUT_btUpdate.valid <= 1;
                 end
                 
                 if (branchTaken) begin
-                    if (IN_uop.opcode == INT_JAL) begin
-                        OUT_branch.dstPC <= (IN_uop.pc + imm);
-                        OUT_btUpdate.dst <= (IN_uop.pc + imm);
-                    end
-                    else begin
-                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                    end
+                    OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                    OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
                 end
                 else if (IN_uop.compressed) begin
                     OUT_branch.dstPC <= pcPlus2;
@@ -230,7 +225,6 @@ always_ff@(posedge clk) begin
             // Check speculated return address
             else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR) begin
                 if (srcA != srcB) begin
-                    //$display("Ret misspeculation %x %x", srcA, srcB);
                     OUT_branch.dstPC <= srcA;
                     OUT_branch.taken <= 1;
                     
@@ -238,16 +232,12 @@ always_ff@(posedge clk) begin
                         OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                         OUT_btUpdate.dst <= srcA[31:0];
                         OUT_btUpdate.isJump <= 1;
+                        OUT_btUpdate.isCall <= 0; // TODO
                         OUT_btUpdate.compressed <= IN_uop.compressed;
                         OUT_btUpdate.clean <= 0;
                         OUT_btUpdate.valid <= 1;
                     end
                 end
-                /*if (IN_uop.opcode == INT_V_JALR) begin
-                    OUT_ibInfo.src <= IN_uop.pc[31:1];
-                    OUT_ibInfo.dst <= srcA[31:1];
-                    OUT_ibInfo.valid <= 1;
-                end*/
             end
 
             OUT_uop.tagDst <= IN_uop.tagDst;
@@ -256,9 +246,9 @@ always_ff@(posedge clk) begin
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.doNotCommit <= 0;
             
-            if (isBranch && IN_uop.bpi.predicted && IN_uop.opcode != INT_JAL)
+            if (isBranch && IN_uop.bpi.predicted)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
-            else if (isBranch && IN_uop.opcode != INT_JAL)
+            else if (isBranch)
                 OUT_uop.flags <= FLAGS_BRANCH;
             else
                 OUT_uop.flags <= flags;

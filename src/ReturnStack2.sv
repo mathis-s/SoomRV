@@ -22,10 +22,11 @@ module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_P
     input FetchOff_t IN_brOffs,
     input wire IN_isCall,
 
-    output wire[$clog2(SIZE)-1:0] OUT_curIdx,
-    
+    input wire IN_setIdx,
+    input RetStackIdx_t IN_idx,
+
+    output RetStackIdx_t OUT_curIdx,
     output PredBranch OUT_predBr,
-    
     input ReturnDecUpd IN_returnUpd
 );
 
@@ -63,7 +64,7 @@ end
 
 
 reg[30:0] rstack[SIZE-1:0];
-reg[$clog2(SIZE)-1:0] rindex;
+RetStackIdx_t rindex;
 reg[$clog2(RET_PRED_ASSOC)-1:0] lookupAssocIdx;
 always_comb begin
 
@@ -81,7 +82,8 @@ always_comb begin
         for (i = 0; i < RET_PRED_ASSOC; i=i+1) begin
             if (rtable[lookupIdx][i].valid && 
                 rtable[lookupIdx][i].tag == lookupTag && 
-                rtable[lookupIdx][i].offs >= lookupOffs) begin
+                rtable[lookupIdx][i].offs >= lookupOffs &&
+                (!OUT_predBr.valid || OUT_predBr.offs > rtable[lookupIdx][i].offs)) begin
                 OUT_predBr.valid = 1;
                 OUT_predBr.offs = rtable[lookupIdx][i].offs;
                 OUT_predBr.compr = rtable[lookupIdx][i].compr;
@@ -102,22 +104,27 @@ always_ff@(posedge clk) begin
             rstack[i] <= 0;
     end
     else begin
-        if (IN_returnUpd.valid) begin
 
+        if (IN_setIdx) begin
+            rindex <= IN_idx;
+        end
+
+        if (IN_returnUpd.valid) begin
             if (IN_returnUpd.cleanRet) begin
                 // TODO: only clean with matching tag
                 for (i = 0; i < RET_PRED_LEN; i=i+1)
                     rtable[decodeIdx][i].valid <= 0;
             end
-
+            
             if (IN_returnUpd.isCall) begin
-                rstack[IN_returnUpd.idx] <= IN_returnUpd.addr + 1;
+                rstack[IN_returnUpd.idx + 1] <= IN_returnUpd.addr + 1;
                 rindex <= IN_returnUpd.idx + 1;
             end
             else if (IN_returnUpd.isRet) begin
                 rindex <= IN_returnUpd.idx - 1;
 
                 // Try to insert into rtable
+                // FIXME: this might double insert
                 begin
                     reg inserted = 0;
                     for (i = 0; i < RET_PRED_ASSOC; i=i+1) begin
@@ -126,6 +133,7 @@ always_ff@(posedge clk) begin
                             rtable[decodeIdx][i].valid <= 1;
                             rtable[decodeIdx][i].tag <= decodeTag;
                             rtable[decodeIdx][i].compr <= IN_returnUpd.compr;
+                            rtable[decodeIdx][i].offs <= decodeOffs;
                             rtable[decodeIdx][i].used <= 0;
                         end
                     end
@@ -134,12 +142,12 @@ always_ff@(posedge clk) begin
             end
         end
         else begin
-            if (OUT_predBr.valid && (!IN_brValid || IN_brOffs > OUT_predBr.offs)) begin
-                rindex <= rindex - 1;
+            if (OUT_predBr.valid && (!IN_brValid || IN_brOffs >= OUT_predBr.offs)) begin
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
+                rindex <= rindex - 1;
             end
             else if (IN_brValid && IN_isCall) begin
-                rstack[rindex] <= {IN_pc[30:$bits(FetchOff_t)], IN_brOffs} + 1;
+                rstack[rindex + 1] <= {IN_pc[30:$bits(FetchOff_t)], IN_brOffs} + 1;
                 rindex <= rindex + 1;
             end
         end

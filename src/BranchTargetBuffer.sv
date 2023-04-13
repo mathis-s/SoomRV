@@ -10,6 +10,7 @@ module BranchTargetBuffer
     output reg[30:0] OUT_branchDst,
     output FetchOff_t OUT_branchSrcOffs,
     output reg OUT_branchIsJump,
+    output reg OUT_branchIsCall,
     output reg OUT_branchCompr,
     output reg OUT_multipleBranches,
     input wire IN_BPT_branchTaken,
@@ -20,6 +21,7 @@ module BranchTargetBuffer
 typedef struct packed
 {
     bit isJump;
+    bit isCall; // TODO unify fields
     bit compr;
     bit used;
     bit valid;
@@ -43,6 +45,7 @@ always_comb begin
     OUT_multipleBranches = 0;
     OUT_branchDst = 'x;
     OUT_branchIsJump = 0;
+    OUT_branchIsCall = 0;
     OUT_branchCompr = 0;
     OUT_branchSrcOffs = 'x;
     usedID = 0;
@@ -58,6 +61,7 @@ always_comb begin
                     OUT_multipleBranches = 1;
                 OUT_branchFound = 1;
                 OUT_branchIsJump = fetched[i].isJump;
+                OUT_branchIsCall = fetched[i].isCall;
                 OUT_branchDst = fetched[i].dst;
                 OUT_branchSrcOffs = fetched[i].src[$bits(FetchOff_t)-1:0];
                 OUT_branchCompr = fetched[i].compr;
@@ -90,6 +94,7 @@ always_ff@(posedge clk) begin
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
+                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isCall <= IN_btUpdate.isCall;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
                     end
@@ -105,6 +110,7 @@ always_ff@(posedge clk) begin
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
+                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isCall <= IN_btUpdate.isCall;
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
                         entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
                     end

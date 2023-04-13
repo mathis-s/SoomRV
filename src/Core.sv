@@ -127,7 +127,6 @@ PreDecode preDec
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
 DecodeBranchProv DEC_decBranch;
 ReturnDecUpd DEC_retUpd;
-assign DEC_retUpd = '0;
 InstrDecoder idec
 (
     .clk(clk),
@@ -139,7 +138,7 @@ InstrDecoder idec
     .IN_enCustom(1'b1),
     
     .OUT_decBranch(DEC_decBranch),
-    .OUT_retUpd(),
+    .OUT_retUpd(DEC_retUpd),
     .OUT_btUpdate(BP_btUpdates[2]),
     
     .OUT_uop(DE_uop)

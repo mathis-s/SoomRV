@@ -39,9 +39,7 @@ always_comb begin
     else
         baseIndexHist = IN_pcReadData.hist;
         
-        baseIndexBPI = (IN_trapInstr.fetchOffs == IN_pcReadData.branchPos) ?
-            IN_pcReadData.bpi :
-            0;
+    baseIndexBPI = IN_pcReadData.bpi;
 end
 
 always_ff@(posedge clk) begin
@@ -110,6 +108,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
                 OUT_branch.history <= baseIndexHist;
+                OUT_branch.rIdx <= baseIndexBPI.rIdx;
                 
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
@@ -162,6 +161,7 @@ always_ff@(posedge clk) begin
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
                 OUT_branch.history <= baseIndexHist;
+                OUT_branch.rIdx <= baseIndexBPI.rIdx;
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
@@ -173,6 +173,8 @@ always_ff@(posedge clk) begin
                     OUT_bpUpdate.pc <= IN_pcReadData.pc;
                     OUT_bpUpdate.compressed <= IN_trapInstr.compressed;
                     OUT_bpUpdate.history <= IN_pcReadData.hist;
+                    OUT_branch.rIdx <= baseIndexBPI.rIdx;
+
                     OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
                     OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
                 end

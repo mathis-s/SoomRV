@@ -29,6 +29,7 @@ typedef struct packed
     logic predTaken;
     logic[30:0] predTarget;
     BHist_t history;
+    RetStackIdx_t rIdx;
     logic[7:0][15:0] instr;
 } PDEntry;
 
@@ -90,6 +91,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].predTaken <= (buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut);
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
+                        OUT_instrs[i].rIdx <= buffer[bufIndexOut].rIdx;
                         OUT_instrs[i].is16bit <= 0;
                         
                         if (subIndexOut > buffer[bufIndexOut].predPos)
@@ -116,6 +118,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].predInvalid <= invalidBranch;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
+                        OUT_instrs[i].rIdx <= buffer[bufIndexOut].rIdx;
                         OUT_instrs[i].is16bit <= 1;
                         
                         if (subIndexOut > buffer[bufIndexOut].predPos)
@@ -150,6 +153,7 @@ always_ff@(posedge clk) begin
             buffer[bufIndexIn].instr <= IN_instrs.instrs;
             buffer[bufIndexIn].predTarget <= IN_instrs.predTarget;
             buffer[bufIndexIn].history <= IN_instrs.history;
+            buffer[bufIndexIn].rIdx <= IN_instrs.rIdx;
             
             if (bufIndexIn == bufIndexOut) 
                 subIndexOut = IN_instrs.firstValid;

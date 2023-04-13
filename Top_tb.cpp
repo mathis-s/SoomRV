@@ -1,6 +1,6 @@
 // #define TRACE
 // #define KONATA
-// #define COSIM
+#define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "VTop.h"
@@ -525,7 +525,7 @@ void LogInstructions()
     auto core = top->rootp->Top->core;
 
     bool brTaken = core->branch[0] & 1;
-    int brSqN = ExtractField<3>(core->branch, 78 - 32 - 7, 7);
+    int brSqN = ExtractField<3>(core->branch, 80 - 32 - 7, 7);
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -669,8 +669,8 @@ void LogInstructions()
                     pd[i].valid = true;
                     pd[i].flags = 0;
                     pd[i].id = id++;
-                    pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 31 - 32, 31) << 1;
-                    pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 123 - 32, 32);
+                    pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 125 - 31 - 32, 31) << 1;
+                    pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 125 - 32, 32);
                     pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 4, 5);
                     if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
 

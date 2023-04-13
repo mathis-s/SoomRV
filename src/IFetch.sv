@@ -82,6 +82,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_mispredFlush(IN_mispredFlush),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
     .IN_misprHist(OUT_branch.taken ? OUT_branch.history : IN_decBranch.history),
+    .IN_misprRIdx(OUT_branch.taken ? OUT_branch.rIdx : IN_decBranch.rIdx),
     
     .IN_pcValid(en),
     .IN_pc({pc, 1'b0}),
@@ -284,6 +285,7 @@ always_ff@(posedge clk) begin
                 outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : (3'b111);
                 outInstrs_r.predTarget <= infoLast.taken ? pc : 'x;
                 outInstrs_r.history <= histLast;
+                outInstrs_r.rIdx <= infoLast.rIdx;
             
                 fetchID <= fetchID + 1;
             end

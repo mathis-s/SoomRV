@@ -11,6 +11,7 @@ module BranchPredictor
     input wire IN_mispredFlush,
     input wire IN_mispr,
     input BHist_t IN_misprHist,
+    input RetStackIdx_t IN_misprRIdx,
     
     // IF interface
     input wire IN_pcValid,
@@ -58,10 +59,12 @@ wire[30:0] branchAddr = IN_pc[31:1];
 
 assign OUT_branchHistory = gHistory;
 
+reg BTB_branchTaken;
 always_comb begin
     if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
         OUT_branchTaken = BTB_br.valid && (BTB_br.isJump || TAGE_taken);
+        BTB_branchTaken = BTB_br.valid && (BTB_br.isJump || TAGE_taken);
         OUT_multipleBranches = !OUT_branchTaken && (BTB_multipleBranches || RET_br.valid);
 
         OUT_branchInfo.predicted = 1;
@@ -76,11 +79,13 @@ always_comb begin
         OUT_branchInfo.predicted = RET_br.valid;
         OUT_branchInfo.taken = RET_br.valid;
         OUT_branchInfo.isJump = 1;
+
+        BTB_branchTaken = 0;
     end
 end
 
 PredBranch BTB_br;
-wire BTB_branchTaken = BTB_br.valid && (BTB_br.isJump || TAGE_taken);
+wire BTB_isCall;
 
 wire BTB_multipleBranches;
 BranchTargetBuffer btb
@@ -93,6 +98,7 @@ BranchTargetBuffer btb
     .OUT_branchDst(BTB_br.dst),
     .OUT_branchSrcOffs(BTB_br.offs),
     .OUT_branchIsJump(BTB_br.isJump),
+    .OUT_branchIsCall(BTB_isCall),
     .OUT_branchCompr(BTB_br.compr),
 
     .OUT_multipleBranches(BTB_multipleBranches),
@@ -132,9 +138,12 @@ ReturnStack retStack
     .IN_pc(IN_pc[31:1]),
     .IN_brValid(BTB_br.valid),
     .IN_brOffs(BTB_br.offs),
-    .IN_isCall(1'b0),
+    .IN_isCall(BTB_isCall),
+
+    .IN_setIdx(IN_mispr),
+    .IN_idx(IN_misprRIdx),
     
-    .OUT_curIdx(OUT_branchInfo.idx),
+    .OUT_curIdx(OUT_branchInfo.rIdx),
     .OUT_predBr(RET_br),
 
     .IN_returnUpd(IN_retDecUpd)

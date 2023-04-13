@@ -172,6 +172,7 @@ always_ff@(posedge clk) begin
             OUT_aguOp.fetchID <= IN_uop.fetchID;
             OUT_aguOp.compressed <= IN_uop.compressed;
             OUT_aguOp.history <= IN_uop.history;
+            OUT_aguOp.rIdx <= IN_uop.bpi.rIdx;
             OUT_aguOp.exception <= except;
             
             if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION) begin

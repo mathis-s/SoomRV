@@ -41,6 +41,7 @@ always_comb begin
                 OUT_branch.flush = IN_branches[i].flush;
             OUT_branch.fetchID = IN_branches[i].fetchID;
             OUT_branch.history = IN_branches[i].history;
+            OUT_branch.rIdx = IN_branches[i].rIdx;
             
             if (i < 2 && !IN_mispredFlush) OUT_PERFC_branchMispr = 1;
         end
@@ -56,6 +57,7 @@ always_comb begin
         OUT_branch.flush = IN_branches[3].flush;
         OUT_branch.fetchID = IN_branches[3].fetchID;
         OUT_branch.history = IN_branches[3].history;
+        OUT_branch.rIdx = IN_branches[3].rIdx;
         OUT_PERFC_branchMispr = 0;
     end
 end

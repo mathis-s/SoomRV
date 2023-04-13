@@ -220,8 +220,6 @@ reg[30:0] RS_outData = 0;
 
 integer i;
 
-assign OUT_retUpd = '0;
-
 D_UOp uop;
 reg invalidEnc;
 Instr32 instr;
@@ -238,6 +236,9 @@ always_comb begin
     
     btUpdate_c = 'x;
     btUpdate_c.valid = 0;
+
+    retUpd_c = 'x;
+    retUpd_c.valid = 0;
     
     RS_inValid = 0;
     RS_inData = 31'bx;
@@ -442,22 +443,10 @@ always_comb begin
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
                         // there is the slim chance that this jump's dst was predicted, but it being a call wasn't...
-                        // isCall = (uop.rd == 1);      
+                        isCall = (uop.rd == 1);      
                         
-                        // Handle unpredicted jumps right away
-                        /*if (!IN_instrs[i].predTaken) begin
-                            OUT_decBranch.dst = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                            OUT_decBranch.history = IN_instrs[i].history;
-                            OUT_decBranch.taken = 1;
-                            OUT_decBranch.fetchID = IN_instrs[i].fetchID;                          
-                        end
-                        // Predicted jumps don't need to be executed if they don't write anything
-                        else if (uop.rd == 0 && IN_instrs[i].predTaken) begin
-                            uop.fu = FU_RN;
-                        end*/
-
-                        if (uop.rd == 0)
-                            uop.fu = FU_RN;
+                        // No need to execute jumps that don't write to a register
+                        if (uop.rd == 0) uop.fu = FU_RN;
                     end
                     `OPC_JALR: begin
                         uop.fu = FU_INT;
@@ -1209,6 +1198,7 @@ always_comb begin
                         
                         isBranch = 1;
                         isJump = 1;
+                        isCall = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
                         RS_inValid = 1;
@@ -1382,34 +1372,19 @@ always_comb begin
                     // c.jr
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
                         uop.fu = FU_INT;
-                        //uop.opcode = INT_JALR;
                         uop.rs0 = i16.cr.rd_rs1;
                         
-                        // jr ra
-                        /*if (i16.cr.rd_rs1 == 1 && RS_outValid) begin
-                            RS_inPop = 1;
-                            uop.opcode = INT_V_RET;
-                            uop.imm = {RS_outData, 1'b0};
-                            uop.immB = 1;
-                            
-                            isIndirBranch = 1;
-                            
-                            OUT_decBranch.taken = 1;
-                            OUT_decBranch.dst = RS_outData;
-                            OUT_decBranch.history = IN_instrs[i].history;
-                            OUT_decBranch.fetchID = uop.fetchID;
-                        end
-                        else */
-                        begin
-                            isIndirBranch = 1;
-                            uop.opcode = INT_V_JALR;
-                            uop.immB = 1;
-                            
-                            if (IN_instrs[i].predTaken)
-                                uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                            else
-                                uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        end
+                        isIndirBranch = 1;
+                        isReturn = (i16.cr.rd_rs1 == 1);
+                        uop.opcode = INT_V_JALR;
+                        uop.immB = 1;
+                        
+                        if (IN_instrs[i].predTaken)
+                            uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                        else
+                            uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
+                        
+
                         invalidEnc = 0;
                     end
                     // c.jalr
@@ -1473,6 +1448,7 @@ always_comb begin
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                     
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 1;
@@ -1495,21 +1471,47 @@ always_comb begin
                     //$display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
                 end
             end
-            // Handle non-predicted taken jumps
             else begin
+                // Handle non-predicted taken jumps
                 if (isJump) begin
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                     OUT_decBranch.dst = branchTarget;
+                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                     
                     // Register branch target
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 0;
+                    btUpdate_c.isCall = isCall;
                     btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
                     btUpdate_c.dst = {branchTarget, 1'b0};
                     btUpdate_c.compressed = uop.compressed;
                     btUpdate_c.isJump = isJump;
+                    
+                    // Update return stack
+                    if (isCall) begin
+                        retUpd_c.valid = 1;
+                        retUpd_c.cleanRet = 0;
+                        retUpd_c.compr = uop.compressed;
+                        retUpd_c.isRet = 0;
+                        retUpd_c.isCall = 1;
+                        retUpd_c.idx = IN_instrs[i].rIdx;
+                        retUpd_c.addr = btUpdate_c.src[31:1];
+                    end
+                end
+                
+                // Update return stack for non-predicted rets
+                else if (isReturn) begin
+                    retUpd_c.valid = 1;
+                    retUpd_c.cleanRet = 0;
+                    retUpd_c.compr = uop.compressed;
+                    retUpd_c.isRet = 1;
+                    retUpd_c.isCall = 0;
+                    retUpd_c.idx = IN_instrs[i].rIdx;
+                    retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
+                    
+                    // TODO: squash following ops to prevent retUpd_c from being polluted with wrong path info?
                 end
             end
         end
@@ -1522,9 +1524,12 @@ always_comb begin
     end
 end
 
+assign OUT_retUpd = retUpd_c;
+
 always_ff@(posedge clk) begin
     
     OUT_btUpdate <= btUpdate_c;
+    //OUT_retUpd <= retUpd_c;
 
     if (rst || IN_invalidate) begin
         for (i = 0; i < NUM_UOPS; i=i+1)
