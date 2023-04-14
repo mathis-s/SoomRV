@@ -1,0 +1,26 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install verilator
+      run: |
+        sudo apt-get update
+        sudo apt-get install verilator
+
+    - name: Compile
+      run: make
+
+    - name: Run Hello World
+      run: ./obj_dir/VTop test_programs/hello_world_spi.s
