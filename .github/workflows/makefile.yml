@@ -17,11 +17,18 @@ jobs:
     - name: Fetch Submodules
       run: git submodule update --init --recursive
 
-    - name: Install verilator
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install verilator
-
+        sudo apt-get install verilator device-tree-compiler
+        
+    - name: Build Spike
+      run: |
+        cd riscv-isa-sim
+        ./configure
+        make
+        cd ..
+        
     - name: Compile
       run: make
 
