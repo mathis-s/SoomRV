@@ -16,19 +16,19 @@ jobs:
     
     - name: Fetch Submodules
       run: git submodule update --init --recursive
-      
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install verilator spike
+        
     - name: Build Spike
       run: |
         cd riscv-isa-sim
         ./configure
         make
         cd ..
-
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install verilator spike
-
+        
     - name: Compile
       run: make
 
