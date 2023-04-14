@@ -22,13 +22,6 @@ module BranchPredictor
     output wire OUT_multipleBranches,
     
     output PredBranch OUT_predBr,
-    //output wire OUT_isJump,
-    //output FetchOff_t OUT_branchSrcOffs,
-    //output wire[31:0] OUT_branchDst,
-    //output wire OUT_branchFound,
-    //output wire OUT_branchCompr,
-    
-
     input ReturnDecUpd IN_retDecUpd,
     
     // Branch XU interface
@@ -128,7 +121,6 @@ TagePredictor tagePredictor
 );
 
 PredBranch RET_br;
-assign RET_br.isJump = 1;
 ReturnStack retStack
 (
     .clk(clk),
@@ -148,7 +140,6 @@ ReturnStack retStack
 
     .IN_returnUpd(IN_retDecUpd)
 );
-
 
 always_ff@(posedge clk) begin
 

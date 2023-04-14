@@ -490,14 +490,26 @@ PageWalker pageWalker
     .IN_ldResUOp(LSU_PW_ldUOp)
 );
 
+wire LS_AGULD_uopStall;
+LD_UOp LS_uopLd;
+LoadSelector loadSelector
+(
+    .IN_aguLd(AGU_LD_uop),
+    .OUT_aguLdStall(LS_AGULD_uopStall),
+
+    .IN_pwLd(PW_LD_uop),
+    .OUT_pwLdStall(CC_PW_LD_stall),
+
+    .IN_ldUOpStall(CC_loadStall),
+    .OUT_ldUOp(LS_uopLd)
+);
+
 LD_UOp CC_uopLd;
 ST_UOp CC_uopSt;
 wire CC_storeStall;
 wire CC_loadStall;
 CTRL_MemC CC_MC_if;
-
 wire CC_fenceBusy;
-
 CacheController cc
 (
     .clk(clk),
@@ -507,11 +519,8 @@ CacheController cc
     .IN_SQ_empty(SQ_empty),
     .IN_stall('{LSU_stStall, 1'b0}),
     .OUT_stall('{CC_storeStall, CC_loadStall}),
-    
-    .IN_uopPwLd(PW_LD_uop),
-    .OUT_pwLdStall(CC_PW_LD_stall),
 
-    .IN_uopLd(AGU_LD_uop),
+    .IN_uopLd(LS_uopLd),
     .OUT_uopLd(CC_uopLd),
     
     .IN_uopSt(SQ_uop),
@@ -531,7 +540,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .clk(clk),
     .rst(rst),
     .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
-    .IN_stall(CC_loadStall),
+    .IN_stall(LS_AGULD_uopStall),
     .OUT_stall(stall[2]),
     
     .IN_branch(branch),

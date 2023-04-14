@@ -14,11 +14,8 @@ module CacheController
     
     input wire IN_stall[TOTAL_UOPS-1:0],
     output wire OUT_stall[TOTAL_UOPS-1:0],
-    
-    input PW_LD_UOp IN_uopPwLd,
-    output wire OUT_pwLdStall,
 
-    input AGU_UOp IN_uopLd,
+    input LD_UOp IN_uopLd,
     output LD_UOp OUT_uopLd,
     
     input ST_UOp IN_uopSt,
@@ -57,30 +54,17 @@ typedef struct packed
     logic valid;
 } CommonUOp;
 
-wire inUOpLdValid = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0);
-assign OUT_pwLdStall = OUT_stall[0] || inUOpLdValid;
+wire inUOpLdValid = IN_uopLd.valid && (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0);
 
 CommonUOp uops[TOTAL_UOPS-1:0];
 always_comb begin
-    // TODO: put this load selection into a separate combinatorial module.
-    if (inUOpLdValid) begin
-        uops[0].valid = 1;
-        uops[0].exception = IN_uopLd.exception;
-        uops[0].isLoad = 1;
-        uops[0].isMgmt = 0;
-        uops[0].external = 0;
-        uops[0].mgmtOp = 'x;
-        uops[0].addr = IN_uopLd.addr;
-    end
-    else begin
-        uops[0].valid = IN_uopPwLd.valid;
-        uops[0].exception = AGU_NO_EXCEPTION;
-        uops[0].isLoad = 1;
-        uops[0].isMgmt = 0;
-        uops[0].external = 1;
-        uops[0].mgmtOp = 'x;
-        uops[0].addr = IN_uopPwLd.addr;
-    end
+    uops[0].valid = IN_uopLd.valid;
+    uops[0].exception = IN_uopLd.exception;
+    uops[0].isLoad = 1;
+    uops[0].isMgmt = 0;
+    uops[0].external = IN_uopLd.external;
+    uops[0].mgmtOp = 'x;
+    uops[0].addr = IN_uopLd.addr;
 
     uops[1].valid = IN_uopSt.valid;
     uops[1].exception = AGU_NO_EXCEPTION;
@@ -165,27 +149,10 @@ end
 
 CommonUOp outUops[TOTAL_UOPS-1:0];
 ST_UOp outStUOp_r;
-AGU_UOp outLdUOp_r;
+LD_UOp outLdUOp_r;
 always_comb begin
 
-    if (outUops[0].external) begin
-        // External DMA or page walk accesses have to be handled a bit differently.
-        OUT_uopLd = '0;
-        OUT_uopLd.size = 2;
-        OUT_uopLd.signExtend = 0;
-        OUT_uopLd.doNotCommit = 1;
-        OUT_uopLd.exception = AGU_NO_EXCEPTION;
-    end
-    else begin
-        OUT_uopLd.signExtend = outLdUOp_r.signExtend;
-        OUT_uopLd.size = outLdUOp_r.size;
-        OUT_uopLd.tagDst = outLdUOp_r.tagDst;
-        OUT_uopLd.nmDst = outLdUOp_r.nmDst;
-        OUT_uopLd.sqN = outLdUOp_r.sqN;
-        OUT_uopLd.doNotCommit = outLdUOp_r.doNotCommit;
-        OUT_uopLd.exception = outLdUOp_r.exception;
-    end
-
+    OUT_uopLd = outLdUOp_r;
     OUT_uopLd.valid = outUops[0].valid;
     OUT_uopLd.addr = outUops[0].addr;
     OUT_uopLd.isMMIO = outUops[0].isMMIO;

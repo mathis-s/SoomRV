@@ -52,6 +52,7 @@ SRC_FILES = \
 	src/MemoryInterface.sv \
 	src/Peripherals.sv \
 	src/PageWalker.sv \
+	src/LoadSelector.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
