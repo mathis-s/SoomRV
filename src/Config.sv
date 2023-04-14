@@ -34,10 +34,10 @@
 
 // PMAs
 `define IS_MMIO_PMA(addr) \
-    ((addr[31]) == 0)
+    ((addr) < 32'h8000_0000)
     
 `define IS_MMIO_PMA_W(addr) \
-    ((addr[29]) == 0)
+    `IS_MMIO_PMA({addr, 2'b0})
 
 `define SERIAL_ADDR 32'h1000_0000
 `define SYSCON_ADDR 32'h1110_0000
@@ -48,25 +48,3 @@
 `define IS_LEGAL_ADDR(addr) \
     ((addr >= 32'h80000000 && addr < 32'h84000000) || \
     (`IS_MMIO_PMA(addr) && addr >= 32'h10000000 && addr < 32'h12000000))
-    //(addr[31:2] == 30'((`SERIAL_ADDR + 4) >> 2)) || \
-    //(addr[31:2] == 30'(`SERIAL_ADDR >> 2)) || \
-    //(addr[31:2] == 30'(`SYSCON_ADDR >> 2)) || \
-    //(addr[31:2] == 30'((`MTIME_ADDR + 4) >> 2)) || \
-    //(addr[31:2] == 30'(`MTIME_ADDR >> 2)) || \
-    //(addr[31:2] == 30'((`MTIMECMP_ADDR + 4) >> 2)) || \
-    //(addr[31:2] == 30'(`MTIMECMP_ADDR >> 2)))
-    
-
-
-//`define ENTRY_POINT (32'h000_0000)
-// PMAs
-//`define IS_MMIO_PMA(addr) \
-//    ((addr[31:24]) == 8'hFF)
-  
-//`define IS_MMIO_PMA_W(addr) \
-//    ((addr[29:22]) == 8'hFF)
-  
-//`define SERIAL_ADDR   32'hFF00_0000
-//`define SYSCON_ADDR   32'hFF00_0004
-//`define MTIME_ADDR    32'hFF00_0080
-//`define MTIMECMP_ADDR 32'hFF00_0088
