@@ -21,7 +21,7 @@ module StoreQueue
     output reg OUT_empty,
     
     input AGU_UOp IN_uopSt,
-    input AGU_UOp IN_uopLd,
+    input LD_UOp IN_uopLd,
     
     input SqN IN_curSqN,
     
@@ -72,7 +72,7 @@ always_comb begin
     lookupData = 32'bx;
     
     for (i = 0; i < 2; i=i+1) begin
-        if (IN_uopLd.isLoad && evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2]) begin
+        if (/*IN_uopLd.isLoad && */evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2]) begin
             if (evicted[i].wmask[0])
                 lookupData[7:0] = evicted[i].data[7:0];
             if (evicted[i].wmask[1])
@@ -87,7 +87,7 @@ always_comb begin
     end
     
     for (i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (IN_uopLd.isLoad && entries[i].valid && entries[i].addr == IN_uopLd.addr[31:2] && ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready)) begin
+        if (/*IN_uopLd.isLoad && */entries[i].valid && entries[i].addr == IN_uopLd.addr[31:2] && ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready)) begin
             // this is pretty neat!
             if (entries[i].wmask[0])
                 lookupData[7:0] = entries[i].data[7:0];
@@ -196,7 +196,7 @@ always_ff@(posedge clk) begin
         if (OUT_empty) flushing <= 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
-        if (!IN_stallLd) begin
+        if (!IN_stallLd && IN_uopLd.valid) begin
             OUT_lookupData <= lookupData;
             OUT_lookupMask <= lookupMask;
         end
@@ -206,4 +206,3 @@ end
 
 
 endmodule
-

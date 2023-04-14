@@ -506,6 +506,7 @@ LoadSelector loadSelector
 
 LD_UOp CC_uopLd;
 ST_UOp CC_uopSt;
+LD_UOp CC_SQ_uopLd;
 wire CC_storeStall;
 wire CC_loadStall;
 CTRL_MemC CC_MC_if;
@@ -521,6 +522,7 @@ CacheController cc
     .OUT_stall('{CC_storeStall, CC_loadStall}),
 
     .IN_uopLd(LS_uopLd),
+    .OUT_uopLdSq(CC_SQ_uopLd),
     .OUT_uopLd(CC_uopLd),
     
     .IN_uopSt(SQ_uop),
@@ -604,11 +606,11 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     .IN_disable(CC_storeStall),
-    .IN_stallLd(CC_loadStall),
+    .IN_stallLd(1'b0),
     .OUT_empty(SQ_empty),
     
     .IN_uopSt(AGU_ST_uop),
-    .IN_uopLd(AGU_LD_uop),
+    .IN_uopLd(CC_SQ_uopLd),
     
     .IN_curSqN(ROB_curSqN),
     

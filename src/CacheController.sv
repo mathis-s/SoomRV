@@ -16,6 +16,7 @@ module CacheController
     output wire OUT_stall[TOTAL_UOPS-1:0],
 
     input LD_UOp IN_uopLd,
+    output LD_UOp OUT_uopLdSq,
     output LD_UOp OUT_uopLd,
     
     input ST_UOp IN_uopSt,
@@ -33,6 +34,32 @@ integer j;
 
 localparam LEN = SIZE / ASSOC;
 localparam TAG_LEN = 32 - CLSIZE_E - $clog2(LEN);
+
+wire LMQ_full;
+LD_UOp LMQ_ld;
+LD_UOp uopLd;
+assign uopLd = LMQ_ld.valid ? LMQ_ld : IN_uopLd;
+assign OUT_uopLdSq = uopLd;
+LoadMissQueue loadMissQueue
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_ready(state == IDLE),
+    .IN_branch(IN_branch),
+    
+    .OUT_full(LMQ_full),
+
+    .IN_cacheLoadActive(state == LOAD_ACTIVE),
+    .IN_cacheLoadProgress(IN_memc.progress[CLSIZE_E-2:0]),
+    .IN_cacheLoadAddr(OUT_memc.extAddr[29:CLSIZE_E-2]),
+
+    .IN_ld(uopLd),
+    .IN_enqueue(isCacheMiss[0]),
+
+    .OUT_ld(LMQ_ld),
+    .IN_dequeue(!stall[0] && LMQ_ld.valid)
+);
 
 typedef struct packed
 {
@@ -54,17 +81,15 @@ typedef struct packed
     logic valid;
 } CommonUOp;
 
-wire inUOpLdValid = IN_uopLd.valid && (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0);
-
 CommonUOp uops[TOTAL_UOPS-1:0];
 always_comb begin
-    uops[0].valid = IN_uopLd.valid;
-    uops[0].exception = IN_uopLd.exception;
+    uops[0].valid = uopLd.valid && (uopLd.external || !IN_branch.taken || $signed(uopLd.sqN - IN_branch.sqN) <= 0);
+    uops[0].exception = uopLd.exception;
     uops[0].isLoad = 1;
     uops[0].isMgmt = 0;
-    uops[0].external = IN_uopLd.external;
+    uops[0].external = uopLd.external;
     uops[0].mgmtOp = 'x;
-    uops[0].addr = IN_uopLd.addr;
+    uops[0].addr = uopLd.addr;
 
     uops[1].valid = IN_uopSt.valid;
     uops[1].exception = AGU_NO_EXCEPTION;
@@ -127,6 +152,8 @@ reg isMgmt[TOTAL_UOPS-1:0];
 reg isMMIO[TOTAL_UOPS-1:0];
 reg isCacheHit[TOTAL_UOPS-1:0];
 reg isCachePassthru[TOTAL_UOPS-1:0];
+reg isCacheMiss[TOTAL_UOPS-1:0];
+reg stall[TOTAL_UOPS-1:0];
 always_comb begin
     for (i = 0; i < TOTAL_UOPS; i=i+1) begin
         
@@ -140,10 +167,24 @@ always_comb begin
         isCachePassthru[i] = uops[i].valid && !uops[i].isMgmt && !`IS_MMIO_PMA(uops[i].addr) &&
             state == LOAD_ACTIVE &&
             OUT_memc.extAddr[29:CLSIZE_E-2] == uops[i].addr[31:CLSIZE_E] &&
-            IN_memc.progress[CLSIZE_E-3:0] > uops[i].addr[CLSIZE_E-1:2];
+            IN_memc.progress[CLSIZE_E-2:0] > {1'b0, uops[i].addr[CLSIZE_E-1:2]};
 
-        OUT_stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid /* HACK */) &&
-            !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i] || flushActive;
+        isCacheMiss[i] = uops[i].valid && 
+            !uops[i].isMgmt && 
+            !`IS_MMIO_PMA(uops[i].addr) &&
+            !isCacheHit[i] &&
+            !isCachePassthru[i];
+
+        if (i == 1) begin
+            stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid /* HACK */) &&
+                !isMMIO[i] && !isCacheHit[i] && !isCachePassthru[i]) || IN_stall[i] || flushActive;
+
+            OUT_stall[i] = stall[i];
+        end
+        else begin
+            stall[i] = IN_stall[i] || flushActive;
+            OUT_stall[i] = stall[i] || (LMQ_full && isCacheMiss[i]) || LMQ_ld.valid;
+        end
     end
 end
 
@@ -194,7 +235,7 @@ always_ff@(posedge clk) begin
                 end
             end
             LOAD_ACTIVE: begin
-                if (!IN_memc.busy) begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
                     state <= IDLE;
                     ctable[evictIdx][evictAssocIdx].valid <= 1;
                     ctable[evictIdx][evictAssocIdx].addr <= OUT_memc.extAddr[29:$clog2(LEN)+CLSIZE_E-2];
@@ -207,7 +248,7 @@ always_ff@(posedge clk) begin
                 end
             end
             EVICT_ACTIVE: begin
-                if (!IN_memc.busy) begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
                     state <= IDLE;
                 end
             end
@@ -270,7 +311,7 @@ always_ff@(posedge clk) begin
             if (uops[i].valid && !flushActive) begin
                 
                 // Cache Management Ops
-                if (isMgmt[i] && state == IDLE && !OUT_stall[i]) begin
+                if (isMgmt[i] && state == IDLE && !stall[i]) begin
 
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
                     for (j = 0; j < TOTAL_UOPS; j=j+1)
@@ -305,16 +346,16 @@ always_ff@(posedge clk) begin
                 end
 
                 // MMIO
-                else if (isMMIO[i] && !OUT_stall[i]) begin
+                else if (isMMIO[i] && !stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 1;
                     outUops[i].valid <= 1;
-                    if (i == 0) outLdUOp_r <= IN_uopLd;
+                    if (i == 0) outLdUOp_r <= uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
 
                 // Regular load/store, cache hit
-                else if ((isCacheHit[i] || isCachePassthru[i]) && !OUT_stall[i]) begin
+                else if ((isCacheHit[i] || isCachePassthru[i]) && !stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 0;
                     outUops[i].valid <= 1;
@@ -334,24 +375,11 @@ always_ff@(posedge clk) begin
                         ctable[evictIdx][evictAssocIdx].used <= 1;
                     end
 
-                    if (i == 0) outLdUOp_r <= IN_uopLd;
+                    if (i == 0) outLdUOp_r <= uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
 
-                // Load Cache Line
-                else if (!cacheHit[i] && state == IDLE && cacheFreeAvail[i] && !temp) begin
-                    state <= LOAD_RQ;
-
-                    OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    OUT_memc.sramAddr <= {cacheFreeIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
-                    OUT_memc.extAddr <= {uops[i].addr[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
-                    OUT_memc.cacheID <= 0;
-                    OUT_memc.rqID <= 0;
-
-                    temp = 1;
-                end
-
-                // Evict cache line
+                // Evict/Clean/Load cache line
                 else if (!cacheHit[i] && state == IDLE && !temp) begin
                     
                     reg dirty = ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty;
@@ -361,16 +389,34 @@ always_ff@(posedge clk) begin
                             cacheHitIdx[j] == cacheEvictIdx[i] &&
                             !uops[j].isLoad) 
                             dirty = 1;
-                        
-                    ctable[cacheIdx[i]][cacheEvictIdx[i]].valid <= 0;
-                    ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty <= 0;
-                    ctable[cacheIdx[i]][cacheEvictIdx[i]].used <= 0;
-
-                    if (dirty) begin
+                    
+                    if (!cacheFreeAvail[i]) begin
+                        ctable[cacheIdx[i]][cacheEvictIdx[i]].valid <= 0;
+                        ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty <= 0;
+                        ctable[cacheIdx[i]][cacheEvictIdx[i]].used <= 0;
+                    end
+                    
+                    // Evict if dirty
+                    if (dirty && !cacheFreeAvail[i]) begin
                         state <= EVICT_RQ;
                         OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {cacheEvictIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
                         OUT_memc.extAddr <= {ctable[cacheIdx[i]][cacheEvictIdx[i]].addr, cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
+                        OUT_memc.cacheID <= 0;
+                        OUT_memc.rqID <= 0;
+                        temp = 1;
+                    end
+                    // Load immediately if clean or free avail
+                    else begin
+                        state <= LOAD_RQ;
+                        OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
+
+                        if (cacheFreeAvail[i])
+                            OUT_memc.sramAddr <= {cacheFreeIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
+                        else
+                            OUT_memc.sramAddr <= {cacheEvictIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
+
+                        OUT_memc.extAddr <= {uops[i].addr[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
                         OUT_memc.cacheID <= 0;
                         OUT_memc.rqID <= 0;
                         temp = 1;

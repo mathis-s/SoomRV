@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.114 (w)1999-2023 BSI
-[*] Thu Apr 13 19:11:22 2023
+[*] Fri Apr 14 18:25:10 2023
 [*]
 [dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
-[dumpfile_mtime] "Thu Apr 13 18:54:18 2023"
-[dumpfile_size] 232062948
+[dumpfile_mtime] "Fri Apr 14 18:21:57 2023"
+[dumpfile_size] 115326410
 [savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
-[timestart] 42191
+[timestart] 19330
 [size] 3840 2118
 [pos] -1 -1
-*-3.130973 42210 42206 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-1.930973 19367 42206 19334 19364 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -23,9 +23,20 @@
 [treeopen] TOP.Top.core.branch.
 [treeopen] TOP.Top.core.branchProvs[2].
 [treeopen] TOP.Top.core.cc.
+[treeopen] TOP.Top.core.cc.IN_memc.
 [treeopen] TOP.Top.core.cc.IN_uopLd.
 [treeopen] TOP.Top.core.cc.IN_uopSt.
+[treeopen] TOP.Top.core.cc.loadMissQueue.
+[treeopen] TOP.Top.core.cc.loadMissQueue.IN_ld.
+[treeopen] TOP.Top.core.cc.loadMissQueue.OUT_ld.
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[0].
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[0].ld.
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[1].
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[1].ld.
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[2].
+[treeopen] TOP.Top.core.cc.loadMissQueue.queue[3].
 [treeopen] TOP.Top.core.cc.OUT_uopLd.
+[treeopen] TOP.Top.core.cc.uopLd.
 [treeopen] TOP.Top.core.DEC_decBranch.
 [treeopen] TOP.Top.core.div.
 [treeopen] TOP.Top.core.div.IN_uop.
@@ -85,6 +96,7 @@
 [treeopen] TOP.Top.core.LD_uop[2].
 [treeopen] TOP.Top.core.LD_uop[3].
 [treeopen] TOP.Top.core.lsu.
+[treeopen] TOP.Top.core.lsu.IF_mem.
 [treeopen] TOP.Top.core.lsu.IN_uopLd.
 [treeopen] TOP.Top.core.lsu.OUT_uopLd.
 [treeopen] TOP.Top.core.mul.
@@ -117,6 +129,7 @@
 [treeopen] TOP.Top.core.sq.OUT_uopSt.
 [treeopen] TOP.Top.core.trapHandler.
 [treeopen] TOP.Top.core.trapHandler.OUT_trapInfo.
+[treeopen] TOP.Top.dcache0.
 [treeopen] TOP.Top.extMem.
 [treeopen] TOP.Top.MC_DC_if[0].
 [treeopen] TOP.Top.MC_DC_if[1].
@@ -200,7 +213,7 @@ TOP.Top.core.ifetch.bp.btb.IN_btUpdate.valid
 TOP.Top.core.ifetch.bp.btb.IN_pc[30:0]
 @28
 TOP.Top.core.ifetch.bp.btb.usedID[2:0]
-@23
+@22
 TOP.Top.core.ifetch.bp.btb.OUT_branchDst[30:0]
 @28
 TOP.Top.core.ifetch.bp.btb.IN_BPT_branchTaken
@@ -317,6 +330,33 @@ TOP.Top.core.idec.OUT_uop[2].valid
 TOP.Top.core.idec.OUT_uop[3].valid
 @200
 -dcache
+@28
+TOP.Top.dcache0.ce_reg
+@22
+TOP.Top.dcache0.addr_reg[8:0]
+TOP.Top.dcache0.data_reg[31:0]
+@200
+-
+@28
+TOP.Top.dcache0.ce1_reg
+@22
+TOP.Top.dcache0.addr1_reg[8:0]
+TOP.Top.dcache0.OUT_data1[31:0]
+@200
+-
+@28
+TOP.Top.dcache1.ce_reg
+@22
+TOP.Top.dcache1.addr_reg[8:0]
+TOP.Top.dcache1.data_reg[31:0]
+@200
+-
+@28
+TOP.Top.dcache1.ce1_reg
+@22
+TOP.Top.dcache1.addr1_reg[8:0]
+TOP.Top.dcache1.OUT_data1[31:0]
+@200
 -ExtMem
 @22
 TOP.Top.extMem.addr[31:0]
@@ -361,26 +401,94 @@ TOP.Top.memc.OUT_stat.result[31:0]
 -CTable
 -
 @22
-TOP.Top.core.cc.IN_uopSt.addr[31:0]
+TOP.Top.core.cc.IN_memc.progress[9:0]
 @28
-TOP.Top.core.cc.IN_uopSt.valid
+TOP.Top.core.cc.IN_memc.busy
+@22
+TOP.Top.core.cc.OUT_memc.extAddr[29:0]
+@28
+TOP.Top.core.cc.state[2:0]
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.queue[0].ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.queue[0].ld.sqN[6:0]
+@28
+TOP.Top.core.cc.loadMissQueue.queue[0].ready
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.queue[1].ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.queue[1].ld.sqN[6:0]
+@28
+TOP.Top.core.cc.loadMissQueue.queue[1].ready
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.queue[2].ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.queue[2].ld.sqN[6:0]
+@28
+TOP.Top.core.cc.loadMissQueue.queue[2].ready
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.queue[3].ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.queue[3].ld.sqN[6:0]
+@28
+TOP.Top.core.cc.loadMissQueue.queue[3].ready
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.OUT_ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.OUT_ld.sqN[6:0]
+@200
+-
+@28
+TOP.Top.core.cc.loadMissQueue.IN_ld.valid
+@22
+TOP.Top.core.cc.loadMissQueue.IN_ld.sqN[6:0]
+@28
+TOP.Top.core.cc.loadMissQueue.IN_enqueue
 @200
 -
 @22
 TOP.Top.core.cc.IN_uopLd.addr[31:0]
+TOP.Top.core.cc.IN_uopLd.sqN[6:0]
 @28
 TOP.Top.core.cc.IN_uopLd.valid
 @200
 -
 @28
-#{TOP.Top.core.cc.OUT_stall[0:1]} TOP.Top.core.cc.OUT_stall[0] TOP.Top.core.cc.OUT_stall[1]
-#{TOP.Top.core.cc.IN_stall[0:1]} TOP.Top.core.cc.IN_stall[0] TOP.Top.core.cc.IN_stall[1]
-#{TOP.Top.core.cc.cacheHit[0:1]} TOP.Top.core.cc.cacheHit[0] TOP.Top.core.cc.cacheHit[1]
+TOP.Top.core.cc.uopLd.valid
+@23
+TOP.Top.core.cc.uopLd.sqN[6:0]
 @200
 -
+@28
+TOP.Top.core.cc.OUT_uopLd.valid
+@22
+TOP.Top.core.cc.OUT_uopLd.sqN[6:0]
+@200
 -
 @28
-TOP.Top.core.cc.state[2:0]
+TOP.Top.core.cc.OUT_uopLd.valid
+@22
+TOP.Top.core.cc.OUT_uopLd.sqN[6:0]
+TOP.Top.core.cc.OUT_uopLd.nmDst[4:0]
+TOP.Top.core.cc.OUT_uopLd.addr[31:0]
+@200
+-
+@28
+#{TOP.Top.core.cc.OUT_stall[0:1]} TOP.Top.core.cc.OUT_stall[0] TOP.Top.core.cc.OUT_stall[1]
+#{TOP.Top.core.cc.IN_stall[0:1]} TOP.Top.core.cc.IN_stall[0] TOP.Top.core.cc.IN_stall[1]
+#{TOP.Top.core.cc.isCachePassthru[0:1]} TOP.Top.core.cc.isCachePassthru[0] TOP.Top.core.cc.isCachePassthru[1]
+#{TOP.Top.core.cc.cacheHit[0:1]} TOP.Top.core.cc.cacheHit[0] TOP.Top.core.cc.cacheHit[1]
+#{TOP.Top.core.cc.isCacheMiss[0:1]} TOP.Top.core.cc.isCacheMiss[0] TOP.Top.core.cc.isCacheMiss[1]
 @200
 -
 -RN_uop[0]
@@ -536,8 +644,10 @@ TOP.Top.core.lsu.OUT_uopLd.valid
 @22
 TOP.Top.core.lsu.OUT_uopLd.sqN[6:0]
 TOP.Top.core.lsu.OUT_uopLd.result[31:0]
-@28
-TOP.Top.core.lsu.OUT_uopLd.valid
+@200
+-
+@22
+TOP.Top.core.lsu.IF_mem.rdata[31:0]
 @200
 -IALU1
 @28
@@ -637,6 +747,15 @@ TOP.Top.core.sq.OUT_uopSt.data[31:0]
 TOP.Top.core.sq.OUT_uopSt.addr[31:0]
 @28
 TOP.Top.core.sq.IN_disable
+@200
+-
+@22
+TOP.Top.core.sq.IN_uopLd.sqN[6:0]
+@28
+TOP.Top.core.sq.IN_uopLd.valid
+@22
+TOP.Top.core.sq.lookupMask[3:0]
+TOP.Top.core.sq.lookupData[31:0]
 @200
 -FPU
 -Mul

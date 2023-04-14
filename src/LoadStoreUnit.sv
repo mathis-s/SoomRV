@@ -56,10 +56,8 @@ assign OUT_loadFwdValid = uopLd_0.valid || (IN_uopLd.valid && IN_SQ_lookupMask =
 assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
 
 always_comb begin
-    
     IF_mmio.wdata = IF_mem.wdata;
     IF_mmio.wmask = IF_mem.wmask;
-    
 end
 
 wire doRead = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111;

@@ -1,40 +1,4 @@
 .text
-    
-printdecu_fast:
-	# get space on stack
-	addi sp, sp, -8
-	mv a4, sp
-	li a1, 10
-
-	.loop_printdecu_fast:
-		# divide
-		# divu a2, a0, a1
-		li a2, 0xcccccccd
-		mulhu a2, a0, a2
-		srli a2, a2, 3
-		# rounded down original
-		mul a3, a2, a1
-		
-		# get char
-		sub a3, a0, a3
-		ori a3, a3, 0x30
-		sb a3, 0(a4)
-		addi a4, a4, 1
-		mv a0, a2
-		bnez a2, .loop_printdecu_fast
-		
-	li a1, 0xff000003
-	.loop_print:
-		addi a4, a4, -1
-		lb a0, 0(a4)
-		sb a0, 0(a1)
-		bne a4, sp, .loop_print
-	
-	addi sp, sp, 8
-	li a0, 10
-	sb a0, 0(a1)
-	ret
-
 .globl main
 main:
 	
@@ -56,7 +20,7 @@ main:
 		fdiv.s a0, s5, a0
 		fmul.s a0, a0, s4
 		fcvt.w.s a0, a0
-		call printdecu_fast
+		call printdecu
 		
 		srli a0, s1, 1
 		li a1, 0x5f3759df
@@ -69,10 +33,10 @@ main:
 		
 		fmul.s a0, a0, s4
 		fcvt.w.s a0, a0
-		call printdecu_fast
+		call printdecu
 		
 		li a0, 10
-		li a1, 0xff000003
+		li a1, 0x10000000
 		sb a0, 0(a1)
 		
 		addi s2, s2, -1

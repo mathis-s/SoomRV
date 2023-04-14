@@ -768,16 +768,16 @@ int main(int argc, char** argv)
         top->clk = !top->clk;
         top->eval(); // Evaluate model
 
+#ifdef TRACE
+        tfp->dump(main_time);
+#endif
+
         if (top->clk == 1) 
         {
             LogInstructions();
         }
 
-        // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC);
-
-#ifdef TRACE
-        tfp->dump(main_time);
-#endif
+        // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC)
         main_time++; // Time passes...
     }
 
