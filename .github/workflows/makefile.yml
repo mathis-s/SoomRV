@@ -24,10 +24,10 @@ jobs:
         make
         cd ..
 
-    - name: Install verilator
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install verilator
+        sudo apt-get install verilator spike
 
     - name: Compile
       run: make
