@@ -20,7 +20,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install verilator dtc
+        sudo apt-get install verilator device-tree-compiler
         
     - name: Build Spike
       run: |
