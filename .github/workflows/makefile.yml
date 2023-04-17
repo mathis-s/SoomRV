@@ -22,6 +22,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install device-tree-compiler libfl2 libfl-dev zlib1g zlib1g-dev numactl git help2man perl python3 make
         
+    - name: Install RISC-V Toolchain
+      run: |
+        wget -O riscv_gcc.tar.gz https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.03.14/riscv32-glibc-ubuntu-22.04-nightly-2023.03.14-nightly.tar.gz
+        tar -xf riscv_gcc.tar.gz
+        sudo mv -f ./riscv/* /usr
+        
     # Verilator in Ubuntu repos is very old, so build it manually.
     - name: Build Verilator 5
       run: |
