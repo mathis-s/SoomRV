@@ -26,7 +26,7 @@ jobs:
       run: |
         wget -qO riscv_gcc.tar.gz https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.03.14/riscv32-glibc-ubuntu-22.04-nightly-2023.03.14-nightly.tar.gz
         tar -xf riscv_gcc.tar.gz
-        cp -rlf ./riscv/* /usr
+        sudo cp -rlf ./riscv/* /usr
         
     # Verilator in Ubuntu repos is very old, so build it manually.
     - name: Build Verilator 5
