@@ -20,7 +20,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install device-tree-compiler
+        sudo apt-get install device-tree-compiler libgz libfl2 libfl-dev zlibc zlib1g zlib1g-dev ccache libgoogle-perftools-dev numactl
         
     # Verilator in Ubuntu repos is very old, so build it manually.
     - name: Build Verilator 5
