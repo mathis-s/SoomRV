@@ -24,9 +24,9 @@ jobs:
         
     - name: Install RISC-V Toolchain
       run: |
-        wget -O riscv_gcc.tar.gz https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.03.14/riscv32-glibc-ubuntu-22.04-nightly-2023.03.14-nightly.tar.gz
+        wget -qO riscv_gcc.tar.gz https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.03.14/riscv32-glibc-ubuntu-22.04-nightly-2023.03.14-nightly.tar.gz
         tar -xf riscv_gcc.tar.gz
-        sudo mv -f ./riscv/* /usr
+        cp -rlf ./riscv/* /usr
         
     # Verilator in Ubuntu repos is very old, so build it manually.
     - name: Build Verilator 5
