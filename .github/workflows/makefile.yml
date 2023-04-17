@@ -28,9 +28,9 @@ jobs:
         wget https://github.com/verilator/verilator/archive/refs/tags/v5.008.tar.gz
         tar -xf v5.008.tar.gz
         cd verilator-5.008
-        autoconf
+        CXXFLAGS="-Os" autoconf
         ./configure
-        make -j `nproc`
+        make
         sudo make install
         
     - name: Build Spike
