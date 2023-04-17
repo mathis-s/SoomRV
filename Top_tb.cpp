@@ -15,7 +15,6 @@
 #include <cstdio>
 #include <iostream> // Need std::cout
 #include <unistd.h>
-#include <verilated.h> // Defines common routines
 #ifdef TRACE
 #include "verilated_vcd_c.h"
 #endif
