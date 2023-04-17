@@ -1,10 +1,10 @@
 VERILATOR_FLAGS = \
 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-MULTIDRIVEN --x-assign unique --x-initial unique -O3 -sv \
-	-CFLAGS "-march=native -std=c++17" \
+	-CFLAGS "-march=native" \
 	-MAKEFLAGS -j16
 
-VERILATOR_CFG = -CFLAGS -g --top-module Top -Ihardfloat
+VERILATOR_CFG = --exe Top_tb.cpp ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
 VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 64 -CFLAGS -DTRACE
 
@@ -68,23 +68,7 @@ SRC_FILES = \
 	hardfloat/mulRecFN.v \
 	hardfloat/HardFloat_rawFN.v
 
-bench: top Top_tb.cpp
-	$(CXX) -O2 -g -faligned-new -fcf-protection=none -std=c++17 -pthread -lpthread -latomic \
-	Top_tb.cpp \
-	-I obj_dir \
-	-I riscv-isa-sim \
-	-I/usr/share/verilator/include \
-	-I/usr/share/verilator/include/vltstd \
-	obj_dir/VTop__ALL.a \
-	riscv-isa-sim/libriscv.a \
-	riscv-isa-sim/libsoftfloat.a \
-	riscv-isa-sim/libdisasm.a \
-	obj_dir/verilated.o \
-	obj_dir/verilated_dpi.o \
-	obj_dir/verilated_threads.o \
-	-o obj_dir/VTop
-
-top:
+decoder_tb:
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
 trace:
