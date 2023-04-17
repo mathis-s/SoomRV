@@ -20,17 +20,28 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install verilator device-tree-compiler
+        sudo apt-get install device-tree-compiler
+        
+    # Verilator in Ubuntu repos is very old, so build it manually.
+    - name: Build Verilator 5
+      run: |
+        wget https://github.com/verilator/verilator/archive/refs/tags/v5.008.tar.gz
+        tar -xf v5.008.tar.gz
+        cd verilator-5.008
+        autoconf
+        ./configure
+        make -j `nproc`
+        sudo make install
         
     - name: Build Spike
       run: |
         cd riscv-isa-sim
         ./configure
-        make
+        make -j `nproc`
         cd ..
         
     - name: Compile
-      run: make
+      run: make -j `nproc`
 
     - name: Run Hello World
       run: ./obj_dir/VTop test_programs/hello_world_spi.s
