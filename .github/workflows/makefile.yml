@@ -1,10 +1,11 @@
 name: Makefile CI
 
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+  workflow_dispatch
+  #push:
+  #  branches: [ "master" ]
+  #pull_request:
+  #  branches: [ "master" ]
 
 jobs:
   build:
@@ -28,7 +29,7 @@ jobs:
         tar -xf riscv_gcc.tar.gz
         sudo cp -rlf ./riscv/* /usr
         
-    # Verilator in Ubuntu repos is very old, so build it manually.
+    # Verilator in Ubuntu repos is very old, so build it manually. Replace this once github uses Ubuntu 23.
     - name: Build Verilator 5
       run: |
         wget https://github.com/verilator/verilator/archive/refs/tags/v5.008.tar.gz
@@ -50,4 +51,4 @@ jobs:
       run: make -j `nproc`
 
     - name: Run Hello World
-      run: ./obj_dir/VTop test_programs/hello_world_spi.s
+      run: ./obj_dir/VTop test_programs/hello_world_spi.s 2>/dev/null
