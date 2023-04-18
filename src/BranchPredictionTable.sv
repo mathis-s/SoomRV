@@ -10,7 +10,6 @@ module BranchPredictionTable
     input wire[`BP_BASEP_ID_LEN-1:0] IN_writeAddr,
     input wire IN_writeTaken
 );
-integer i;
 
 localparam NUM_COUNTERS = (1 << `BP_BASEP_ID_LEN);
 reg[1:0] counters[NUM_COUNTERS-1:0];
@@ -22,7 +21,7 @@ always@(posedge clk) begin
     if (rst) begin
         // NOTE: Reset state for easier debugging + perf analysis, remove this before synthesis.
         `ifdef __ICARUS__
-        for (i = 0; i < NUM_COUNTERS; i=i+1) begin
+        for (integer i = 0; i < NUM_COUNTERS; i=i+1) begin
             counters[i] <= 2'b10;
         end
         `endif

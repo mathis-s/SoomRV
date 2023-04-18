@@ -25,8 +25,6 @@ module TagePredictor
 );
 
 localparam HASH_SIZE = $clog2(TABLE_SIZE);
-integer i;
-integer j;
 
 wire[NUM_STAGES-1:0] valid;
 wire[NUM_STAGES-1:0] predictions;
@@ -53,7 +51,7 @@ reg[TAG_SIZE-1:0] writeTags[NUM_STAGES-2:0];
 
 always_comb begin
     
-    for (i = 0; i < NUM_STAGES-1; i=i+1) begin
+    for (integer i = 0; i < NUM_STAGES-1; i=i+1) begin
         
         predTags[i] = IN_predAddr[TAG_SIZE-1:0];
         writeTags[i] = IN_writeAddr[TAG_SIZE-1:0];
@@ -61,13 +59,13 @@ always_comb begin
         predHashes[i] = 0;
         writeHashes[i] = 0;
         
-        for (j = 0; j < ($bits(IN_predAddr)/HASH_SIZE); j=j+1) begin
+        for (integer j = 0; j < ($bits(IN_predAddr)/HASH_SIZE); j=j+1) begin
             predHashes[i] = predHashes[i] ^ IN_predAddr[j*HASH_SIZE+:HASH_SIZE];
             writeHashes[i] = writeHashes[i] ^ IN_writeAddr[j*HASH_SIZE+:HASH_SIZE];
         end
         
         
-        for (j = 0; j < ((FACTOR ** i)); j=j+1) begin
+        for (integer j = 0; j < ((FACTOR ** i)); j=j+1) begin
         
             predHashes[i] = predHashes[i] ^ IN_predHistory[TAG_SIZE*j+:HASH_SIZE] ^ {4'b0, IN_predHistory[TAG_SIZE*j+HASH_SIZE+:2]};
             writeHashes[i] = writeHashes[i] ^ IN_writeHistory[TAG_SIZE*j+:HASH_SIZE] ^ {4'b0, IN_writeHistory[TAG_SIZE*j+HASH_SIZE+:2]};
@@ -142,7 +140,7 @@ always_comb begin
     OUT_predTaken = 0;
     OUT_predTageID = 0;
     
-    for (i = 0; i < NUM_STAGES; i=i+1) begin
+    for (integer i = 0; i < NUM_STAGES; i=i+1) begin
         if (valid[i]) begin
             OUT_predTageID = i[2:0];
             OUT_predTaken = predictions[i];

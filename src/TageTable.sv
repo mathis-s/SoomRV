@@ -28,7 +28,6 @@ module TageTable
     output reg OUT_writeAlloc,
     input wire IN_anyAlloc
 );
-integer i;
 
 typedef struct packed
 {
@@ -54,7 +53,7 @@ end
 always_ff@(posedge clk) begin
     
     if (decrCnt == 0) begin
-        for (i = 0; i < SIZE; i=i+1)
+        for (integer i = 0; i < SIZE; i=i+1)
             if (entries[i].useful != 0) 
                 entries[i].useful <= entries[i].useful - 1;
     end
@@ -62,7 +61,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         decrCnt <= 0;
 `ifdef __ICARUS__
-        for (i = 0; i < SIZE; i=i+1)
+        for (integer i = 0; i < SIZE; i=i+1)
             entries[i] <= 0;
 `endif
     end

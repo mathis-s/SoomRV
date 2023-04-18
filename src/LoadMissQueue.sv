@@ -20,7 +20,6 @@ module LoadMissQueue#(parameter SIZE=2, parameter CLSIZE_E=7)
     input wire IN_dequeue
 );
 
-integer i;
 
 // unordered queue
 struct packed
@@ -31,7 +30,7 @@ struct packed
 
 always_comb begin
     OUT_full = 1;
-    for (i = 0; i < SIZE; i=i+1) begin
+    for (integer i = 0; i < SIZE; i=i+1) begin
         if (!queue[i].ld.valid)
             OUT_full = 0;
     end
@@ -40,19 +39,19 @@ end
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        for (i = 0; i < SIZE; i=i+1)
+        for (integer i = 0; i < SIZE; i=i+1)
             queue[i].ld.valid <= 0;
     end
     else begin
         
         // Invalidate
-        for (i = 0; i < SIZE; i=i+1) begin
+        for (integer i = 0; i < SIZE; i=i+1) begin
             if (!(queue[i].ld.external || !IN_branch.taken || $signed(queue[i].ld.sqN - IN_branch.sqN) <= 0))
                 queue[i].ld.valid <= 0;
         end
 
         // Set Ready
-        for (i = 0; i < SIZE; i=i+1) begin
+        for (integer i = 0; i < SIZE; i=i+1) begin
             if (IN_cacheLoadActive && queue[i].ld.valid &&
                 queue[i].ld.addr[31:CLSIZE_E] == IN_cacheLoadAddr &&
                 {1'b0, queue[i].ld.addr[CLSIZE_E-1:2]} < IN_cacheLoadProgress)
@@ -63,7 +62,7 @@ always_ff@(posedge clk) begin
         if (IN_ld.valid && IN_enqueue && 
             (IN_ld.external || !IN_branch.taken || $signed(IN_ld.sqN - IN_branch.sqN) <= 0)) begin
             reg enq = 0;
-            for (i = 0; i < SIZE; i=i+1) begin
+            for (integer i = 0; i < SIZE; i=i+1) begin
                 if (!enq && !queue[i].ld.valid) begin
                     enq = 1;
                     queue[i].ld <= IN_ld;
@@ -84,7 +83,7 @@ always_ff@(posedge clk) begin
         end
         if (!OUT_ld.valid || IN_dequeue) begin
             reg deq = 0;
-            for (i = 0; i < SIZE; i=i+1) begin
+            for (integer i = 0; i < SIZE; i=i+1) begin
                 if (!deq && queue[i].ld.valid && (queue[i].ready || IN_ready) && 
                     (queue[i].ld.external || !IN_branch.taken || $signed(queue[i].ld.sqN - IN_branch.sqN) <= 0)) begin
                     deq = 1;

@@ -40,23 +40,21 @@ module RenameTable
     input wire[ID_SIZE-1:0] IN_wbID[NUM_WB-1:0],
     input wire[TAG_SIZE-1:0] IN_wbTag[NUM_WB-1:0]
 );
-integer i;
-integer j;
 
 RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
 
 always_comb begin
-    for (i = 0; i < NUM_LOOKUP; i=i+1) begin
+    for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
         OUT_lookupAvail[i] = rat[IN_lookupIDs[i]].avail;
         OUT_lookupSpecTag[i] = rat[IN_lookupIDs[i]].specTag;
         
         // Results that are written back in the current cycle also need to be marked as available
-        for (j = 0; j < NUM_WB; j=j+1) begin
+        for (integer j = 0; j < NUM_WB; j=j+1) begin
             if (IN_wbValid[j] && IN_wbTag[j] == OUT_lookupSpecTag[i])
                 OUT_lookupAvail[i] = 1;
         end
         // Later lookups are affected by previous ops, even in the same cycle
-        for (j = 0; j < (i / 2); j=j+1) begin
+        for (integer j = 0; j < (i / 2); j=j+1) begin
             if (IN_issueValid[j] && IN_issueIDs[j] == IN_lookupIDs[i] && IN_issueIDs[j] != 0) begin
                 OUT_lookupAvail[i] = IN_issueAvail[j];
                 OUT_lookupSpecTag[i] = IN_issueTags[j];
@@ -64,7 +62,7 @@ always_comb begin
         end
     end
     
-    for (i = 0; i < NUM_COMMIT; i=i+1) begin
+    for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
         OUT_commitPrevTags[i] = rat[IN_commitIDs[i]].comTag;
     end
 end
@@ -73,7 +71,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         // Registers initialized with 0
-        for (i = 0; i < NUM_REGS; i=i+1) begin
+        for (integer i = 0; i < NUM_REGS; i=i+1) begin
             rat[i].avail <= 1;
             rat[i].comTag <= 7'h40;
             rat[i].specTag <= 7'h40;
@@ -81,14 +79,14 @@ always_ff@(posedge clk) begin
     end
     else begin
         // Written back values are speculatively available
-        for (i = 0; i < NUM_WB; i=i+1) begin
+        for (integer i = 0; i < NUM_WB; i=i+1) begin
             if (IN_wbValid[i] && rat[IN_wbID[i]].specTag == IN_wbTag[i] && IN_wbID[i] != 0) begin
                 rat[IN_wbID[i]].avail <= 1;
             end
         end
         
         if (IN_mispred) begin
-            for (i = 1; i < NUM_REGS; i=i+1) begin
+            for (integer i = 1; i < NUM_REGS; i=i+1) begin
                 rat[i].avail <= 1;
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
                 // We can't keep such a history for every register though. As such, we flush the pipeline
@@ -97,7 +95,7 @@ always_ff@(posedge clk) begin
             end
         end
         else begin
-            for (i = 0; i < NUM_ISSUE; i=i+1) begin
+            for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
                     rat[IN_issueIDs[i]].avail <= IN_issueAvail[i];
                     rat[IN_issueIDs[i]].specTag <= IN_issueTags[i];
@@ -105,13 +103,13 @@ always_ff@(posedge clk) begin
             end
         end
         
-        for (i = 0; i < NUM_COMMIT; i=i+1) begin
+        for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
             if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
                 if (IN_mispredFlush) begin
                     if (!IN_mispred) begin
                         rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
                         rat[IN_commitIDs[i]].avail <= IN_commitAvail[i];
-                        for (j = 0; j < NUM_WB; j=j+1)
+                        for (integer j = 0; j < NUM_WB; j=j+1)
                             if (IN_wbValid[j] && IN_wbTag[j] == IN_commitTags[i])
                                 rat[IN_commitIDs[i]].avail <= 1;
                     end

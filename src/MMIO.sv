@@ -17,7 +17,6 @@ module MMIO
     IF_CSR_MMIO.MMIO OUT_csrIf
 );
 
-integer i;
 
 // Registered Inputs
 reg reReg;

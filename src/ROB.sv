@@ -49,19 +49,17 @@ module ROB
     output reg OUT_mispredFlush
 );
 
-integer i;
-integer j;
 
 localparam LENGTH = 1 << ID_LEN;
 
 R_UOp rnUOpSorted[WIDTH_RN-1:0];
 reg rnUOpValidSorted[WIDTH_RN-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH_RN; i=i+1) begin
+    for (integer i = 0; i < WIDTH_RN; i=i+1) begin
         rnUOpValidSorted[i] = 0;
         rnUOpSorted[i] = 'x;
         
-        for (j = 0; j < WIDTH_RN; j=j+1) begin
+        for (integer j = 0; j < WIDTH_RN; j=j+1) begin
             // This could be one-hot...
             if (IN_uopValid[j] && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
                 rnUOpValidSorted[i] = 1;
@@ -85,7 +83,7 @@ SqN misprReplayIter;
 SqN misprReplayEndSqN;
 
 always_comb begin
-    for (i = 0; i < WIDTH; i=i+1) 
+    for (integer i = 0; i < WIDTH; i=i+1) 
         OUT_PERFC_retireBranch[i] = OUT_PERFC_validRetire[i] && OUT_comUOp[i].isBranch;
 end
 
@@ -96,7 +94,7 @@ end
 reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddresses[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH; i=i+1) begin
+    for (integer i = 0; i < WIDTH; i=i+1) begin
         deqPorts[i] = entries[{deqAddresses[i], i[1:0]}];
     end
 end
@@ -105,10 +103,10 @@ always_comb begin
     reg[ID_LEN-1:0] addr = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
     
     // So synthesis doesn't generate latches... (actually, 16 latches seems worth it vs. 1k std cells)
-    //for (i = 0; i < WIDTH; i=i+1)
+    //for (integer i = 0; i < WIDTH; i=i+1)
     //    deqAddresses[i] = 4'bx;
     
-    for (i = 0; i < WIDTH; i=i+1) begin
+    for (integer i = 0; i < WIDTH; i=i+1) begin
     
         deqAddresses[addr[1:0]] = addr[ID_LEN-1:$clog2(WIDTH)];
         deqEntries[i] = deqPorts[addr[1:0]];
@@ -124,14 +122,14 @@ always_ff@(posedge clk) begin
     OUT_trapUOp <= 'x;
     OUT_trapUOp.valid <= 0;
     
-    for (i = 0; i < WIDTH; i=i+1) begin
+    for (integer i = 0; i < WIDTH; i=i+1) begin
         OUT_comUOp[i] <= 'x;
         OUT_comUOp[i].valid <= 0;
     end
     
     if (rst) begin
         baseIndex <= 0;
-        for (i = 0; i < LENGTH; i=i+1) begin
+        for (integer i = 0; i < LENGTH; i=i+1) begin
             entries[i].valid <= 0;
         end
         misprReplay <= 0;
@@ -140,7 +138,7 @@ always_ff@(posedge clk) begin
         stop <= 0;
     end
     else if (IN_branch.taken) begin
-        for (i = 0; i < LENGTH; i=i+1) begin
+        for (integer i = 0; i < LENGTH; i=i+1) begin
             if ($signed(({entries[i].sqN_msb, i[ID_LEN-1:0]}) - IN_branch.sqN) > 0) begin
                 entries[i].valid <= 0;
             end
@@ -167,7 +165,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 OUT_mispredFlush <= 1;
-                for (i = 0; i < WIDTH; i=i+1) begin
+                for (integer i = 0; i < WIDTH; i=i+1) begin
                     if ($signed((misprReplayIter + i[$bits(SqN)-1:0]) - misprReplayEndSqN) <= 0) begin
                         
                         reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
@@ -178,7 +176,7 @@ always_ff@(posedge clk) begin
                         OUT_comUOp[i].nmDst <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].name;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
-                        for (j = 0; j < WIDTH_WB; j=j+1)
+                        for (integer j = 0; j < WIDTH_WB; j=j+1)
                             if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == deqEntries[i].tag)
                                 OUT_comUOp[i].compressed <= 1;
                     end
@@ -195,7 +193,7 @@ always_ff@(posedge clk) begin
             reg[ID_LEN-1:0] cnt = 0;
             reg[WIDTH-1:0] deqMask = 0;
             
-            for (i = 0; i < WIDTH; i=i+1) begin
+            for (integer i = 0; i < WIDTH; i=i+1) begin
             
                 reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
@@ -268,7 +266,7 @@ always_ff@(posedge clk) begin
         end
         
         // Enqueue ops directly from Rename
-        for (i = 0; i < WIDTH_RN; i=i+1) begin
+        for (integer i = 0; i < WIDTH_RN; i=i+1) begin
             if (rnUOpValidSorted[i] && (!IN_branch.taken)) begin
                 
                 reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
@@ -293,7 +291,7 @@ always_ff@(posedge clk) begin
         end
         
         // Mark committed ops as valid and set flags
-        for (i = 0; i < WIDTH_WB; i=i+1) begin
+        for (integer i = 0; i < WIDTH_WB; i=i+1) begin
             if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_wbUOps[i].doNotCommit) begin
                 
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];

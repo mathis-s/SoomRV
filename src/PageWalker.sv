@@ -11,7 +11,6 @@ module PageWalker#(parameter NUM_RQS=3)
     input PW_LD_RES_UOp IN_ldResUOp
 );
 
-integer i;
 
 reg[0:0] pageWalkIter;
 reg[31:0] pageWalkAddr;
@@ -32,7 +31,7 @@ always_ff@(posedge clk) begin
 
         case (state)
             default: begin
-                for (i = 0; i < NUM_RQS; i=i+1) begin
+                for (integer i = 0; i < NUM_RQS; i=i+1) begin
                     if (IN_rqs[i].valid) begin
                         
                         state <= WAIT_FOR_LOAD;

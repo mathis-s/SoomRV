@@ -8,7 +8,6 @@ module IndirectBranchPredictor#(parameter NUM_UPDATES=2)
     
     output reg[30:0] OUT_predDst
 );
-integer i;
 
 always_ff@(posedge clk) begin
 
@@ -16,7 +15,7 @@ always_ff@(posedge clk) begin
         OUT_predDst <= 0;
     end
     else begin
-        for (i = 0; i < NUM_UPDATES; i=i+1) begin
+        for (integer i = 0; i < NUM_UPDATES; i=i+1) begin
             if (IN_ibUpdates[i].valid)
                 OUT_predDst <= IN_ibUpdates[i].dst;
         end

@@ -30,8 +30,6 @@ typedef struct packed
 } BTBEntry;
 
 localparam LENGTH = `BTB_ENTRIES / `BTB_ASSOC;
-integer i;
-integer j;
 
 BTBEntry[`BTB_ASSOC-1:0] entries[LENGTH-1:0];
 
@@ -52,7 +50,7 @@ always_comb begin
     
     if (IN_pcValid) begin
         
-        for (i = 0; i < `BTB_ASSOC; i=i+1) begin
+        for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
             
             if (fetched[i].valid && fetched[i].src[`BTB_TAG_SIZE-1:3] == IN_pc[`BTB_TAG_SIZE-1:3] && fetched[i].src[2:0] >= IN_pc[2:0] &&
                 (!OUT_branchFound || fetched[i].src[2:0] < OUT_branchSrcOffs)) begin
@@ -74,8 +72,8 @@ end
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        for (i = 0; i < LENGTH; i=i+1)
-            for (j = 0; j < `BTB_ASSOC; j=j+1)
+        for (integer i = 0; i < LENGTH; i=i+1)
+            for (integer j = 0; j < `BTB_ASSOC; j=j+1)
                 entries[i][j].valid <= 0;
     end
     else begin
@@ -86,7 +84,7 @@ always_ff@(posedge clk) begin
             
             if (!IN_btUpdate.clean) begin
                 // Try to find invalid fields
-                for (i = 0; i < `BTB_ASSOC; i=i+1) begin
+                for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
                     if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid)) begin
                         
                         inserted = 1;
@@ -102,7 +100,7 @@ always_ff@(posedge clk) begin
                 end
                 
                 // Try to find unused fields
-                for (i = 0; i < `BTB_ASSOC; i=i+1) begin
+                for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
                     if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used)) begin
                         
                         inserted = 1;
@@ -119,7 +117,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 // Delete all entries in block on branch target mispredict for now.
-                for (i = 0; i < `BTB_ASSOC; i=i+1)
+                for (integer i = 0; i < `BTB_ASSOC; i=i+1)
                     entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 0;
             end
         end

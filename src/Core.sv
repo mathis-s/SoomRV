@@ -16,7 +16,6 @@ module Core
     input STAT_MemC IN_memc
 );
 
-integer i;
 
 always_comb begin
     if (PC_MC_if.cmd != MEMC_NONE)
@@ -29,7 +28,7 @@ localparam NUM_WBS = 4;
 RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
 reg wbHasResult[NUM_WBS-1:0];
 always_comb begin
-    for (i = 0; i < 4; i=i+1)
+    for (integer i = 0; i < 4; i=i+1)
         wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[6];
 end
 

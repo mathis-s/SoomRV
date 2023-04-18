@@ -18,7 +18,6 @@ module AGU
     output RES_UOp OUT_uop
 );
 
-integer i;
 
 reg pageWalkActive;
 reg pageWalkAccepted;

@@ -37,8 +37,6 @@ module StoreQueue
     
 );
 
-integer i;
-integer j;
 
 SQEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
@@ -48,7 +46,7 @@ reg didCSRwrite;
 reg empty;
 always_comb begin
     empty = 1;
-    for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         if (entries[i].valid)
             empty = 0;
     end
@@ -71,7 +69,7 @@ always_comb begin
     
     lookupData = 32'bx;
     
-    for (i = 0; i < 2; i=i+1) begin
+    for (integer i = 0; i < 2; i=i+1) begin
         if (/*IN_uopLd.isLoad && */evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2]) begin
             if (evicted[i].wmask[0])
                 lookupData[7:0] = evicted[i].data[7:0];
@@ -86,7 +84,7 @@ always_comb begin
         end
     end
     
-    for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         if (/*IN_uopLd.isLoad && */entries[i].valid && entries[i].addr == IN_uopLd.addr[31:2] && ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready)) begin
             // this is pretty neat!
             if (entries[i].wmask[0])
@@ -112,7 +110,7 @@ always_ff@(posedge clk) begin
     doingEnqueue = 0;
 
     if (rst) begin
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
         end
         
@@ -129,7 +127,7 @@ always_ff@(posedge clk) begin
     else begin
         
         // Set entries of committed instructions to ready
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             if ($signed(IN_curSqN - entries[i].sqN) > 0)
                 entries[i].ready <= 1;
         end
@@ -151,7 +149,7 @@ always_ff@(posedge clk) begin
             OUT_uopSt.wmask <= entries[0].wmask;
             OUT_uopSt.isMMIO <= 'x;
             
-            for (i = 1; i < NUM_ENTRIES; i=i+1) begin
+            for (integer i = 1; i < NUM_ENTRIES; i=i+1) begin
                 entries[i-1] <= entries[i];
                 if ($signed(IN_curSqN - entries[i].sqN) > 0)
                     entries[i-1].ready <= 1;
@@ -164,7 +162,7 @@ always_ff@(posedge clk) begin
         
         // Invalidate
         if (IN_branch.taken) begin
-            for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) > 0 && !entries[i].ready)
                     entries[i].valid <= 0;
             end
@@ -189,7 +187,7 @@ always_ff@(posedge clk) begin
         end
         
         if (flushing)
-            for (i = 0; i < 2; i=i+1)
+            for (integer i = 0; i < 2; i=i+1)
                 evicted[i].valid <= 0;
 
         OUT_empty <= empty && !doingEnqueue;

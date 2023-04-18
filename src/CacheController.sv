@@ -29,8 +29,6 @@ module CacheController
     output wire OUT_fenceBusy
 );
 
-integer i;
-integer j;
 
 localparam LEN = SIZE / ASSOC;
 localparam TAG_LEN = 32 - CLSIZE_E - $clog2(LEN);
@@ -116,7 +114,8 @@ reg[$clog2(ASSOC)-1:0] cacheEvictIdx[1:0];
 reg[$clog2(LEN)-1:0] cacheIdx[1:0];
 always_comb begin
     
-    for (i = 0; i < TOTAL_UOPS; i=i+1) begin
+    /* verilator lint_off VARHIDDEN */
+    for (integer i = 0; i < TOTAL_UOPS; i=i+1) begin
         cacheHit[i] = 0;
         cacheFreeAvail[i] = 0;
         cacheHitIdx[i] = 'x;
@@ -125,7 +124,7 @@ always_comb begin
 
         cacheIdx[i] = uops[i].addr[CLSIZE_E+$clog2(LEN)-1:CLSIZE_E];
 
-        for (j = 0; j < ASSOC; j=j+1)
+        for (integer j = 0; j < ASSOC; j=j+1)
             if (ctable[cacheIdx[i]][j].valid &&
                 ctable[cacheIdx[i]][j].addr == uops[i].addr[31:CLSIZE_E+$clog2(LEN)]) begin
                 
@@ -133,13 +132,13 @@ always_comb begin
                 cacheHitIdx[i] = j[$clog2(ASSOC)-1:0];
             end
 
-        for (j = 0; j < ASSOC; j=j+1)
+        for (integer j = 0; j < ASSOC; j=j+1)
             if (!ctable[cacheIdx[i]][j].valid) begin
                 cacheFreeIdx[i] = j[$clog2(ASSOC)-1:0];
                 cacheFreeAvail[i] = 1;
             end
 
-        for (j = 0; j < ASSOC; j=j+1)
+        for (integer j = 0; j < ASSOC; j=j+1)
             if (!ctable[cacheIdx[i]][j].used)
                 cacheEvictIdx[i] = j[$clog2(ASSOC)-1:0];
     end
@@ -155,7 +154,7 @@ reg isCachePassthru[TOTAL_UOPS-1:0];
 reg isCacheMiss[TOTAL_UOPS-1:0];
 reg stall[TOTAL_UOPS-1:0];
 always_comb begin
-    for (i = 0; i < TOTAL_UOPS; i=i+1) begin
+    for (integer i = 0; i < TOTAL_UOPS; i=i+1) begin
         
         isMgmt[i] = uops[i].valid && uops[i].isMgmt;
 
@@ -218,7 +217,7 @@ always_ff@(posedge clk) begin
         OUT_memc.cmd <= MEMC_NONE;
         state <= IDLE;
         flushActive <= 0;
-        for (i = 0; i < TOTAL_UOPS; i=i+1) begin
+        for (integer i = 0; i < TOTAL_UOPS; i=i+1) begin
             outUops[i] <= 'x;
             outUops[i].valid <= 0;
         end
@@ -301,7 +300,7 @@ always_ff@(posedge clk) begin
         end
 
         // Incoming UOps handling
-        for (i = 0; i < TOTAL_UOPS; i=i+1) begin
+        for (integer i = 0; i < TOTAL_UOPS; i=i+1) begin
             
             if (!IN_stall[i]) begin
                 outUops[i] <= 'x;
@@ -314,7 +313,7 @@ always_ff@(posedge clk) begin
                 if (isMgmt[i] && state == IDLE && !stall[i]) begin
 
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
-                    for (j = 0; j < TOTAL_UOPS; j=j+1)
+                    for (integer j = 0; j < TOTAL_UOPS; j=j+1)
                         if (j != i && isCacheHit[j] && 
                             cacheIdx[j] == cacheIdx[i] &&
                             cacheHitIdx[j] == cacheHitIdx[i] &&
@@ -364,7 +363,7 @@ always_ff@(posedge clk) begin
                         outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, cacheHitIdx[i], cacheIdx[i], uops[i].addr[CLSIZE_E-1:0]};
                         if (!uops[i].isLoad) ctable[cacheIdx[i]][cacheHitIdx[i]].dirty <= 1;
                         // maybe manage used in separate array?
-                        for (j = 0; j < ASSOC; j=j+1) 
+                        for (integer j = 0; j < ASSOC; j=j+1) 
                             ctable[cacheIdx[i]][j].used <= 0;
                         ctable[cacheIdx[i]][cacheHitIdx[i]].used <= 1;
                     end
@@ -383,7 +382,7 @@ always_ff@(posedge clk) begin
                 else if (!cacheHit[i] && state == IDLE && !temp) begin
                     
                     reg dirty = ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty;
-                    for (j = 0; j < TOTAL_UOPS; j=j+1)
+                    for (integer j = 0; j < TOTAL_UOPS; j=j+1)
                         if (j != i && isCacheHit[j] && 
                             cacheIdx[j] == cacheIdx[i] &&
                             cacheHitIdx[j] == cacheEvictIdx[i] &&

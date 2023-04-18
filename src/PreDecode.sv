@@ -33,7 +33,6 @@ typedef struct packed
     logic[7:0][15:0] instr;
 } PDEntry;
 
-integer i;
 PDEntry buffer[BUF_SIZE-1:0];
 
 reg[$clog2(BUF_SIZE)-1:0] bufIndexIn;
@@ -48,14 +47,14 @@ always_ff@(posedge clk) begin
     if (rst) begin
         bufIndexIn = 0;
         bufIndexOut = 0;
-        for (i = 0; i < NUM_INSTRS_OUT; i=i+1)
+        for (integer i = 0; i < NUM_INSTRS_OUT; i=i+1)
             OUT_instrs[i].valid <= 0;
         freeEntries = BUF_SIZE;
     end
     else if (!mispred) begin
 
         if (outEn) begin
-            for (i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
+            for (integer i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
                 
                 if ((bufIndexOut != bufIndexIn || freeEntries == 0)) begin
                     
@@ -167,7 +166,7 @@ always_ff@(posedge clk) begin
     else begin
         bufIndexIn = 0;
         bufIndexOut = 0;
-        for (i = 0; i < NUM_INSTRS_OUT; i=i+1)
+        for (integer i = 0; i < NUM_INSTRS_OUT; i=i+1)
             OUT_instrs[i].valid <= 0;
         freeEntries = BUF_SIZE;
     end

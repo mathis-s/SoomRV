@@ -46,8 +46,6 @@ typedef struct packed
     logic valid;
 } LrScRsv;
 
-integer i;
-integer j;
 
 wire RAT_lookupAvail[2*WIDTH_ISSUE-1:0];
 wire[6:0] RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
@@ -89,7 +87,7 @@ always_comb begin
         nextLrScRsv.valid = 0;
         
     // Stall
-    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
 
         if (IN_mispredFlush && IN_uop[i].valid)
             OUT_stall = 1;
@@ -107,7 +105,7 @@ always_comb begin
     end
         
     // Issue/Lookup
-    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
     
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
@@ -143,13 +141,13 @@ always_comb begin
     end
     
     // Writeback
-    for (i = 0; i < WIDTH_WR; i=i+1) begin
+    for (integer i = 0; i < WIDTH_WR; i=i+1) begin
         RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
         RAT_wbTags[i] = IN_wbUOp[i].tagDst;
     end
     
     // Commit
-    for (i = 0; i < WIDTH_COMMIT; i=i+1) begin
+    for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
         RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
             //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         TB_commitValid[i] = IN_comUOp[i].valid;
@@ -200,7 +198,7 @@ reg[5:0] TB_tags[WIDTH_ISSUE-1:0];
 reg[6:0] newTags[WIDTH_ISSUE-1:0];
 reg TB_tagsValid[WIDTH_ISSUE-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
         if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
         else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
         else if (isSc[i]) newTags[i] = {1'b1, 5'b0, !scSuccessful[i]};
@@ -232,13 +230,13 @@ assign OUT_nextSqN = counterSqN;
 
 reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
-    for (i = 0; i < WIDTH_COMMIT; i=i+1) begin
+    for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
         
         // When nmDst == 0, the register is (also) discarded immediately instead of being committed.
         // This is currently only used for rmw atomics with rd=x0.
         isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].nmDst != 0;
         if (IN_comUOp[i].valid)
-            for (j = i + 1; j < WIDTH_COMMIT; j=j+1)
+            for (integer j = i + 1; j < WIDTH_COMMIT; j=j+1)
                 if (IN_comUOp[j].valid && (IN_comUOp[j].nmDst == IN_comUOp[i].nmDst))
                     isNewestCommit[i] = 0;
     end
@@ -256,7 +254,7 @@ always_ff@(posedge clk) begin
         intOrder = 0;
         lrScRsv.valid <= 0;
     
-        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -268,7 +266,7 @@ always_ff@(posedge clk) begin
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
         
-        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -277,7 +275,7 @@ always_ff@(posedge clk) begin
     else if (frontEn && !OUT_stall) begin
 
         // Look up tags and availability of operands for new instructions
-        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             //OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
@@ -302,7 +300,7 @@ always_ff@(posedge clk) begin
         end
         
         // Set seqnum/tags for next instruction(s)
-        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if (IN_uop[i].valid) begin
                 
                 OUT_uopValid[i] <= 1;
@@ -345,7 +343,7 @@ always_ff@(posedge clk) begin
         lrScRsv <= nextLrScRsv;
     end
     else if (!IN_stall) begin
-        for (i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uopValid[i] <= 0;
         end
@@ -355,9 +353,9 @@ always_ff@(posedge clk) begin
         // If frontend is stalled right now we need to make sure 
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
-        for (i = 0; i < WIDTH_WR; i=i+1) begin
+        for (integer i = 0; i < WIDTH_WR; i=i+1) begin
             if (IN_wbHasResult[i]) begin
-                for (j = 0; j < WIDTH_ISSUE; j=j+1) begin
+                for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
                     if (OUT_uopValid[j]) begin
                         if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availA <= 1;

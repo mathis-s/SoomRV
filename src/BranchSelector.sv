@@ -17,7 +17,6 @@ module BranchSelector
     input wire IN_mispredFlush
 );
 
-integer i;
 
 SqN mispredFlushSqN;
 reg disableMispredFlush;
@@ -28,7 +27,7 @@ always_comb begin
     OUT_branch.taken = 0;
     OUT_PERFC_branchMispr = 0;
     
-    for (i = 0; i < 3; i=i+1) begin
+    for (integer i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 
             (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0) &&
             (!IN_mispredFlush || $signed(IN_branches[i].sqN - mispredFlushSqN) < 0)) begin

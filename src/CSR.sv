@@ -26,7 +26,6 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     output RES_UOp OUT_uop
 );
 
-integer i;
 
 typedef enum logic[11:0]
 {
@@ -370,7 +369,7 @@ always_comb begin
     
         
     if (priv < PRIV_SUPERVISOR || (mstatus.sie && priv == PRIV_SUPERVISOR))
-        for (i = 0; i < 3; i=i+1)
+        for (integer i = 0; i < 3; i=i+1)
             if (mip[sPrio[i]] && mie[sPrio[i]]) begin 
                 interrupt = 1;
                 interruptCause = sPrio[i]; 
@@ -378,7 +377,7 @@ always_comb begin
             end
             
     if (priv < PRIV_MACHINE || mstatus.mie)
-        for (i = 0; i < 6; i=i+1)
+        for (integer i = 0; i < 6; i=i+1)
             if (mip[mPrio[i]] && mie[mPrio[i]] && !mideleg[mPrio[i]]) begin 
                 interrupt = 1;
                 interruptCause = mPrio[i]; 
@@ -669,14 +668,14 @@ always_ff@(posedge clk) begin
         
         if (!mcounterinhibit[2]) begin
             reg[2:0] temp = 0;
-            for (i = 0; i < 4; i=i+1)
+            for (integer i = 0; i < 4; i=i+1)
                 if (IN_commitValid[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
         
         if (!mcounterinhibit[3]) begin
             reg[2:0] temp = 0;
-            for (i = 0; i < 4; i=i+1)
+            for (integer i = 0; i < 4; i=i+1)
                 if (IN_commitBranch[i]) temp = temp + 1;
             mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
         end
@@ -953,18 +952,3 @@ always_ff@(posedge clk) begin
 end
 
 endmodule
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

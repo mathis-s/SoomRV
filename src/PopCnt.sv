@@ -4,7 +4,6 @@ module PopCnt(
     output reg[5:0] res
 );
 
-integer i;
 reg[5:0] resPopCnt;
 
 reg[1:0] resStage0[15:0]; // max 2
@@ -15,16 +14,16 @@ reg[4:0] resStage3[1:0]; // max 16
 always_comb begin
 
     resPopCnt = 0;
-    for (i = 0; i < 16; i=i+1)
+    for (integer i = 0; i < 16; i=i+1)
         resStage0[i] = {1'b0, a[2*i]} + {1'b0, a[2*i+1]};
     
-    for (i = 0; i < 8; i=i+1)
+    for (integer i = 0; i < 8; i=i+1)
         resStage1[i] = {1'b0, resStage0[2*i]} + {1'b0, resStage0[2*i+1]};
         
-    for (i = 0; i < 4; i=i+1)
+    for (integer i = 0; i < 4; i=i+1)
         resStage2[i] = {1'b0, resStage1[2*i]} + {1'b0, resStage1[2*i+1]};
 
-    for (i = 0; i < 2; i=i+1)
+    for (integer i = 0; i < 2; i=i+1)
         resStage3[i] = {1'b0, resStage2[2*i]} + {1'b0, resStage2[2*i+1]};
 
     

@@ -31,8 +31,6 @@ module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_P
 );
 
 localparam RET_PRED_LEN = RET_PRED_SIZE / RET_PRED_ASSOC;
-integer i;
-integer j;
 
 typedef struct packed
 {
@@ -79,7 +77,7 @@ always_comb begin
     lookupAssocIdx = 'x;
     
     if (IN_valid) begin
-        for (i = 0; i < RET_PRED_ASSOC; i=i+1) begin
+        for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
             if (rtable[lookupIdx][i].valid && 
                 rtable[lookupIdx][i].tag == lookupTag && 
                 rtable[lookupIdx][i].offs >= lookupOffs &&
@@ -95,12 +93,12 @@ end
 
 always_ff@(posedge clk) begin
     if (rst) begin
-        for (i = 0; i < RET_PRED_LEN; i=i+1)
-            for (j = 0; j < RET_PRED_ASSOC; j=j+1)
+        for (integer i = 0; i < RET_PRED_LEN; i=i+1)
+            for (integer j = 0; j < RET_PRED_ASSOC; j=j+1)
                 rtable[i][j].valid <= 0;
         
         // Not strictly necessary
-        for (i = 0; i < SIZE; i=i+1)
+        for (integer i = 0; i < SIZE; i=i+1)
             rstack[i] <= 0;
     end
     else begin
@@ -112,7 +110,7 @@ always_ff@(posedge clk) begin
         if (IN_returnUpd.valid) begin
             if (IN_returnUpd.cleanRet) begin
                 // TODO: only clean with matching tag
-                for (i = 0; i < RET_PRED_LEN; i=i+1)
+                for (integer i = 0; i < RET_PRED_LEN; i=i+1)
                     rtable[decodeIdx][i].valid <= 0;
             end
             
@@ -127,7 +125,7 @@ always_ff@(posedge clk) begin
                 // FIXME: this might double insert
                 begin
                     reg inserted = 0;
-                    for (i = 0; i < RET_PRED_ASSOC; i=i+1) begin
+                    for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
                         if (!inserted && (!rtable[decodeIdx][i].valid || !rtable[decodeIdx][i].used)) begin
                             inserted = 1;
                             rtable[decodeIdx][i].valid <= 1;

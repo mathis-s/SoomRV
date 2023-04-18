@@ -49,7 +49,6 @@ module RF
     output reg[WIDTH-1:0] rdata7
 );
 
-integer i;
 
 reg[WIDTH-1:0] mem[SIZE-1:0] /*verilator public*/;
 

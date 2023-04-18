@@ -21,7 +21,6 @@ module MemoryController#(parameter NUM_CACHES=2)
     
 );
 
-integer i;
 
 reg[2:0] state;
 reg[2:0] returnState;

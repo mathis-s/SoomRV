@@ -23,8 +23,6 @@ module LoadStoreUnit
     output Tag OUT_loadFwdTag
 );
 
-integer i;
-integer j;
 
 typedef struct packed
 {

@@ -7,7 +7,6 @@ module ExternalMemorySim#(parameter SIZE=(1<<24))
     inout wire[31:0] bus
 );
 
-integer i;
 
 reg oen = 0;
 reg[31:0] outBus;

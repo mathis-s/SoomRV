@@ -47,7 +47,6 @@ module IFetch
     output wire OUT_stall
 );
 
-integer i;
 
 assign OUT_instrReadEnable = !en;
 
@@ -138,7 +137,7 @@ wire[127:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
 IF_Instr outInstrs_r;
 always_comb begin
     OUT_instrs = outInstrs_r;
-    for (i = 0; i < NUM_BLOCKS; i=i+1)
+    for (integer i = 0; i < NUM_BLOCKS; i=i+1)
         OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
 end
 

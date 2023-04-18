@@ -218,7 +218,6 @@ reg RS_outValid = 0;
 reg RS_inPop;
 reg[30:0] RS_outData = 0;
 
-integer i;
 
 D_UOp uop;
 reg invalidEnc;
@@ -247,7 +246,7 @@ always_comb begin
     OUT_decBranch.taken = 0;
     validMask = 4'b1111;
     
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         
         instr = IN_instrs[i].instr;
         i32 = IN_instrs[i].instr;
@@ -1532,11 +1531,11 @@ always_ff@(posedge clk) begin
     //OUT_retUpd <= retUpd_c;
 
     if (rst || IN_invalidate) begin
-        for (i = 0; i < NUM_UOPS; i=i+1)
+        for (integer i = 0; i < NUM_UOPS; i=i+1)
             OUT_uop[i].valid <= 0;
     end
     else if (en) begin
-        for (i = 0; i < NUM_UOPS; i=i+1) begin
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= uopsComb[i];
             if (!validMask[i]) OUT_uop[i].valid <= 0;
         end

@@ -39,13 +39,11 @@ module Load
 
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
-integer i;
-integer j;
 
 always_comb begin
 
     // All ports get to read from integer rf and pc rf
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
         
@@ -60,13 +58,13 @@ FuncUnit outFU[NUM_UOPS-1:0];
 
 always_ff@(posedge clk) begin
     if (rst) begin
-        for (i = 0; i < NUM_UOPS; i=i+1) begin
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;
         end
     end
     else begin
-        for (i = 0; i < NUM_UOPS; i=i+1) begin
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             if (!IN_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
                 OUT_uop[i].imm <= IN_uop[i].imm;
@@ -111,7 +109,7 @@ always_ff@(posedge clk) begin
                     reg found = 0;
                     
                     // Try to forward from wbs
-                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
                         if (IN_wbHasResult[j] && IN_uop[i].tagA == IN_wbUOp[j].tagDst) begin
                             OUT_uop[i].srcA <= IN_wbUOp[j].result;
@@ -120,7 +118,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     // Try to forward zero cycle (TODO: one hot too)
-                    for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                    for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagA) begin
                             OUT_uop[i].srcA <= IN_zcFwdResult[j];
                             found = 1;
@@ -140,7 +138,7 @@ always_ff@(posedge clk) begin
                 end
                 else begin
                     reg found = 0;
-                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
                         if (IN_wbHasResult[j] && IN_uop[i].tagB == IN_wbUOp[j].tagDst) begin
                             OUT_uop[i].srcB <= IN_wbUOp[j].result;
@@ -149,7 +147,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     // Try to forward zero cycle (TODO: one hot too)
-                    for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                    for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagB) begin
                             OUT_uop[i].srcB <= IN_zcFwdResult[j];
                             found = 1;
@@ -165,7 +163,7 @@ always_ff@(posedge clk) begin
                 if (i == 3) begin
                     reg found = 0;
                     // Try to forward from wbs
-                    for (j = 0; j < NUM_WBS; j=j+1) begin
+                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
                         if (IN_wbHasResult[j] && IN_uop[i].tagC == IN_wbUOp[j].tagDst) begin
                             OUT_uop[i].srcC <= IN_wbUOp[j].result;
@@ -174,7 +172,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     // ZC is impossible as the atomic memory operand always comes from the Load port
-                    /*for (j = 0; j < NUM_ZC_FWDS; j=j+1) begin
+                    /*for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagC) begin
                             OUT_uop[i].srcC <= IN_zcFwdResult[j];
                             found = 1;

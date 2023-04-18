@@ -32,7 +32,6 @@ module BranchPredictor
     input BPUpdate IN_bpUpdate
 );
 
-integer i;
 
 BHist_t gHistory;
 BHist_t gHistoryCom;
@@ -42,7 +41,7 @@ BTUpdate btUpdate;
 always_comb begin
     btUpdate = 'x;
     btUpdate.valid = 0;
-    for (i = 0; i < NUM_IN; i=i+1) begin
+    for (integer i = 0; i < NUM_IN; i=i+1) begin
         if (IN_btUpdates[i].valid)
             btUpdate = IN_btUpdates[i];
     end

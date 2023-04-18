@@ -17,7 +17,6 @@ module MemRTL
     input wire[$clog2(NUM_WORDS)-1:0] IN_addr1,
     output reg[WORD_SIZE-1:0] OUT_data1
 );
-integer i;
 
 reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0];
 
@@ -45,7 +44,7 @@ always@(posedge clk) begin
     
     if (!ce_reg) begin
         if (!we_reg) begin
-            for (i = 0; i < WORD_SIZE/8; i=i+1) begin
+            for (integer i = 0; i < WORD_SIZE/8; i=i+1) begin
                 if (wm_reg[i])
                     mem[addr_reg][(8*i)+:8] <= data_reg[(8*i)+:8];
             end
@@ -67,7 +66,7 @@ always@(posedge clk) begin
         OUT_data1 <= 'x;
         
         /*if (!we_reg) begin
-            for (i = 0; i < WORD_SIZE/8; i=i+1) begin
+            for (integer i = 0; i < WORD_SIZE/8; i=i+1) begin
                 if (wm_reg[i])
                     mem[addr_reg][(8*i)+:8] <= 'x;
             end

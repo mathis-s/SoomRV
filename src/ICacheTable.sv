@@ -21,7 +21,6 @@ module ICacheTable#(parameter NUM_ICACHE_LINES=8)
     output CTRL_MemC OUT_memc,
     input STAT_MemC IN_memc
 );
-integer i;
 
 ICacheTableEntry icacheTable[NUM_ICACHE_LINES-1:0];
 reg cacheEntryFound;
@@ -30,7 +29,7 @@ always_comb begin
     cacheEntryFound = 0;
     cacheEntryIndex = 0;
     OUT_lookupAddress = 28'bx;
-    for (i = 0; i < NUM_ICACHE_LINES; i=i+1) begin
+    for (integer i = 0; i < NUM_ICACHE_LINES; i=i+1) begin
         if (icacheTable[i].valid && icacheTable[i].addr == IN_lookupPC[30:8]) begin
             OUT_lookupAddress = {i[22:0], IN_lookupPC[7:3]};
             cacheEntryFound = 1;
@@ -59,7 +58,7 @@ always_ff@(posedge clk) begin
     OUT_memc.cmd <= MEMC_NONE;
     
     if (rst) begin
-        for (i = 0; i < NUM_ICACHE_LINES; i=i+1)
+        for (integer i = 0; i < NUM_ICACHE_LINES; i=i+1)
             icacheTable[i].valid <= 0;
         lruPointer <= 0;
         loading <= 0;

@@ -27,7 +27,6 @@ module LoadBuffer
     output SqN OUT_maxLoadSqN
 );
 
-integer i;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
@@ -38,7 +37,7 @@ logic storeIsCollision;
 always_comb begin
     storeIsCollision = 0;
 
-    for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         if (entries[i].valid &&
             $signed(IN_uopSt.sqN - entries[i].sqN) <= 0 &&
             entries[i].addr[31:2] == IN_uopSt.addr[31:2] &&
@@ -66,7 +65,7 @@ always_ff@(posedge clk) begin
     OUT_branch.taken <= 0;
 
     if (rst) begin
-        for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
         end
         baseIndex = 0;
@@ -74,7 +73,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (IN_branch.taken) begin
-            for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) >= 0)
                     entries[i].valid <= 0;
             end
@@ -85,7 +84,7 @@ always_ff@(posedge clk) begin
         else begin
             // Delete entries that have been committed
             if (entries[0].valid && $signed(commitSqN - entries[0].sqN) > 0) begin
-                for (i = 0; i < NUM_ENTRIES-1; i=i+1)
+                for (integer i = 0; i < NUM_ENTRIES-1; i=i+1)
                     entries[i] <= entries[i+1];
                 entries[NUM_ENTRIES - 1].valid <= 0;
                 

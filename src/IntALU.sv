@@ -21,7 +21,6 @@ module IntALU
 
     output RES_UOp OUT_uop
 );
-integer i = 0;
 
 wire[31:0] srcA = IN_uop.srcA;
 wire[31:0] srcB = IN_uop.srcB;
@@ -41,7 +40,7 @@ wire[5:0] resLzTz;
 
 reg[31:0] srcAbitRev;
 always_comb begin
-    for (i = 0; i < 32; i=i+1)
+    for (integer i = 0; i < 32; i=i+1)
         srcAbitRev[i] = srcA[31-i];
 end
 LZCnt lzc (

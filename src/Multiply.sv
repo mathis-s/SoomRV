@@ -34,7 +34,6 @@ typedef struct packed
 } MulPS;
 
 
-integer i;
 
 MulPS pl[NUM_STAGES:0];
 assign OUT_busy = 0;
@@ -42,7 +41,7 @@ assign OUT_busy = 0;
 always_ff@(posedge clk) begin
     
 
-    for (i = 0; i < NUM_STAGES+1; i=i+1) begin
+    for (integer i = 0; i < NUM_STAGES+1; i=i+1) begin
         pl[i] <= 'x;
         pl[i].valid <= 0;
     end
@@ -84,7 +83,7 @@ always_ff@(posedge clk) begin
             pl[0].valid <= 0;
         
         begin
-            for (i = 0; i < NUM_STAGES; i=i+1) begin
+            for (integer i = 0; i < NUM_STAGES; i=i+1) begin
                 
                 if (pl[i].valid && (!IN_branch.taken || $signed(pl[i].sqN - IN_branch.sqN) <= 0)) begin
                     

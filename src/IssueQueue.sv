@@ -52,9 +52,6 @@ module IssueQueue
 
 localparam ID_LEN = $clog2(SIZE);
 
-integer i;
-integer j;
-integer k;
 
 typedef struct packed
 {
@@ -89,39 +86,39 @@ reg[NUM_OPERANDS-1:0] newAvail_dl[SIZE-1:0];
 
 
 always_comb begin
-    for (i = 0; i < SIZE; i=i+1) begin
+    for (integer i = 0; i < SIZE; i=i+1) begin
         
-        for (k = 0; k < NUM_OPERANDS; k=k+1) begin
+        for (integer k = 0; k < NUM_OPERANDS; k=k+1) begin
             newAvail[i][k] = 0;
             newAvail_dl[i][k] = 0;
         end
         
-        for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-            for (k = 0; k < NUM_OPERANDS; k=k+1)
+        for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
+            for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                 if (IN_resultValid[j] && queue[i].tags[k] == IN_resultUOp[j].tagDst) newAvail[i][k] = 1;
         end
         
-        for (j = 0; j < 2; j=j+1) begin
+        for (integer j = 0; j < 2; j=j+1) begin
             if (IN_issueValid[j] && IN_issueUOps[j].nmDst != 0) begin
                 if (IN_issueUOps[j].fu == FU_INT) begin
-                    for (k = 0; k < NUM_OPERANDS; k=k+1)
+                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                         if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
                 end
                 else if (IN_issueUOps[j].fu == FU_FPU || IN_issueUOps[j].fu == FU_FMUL) begin
-                    for (k = 0; k < NUM_OPERANDS; k=k+1)
+                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                         if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail_dl[i][k] = 1;
                 end
             end
         end
         
-        for (k = 0; k < NUM_OPERANDS; k=k+1)
+        for (integer k = 0; k < NUM_OPERANDS; k=k+1)
             if (IN_loadForwardValid && queue[i].tags[k] == IN_loadForwardTag) newAvail[i][k] = 1;
     end
 end
 
 always_comb begin
     reg[$clog2(SIZE):0] count = 0;
-    for (i = 0; i < NUM_UOPS; i=i+1) begin
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         if (IN_uopValid[i] && 
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
@@ -134,7 +131,7 @@ end
 always_ff@(posedge clk) begin
     
     // Update availability
-    for (i = 0; i < SIZE; i=i+1) begin
+    for (integer i = 0; i < SIZE; i=i+1) begin
         queue[i].avail <= queue[i].avail | newAvail[i] | newAvail_dl[i];
     end
     reservedWBs <= {1'b0, reservedWBs[32:1]};
@@ -149,7 +146,7 @@ always_ff@(posedge clk) begin
         
         reg[ID_LEN:0] newInsertIndex = 0;
         // Set insert index to first invalid entry
-        for (i = 0; i < SIZE; i=i+1) begin
+        for (integer i = 0; i < SIZE; i=i+1) begin
             if (i < insertIndex && $signed(queue[i].sqN - IN_branch.sqN) <= 0) begin
                 newInsertIndex = i[$clog2(SIZE):0] + 1;
             end
@@ -168,7 +165,7 @@ always_ff@(posedge clk) begin
             OUT_uop <= 'x;
             OUT_valid <= 0;
             
-            for (i = 0; i < SIZE; i=i+1) begin
+            for (integer i = 0; i < SIZE; i=i+1) begin
                 if (i < insertIndex && !issued) begin
                     if (&(queue[i].avail | newAvail[i]) &&
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
@@ -225,7 +222,7 @@ always_ff@(posedge clk) begin
                         OUT_uop.compressed <= queue[i].compressed;
                         
                         // Shift other ops forward
-                        for (j = i; j < SIZE-1; j=j+1) begin
+                        for (integer j = i; j < SIZE-1; j=j+1) begin
                             queue[j] <= queue[j+1];
                             queue[j].avail <= queue[j+1].avail | newAvail[j+1] | newAvail_dl[j+1];
                         end
@@ -241,7 +238,7 @@ always_ff@(posedge clk) begin
         
         // Enqueue
         if (frontEn && !IN_branch.taken) begin
-            for (i = 0; i < NUM_UOPS; i=i+1) begin
+            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
                 if (IN_uopValid[i] && 
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                         IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
@@ -274,9 +271,9 @@ always_ff@(posedge clk) begin
                     
                     
                     // Check if the result for this op is being broadcasted in the current cycle
-                    for (j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
+                    for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                         if (IN_resultValid[j]) begin
-                            for (k = 0; k < NUM_OPERANDS; k=k+1)
+                            for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                                 if (k < 2 && temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                         end
                     end
