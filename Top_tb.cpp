@@ -12,11 +12,9 @@
 #include "VTop_Top.h"
 #include "VTop_CSR.h"
 #include "VTop_ROB.h"
-#include "VTop___024root.h"
 #include <cstdio>
 #include <iostream> // Need std::cout
 #include <unistd.h>
-#include <verilated.h> // Defines common routines
 #ifdef TRACE
 #include "verilated_vcd_c.h"
 #endif
@@ -386,7 +384,7 @@ Inst insts[128];
 std::array<uint8_t, 32> regTagOverride;
 uint32_t ReadRegister(uint32_t rid)
 {
-    auto core = top->rootp->Top->core;
+    auto core = top->Top->core;
 
     uint8_t comTag = regTagOverride[rid];
     if (comTag == 0xff) comTag = (core->rn->rt->rat[rid] >> 7) & 127;
@@ -401,7 +399,7 @@ SpikeSimif simif;
 
 void DumpState(FILE* stream, uint32_t pc, uint32_t inst)
 {
-    auto core = top->rootp->Top->core;
+    auto core = top->Top->core;
     fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x\n", core->csr->minstret, pc, inst);
     for (size_t j = 0; j < 4; j++)
     {
@@ -525,7 +523,7 @@ void LogCycle()
 uint32_t mostRecentPC;
 void LogInstructions()
 {
-    auto core = top->rootp->Top->core;
+    auto core = top->Top->core;
 
     bool brTaken = core->branch[0] & 1;
     int brSqN = ExtractField<3>(core->branch, 80 - 32 - 7, 7);
@@ -651,7 +649,7 @@ void LogInstructions()
         if (core->frontendEn && !core->RN_stall)
         {
             for (size_t i = 0; i < 4; i++)
-                if (top->rootp->Top->core->DE_uop[i].at(0) & (1 << 0))
+                if (top->Top->core->DE_uop[i].at(0) & (1 << 0))
                 {
                     de[i] = pd[i];
                     de[i].rd = ExtractField(core->DE_uop[i], 68 - 32 - 5 - 5 - 1 - 5, 5);
@@ -672,9 +670,9 @@ void LogInstructions()
                     pd[i].valid = true;
                     pd[i].flags = 0;
                     pd[i].id = id++;
-                    pd[i].pc = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 125 - 31 - 32, 31) << 1;
-                    pd[i].inst = ExtractField<4>(top->rootp->Top->core->PD_instrs[i], 125 - 32, 32);
-                    pd[i].fetchID = ExtractField(top->rootp->Top->core->PD_instrs[i], 4, 5);
+                    pd[i].pc = ExtractField<4>(top->Top->core->PD_instrs[i], 125 - 31 - 32, 31) << 1;
+                    pd[i].inst = ExtractField<4>(top->Top->core->PD_instrs[i], 125 - 32, 32);
+                    pd[i].fetchID = ExtractField(top->Top->core->PD_instrs[i], 4, 5);
                     if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
 
                     LogPredec(pd[i]);
@@ -738,7 +736,7 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < (1 << 24); i++)
     {
-        top->rootp->Top->extMem->mem[i] = pram[i];
+        top->Top->extMem->mem[i] = pram[i];
     }
     
 
