@@ -1,6 +1,6 @@
 VERILATOR_FLAGS = \
 	--cc --build --threads 2 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
-	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-MULTIDRIVEN --x-assign unique --x-initial unique -O3 -sv \
+	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --x-assign unique --x-initial unique -O3 -sv \
 	-CFLAGS "-march=native" \
 	-MAKEFLAGS -j16
 

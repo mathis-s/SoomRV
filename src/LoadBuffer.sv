@@ -41,20 +41,20 @@ always_comb begin
         if (entries[i].valid &&
             $signed(IN_uopSt.sqN - entries[i].sqN) <= 0 &&
             entries[i].addr[31:2] == IN_uopSt.addr[31:2] &&
-                (entries[i].size == 2 ||
-                (entries[i].size == 1 && entries[i].addr[1] == IN_uopSt.addr[1]) ||
-                (entries[i].size == 0 && entries[i].addr[1:0] == IN_uopSt.addr[1:0]))
+                (IN_uopSt.size == 2 ||
+                (IN_uopSt.size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uopSt.addr[1])) ||
+                (IN_uopSt.size == 0 && (entries[i].size > 0 || entries[i].addr[1:0] == IN_uopSt.addr[1:0])))
             ) begin
             storeIsCollision = 1;
         end
     end
-
+    
     if (IN_uopLd.valid && !IN_stall[0] &&
         $signed(IN_uopSt.sqN - IN_uopLd.sqN) <= 0 &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
-            (IN_uopLd.size == 2 ||
-            (IN_uopLd.size == 1 && IN_uopLd.addr[1] == IN_uopSt.addr[1]) ||
-            (IN_uopLd.size == 0 && IN_uopLd.addr[1:0] == IN_uopSt.addr[1:0]))
+            (IN_uopSt.size == 2 ||
+            (IN_uopSt.size == 1 && (IN_uopLd.size > 1 || IN_uopLd.addr[1] == IN_uopSt.addr[1])) ||
+            (IN_uopSt.size == 0 && (IN_uopLd.size > 0 || IN_uopLd.addr[1:0] == IN_uopSt.addr[1:0])))
         )
         storeIsCollision = 1;
 end
