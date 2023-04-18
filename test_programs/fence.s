@@ -48,6 +48,7 @@ main:
     
     fence.i
 
+
     jalr a0
     call printhex
     

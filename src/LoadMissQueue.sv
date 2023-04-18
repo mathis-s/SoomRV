@@ -1,4 +1,4 @@
-module LoadMissQueue#(parameter SIZE=4, parameter CLSIZE_E=7)
+module LoadMissQueue#(parameter SIZE=2, parameter CLSIZE_E=7)
 (
     input wire clk,
     input wire rst,

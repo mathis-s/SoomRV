@@ -2,7 +2,8 @@ typedef struct packed
 {
     bit valid;
     SqN sqN;
-    bit[29:0] addr;
+    bit[1:0] size;
+    bit[31:0] addr;
 } LBEntry;
 
 module LoadBuffer
@@ -17,7 +18,8 @@ module LoadBuffer
     input SqN commitSqN,
     
     input wire IN_stall[1:0],
-    input AGU_UOp IN_uop[NUM_PORTS-1:0],
+    input AGU_UOp IN_uopLd,
+    input AGU_UOp IN_uopSt,
     
     input BranchProv IN_branch,
     output BranchProv OUT_branch,
@@ -26,27 +28,51 @@ module LoadBuffer
 );
 
 integer i;
-integer j;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
 SqN baseIndex;
 SqN indexIn;
 
+logic storeIsCollision;
+always_comb begin
+    storeIsCollision = 0;
+
+    for (i = 0; i < NUM_ENTRIES; i=i+1) begin
+        if (entries[i].valid &&
+            $signed(IN_uopSt.sqN - entries[i].sqN) <= 0 &&
+            entries[i].addr[31:2] == IN_uopSt.addr[31:2] &&
+                (entries[i].size == 2 ||
+                (entries[i].size == 1 && entries[i].addr[1] == IN_uopSt.addr[1]) ||
+                (entries[i].size == 0 && entries[i].addr[1:0] == IN_uopSt.addr[1:0]))
+            ) begin
+            storeIsCollision = 1;
+        end
+    end
+
+    if (IN_uopLd.valid && !IN_stall[0] &&
+        $signed(IN_uopSt.sqN - IN_uopLd.sqN) <= 0 &&
+        IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
+            (IN_uopLd.size == 2 ||
+            (IN_uopLd.size == 1 && IN_uopLd.addr[1] == IN_uopSt.addr[1]) ||
+            (IN_uopLd.size == 0 && IN_uopLd.addr[1:0] == IN_uopSt.addr[1:0]))
+        )
+        storeIsCollision = 1;
+end
+
 always_ff@(posedge clk) begin
+    
+    OUT_branch <= 'x;
+    OUT_branch.taken <= 0;
 
     if (rst) begin
         for (i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
         end
         baseIndex = 0;
-        OUT_branch.taken <= 0;
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
     end
     else begin
-    
-        OUT_branch.taken <= 0;
-        
         if (IN_branch.taken) begin
             for (i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) >= 0)
@@ -68,43 +94,27 @@ always_ff@(posedge clk) begin
         end
     
         // Insert new entries, check stores
-        for (i = 0; i < NUM_PORTS; i=i+1) begin
-            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
-            
-                if (i == 0) begin
-                    reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
-                    assert(IN_uop[i].loadSqN <= baseIndex + NUM_ENTRIES - 1);
+        if (!IN_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
 
-                    entries[index].sqN <= IN_uop[i].sqN;
-                    entries[index].addr <= IN_uop[i].addr[31:2];
-                    entries[index].valid <= 1;
-                end
-                
-                else if (i == 1 && IN_uop[1].wmask != 0) begin
-                    reg temp = 0;
-                    for (j = 0; j < NUM_ENTRIES; j=j+1) begin
-                        if (entries[j].valid && entries[j].addr == IN_uop[i].addr[31:2] && $signed(IN_uop[i].sqN - entries[j].sqN) <= 0) begin
-                            temp = 1;
-                        end
-                    end
-                    
-                    // TODO: Delay SQ lookup by one cycle instead of this.
-                    if (IN_uop[0].valid && !IN_stall[0] && $signed(IN_uop[1].sqN - IN_uop[0].sqN) <= 0
-                        && IN_uop[0].addr[31:2] == IN_uop[1].addr[31:2])
-                        temp = 1;
-                    
-                    if (temp) begin
-                        OUT_branch.taken <= 1;
-                        OUT_branch.dstPC <= IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
-                        OUT_branch.sqN <= IN_uop[i].sqN;
-                        OUT_branch.loadSqN <= IN_uop[i].loadSqN;
-                        OUT_branch.storeSqN <= IN_uop[i].storeSqN;
-                        OUT_branch.fetchID <= IN_uop[i].fetchID;
-                        OUT_branch.history <= IN_uop[i].history;
-                        OUT_branch.rIdx <= IN_uop[i].rIdx;
-                        OUT_branch.flush <= 0;
-                    end
-                end
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopLd.loadSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
+            assert(IN_uopLd.loadSqN <= baseIndex + NUM_ENTRIES - 1);
+            entries[index].sqN <= IN_uopLd.sqN;
+            entries[index].addr <= IN_uopLd.addr;
+            entries[index].size <= IN_uopLd.size;
+            entries[index].valid <= 1;
+        end
+        
+        if (!IN_stall[1] && IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
+            if (storeIsCollision) begin
+                OUT_branch.taken <= 1;
+                OUT_branch.dstPC <= IN_uopSt.pc + (IN_uopSt.compressed ? 2 : 4);
+                OUT_branch.sqN <= IN_uopSt.sqN;
+                OUT_branch.loadSqN <= IN_uopSt.loadSqN;
+                OUT_branch.storeSqN <= IN_uopSt.storeSqN;
+                OUT_branch.fetchID <= IN_uopSt.fetchID;
+                OUT_branch.history <= IN_uopSt.history;
+                OUT_branch.rIdx <= IN_uopSt.rIdx;
+                OUT_branch.flush <= 0;
             end
         end
         
