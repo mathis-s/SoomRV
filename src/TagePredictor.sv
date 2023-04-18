@@ -108,7 +108,7 @@ always_comb begin
     end
 end
 
-/* verilator lint_off UNOPT */
+/* verilator lint_off UNOPTFLAT */
 wire[NUM_STAGES-1:0] alloc;
 assign alloc[0] = 0;
 generate 
