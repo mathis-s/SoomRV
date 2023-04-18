@@ -34,7 +34,7 @@ localparam RET_PRED_LEN = RET_PRED_SIZE / RET_PRED_ASSOC;
 integer i;
 integer j;
 
-typedef struct packed
+typedef struct
 {
     logic[RET_PRED_TAG_LEN-1:0] tag;
     FetchOff_t offs; // offset of second halfword if 32 bit, otherwise first
