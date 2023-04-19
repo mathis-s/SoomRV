@@ -1,11 +1,3 @@
-typedef struct packed
-{
-    bit valid;
-    SqN sqN;
-    bit[1:0] size;
-    bit[31:0] addr;
-} LBEntry;
-
 module LoadBuffer
 #(
     parameter NUM_PORTS=2,
@@ -27,6 +19,13 @@ module LoadBuffer
     output SqN OUT_maxLoadSqN
 );
 
+typedef struct packed
+{
+    bit valid;
+    SqN sqN;
+    bit[1:0] size;
+    bit[31:0] addr;
+} LBEntry;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 

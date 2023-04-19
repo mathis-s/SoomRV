@@ -1,10 +1,3 @@
-typedef struct packed
-{
-    bit avail;
-    bit[6:0] comTag;
-    bit[6:0] specTag;
-} RATEntry;
-
 module RenameTable
 #(
     parameter NUM_LOOKUP=8,
@@ -40,6 +33,13 @@ module RenameTable
     input wire[ID_SIZE-1:0] IN_wbID[NUM_WB-1:0],
     input wire[TAG_SIZE-1:0] IN_wbTag[NUM_WB-1:0]
 );
+
+typedef struct packed
+{
+    bit avail;
+    bit[TAG_SIZE-1:0] comTag;
+    bit[TAG_SIZE-1:0] specTag;
+} RATEntry;
 
 RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
 

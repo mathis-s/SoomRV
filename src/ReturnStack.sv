@@ -1,15 +1,3 @@
-
-// If a return is detected in decode,
-// decode sends us this.
-// We update the ringbuffer and do a predicted return.
-// -> Returns are always predicted? What if queue empty?
-// Simple Hack: Return does invalidation to itself, we then predict the return from there.
-
-// Decode needs to inform us if
-// - unpredicted jal (decode does jump, we push ra)
-// - unpredict jalr (jump done by ialu, we push ra)
-// - unpredicted ret (jump done by ialu for now, we pop ra)
-
 module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_PRED_ASSOC=2, parameter RET_PRED_TAG_LEN=8)
 (
     input wire clk,
