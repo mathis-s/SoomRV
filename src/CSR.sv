@@ -730,7 +730,6 @@ always_ff@(posedge clk) begin
         OUT_uop.doNotCommit <= 0;
         OUT_uop.flags <= FLAGS_NONE;
         OUT_uop.sqN <= IN_uop.sqN;
-        OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.tagDst <= IN_uop.tagDst;
         
         if (IN_uop.opcode == CSR_MRET || IN_uop.opcode == CSR_SRET) begin
@@ -939,7 +938,7 @@ always_ff@(posedge clk) begin
                 end
                 
                 // Do read?
-                if ((IN_uop.opcode != CSR_RW && IN_uop.opcode != CSR_RW_I) || IN_uop.nmDst != 0) begin
+                if ((IN_uop.opcode != CSR_RW && IN_uop.opcode != CSR_RW_I) || !IN_uop.tagDst[$bits(Tag)-1]) begin
                     OUT_uop.result <= rdata;
                     // read side effects
                 end

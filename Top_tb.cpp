@@ -1,5 +1,5 @@
 // #define TRACE
-// #define KONATA
+#define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -42,6 +42,8 @@ struct Inst
     uint32_t srcC;
     uint32_t imm;
     uint32_t result;
+    uint32_t memAddr;
+    uint32_t memData;
     uint8_t fetchID;
     uint8_t sqn;
     uint8_t fu;
@@ -270,6 +272,21 @@ class SpikeSimif : public simif_t
                 mem_pass_thru = true;
             }
         }
+        
+        bool writeValid = true;
+        for (auto write : processor->get_state()->log_mem_write)
+        {
+            /*if ((uint32_t)std::get<0>(write) != inst.memAddr)
+            {
+                fprintf(stderr, "Write addr mismatch %.8x != %.8x\n", inst.memAddr, (uint32_t)std::get<0>(write));
+                writeValid = false;
+            }
+            if ((uint32_t)std::get<1>(write) != (inst.memData >> (8 * (inst.memAddr & 3))))
+            {
+                fprintf(stderr, "Write data mismatch %.8x != %.8x\n", inst.memData, (uint32_t)std::get<1>(write));
+                writeValid = false;
+            }*/
+        }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
         {
@@ -283,7 +300,7 @@ class SpikeSimif : public simif_t
         }
 
         bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
-        return instrEqual && inst.pc == initialSpikePC && compare_state();
+        return instrEqual && inst.pc == initialSpikePC && writeValid && compare_state();
     }
 
     const std::map<size_t, processor_t*>& get_harts() const override
@@ -438,10 +455,11 @@ void LogCommit(Inst& inst)
 #ifdef TRACE
             tfp->flush();
 #endif
-            exit(-1);
 #ifdef KONATA
             fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
+            fflush(konataFile);
 #endif
+            exit(-1);
         }
 #endif
 
@@ -533,7 +551,7 @@ void LogInstructions()
     {
         if (!core->stall[i] && core->RV_uopValid[i])
         {
-            uint32_t sqn = ExtractField<4>(core->RV_uop[i], 108 - (32 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
+            uint32_t sqn = ExtractField<4>(core->RV_uop[i], 103 - (32 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
             LogIssue(insts[sqn]);
         }
     }
@@ -544,14 +562,23 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 239 - 32 * 5 - 6 - 7 - 5 - 7, 7);
-            insts[sqn].srcA = ExtractField(core->LD_uop[i], 239 - 32, 32);
-            insts[sqn].srcB = ExtractField(core->LD_uop[i], 239 - 32 - 32, 32);
-            insts[sqn].srcC = ExtractField(core->LD_uop[i], 239 - 32 - 32 - 32, 32);
-            insts[sqn].imm = ExtractField(core->LD_uop[i], 239 - 32 - 32 - 32 - 32 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 234 - 32 * 5 - 6 - 7 - 7, 7);
+            insts[sqn].srcA = ExtractField(core->LD_uop[i], 234 - 32, 32);
+            insts[sqn].srcB = ExtractField(core->LD_uop[i], 234 - 32 - 32, 32);
+            insts[sqn].srcC = ExtractField(core->LD_uop[i], 234 - 32 - 32 - 32, 32);
+            insts[sqn].imm = ExtractField(core->LD_uop[i], 234 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(insts[sqn]);
         }
     }
+
+    // Memory Access
+    for (auto& uop : {core->AGU_LD_uop, core->AGU_ST_uop})
+        if (uop[0] & 1)
+        {
+            uint32_t sqn = ExtractField(uop, 162 - 32*2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
+            insts[sqn].memAddr =  ExtractField(uop, 162 - 32, 32);
+            insts[sqn].memData =  ExtractField(uop, 162 - 32*2, 32);
+        }
 
     // Result
     for (size_t i = 0; i < 4; i++)
@@ -560,7 +587,7 @@ void LogInstructions()
         if (core->wbUOp[i] & 1)
         {
             uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
-            uint32_t result = (core->wbUOp[i] >> (6+7+5+7)) & 0xffff'ffff;
+            uint32_t result = (core->wbUOp[i] >> (6+7+7)) & 0xffff'ffff;
             insts[sqn].result = result;
             insts[sqn].flags = (core->wbUOp[i] >> 2) & 0xF;
 

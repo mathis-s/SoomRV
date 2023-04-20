@@ -457,6 +457,27 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] imm;
+    logic availA;
+    Tag tagA;
+    logic availB;
+    Tag tagB;
+    logic immB;
+    Tag tagC; // only used in store port (for atomics), optimized out otherwise
+    SqN sqN;
+    Tag tagDst;
+    logic[5:0] opcode;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
+    SqN storeSqN;
+    SqN loadSqN;
+    FuncUnit fu;
+    logic compressed;
+} IS_UOp;
+
+
+typedef struct packed
+{
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] srcC; // only used in store port (for atomics), optimized out otherwise
@@ -464,7 +485,6 @@ typedef struct packed
     logic[31:0] imm;
     logic[5:0] opcode;
     Tag tagDst;
-    RegNm nmDst;
     SqN sqN;
     FetchID_t fetchID;
     BranchPredInfo bpi;
@@ -480,7 +500,6 @@ typedef struct packed
 {
     bit[31:0] result;
     Tag tagDst;
-    RegNm nmDst;
     SqN sqN;
     Flags flags;
     logic doNotCommit;
@@ -506,7 +525,6 @@ typedef struct packed
     logic isLoad;
     logic[31:0] pc;
     Tag tagDst;
-    RegNm nmDst;
     SqN sqN;
     SqN storeSqN;
     SqN loadSqN;
@@ -553,7 +571,6 @@ typedef struct packed
     logic signExtend;
     logic[1:0] size;
     Tag tagDst;
-    RegNm nmDst;
     SqN sqN;
     logic doNotCommit;
     logic external; // not part of normal execution, ignore sqn, tagDst and nmDst, don't commit

@@ -164,7 +164,6 @@ always_ff@(posedge clk) begin
             OUT_aguOp.addr <= addr;
             OUT_aguOp.pc <= IN_uop.pc;
             OUT_aguOp.tagDst <= IN_uop.tagDst;
-            OUT_aguOp.nmDst <= IN_uop.nmDst;
             OUT_aguOp.sqN <= IN_uop.sqN;
             OUT_aguOp.storeSqN <= IN_uop.storeSqN;
             OUT_aguOp.loadSqN <= IN_uop.loadSqN;
@@ -227,7 +226,6 @@ always_ff@(posedge clk) begin
                 OUT_aguOp.doNotCommit <= 0;
                 
                 OUT_uop.tagDst <= IN_uop.tagDst;
-                OUT_uop.nmDst <= IN_uop.nmDst;
                 OUT_uop.sqN <= IN_uop.sqN;
                 OUT_uop.result <= addr;
                 OUT_uop.doNotCommit <= 0;
@@ -235,17 +233,18 @@ always_ff@(posedge clk) begin
                 // HACKY: Successful SC return value has already been handled
                 // in rename; thus outputting a result here again might cause problems, so redirect to zero register.
                 if (IN_uop.opcode == LSU_SC_W) begin
-                    OUT_uop.nmDst <= 0;
                     OUT_uop.tagDst <= 7'h40;
                 end
                 
                 // default
                 OUT_aguOp.wmask <= 4'b1111;
+                OUT_aguOp.size <= 2;
                 
                 OUT_uop.flags <= exceptFlags;
                 
                 case (IN_uop.opcode)
                     LSU_SB, LSU_SB_I: begin
+                        OUT_aguOp.size <= 0;
                         case (addr[1:0]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0001;
@@ -267,6 +266,7 @@ always_ff@(posedge clk) begin
                     end
 
                     LSU_SH, LSU_SH_I: begin
+                        OUT_aguOp.size <= 1;
                         case (addr[1]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0011;

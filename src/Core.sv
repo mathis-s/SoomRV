@@ -187,7 +187,7 @@ Rename rn
 );
 
 wire RV_uopValid[3:0] /*verilator public*/;
-R_UOp RV_uop[3:0] /*verilator public*/;
+IS_UOp RV_uop[3:0] /*verilator public*/;
 
 wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
@@ -534,7 +534,7 @@ CacheController cc
     .OUT_fenceBusy(CC_fenceBusy)
 );
 
-AGU_UOp AGU_LD_uop;
+AGU_UOp AGU_LD_uop /* verilator public */;
 PageWalkRq LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
@@ -554,7 +554,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .OUT_uop()
 );
 
-AGU_UOp AGU_ST_uop;
+AGU_UOp AGU_ST_uop /* verilator public */;
 PageWalkRq STAGU_PW_rq;
 AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 (

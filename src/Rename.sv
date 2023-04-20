@@ -66,7 +66,6 @@ reg[6:0] RAT_commitTags[WIDTH_COMMIT-1:0];
 wire[6:0] RAT_commitPrevTags[WIDTH_COMMIT-1:0];
 reg RAT_commitAvail[WIDTH_COMMIT-1:0];
 
-reg[4:0] RAT_wbIDs[WIDTH_WR-1:0];
 reg[6:0] RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
@@ -142,7 +141,6 @@ always_comb begin
     
     // Writeback
     for (integer i = 0; i < WIDTH_WR; i=i+1) begin
-        RAT_wbIDs[i] = IN_wbUOp[i].nmDst;
         RAT_wbTags[i] = IN_wbUOp[i].tagDst;
     end
     
@@ -190,7 +188,6 @@ rt
     .OUT_commitPrevTags(RAT_commitPrevTags),
     
     .IN_wbValid(IN_wbHasResult),
-    .IN_wbID(RAT_wbIDs),
     .IN_wbTag(RAT_wbTags)
 );
 

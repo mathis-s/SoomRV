@@ -30,23 +30,24 @@ module RenameTable
     output reg[TAG_SIZE-1:0] OUT_commitPrevTags[NUM_COMMIT-1:0],
 
     input wire IN_wbValid[NUM_WB-1:0],
-    input wire[ID_SIZE-1:0] IN_wbID[NUM_WB-1:0],
     input wire[TAG_SIZE-1:0] IN_wbTag[NUM_WB-1:0]
 );
 
+localparam NUM_TAGS = (1 << (TAG_SIZE - 1));
+
 typedef struct packed
 {
-    bit avail;
     bit[TAG_SIZE-1:0] comTag;
     bit[TAG_SIZE-1:0] specTag;
 } RATEntry;
 
 RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
+reg[NUM_TAGS-1:0] tagAvail;
 
 always_comb begin
     for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
-        OUT_lookupAvail[i] = rat[IN_lookupIDs[i]].avail;
         OUT_lookupSpecTag[i] = rat[IN_lookupIDs[i]].specTag;
+        OUT_lookupAvail[i] = tagAvail[OUT_lookupSpecTag[i][TAG_SIZE-2:0]] | OUT_lookupSpecTag[i][TAG_SIZE-1];
         
         // Results that are written back in the current cycle also need to be marked as available
         for (integer j = 0; j < NUM_WB; j=j+1) begin
@@ -72,22 +73,21 @@ always_ff@(posedge clk) begin
     if (rst) begin
         // Registers initialized with 0
         for (integer i = 0; i < NUM_REGS; i=i+1) begin
-            rat[i].avail <= 1;
             rat[i].comTag <= 7'h40;
             rat[i].specTag <= 7'h40;
         end
+        tagAvail <= {NUM_TAGS{1'b1}};
     end
     else begin
         // Written back values are speculatively available
         for (integer i = 0; i < NUM_WB; i=i+1) begin
-            if (IN_wbValid[i] && rat[IN_wbID[i]].specTag == IN_wbTag[i] && IN_wbID[i] != 0) begin
-                rat[IN_wbID[i]].avail <= 1;
+            if (IN_wbValid[i] && !IN_wbTag[i][TAG_SIZE-1]) begin
+                tagAvail[IN_wbTag[i][TAG_SIZE-2:0]] <= 1;
             end
         end
         
         if (IN_mispred) begin
             for (integer i = 1; i < NUM_REGS; i=i+1) begin
-                rat[i].avail <= 1;
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
                 // We can't keep such a history for every register though. As such, we flush the pipeline
                 // after a mispredict. After flush, all results are committed, and rename can continue again.
@@ -97,8 +97,12 @@ always_ff@(posedge clk) begin
         else begin
             for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
-                    rat[IN_issueIDs[i]].avail <= IN_issueAvail[i];
                     rat[IN_issueIDs[i]].specTag <= IN_issueTags[i];
+                    
+                    if (!IN_issueTags[i][TAG_SIZE-1]) begin
+                        tagAvail[IN_issueTags[i][TAG_SIZE-2:0]] <= 0;
+                        assert(IN_issueAvail[i] == 0);
+                    end
                 end
             end
         end
@@ -108,10 +112,6 @@ always_ff@(posedge clk) begin
                 if (IN_mispredFlush) begin
                     if (!IN_mispred) begin
                         rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
-                        rat[IN_commitIDs[i]].avail <= IN_commitAvail[i];
-                        for (integer j = 0; j < NUM_WB; j=j+1)
-                            if (IN_wbValid[j] && IN_wbTag[j] == IN_commitTags[i])
-                                rat[IN_commitIDs[i]].avail <= 1;
                     end
                 end
                 else begin

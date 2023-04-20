@@ -114,7 +114,6 @@ always@(posedge clk) begin
         reg[4:0] except = 0;
         
         OUT_uop.tagDst <= IN_uop.tagDst;
-        OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.valid <= 1;
         OUT_uop.doNotCommit <= 0;

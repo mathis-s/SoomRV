@@ -70,7 +70,6 @@ always_ff@(posedge clk) begin
         
         // Store metadata in output uop (without setting it valid)
         OUT_uop.tagDst <= IN_uop.tagDst;
-        OUT_uop.nmDst <= IN_uop.nmDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.doNotCommit <= 0;
         if (rm >= 3'b101)

@@ -10,7 +10,7 @@ module Load
     input wire rst,
     
     input wire IN_uopValid[NUM_UOPS-1:0],
-    input R_UOp IN_uop[NUM_UOPS-1:0],
+    input IS_UOp IN_uop[NUM_UOPS-1:0],
 
     // Writeback Port (snoop) read
     input wire IN_wbHasResult[NUM_WBS-1:0],
@@ -70,7 +70,6 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].imm <= IN_uop[i].imm;
                 OUT_uop[i].sqN <= IN_uop[i].sqN;
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
-                OUT_uop[i].nmDst <= IN_uop[i].nmDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
                 
                 OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:3], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
