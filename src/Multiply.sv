@@ -53,7 +53,6 @@ always_ff@(posedge clk) begin
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             pl[0].valid <= 1;
             pl[0].tagDst <= IN_uop.tagDst;
-            pl[0].nmDst <= IN_uop.nmDst;
             pl[0].sqN <= IN_uop.sqN;
             pl[0].res <= 0;
             
@@ -98,7 +97,6 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop.valid <= 1;
                 OUT_uop.tagDst <= pl[NUM_STAGES].tagDst;
-                OUT_uop.nmDst <= pl[NUM_STAGES].nmDst;
                 OUT_uop.sqN <= pl[NUM_STAGES].sqN;
                 OUT_uop.flags <= FLAGS_NONE;
                 OUT_uop.doNotCommit <= 0;

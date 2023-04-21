@@ -24,7 +24,6 @@ always_comb begin
         OUT_ldUOp.signExtend = 0;
         OUT_ldUOp.size = 2;
         OUT_ldUOp.tagDst = 0;
-        OUT_ldUOp.nmDst = 0;
         OUT_ldUOp.sqN = 0;
         OUT_ldUOp.doNotCommit = 1;
         OUT_ldUOp.external = 1;
@@ -40,7 +39,6 @@ always_comb begin
         OUT_ldUOp.signExtend = IN_aguLd.signExtend;
         OUT_ldUOp.size = IN_aguLd.size;
         OUT_ldUOp.tagDst = IN_aguLd.tagDst;
-        OUT_ldUOp.nmDst = IN_aguLd.nmDst;
         OUT_ldUOp.sqN = IN_aguLd.sqN;
         OUT_ldUOp.doNotCommit = IN_aguLd.doNotCommit;
         OUT_ldUOp.external = 0;

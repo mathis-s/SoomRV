@@ -33,7 +33,7 @@ Flags flags;
 
 assign OUT_zcFwdResult = resC;
 assign OUT_zcFwdTag = IN_uop.tagDst;
-assign OUT_zcFwdValid = IN_uop.valid && en && IN_uop.nmDst != 0;
+assign OUT_zcFwdValid = IN_uop.valid && en && !IN_uop.tagDst[$bits(Tag)-1];
 
 
 wire[5:0] resLzTz;
@@ -240,7 +240,6 @@ always_ff@(posedge clk) begin
             end
 
             OUT_uop.tagDst <= IN_uop.tagDst;
-            OUT_uop.nmDst <= IN_uop.nmDst;
             OUT_uop.result <= resC;
             OUT_uop.sqN <= IN_uop.sqN;
             OUT_uop.doNotCommit <= 0;

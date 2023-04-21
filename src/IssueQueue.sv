@@ -38,14 +38,14 @@ module IssueQueue
     // All ops that are being issued (including OUT_uop)
     // For operand forwarding
     input wire IN_issueValid[RESULT_BUS_COUNT-1:0],
-    input R_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
+    input IS_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
     
     input SqN IN_maxStoreSqN,
     input SqN IN_maxLoadSqN,
     input SqN IN_commitSqN,
     
     output reg OUT_valid,
-    output R_UOp OUT_uop,
+    output IS_UOp OUT_uop,
     
     output reg OUT_full
 );
@@ -59,11 +59,10 @@ typedef struct packed
     
     logic[NUM_OPERANDS-1:0] avail;
     Tag[NUM_OPERANDS-1:0] tags;
-    
+
     logic immB;
     SqN sqN;
     Tag tagDst;
-    RegNm nmDst;
     logic[5:0] opcode;
     FetchID_t fetchID;
     FetchOff_t fetchOffs;
@@ -99,7 +98,7 @@ always_comb begin
         end
         
         for (integer j = 0; j < 2; j=j+1) begin
-            if (IN_issueValid[j] && IN_issueUOps[j].nmDst != 0) begin
+            if (IN_issueValid[j] && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
                 if (IN_issueUOps[j].fu == FU_INT) begin
                     for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                         if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
@@ -212,7 +211,6 @@ always_ff@(posedge clk) begin
                         OUT_uop.immB <= queue[i].immB;
                         OUT_uop.sqN <= queue[i].sqN;
                         OUT_uop.tagDst <= queue[i].tagDst;
-                        OUT_uop.nmDst <= queue[i].nmDst;
                         OUT_uop.opcode <= queue[i].opcode;
                         OUT_uop.fetchID <= queue[i].fetchID;
                         OUT_uop.fetchOffs <= queue[i].fetchOffs;
@@ -260,7 +258,6 @@ always_ff@(posedge clk) begin
                     temp.immB = IN_uop[i].immB;
                     temp.sqN = IN_uop[i].sqN;
                     temp.tagDst = IN_uop[i].tagDst;
-                    temp.nmDst = IN_uop[i].nmDst;
                     temp.opcode = IN_uop[i].opcode;
                     temp.fetchID = IN_uop[i].fetchID;
                     temp.fetchOffs = IN_uop[i].fetchOffs;
@@ -287,7 +284,6 @@ always_ff@(posedge clk) begin
                             temp.tags[2] = IN_uop[i].tagDst;
                             temp.avail[2] = 0;
                             // Result was already written
-                            temp.nmDst = 0;
                             temp.tagDst = 7'h40;
                         end
                         else temp.avail[2] = 1;

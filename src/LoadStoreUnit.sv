@@ -32,7 +32,6 @@ typedef struct packed
     logic signExtend;
     logic[1:0] size;
     Tag tagDst;
-    RegNm nmDst;
     SqN sqN;
     logic doNotCommit;
     logic external;
@@ -146,7 +145,6 @@ always_comb begin
 
     OUT_uopLd.result = result;
     OUT_uopLd.tagDst = uopLd_1.tagDst;
-    OUT_uopLd.nmDst = uopLd_1.nmDst;
     OUT_uopLd.sqN = uopLd_1.sqN;
     case (uopLd_1.exception)
         AGU_NO_EXCEPTION: OUT_uopLd.flags = FLAGS_NONE;

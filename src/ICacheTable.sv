@@ -43,7 +43,7 @@ always_comb begin
     end
 end
 
-assign OUT_stall = !cacheEntryFound || loading;
+assign OUT_stall = (!cacheEntryFound || loading) && IN_lookupValid;
 reg[$clog2(NUM_ICACHE_LINES)-1:0] lruPointer;
 
 reg[30:0] loadAddr;

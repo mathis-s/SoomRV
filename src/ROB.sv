@@ -177,7 +177,7 @@ always_ff@(posedge clk) begin
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
                         for (integer j = 0; j < WIDTH_WB; j=j+1)
-                            if (IN_wbUOps[j].valid && IN_wbUOps[j].nmDst != 0 && IN_wbUOps[j].tagDst == deqEntries[i].tag)
+                            if (IN_wbUOps[j].valid && IN_wbUOps[j].tagDst == deqEntries[i].tag && !IN_wbUOps[j].tagDst[$bits(Tag)-1])
                                 OUT_comUOp[i].compressed <= 1;
                     end
                     else

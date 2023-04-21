@@ -34,7 +34,7 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
+wire ifetchEn = !PD_full && !TH_disableIFetch;
 
 BranchProv branchProvs[3:0];
 BranchProv branch /*verilator public*/;
@@ -54,7 +54,7 @@ IFetch ifetch
 (
     .clk(clk),
     .rst(rst),
-    .en(ifetchEn),
+    .IN_en(ifetchEn),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
     
@@ -87,9 +87,7 @@ IFetch ifetch
     .IN_pw(PW_res),
 
     .OUT_memc(PC_MC_if),
-    .IN_memc(IN_memc),
-    
-    .OUT_stall(PC_stall)
+    .IN_memc(IN_memc)
 );
 
 IndirBranchInfo IBP_updates[1:0];
@@ -187,7 +185,7 @@ Rename rn
 );
 
 wire RV_uopValid[3:0] /*verilator public*/;
-R_UOp RV_uop[3:0] /*verilator public*/;
+IS_UOp RV_uop[3:0] /*verilator public*/;
 
 wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
@@ -534,7 +532,7 @@ CacheController cc
     .OUT_fenceBusy(CC_fenceBusy)
 );
 
-AGU_UOp AGU_LD_uop;
+AGU_UOp AGU_LD_uop /* verilator public */;
 PageWalkRq LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
@@ -554,7 +552,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .OUT_uop()
 );
 
-AGU_UOp AGU_ST_uop;
+AGU_UOp AGU_ST_uop /* verilator public */;
 PageWalkRq STAGU_PW_rq;
 AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 (
