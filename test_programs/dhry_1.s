@@ -328,7 +328,7 @@ main:
 	lw	s0,%lo(Ptr_Glob)(a4)
 	lw	a4,0(a5)
 	lbu	s4,50(sp)
-	li	s9,200
+	li	s9,2000
 	sw	a4,4(sp)
 	lw	a4,4(a5)
 	lui	s5,%hi(.LANCHOR1)
@@ -945,8 +945,8 @@ main:
 	li	a2,1757
 	li	a1,999424
 	addi	a1,a1,576
-	li	a0,200704
-	addi	a0,a0,-704
+	li	a0,1998848
+	addi	a0,a0,1152
 	lui	a5,%hi(.LC33)
 	li	a4,109
 	addi	a5,a5,%lo(.LC33)

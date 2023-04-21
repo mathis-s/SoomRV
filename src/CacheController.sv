@@ -169,8 +169,8 @@ always_comb begin
             IN_memc.progress[CLSIZE_E-2:0] > {1'b0, uops[i].addr[CLSIZE_E-1:2]};
 
         isCacheMiss[i] = uops[i].valid && 
-            !uops[i].isMgmt && 
-            !`IS_MMIO_PMA(uops[i].addr) &&
+            !uops[i].isMgmt &&
+            !isMMIO[i] &&
             !isCacheHit[i] &&
             !isCachePassthru[i];
 

@@ -26,6 +26,7 @@ always_ff@(posedge clk) begin
 
     if (rst) begin
         OUT_ldUOp.valid <= 0;
+        state <= IDLE;
     end
     else begin
 

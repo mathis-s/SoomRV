@@ -8,7 +8,7 @@ module IFetch
 (
     input wire clk,
     input wire rst,
-    input wire en,
+    input wire IN_en,
 
     input wire IN_interruptPending,
     
@@ -42,13 +42,8 @@ module IFetch
     input PageWalkRes IN_pw,
     
     output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc,
-    
-    output wire OUT_stall
+    input STAT_MemC IN_memc
 );
-
-
-assign OUT_instrReadEnable = !en;
 
 BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 (
@@ -83,7 +78,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_misprHist(OUT_branch.taken ? OUT_branch.history : IN_decBranch.history),
     .IN_misprRIdx(OUT_branch.taken ? OUT_branch.rIdx : IN_decBranch.rIdx),
     
-    .IN_pcValid(en),
+    .IN_pcValid(ifetchEn && fault == IF_FAULT_NONE && !pageWalkRequired),
     .IN_pc({pc, 1'b0}),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_branchHistory(BP_branchHistory),
@@ -102,12 +97,34 @@ wire pageWalkRequired = IN_vmem.sv32en_ifetch &&
 
 wire[30:0] physicalPC = IN_vmem.sv32en_ifetch ? {pcPPN[19:10], (pcPPNsuperpage ? pc[20:11] : pcPPN[9:0]), pc[10:0]} : pc;
 
+
+// When first encountering a fault, we output a single fake fault instruction.
+// Thus ifetch is still enabled during this first fault cycle.
+wire fetchIsFault = (IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE) ||
+                    `IS_MMIO_PMA(phyPCFull) ||
+                    IN_interruptPending;
+
+wire baseEn = IN_en && 
+    (IN_ROB_curFetchID != fetchID);
+
+wire tryReadICache = 
+    baseEn &&
+    fault == IF_FAULT_NONE &&
+    !fetchIsFault &&
+    !pageWalkRequired;
+
+wire ifetchEn = 
+    baseEn &&
+    (!icacheStall || fetchIsFault);
+
+assign OUT_instrReadEnable = !(tryReadICache && !icacheStall);
+
 wire icacheStall;
 ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
-    .IN_lookupValid(en && !pageWalkRequired && fault == IF_FAULT_NONE && !(IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE)),
+    .IN_lookupValid(tryReadICache),
     .IN_lookupPC(physicalPC),
     
     .OUT_lookupAddress(OUT_instrAddr),
@@ -117,15 +134,12 @@ ICacheTable ict
     .IN_memc(IN_memc)
 );
 
-assign OUT_stall = (IN_ROB_curFetchID == fetchID) || (icacheStall && fault == IF_FAULT_NONE);
-
-
 reg[127:0] instrRawBackup;
 reg useInstrRawBackup;
 always_ff@(posedge clk) begin
     if (rst)
         useInstrRawBackup <= 0;
-    else if (!en) begin
+    else if (!ifetchEn) begin
         instrRawBackup <= instrRaw;
         useInstrRawBackup <= 1;
     end
@@ -177,7 +191,7 @@ PCFile#($bits(PCFileEntry)) pcFile
 (
     .clk(clk),
     
-    .wen0(en && en1),
+    .wen0(ifetchEn && en1),
     .waddr0(fetchID),
     .wdata0(PCF_writeData),
     
@@ -203,11 +217,24 @@ always_ff@(posedge clk) begin
         outInstrs_r.valid <= 0;
         lastVPN_valid <= 0;
         pageWalkActive <= 0;
+        pageWalkAccepted <= 0;
         fault <= IF_FAULT_NONE;
         pcPPNfault <= IF_FAULT_NONE;
     end
     else begin
-    
+        
+        if (IN_clearICache) begin
+            lastVPN_valid <= 0;
+            pageWalkAccepted <= 0;
+            pageWalkActive <= 0;
+        end
+
+        if (IN_en) begin
+            outInstrs_r <= 'x;
+            outInstrs_r.valid <= 0;
+        end
+
+        // Page Walk request was accepted
         if (!pageWalkAccepted && pageWalkActive) begin
             if (IN_pw.busy && IN_pw.rqID == 0)
                 pageWalkAccepted <= 1;
@@ -218,9 +245,10 @@ always_ff@(posedge clk) begin
                 OUT_pw.addr[11:0] <= 'x;
             end
         end
+        // Finalize Page Walk
         else if (IN_pw.valid && pageWalkActive) begin
             pageWalkActive <= 0;
-            pageWalkAccepted <= 'x;
+            pageWalkAccepted <= 0;
             lastVPN <= pageWalkVPN;
             
             pcPPN <= IN_pw.result[29:10];
@@ -249,11 +277,14 @@ always_ff@(posedge clk) begin
                 
                 pcPPNfault <= IF_PAGE_FAULT;
         end
-        
-        if (IN_clearICache) begin
-            lastVPN_valid <= 0;
-            pageWalkAccepted <= 0;
-            pageWalkActive <= 0;
+        // Start Page Walk
+        else if (pageWalkRequired && IN_en && !(OUT_branch.taken || IN_decBranch.taken) && fault == IF_FAULT_NONE) begin
+            en1 <= 0;
+            if (!pageWalkActive && !IN_memc.busy) begin
+                pageWalkActive <= 1;
+                pageWalkAccepted <= 0;
+                pageWalkVPN <= pcVPN;
+            end
         end
     
         if (OUT_branch.taken || IN_decBranch.taken) begin
@@ -270,7 +301,7 @@ always_ff@(posedge clk) begin
             outInstrs_r <= 'x;
             outInstrs_r.valid <= 0;
         end
-        else if (en) begin
+        else if (ifetchEn) begin
             
             // Output fetched package (or fault) to pre-dec
             if (en1) begin
@@ -288,25 +319,11 @@ always_ff@(posedge clk) begin
             
                 fetchID <= fetchID + 1;
             end
-            else begin
-                outInstrs_r <= 'x;
-                outInstrs_r.valid <= 0;
-            end
-            
+
             // Fetch package (if no fault)
-            if (fault == IF_FAULT_NONE) begin
-                if (pageWalkRequired) begin
-                    en1 <= 0;
-                    if (!pageWalkActive && !IN_memc.busy) begin
-                        pageWalkActive <= 1;
-                        pageWalkAccepted <= 0;
-                        pageWalkVPN <= pcVPN;
-                    end
-                end
+            if (fault == IF_FAULT_NONE && !pageWalkRequired) begin
                 // Handle Page Fault, Access Fault and Interrupts
-                else if ((IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE) ||
-                    `IS_MMIO_PMA(phyPCFull) ||
-                    IN_interruptPending) begin
+                if (fetchIsFault) begin
 
                     en1 <= 1;
                     pcLast <= pc;

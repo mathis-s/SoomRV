@@ -938,7 +938,7 @@ always_ff@(posedge clk) begin
                 end
                 
                 // Do read?
-                if ((IN_uop.opcode != CSR_RW && IN_uop.opcode != CSR_RW_I) || !IN_uop.tagDst[$bits(Tag)-1]) begin
+                if (!IN_uop.tagDst[$bits(Tag)-1]) begin
                     OUT_uop.result <= rdata;
                     // read side effects
                 end

@@ -34,7 +34,7 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire ifetchEn = !PD_full && !PC_stall && !TH_disableIFetch;
+wire ifetchEn = !PD_full && !TH_disableIFetch;
 
 BranchProv branchProvs[3:0];
 BranchProv branch /*verilator public*/;
@@ -54,7 +54,7 @@ IFetch ifetch
 (
     .clk(clk),
     .rst(rst),
-    .en(ifetchEn),
+    .IN_en(ifetchEn),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
     
@@ -87,9 +87,7 @@ IFetch ifetch
     .IN_pw(PW_res),
 
     .OUT_memc(PC_MC_if),
-    .IN_memc(IN_memc),
-    
-    .OUT_stall(PC_stall)
+    .IN_memc(IN_memc)
 );
 
 IndirBranchInfo IBP_updates[1:0];

@@ -159,7 +159,7 @@ int main ()
   }
   printf ("Please give the number of runs through the benchmark: ");
   {
-    int n=200;
+    int n=2000;
     //scanf ("%d", &n);
     Number_Of_Runs = n;
   }
@@ -560,5 +560,3 @@ register int    l;
         while (l--) *d++ = *s++;
 }
 #endif
-
-
