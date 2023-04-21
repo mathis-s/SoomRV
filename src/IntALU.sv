@@ -76,6 +76,7 @@ always_comb begin
         INT_SUB: resC = srcA - srcB;
         INT_SRA: resC = $signed(srcA) >>> srcB[4:0];
         INT_LUI: resC = srcB;
+        INT_V_RET,
         INT_V_JALR,
         INT_JALR,
         INT_JAL: resC = (IN_uop.compressed ? pcPlus2 : pcPlus4);

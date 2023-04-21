@@ -452,7 +452,21 @@ always_comb begin
                         uop.rs0 = instr.rs0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
-                        uop.opcode = INT_JALR; 
+
+                        if (uop.imm == 0) begin
+                            isIndirBranch = 1;
+                            isReturn = (uop.rs0 == 1);
+                            uop.opcode = (uop.rs0 == 1) ? INT_V_RET : INT_V_JALR;
+                            
+                            if (IN_instrs[i].predTaken)
+                                uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                            else
+                                uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
+                        end
+                        else begin
+                            uop.opcode = INT_JALR; 
+                        end
+
                         invalidEnc = 0;
                     end
                     `OPC_LOAD: begin
@@ -1375,7 +1389,7 @@ always_comb begin
                         
                         isIndirBranch = 1;
                         isReturn = (i16.cr.rd_rs1 == 1);
-                        uop.opcode = INT_V_JALR;
+                        uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JALR;
                         uop.immB = 1;
                         
                         if (IN_instrs[i].predTaken)
