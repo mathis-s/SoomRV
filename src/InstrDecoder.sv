@@ -201,6 +201,7 @@ module InstrDecoder
     input wire en,
     input wire IN_invalidate,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
+    input wire[30:0] IN_lateRetAddr,
     
     input wire IN_enCustom,
     
@@ -460,7 +461,9 @@ always_comb begin
                             
                             if (IN_instrs[i].predTaken)
                                 uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                            else
+                            else if (isReturn)
+                                uop.imm = {IN_lateRetAddr, 1'b0};
+                            else 
                                 uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
                         end
                         else begin
@@ -1394,7 +1397,9 @@ always_comb begin
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                        else
+                        else if (isReturn)
+                            uop.imm = {IN_lateRetAddr, 1'b0};
+                        else 
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
                         
 
@@ -1524,6 +1529,12 @@ always_comb begin
                     retUpd_c.idx = IN_instrs[i].rIdx;
                     retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
                     
+                    OUT_decBranch.taken = 1;
+                    OUT_decBranch.history = IN_instrs[i].history;
+                    OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
+                    OUT_decBranch.dst = IN_lateRetAddr;
+
                     // TODO: squash following ops to prevent retUpd_c from being polluted with wrong path info?
                 end
             end

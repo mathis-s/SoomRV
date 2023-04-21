@@ -20,6 +20,7 @@ module BranchPredictor
     output BHist_t OUT_branchHistory,
     output BranchPredInfo OUT_branchInfo,
     output wire OUT_multipleBranches,
+    output wire[30:0] OUT_lateRetAddr,
     
     output PredBranch OUT_predBr,
     input ReturnDecUpd IN_retDecUpd,
@@ -130,6 +131,7 @@ ReturnStack retStack
     .IN_brValid(BTB_br.valid),
     .IN_brOffs(BTB_br.offs),
     .IN_isCall(BTB_isCall),
+    .OUT_lateRetAddr(OUT_lateRetAddr),
 
     .IN_setIdx(IN_mispr),
     .IN_idx(IN_misprRIdx),

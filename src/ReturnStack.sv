@@ -10,6 +10,9 @@ module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_P
     input FetchOff_t IN_brOffs,
     input wire IN_isCall,
 
+    // Low effort prediction for returns that are detected late, in decode.
+    output reg[30:0] OUT_lateRetAddr,
+
     input wire IN_setIdx,
     input RetStackIdx_t IN_idx,
 
@@ -56,6 +59,7 @@ always_comb begin
 
     OUT_curIdx = rindex;
     OUT_predBr.dst = rstack[rindex];
+    OUT_lateRetAddr = rstack[rindex];
     
     OUT_predBr.isJump = 1;
     OUT_predBr.valid = 0;

@@ -36,6 +36,7 @@ module IFetch
     output PCFileEntry OUT_pcReadData[4:0],
     
     output IF_Instr OUT_instrs,
+    output wire[30:0] OUT_lateRetAddr,
     
     input STAT_VMem IN_vmem,
     output PageWalkRq OUT_pw,
@@ -84,6 +85,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
     .OUT_multipleBranches(BP_multipleBranches),
+    .OUT_lateRetAddr(OUT_lateRetAddr),
     
     .OUT_predBr(predBr),
 

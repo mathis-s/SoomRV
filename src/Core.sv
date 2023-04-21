@@ -36,6 +36,8 @@ CommitUOp comUOps[3:0] /*verilator public*/;
 
 wire ifetchEn = !PD_full && !TH_disableIFetch;
 
+wire[30:0] BP_lateRetAddr;
+
 BranchProv branchProvs[3:0];
 BranchProv branch /*verilator public*/;
 wire mispredFlush /*verilator public*/;
@@ -81,6 +83,7 @@ IFetch ifetch
     .OUT_pcReadData(PC_readData),
     
     .OUT_instrs(IF_instrs),
+    .OUT_lateRetAddr(BP_lateRetAddr),
     
     .IN_vmem(CSR_vmem),
     .OUT_pw(PC_PW_rq),
@@ -131,6 +134,7 @@ InstrDecoder idec
     .IN_invalidate(branch.taken),
     .en(!RN_stall && frontendEn),
     .IN_instrs(PD_instrs),
+    .IN_lateRetAddr(BP_lateRetAddr),
     
     .IN_enCustom(1'b1),
     
