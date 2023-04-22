@@ -108,7 +108,7 @@ TagePredictor tagePredictor
     .IN_predAddr(branchAddr),
     .IN_predHistory(gHistory),
     .OUT_predTageID(OUT_branchInfo.tageID),
-    .OUT_predUseful(OUT_branchInfo.tageUseful),
+    .OUT_altPred(OUT_branchInfo.altPred),
     .OUT_predTaken(TAGE_taken),
     
     .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush && !IN_bpUpdate.bpi.isJump),
@@ -116,7 +116,7 @@ TagePredictor tagePredictor
     .IN_writeHistory(IN_bpUpdate.history),
     .IN_writeTageID(IN_bpUpdate.bpi.tageID),
     .IN_writeTaken(IN_bpUpdate.branchTaken),
-    .IN_writeUseful(IN_bpUpdate.bpi.tageUseful),
+    .IN_writeAltPred(IN_bpUpdate.bpi.altPred),
     .IN_writePred(IN_bpUpdate.bpi.taken)
 );
 

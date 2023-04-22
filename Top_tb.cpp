@@ -1,5 +1,5 @@
 // #define TRACE
-#define KONATA
+// #define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -544,7 +544,7 @@ void LogInstructions()
     auto core = top->Top->core;
 
     bool brTaken = core->branch[0] & 1;
-    int brSqN = ExtractField<3>(core->branch, 80 - 32 - 7, 7);
+    int brSqN = ExtractField(core->branch, 74 - 32 - 7, 7);
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -562,11 +562,11 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 234 - 32 * 5 - 6 - 7 - 7, 7);
-            insts[sqn].srcA = ExtractField(core->LD_uop[i], 234 - 32, 32);
-            insts[sqn].srcB = ExtractField(core->LD_uop[i], 234 - 32 - 32, 32);
-            insts[sqn].srcC = ExtractField(core->LD_uop[i], 234 - 32 - 32 - 32, 32);
-            insts[sqn].imm = ExtractField(core->LD_uop[i], 234 - 32 - 32 - 32 - 32 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
+            insts[sqn].srcA = ExtractField(core->LD_uop[i], 226 - 32, 32);
+            insts[sqn].srcB = ExtractField(core->LD_uop[i], 226 - 32 - 32, 32);
+            insts[sqn].srcC = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32, 32);
+            insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(insts[sqn]);
         }
     }
@@ -575,9 +575,9 @@ void LogInstructions()
     for (auto& uop : {core->AGU_LD_uop, core->AGU_ST_uop})
         if (uop[0] & 1)
         {
-            uint32_t sqn = ExtractField(uop, 162 - 32*2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
-            insts[sqn].memAddr =  ExtractField(uop, 162 - 32, 32);
-            insts[sqn].memData =  ExtractField(uop, 162 - 32*2, 32);
+            uint32_t sqn = ExtractField(uop, 156 - 32*2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
+            insts[sqn].memAddr =  ExtractField(uop, 156 - 32, 32);
+            insts[sqn].memData =  ExtractField(uop, 156 - 32*2, 32);
         }
 
     // Result
@@ -697,8 +697,8 @@ void LogInstructions()
                     pd[i].valid = true;
                     pd[i].flags = 0;
                     pd[i].id = id++;
-                    pd[i].pc = ExtractField<4>(top->Top->core->PD_instrs[i], 125 - 31 - 32, 31) << 1;
-                    pd[i].inst = ExtractField<4>(top->Top->core->PD_instrs[i], 125 - 32, 32);
+                    pd[i].pc = ExtractField(top->Top->core->PD_instrs[i], 119 - 31 - 32, 31) << 1;
+                    pd[i].inst = ExtractField(top->Top->core->PD_instrs[i], 119 - 32, 32);
                     pd[i].fetchID = ExtractField(top->Top->core->PD_instrs[i], 4, 5);
                     if ((pd[i].inst & 3) != 3) pd[i].inst &= 0xffff;
 

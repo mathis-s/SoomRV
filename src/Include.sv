@@ -34,7 +34,7 @@ typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
-typedef logic[17:0] BHist_t;
+typedef logic[11:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 typedef logic[1:0] RetStackIdx_t;
 
@@ -334,7 +334,7 @@ typedef struct packed
     bit predicted;
     bit taken;
     bit[2:0] tageID;
-    TageUseful_t tageUseful;
+    bit altPred;
     RetStackIdx_t rIdx;
     bit isJump;
 } BranchPredInfo;
