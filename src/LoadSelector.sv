@@ -1,7 +1,7 @@
 // Simple mux between sources of loads, currently regular AGU and page walker.
 module LoadSelector
 (
-    input AGU_UOp IN_aguLd,
+    input LD_UOp IN_aguLd,
     output reg OUT_aguLdStall,
 
     input PW_LD_UOp IN_pwLd,

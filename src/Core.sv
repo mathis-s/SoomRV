@@ -495,7 +495,7 @@ wire LS_AGULD_uopStall;
 LD_UOp LS_uopLd;
 LoadSelector loadSelector
 (
-    .IN_aguLd(AGU_LD_uop),
+    .IN_aguLd(LB_uopLd),
     .OUT_aguLdStall(LS_AGULD_uopStall),
 
     .IN_pwLd(PW_LD_uop),
@@ -578,6 +578,7 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 
 
 SqN LB_maxLoadSqN;
+LD_UOp LB_uopLd;
 LoadBuffer lb
 (
     .clk(clk),
@@ -587,6 +588,8 @@ LoadBuffer lb
     .IN_stall('{1'b0, CC_loadStall}),
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
+
+    .OUT_uopLd(LB_uopLd),
     
     .IN_branch(branch),
     .OUT_branch(branchProvs[2]),
