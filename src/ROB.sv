@@ -82,36 +82,40 @@ reg misprReplayEnd;
 SqN misprReplayIter;
 SqN misprReplayEndSqN;
 
+// All commits/reads from the ROB are sequential.
+// This should convince synthesis of that too.
+ROBEntry deqEntries[WIDTH-1:0];
+always_comb begin
+    reg[ID_LEN-1:0] deqBase = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
+    
+    reg[ID_LEN-1:0] deqAddrs[WIDTH-1:0];
+    reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
+    ROBEntry deqPorts[WIDTH-1:0];
+    
+    // Generate the sequence of SqNs which could be committed in this cycle
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqAddrs[i] = deqBase + i[ID_LEN-1:0];
+    
+    // So synthesis doesn't generate latches...
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqAddrsSorted[i] = 4'bx;
+    
+    // Sort the sequence by least significant bits
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqAddrsSorted[deqAddrs[i][1:0]] = deqAddrs[i][ID_LEN-1:$clog2(WIDTH)];
+    
+    // With the sorted sequence we can convince synth that this is in fact a sequential access
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqPorts[i] = entries[{deqAddrsSorted[i], i[1:0]}];
+
+    // Re-order the accesses into the initial order
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqEntries[i] = deqPorts[deqAddrs[i][1:0]];
+end
+
 always_comb begin
     for (integer i = 0; i < WIDTH; i=i+1) 
         OUT_PERFC_retireBranch[i] = OUT_PERFC_validRetire[i] && OUT_comUOp[i].isBranch;
-end
-
-
-/* verilator lint_off UNOPTFLAT */
-// All commits/reads from the ROB are sequential.
-// This should convince synthesis of that too.
-reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddresses[WIDTH-1:0];
-ROBEntry deqPorts[WIDTH-1:0];
-always_comb begin
-    for (integer i = 0; i < WIDTH; i=i+1) begin
-        deqPorts[i] = entries[{deqAddresses[i], i[1:0]}];
-    end
-end
-ROBEntry deqEntries[WIDTH-1:0];
-always_comb begin
-    reg[ID_LEN-1:0] addr = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
-    
-    // So synthesis doesn't generate latches... (actually, 16 latches seems worth it vs. 1k std cells)
-    //for (integer i = 0; i < WIDTH; i=i+1)
-    //    deqAddresses[i] = 4'bx;
-    
-    for (integer i = 0; i < WIDTH; i=i+1) begin
-    
-        deqAddresses[addr[1:0]] = addr[ID_LEN-1:$clog2(WIDTH)];
-        deqEntries[i] = deqPorts[addr[1:0]];
-        addr = addr + 1;
-    end
 end
 
 always_ff@(posedge clk) begin
