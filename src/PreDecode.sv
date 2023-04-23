@@ -110,7 +110,7 @@ always_ff@(posedge clk) begin
                     end
                     else if (instr[1:0] != 2'b11 || invalidBranch || cur.fetchFault != IF_FAULT_NONE) begin
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
-                        OUT_instrs[i].instr <= {16'bx, instr};
+                        OUT_instrs[i].instr <= invalidBranch ? 32'bx : {16'bx, instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;

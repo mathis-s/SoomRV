@@ -105,8 +105,7 @@ always_ff@(posedge clk) begin
                 for (integer i = 0; i < RET_PRED_LEN; i=i+1)
                     rtable[decodeIdx][i].valid <= 0;
             end
-            
-            if (IN_returnUpd.isCall) begin
+            else if (IN_returnUpd.isCall) begin
                 rstack[IN_returnUpd.idx + 1] <= IN_returnUpd.addr + 1;
                 rindex <= IN_returnUpd.idx + 1;
             end

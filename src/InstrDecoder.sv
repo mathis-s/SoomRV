@@ -283,7 +283,11 @@ always_comb begin
             reg isJump = 0;
             reg[30:0] branchTarget = 'x;
             
-            if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
+            if (IN_instrs[i].predInvalid) begin
+                // A branch was predicted that is impossible considering actual instruction boundaries
+                assert(IN_instrs[i].predTaken);
+            end
+            else if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
                 
                 uop.fu = FU_TRAP;
                 invalidEnc = 0;
@@ -1467,7 +1471,20 @@ always_comb begin
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                     OUT_decBranch.rIdx = IN_instrs[i].rIdx;
+                
+                    // Delete matching return prediction entries
+                    retUpd_c.valid = 1;
+                    retUpd_c.cleanRet = 1;
+                    retUpd_c.compr = uop.compressed;
+                    retUpd_c.isRet = 0;
+                    retUpd_c.isCall = 0;
+                    retUpd_c.idx = IN_instrs[i].rIdx;
+                    if (!IN_instrs[i].predInvalid)
+                        retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
+                    else
+                        retUpd_c.addr = IN_instrs[i].pc;
                     
+                    // Delete matching regular branch prediction entries
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 1;
                     
@@ -1476,6 +1493,8 @@ always_comb begin
                     else
                         btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
                     
+                    // Branch back to following instruction if this is not a branch at all,
+                    // or branch to correct destination if this is a branch.
                     if (IN_instrs[i].predInvalid) begin
                         OUT_decBranch.dst = IN_instrs[i].pc;
                         invalidEnc = 1;
@@ -1485,8 +1504,6 @@ always_comb begin
                         OUT_decBranch.dst = branchTarget;
                     else
                         OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
-                        
-                    //$display("Branch Target Misspeculation: pc=%x, pred=%x, actual=%x", IN_instrs[i].pc << 1, IN_instrs[i].predTarget << 1, OUT_decBranch.dst);
                 end
             end
             else begin
