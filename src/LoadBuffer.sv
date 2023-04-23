@@ -157,7 +157,7 @@ always_ff@(posedge clk) begin
             end
         end
         // Insert new entries, check stores
-        if (!IN_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
+        if (!IN_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
             
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopLd.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].sqN <= IN_uopLd.sqN;
@@ -171,7 +171,7 @@ always_ff@(posedge clk) begin
             entries[index].valid <= 1;
         end
         
-        if (!IN_stall[1] && IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
+        if (!IN_stall[1] && IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) < 0)) begin
             if (storeIsCollision) begin
                 // We reset back to the op after the store when a load collision occurs, even though you only need to
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load

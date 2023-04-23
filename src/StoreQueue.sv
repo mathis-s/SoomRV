@@ -70,7 +70,7 @@ always_comb begin
     lookupData = 32'bx;
     
     for (integer i = 0; i < 2; i=i+1) begin
-        if (/*IN_uopLd.isLoad && */evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2]) begin
+        if (/*IN_uopLd.isLoad && */evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2] && !`IS_MMIO_PMA_W(evicted[i].addr)) begin
             if (evicted[i].wmask[0])
                 lookupData[7:0] = evicted[i].data[7:0];
             if (evicted[i].wmask[1])
@@ -85,7 +85,7 @@ always_comb begin
     end
     
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (/*IN_uopLd.isLoad && */entries[i].valid && entries[i].addr == IN_uopLd.addr[31:2] && ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready)) begin
+        if (/*IN_uopLd.isLoad && */entries[i].valid && entries[i].addr == IN_uopLd.addr[31:2] && ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready) && !`IS_MMIO_PMA_W(entries[i].addr)) begin
             // this is pretty neat!
             if (entries[i].wmask[0])
                 lookupData[7:0] = entries[i].data[7:0];

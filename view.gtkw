@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.114 (w)1999-2023 BSI
-[*] Fri Apr 21 14:52:53 2023
+[*] Sun Apr 23 11:05:04 2023
 [*]
-[dumpfile] "Decode_tb.vcd"
-[dumpfile_mtime] "Fri Apr 21 14:49:22 2023"
-[dumpfile_size] 941112103
-[savefile] "view.gtkw"
-[timestart] 52680
+[dumpfile] "/home/m/Zeug/Programming/Verilog/OoO/Decode_tb.vcd"
+[dumpfile_mtime] "Sun Apr 23 11:02:47 2023"
+[dumpfile_size] 3872261
+[savefile] "/home/m/Zeug/Programming/Verilog/OoO/view.gtkw"
+[timestart] 1123
 [size] 3840 2118
 [pos] -1 -1
-*-11.530973 20822 42206 19334 19364 21694 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.530973 1565 42206 19334 19364 21694 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.core.
@@ -240,9 +240,8 @@ TOP.Top.core.ifetch.IN_pw.valid
 TOP.Top.core.ifetch.IN_pw.busy
 @200
 -
-@29
-TOP.Top.core.ifetch.fault[1:0]
 @28
+TOP.Top.core.ifetch.fault[1:0]
 TOP.Top.core.ifetch.pcPPNfault[1:0]
 TOP.Top.core.PC_stall
 TOP.Top.core.ifetch.icacheStall
@@ -732,8 +731,10 @@ TOP.Top.core.ialu1.OUT_uop.sqN[6:0]
 TOP.Top.core.lb.OUT_branch.taken
 @22
 TOP.Top.core.lb.OUT_branch.dstPC[31:0]
+@23
 TOP.Top.core.lb.OUT_branch.fetchID[4:0]
 @200
+-
 -DIV
 @28
 #{TOP.Top.core.stall[0:1]} TOP.Top.core.stall[0] TOP.Top.core.stall[1]

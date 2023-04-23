@@ -120,6 +120,9 @@ end
 reg[5:0] spiCnt;
 reg[31:0] buffer;
 
+reg readValid /* verilator public */;
+reg[7:0] readData /* verilator public */;
+
 assign OUT_rbusy = spiCnt > 0;
 
 always_ff@(posedge clk) begin
@@ -129,15 +132,17 @@ always_ff@(posedge clk) begin
     if (rst) begin
         spiCnt <= 0;
         buffer <= 0;
+        readValid <= 0;
     end
     else begin            
         if (IN_re) begin
             if ({IN_raddr, 2'b0} == ADDR) begin
-                OUT_rdata <= buffer;
+                OUT_rdata <= {24'b0, readData};
+                readValid <= 0;
                 OUT_rvalid <= 1;
             end
             if ({IN_raddr, 2'b0} == ADDR+4) begin
-                OUT_rdata <= 32'h6000;
+                OUT_rdata <= 32'h6000 | (readValid ? 32'h0100 : 32'h0);
                 OUT_rvalid <= 1;
             end
         end

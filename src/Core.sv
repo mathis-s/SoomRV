@@ -585,7 +585,7 @@ LoadBuffer lb
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_stall('{1'b0, CC_loadStall}),
+    .IN_stall('{1'b0, LS_AGULD_uopStall}),
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
 

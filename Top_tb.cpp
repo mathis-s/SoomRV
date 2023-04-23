@@ -429,6 +429,19 @@ void DumpState(FILE* stream, uint32_t pc, uint32_t inst)
 
 FILE* konataFile;
 
+void Exit (int code)
+{
+#ifdef KONATA
+    fflush(konataFile);
+#endif
+#ifdef TRACE
+    tfp->flush();
+#endif
+    fflush(stdout);
+    fflush(stderr);
+    exit(code);
+}
+
 void LogCommit(Inst& inst)
 {
     if (inst.interrupt == Inst::IR_SQUASH)
@@ -451,15 +464,11 @@ void LogCommit(Inst& inst)
 
             fprintf(stdout, "\nSHOULD BE\n");
             simif.dump_state(stdout, startPC);
-
-#ifdef TRACE
-            tfp->flush();
-#endif
 #ifdef KONATA
             fprintf(konataFile, "L\t%u\t%u\t COSIM ERROR \n", inst.id, 0);
             fflush(konataFile);
 #endif
-            exit(-1);
+            Exit(-1);
         }
 #endif
 
@@ -779,6 +788,10 @@ int main(int argc, char** argv)
         main_time++;
         top->rst = (j < 2);
     }
+    
+    
+    auto core = top->Top->core;
+    uint64_t lastMInstret = core->csr->minstret;
 
     // Run
     top->en = 1;
@@ -801,9 +814,21 @@ int main(int argc, char** argv)
         {
             LogInstructions();
         }
-
-        // if ((main_time & (0xfffff)) == 0) printf("%.10lu pc=%.8x\n", core->csr__DOT__minstret, mostRecentPC)
-        main_time++; // Time passes...
+        
+        // Hang Detection
+        if ((main_time & (0xfff)) == 0)
+        {
+            uint64_t minstret = core->csr->minstret;
+            if (minstret == lastMInstret)
+            {
+                fprintf(stderr, "ERROR: Hang detected\n");
+                fprintf(stderr, "ROB_curSqN=%x\n", core->ROB_curSqN);
+                DumpState(stderr, mostRecentPC, -1);
+                Exit(-1);
+            }
+            lastMInstret = minstret;
+        }
+        main_time++;
     }
 
     // Run a few more cycles ...
