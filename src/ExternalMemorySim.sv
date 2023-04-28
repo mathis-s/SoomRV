@@ -4,13 +4,18 @@ module ExternalMemorySim#(parameter SIZE=(1<<24))
 (
     input wire clk,
     input wire en,
-    inout wire[31:0] bus
+    output wire OUT_oen,
+    input wire[31:0] IN_bus,
+    output wire[31:0] OUT_bus
 );
 
 
 reg oen = 0;
 reg[31:0] outBus;
-assign bus = oen ? outBus : 32'bz;
+assign OUT_bus = oen ? outBus : 32'bx;
+wire[31:0] inBus = oen ? outBus : IN_bus;
+
+assign OUT_oen = oen;
 
 reg[31:0] mem[SIZE-1:0] /*verilator public*/;
 reg[31:0] addr;
@@ -26,7 +31,7 @@ always_ff@(posedge clk) begin
         // lookup
         0: begin
             if (en) begin
-                addr <= bus;
+                addr <= inBus;
                 waitCycles <= 1;
                 state <= 1;
             end
@@ -42,7 +47,7 @@ always_ff@(posedge clk) begin
         // write
         2: begin
             if (en) begin
-                mem[addr[$clog2(SIZE)-1:0]] <= bus;
+                mem[addr[$clog2(SIZE)-1:0]] <= inBus;
                 addr[29:0] <= addr[29:0] + 1;
             end
             else state <= 0;

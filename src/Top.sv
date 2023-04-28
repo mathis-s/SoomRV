@@ -12,6 +12,9 @@ module Top
     input wire clk,
     input wire rst,
     input wire en,
+
+    output wire OUT_uartTx,
+    input wire IN_uartRx,
     output wire OUT_halt
 );
 
@@ -35,7 +38,7 @@ MemoryController memc
     .OUT_CACHE_data('{MC_DC_if[1].data, MC_DC_if[0].data}),
     .IN_CACHE_data('{32'bx, DC_dataOut}),
     
-    .OUT_EXT_oen(EXTMEM_oen),
+    .OUT_EXT_oen(MEMC_EXTMEM_oen),
     .OUT_EXT_en(EXTMEM_en),
     .OUT_EXT_bus(EXTMEM_busOut),
     .IN_EXT_bus(EXTMEM_bus)
@@ -43,15 +46,20 @@ MemoryController memc
 
 assign MC_DC_if[0].addr[29:10] = 0;
 
+wire MEMC_EXTMEM_oen;
 wire EXTMEM_oen;
+
 wire[31:0] EXTMEM_busOut;
-wire[31:0] EXTMEM_bus = EXTMEM_oen ? EXTMEM_busOut : 32'bz;
+wire[31:0] EXTMEM_bus;
 wire EXTMEM_en;
 ExternalMemorySim extMem
 (
     .clk(clk),
     .en(EXTMEM_en && !rst),
-    .bus(EXTMEM_bus)
+
+    .OUT_oen(EXTMEM_oen),
+    .IN_bus(EXTMEM_busOut),
+    .OUT_bus(EXTMEM_bus)
 );
 
 IF_Mem IF_mem();
@@ -172,6 +180,9 @@ MMIO mmio
     .OUT_SPI_clk(),
     .OUT_SPI_mosi(),
     .IN_SPI_miso(1'b0),
+
+    .OUT_uartTx(OUT_uartTx),
+    .IN_uartRx(IN_uartRx),
     
     .OUT_powerOff(OUT_halt),
     .OUT_reboot(),

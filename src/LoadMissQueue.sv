@@ -41,6 +41,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         for (integer i = 0; i < SIZE; i=i+1)
             queue[i].ld.valid <= 0;
+        OUT_ld.valid <= 0;
     end
     else begin
         
@@ -66,6 +67,8 @@ always_ff@(posedge clk) begin
                 if (!enq && !queue[i].ld.valid) begin
                     enq = 1;
                     queue[i].ld <= IN_ld;
+                    assert(IN_ld.exception == AGU_NO_EXCEPTION);
+                    queue[i].ld.exception <= AGU_NO_EXCEPTION;
                     queue[i].ready <= 0;
 
                     //if (IN_cacheLoadActive &&
@@ -88,6 +91,7 @@ always_ff@(posedge clk) begin
                     (queue[i].ld.external || !IN_branch.taken || $signed(queue[i].ld.sqN - IN_branch.sqN) <= 0)) begin
                     deq = 1;
                     OUT_ld <= queue[i].ld;
+                    OUT_ld.exception <= AGU_NO_EXCEPTION;
                     queue[i].ld.valid <= 0;
                 end
             end

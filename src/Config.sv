@@ -29,7 +29,7 @@
 
 // PC at reset
 `define ENTRY_POINT (32'h8000_0000)
-//`define ENTRY_POINT (32'h8000_0000 + 3361880)
+//`define ENTRY_POINT (32'h8000_0000 + 2247620)
 
 
 // PMAs

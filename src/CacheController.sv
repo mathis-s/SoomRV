@@ -13,7 +13,7 @@ module CacheController
     input wire IN_SQ_empty,
     
     input wire IN_stall[TOTAL_UOPS-1:0],
-    output wire OUT_stall[TOTAL_UOPS-1:0],
+    output reg OUT_stall[TOTAL_UOPS-1:0],
 
     input LD_UOp IN_uopLd,
     output LD_UOp OUT_uopLdSq,
@@ -172,7 +172,8 @@ always_comb begin
             !uops[i].isMgmt &&
             !isMMIO[i] &&
             !isCacheHit[i] &&
-            !isCachePassthru[i];
+            !isCachePassthru[i] &&
+            uops[i].exception == AGU_NO_EXCEPTION;
 
         if (i == 1) begin
             stall[i] = (uops[i].valid && !(isMgmt[i] && state == IDLE && !uops[0].valid /* HACK */) &&

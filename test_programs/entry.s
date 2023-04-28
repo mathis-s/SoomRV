@@ -1,5 +1,11 @@
 .set IO_ADDR, 0x10000000
-
+.section .rodata
+.str_boot_msg: .string "SoomRV booting\n"
+.str_except_msg: .string "Unhandled Exception "
+.section .data
+.reg_buf:
+    .zero 4*32
+.text
 .globl _start
 _start:
     
@@ -8,7 +14,12 @@ _start:
     csrrw x0, mtvec, a0
     csrrw x0, stvec, a0
     
-    li sp, 0x80100000
+    #la a0, .str_boot_msg
+    #call prints
+    #call checksum
+    #call printhex
+    
+    li sp, 0x80020000
     call main
     
     # print IPC
@@ -21,24 +32,115 @@ _start:
     #mul a0, a0, a2
     #divu a0, a0, a1
     #call printdecu
+    
+    .align 2
+    .terminate:
     li a0, 0x11100000
     li a1, 0x55
     sb a1, 0(a0)
-    
     .end_loop:
         j .end_loop
     
 
 .align 2
 _exception:
-    li a0, 0x11100000
-    li a1, 0x55
+    csrw mscratch, a0
+    la a0, .reg_buf
+    sw x0, 0(a0)
+    sw x1, 4(a0)
+    sw x2, 8(a0)
+    sw x3, 12(a0)
+    sw x4, 16(a0)
+    sw x5, 20(a0)
+    sw x6, 24(a0)
+    sw x7, 28(a0)
+    sw x8, 32(a0)
+    sw x9, 36(a0)
+    #sw x10, 40(a0)
+    sw x11, 44(a0)
+    sw x12, 48(a0)
+    sw x13, 52(a0)
+    sw x14, 56(a0)
+    sw x15, 60(a0)
+    sw x16, 64(a0)
+    sw x17, 68(a0)
+    sw x18, 72(a0)
+    sw x19, 76(a0)
+    sw x20, 80(a0)
+    sw x21, 84(a0)
+    sw x22, 88(a0)
+    sw x23, 92(a0)
+    sw x24, 96(a0)
+    sw x25, 100(a0)
+    sw x26, 104(a0)
+    sw x27, 108(a0)
+    sw x28, 112(a0)
+    sw x29, 116(a0)
+    sw x30, 120(a0)
+    sw x31, 124(a0)
+    csrr a1, mscratch
+    sw a1, 40(a0)
+
+    la a0, .str_except_msg
+    call prints
+
+    csrr a0, mcause
+    call printhex
+
+    csrr a0, mepc
+    call printhex
+
+    li a0, IO_ADDR
+    li a1, 10
+    sb a1, 0(a0)
+
+    la s0, .reg_buf
+    addi s1, s0, 128
+    .exception_dump_regs:
+        lw a0, 0(s0)
+        call printhex
+        addi s0, s0, 4
+        bne s0, s1, .exception_dump_regs
+    
+    li a0, IO_ADDR
+    li a1, 10
     sb a1, 0(a0)
     
-    j .end_loop
-    
+    # Reading the instruction might cause another exception,
+    # so set tvec to terminate.
+    la a0, .terminate
+    csrw mtvec, a0
 
-    
+    csrr a0, mepc
+    lb a1, 3(a0)
+    slli a1, a1, 24
+    lb a2, 2(a0)
+    slli a2, a2, 16
+    or a1, a1, a2
+    lb a2, 1(a0)
+    slli a2, a2, 8
+    or a1, a1, a2
+    lb a2, 0(a0)
+    or a0, a1, a2
+
+    call printhex
+
+    j .terminate
+
+checksum:
+    li s0, 0x80000000
+    li s1, 0x80000000 + 65536*4
+    mv s2, ra
+    li s3, 0
+    .checksum_loop:
+        lw a0, 0(s0)
+        add s3, s3, a0
+        addi s0, s0, 4
+        bne s0, s1, .checksum_loop
+    mv ra, s2
+    mv a0, s3
+    ret
+
 .globl strcpy
 strcpy:
     
@@ -218,3 +320,15 @@ printhex:
 	li a5, 10
 	sb a5, 0(a4)
 	ret
+
+.globl prints
+prints:
+    li a1, IO_ADDR
+    .prints_loop:
+        lbu a2, 0(a0)
+        beqz a2, .prints_ret
+        addi a0, a0, 1
+        sb a2, 0(a1)
+        j .prints_loop
+    .prints_ret:
+    ret

@@ -1,4 +1,4 @@
-module ACLINT#(parameter MTIME_ADDR=32'hFF000080, parameter MTIMECMP_ADDR=32'hFF000080)
+module ACLINT
 (
     input wire clk,
     input wire rst,
@@ -27,6 +27,22 @@ module ACLINT#(parameter MTIME_ADDR=32'hFF000080, parameter MTIMECMP_ADDR=32'hFF
         if (IN_wmask[3]) x[31:24] <= IN_wdata[31:24]; \
     end
 
+`define WRITE_L32(x) \
+    begin \
+        if (IN_wmask[0]) x[7:0] <= IN_wdata[7:0]; \
+        if (IN_wmask[1]) x[15:8] <= IN_wdata[15:8]; \
+        if (IN_wmask[2]) x[23:16] <= IN_wdata[23:16]; \
+        if (IN_wmask[3]) x[31:24] <= IN_wdata[31:24]; \
+    end
+
+`define WRITE_H32(x) \
+    begin \
+        if (IN_wmask[0]) x[39:32] <= IN_wdata[7:0]; \
+        if (IN_wmask[1]) x[47:40] <= IN_wdata[15:8]; \
+        if (IN_wmask[2]) x[55:48] <= IN_wdata[23:16]; \
+        if (IN_wmask[3]) x[63:56] <= IN_wdata[31:24]; \
+    end
+    
 `define READ(x) \
     begin \
         OUT_rdata <= x; \
@@ -62,25 +78,24 @@ always_ff@(posedge clk) begin
         
         if (IN_re) begin
             case ({IN_raddr, 2'b0})
-                MTIME_ADDR + 0: `READ(mtime[31:0])
-                MTIME_ADDR + 4: `READ(mtime[63:32])
-                MTIMECMP_ADDR + 0: `READ(mtimecmp[31:0])
-                MTIMECMP_ADDR + 4: `READ(mtimecmp[63:32])
+                `MTIME_ADDR + 0: `READ(mtime[31:0])
+                `MTIME_ADDR + 4: `READ(mtime[63:32])
+                `MTIMECMP_ADDR + 0: `READ(mtimecmp[31:0])
+                `MTIMECMP_ADDR + 4: `READ(mtimecmp[63:32])
             endcase
         end
         
         if (IN_we) begin
             case ({IN_waddr, 2'b0})
-                MTIME_ADDR + 0: `WRITE(mtime[31:0])
-                MTIME_ADDR + 4: `WRITE(mtime[63:32])
-                MTIMECMP_ADDR + 0: `WRITE(mtimecmp[31:0])
-                MTIMECMP_ADDR + 4: `WRITE(mtimecmp[63:32])
+                `MTIME_ADDR + 0: `WRITE_L32(mtime)
+                `MTIME_ADDR + 4: `WRITE_H32(mtime)
+                `MTIMECMP_ADDR + 0: `WRITE_L32(mtimecmp)
+                `MTIMECMP_ADDR + 4: `WRITE_H32(mtimecmp)
             endcase
         end
     end
 end
 endmodule
-
 
 module SPI#(parameter ADDR=32'hFF000000)
 (
@@ -184,6 +199,77 @@ always_ff@(posedge clk) begin
     end
 end
 endmodule
+
+`ifdef ENABLE_UART
+module UART#(parameter ADDR=32'hFF000000)
+(
+    input wire clk,
+    input wire rst,
+
+    input wire IN_re,
+    input wire[29:0] IN_raddr,
+    output reg[31:0] OUT_rdata,
+    output wire OUT_rbusy,
+    output reg OUT_rvalid,
+
+    input wire IN_we,
+    input wire[3:0] IN_wmask,
+    input wire[29:0] IN_waddr,
+    input wire[31:0] IN_wdata,
+    
+    output wire OUT_uartTX,
+    input wire IN_uartRX
+);
+
+reg[15:0] divider = 87;
+
+wire[7:0] UART_rdata;
+wire UART_readReady;
+Uart#(.CLOCK_DIVIDER_WIDTH(16)) uart
+(
+    .reset_i(rst),
+    .clock_i(clk),
+    .clock_divider_i(divider),
+    .serial_i(IN_uartRX),
+    .serial_o(OUT_uartTX),
+    
+    .data_i(IN_wdata[7:0]),
+    .data_o(UART_rdata),
+
+    .write_i(IN_we && {IN_waddr, 2'b0} == ADDR && IN_wmask[0]),
+    .write_busy_o(OUT_rbusy),
+    
+    .read_ready_o(UART_readReady),
+    .ack_i(IN_re && {IN_raddr, 2'b0} == ADDR),
+
+    .two_stop_bits_i(0),
+    .parity_bit_i(0),
+    .parity_even_i()
+
+);
+
+always_ff@(posedge clk) begin
+    
+    OUT_rvalid <= 0;
+
+    if (rst) begin
+        divider <= 87; // 115200 baud @ 10MHz
+    end
+    else begin            
+        if (IN_re) begin
+            if ({IN_raddr, 2'b0} == ADDR) begin
+                OUT_rdata <= {24'b0, UART_rdata};
+                OUT_rvalid <= 1;
+            end
+            if ({IN_raddr, 2'b0} == ADDR+4) begin
+                OUT_rdata <= 32'h6000 | (UART_readReady ? 32'h0100 : 32'h0);
+                OUT_rvalid <= 1;
+            end
+        end
+    end
+end
+endmodule
+`endif
 
 module SysCon#(ADDR=32'hFF000004)
 (

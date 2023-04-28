@@ -119,6 +119,8 @@ always_ff@(posedge clk) begin
         end
         baseIndex = 0;
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
+        lateLoadUOp <= 'x;
+        lateLoadUOp.valid <= 0;
     end
     else begin
         if (!IN_stall[0] && issueLateLoad) begin

@@ -759,6 +759,9 @@ int main(int argc, char** argv)
         fclose(f);
     }
 
+    for (size_t i = 0; i < (1 << 24); i++)
+        top->Top->extMem->mem[i] = pram[i];
+
 #ifdef KONATA
     konataFile = fopen("trace_konata.txt", "w");
     fprintf(konataFile, "Kanata	0004\n");
@@ -769,11 +772,19 @@ int main(int argc, char** argv)
     top->trace(tfp, 99);
     tfp->open("Decode_tb.vcd");
 #endif
-
-    for (size_t i = 0; i < (1 << 24); i++)
+    
+#ifdef DUMP_FLAT
     {
-        top->Top->extMem->mem[i] = pram[i];
+        FILE* f = fopen("binary_flat.bin", "w");
+        for (size_t i = 0; i < (1 << 24); i++)
+            if (i <= 65536/*(numInstrBytes / 4)*/)
+            {
+                fwrite(&pram[i], sizeof(uint32_t), 1, f);
+                //fprintf(f, "%.8x\n", pram[i]);
+            }
+        fclose(f);
     }
+#endif
     
 
     // Reset

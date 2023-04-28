@@ -10,6 +10,9 @@ module MMIO
     output reg OUT_SPI_clk,
     output reg OUT_SPI_mosi,
     input wire IN_SPI_miso,
+
+    output wire OUT_uartTx,
+    input wire IN_uartRx,
     
     output reg OUT_powerOff,
     output reg OUT_reboot,
@@ -27,12 +30,12 @@ reg[29:0] readAddrReg;
 reg[31:0] dataReg;
 
 assign IF_mem.rbusy = 0;
-assign IF_mem.wbusy = aclintBusy || spiBusy || sysConBusy || weReg;
+assign IF_mem.wbusy = aclintBusy || spiBusy || sysConBusy || uartBusy || weReg;
 
 wire[31:0] aclintData;
 wire aclintBusy;
 wire aclintRValid;
-ACLINT#(.MTIME_ADDR(`MTIME_ADDR), .MTIMECMP_ADDR(`MTIMECMP_ADDR)) aclint
+ACLINT aclint
 (
     .clk(clk),
     .rst(rst),
@@ -55,7 +58,7 @@ ACLINT#(.MTIME_ADDR(`MTIME_ADDR), .MTIMECMP_ADDR(`MTIMECMP_ADDR)) aclint
 wire[31:0] spiData;
 wire spiBusy;
 wire spiRValid;
-SPI#(.ADDR(`SERIAL_ADDR)) spi
+SPI#(.ADDR(32'h10000000)) spi
 (
     .clk(clk),
     .rst(rst),
@@ -76,6 +79,36 @@ SPI#(.ADDR(`SERIAL_ADDR)) spi
     .OUT_SPI_mosi(OUT_SPI_mosi),
     .IN_SPI_miso(IN_SPI_miso)
 );
+
+wire[31:0] uartData;
+wire uartBusy;
+wire uartRValid;
+`ifdef ENABLE_UART
+UART#(.ADDR(32'h11000000)) uart
+(
+    .clk(clk),
+    .rst(rst),
+    
+    .IN_re(reReg),
+    .IN_raddr(readAddrReg),
+    .OUT_rdata(uartData),
+    .OUT_rbusy(uartBusy),
+    .OUT_rvalid(uartRValid),
+    
+    .IN_we(weReg),
+    .IN_wmask(wmReg),
+    .IN_waddr(writeAddrReg),
+    .IN_wdata(dataReg),
+    
+    .OUT_uartTX(OUT_uartTx),
+    .IN_uartRX(IN_uartRx)
+);
+`else
+    assign uartBusy = 0;
+    assign uartRValid = 0;
+    assign uartData = 'x;
+    assign OUT_uartTx = 0;
+`endif
 
 wire[31:0] sysConData;
 wire sysConBusy;
@@ -106,6 +139,7 @@ always_comb begin
     if (aclintRValid) IF_mem.rdata = aclintData;
     if (spiRValid) IF_mem.rdata = spiData;
     if (sysConRValid) IF_mem.rdata = sysConData;
+    if (uartRValid) IF_mem.rdata = uartData;
 end
 
 always_ff@(posedge clk) begin

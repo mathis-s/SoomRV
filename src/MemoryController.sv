@@ -55,6 +55,21 @@ always_comb begin
 end
 
 wire CACHEIF_busy;
+
+wire CACHEIF_ce;
+wire CACHEIF_we;
+wire[9:0] CACHEIF_addr;
+wire[31:0] CACHEIF_data;
+always_comb begin
+    for (integer i = 0; i < 2; i=i+1) begin
+        OUT_CACHE_ce[i] = 1;
+        OUT_CACHE_we[i] = 1;
+        OUT_CACHE_addr[i] = CACHEIF_addr;
+        OUT_CACHE_data[i] = CACHEIF_data;
+    end
+    OUT_CACHE_ce[idCacheIF] = CACHEIF_ce;
+    OUT_CACHE_we[idCacheIF] = CACHEIF_we;
+end
 CacheInterface cacheIF
 (
     .clk(clk),
@@ -72,10 +87,10 @@ CacheInterface cacheIF
     .OUT_data(outDataCacheIF),
     
     .OUT_CACHE_id(idCacheIF),
-    .OUT_CACHE_ce(OUT_CACHE_ce[idCacheIF]),
-    .OUT_CACHE_we(OUT_CACHE_we[idCacheIF]),
-    .OUT_CACHE_addr(OUT_CACHE_addr[idCacheIF]),
-    .OUT_CACHE_data(OUT_CACHE_data[idCacheIF]),
+    .OUT_CACHE_ce(CACHEIF_ce),
+    .OUT_CACHE_we(CACHEIF_we),
+    .OUT_CACHE_addr(CACHEIF_addr),
+    .OUT_CACHE_data(CACHEIF_data),
     .IN_CACHE_data(IN_CACHE_data[idCacheIF])
 );
 

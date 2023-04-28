@@ -16,10 +16,10 @@ module BranchPredictor
     // IF interface
     input wire IN_pcValid,
     input wire[31:0] IN_pc,
-    output wire OUT_branchTaken,
+    output reg OUT_branchTaken,
     output BHist_t OUT_branchHistory,
     output BranchPredInfo OUT_branchInfo,
-    output wire OUT_multipleBranches,
+    output reg OUT_multipleBranches,
     output wire[30:0] OUT_lateRetAddr,
     
     output PredBranch OUT_predBr,

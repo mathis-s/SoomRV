@@ -67,7 +67,7 @@ always_ff@(posedge clk) begin
     if (wen0) mem[waddr0] <= wdata0;
     if (wen1) mem[waddr1] <= wdata1;
     if (wen2) mem[waddr2] <= wdata2;
-    if (wen3) mem[waddr3] <= wdata3;
+    //if (wen3) mem[waddr3] <= wdata3;
 end
 
 endmodule
