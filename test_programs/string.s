@@ -1,5 +1,6 @@
 .section .rodata
 .string:
+.align 2
 .string "this is a test string\n"
 
 .text
@@ -8,6 +9,7 @@
 main:
     
     li s0, 24
+    mv s1, ra
     .main_loop:
         la a0, .string
         call print
@@ -41,7 +43,8 @@ main:
     #mv a0, s0
     #call printdecu
     
-    ebreak
+    mv ra, s1
+    ret
 
     
 print:

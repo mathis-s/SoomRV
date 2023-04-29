@@ -58,7 +58,7 @@ ACLINT aclint
 wire[31:0] spiData;
 wire spiBusy;
 wire spiRValid;
-SPI#(.ADDR(32'h10000000)) spi
+SPI#(.ADDR(`SPI_ADDR)) spi
 (
     .clk(clk),
     .rst(rst),
@@ -84,7 +84,7 @@ wire[31:0] uartData;
 wire uartBusy;
 wire uartRValid;
 `ifdef ENABLE_UART
-UART#(.ADDR(32'h11000000)) uart
+UART#(.ADDR(`UART_ADDR)) uart
 (
     .clk(clk),
     .rst(rst),

@@ -7,8 +7,6 @@
 // Tage Base Predictor
 `define BP_BASEP_ID_LEN 8
 
-
-
 // IFetch
 `define DEC_WIDTH 4
 
@@ -39,7 +37,8 @@
 `define IS_MMIO_PMA_W(addr) \
     `IS_MMIO_PMA({addr, 2'b0})
 
-`define SERIAL_ADDR 32'h1000_0000
+`define SPI_ADDR 32'h1000_0000
+`define UART_ADDR 32'h1100_0000
 `define SYSCON_ADDR 32'h1110_0000
 `define MTIME_ADDR 32'h1100_bff8
 `define MTIMECMP_ADDR 32'h1100_4000
@@ -48,3 +47,6 @@
 `define IS_LEGAL_ADDR(addr) \
     ((addr >= 32'h80000000 && addr < 32'h84000000) || \
     (`IS_MMIO_PMA(addr) && addr >= 32'h10000000 && addr < 32'h12000000))
+
+
+//`define ENABLE_UART

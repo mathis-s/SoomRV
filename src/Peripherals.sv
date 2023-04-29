@@ -266,6 +266,13 @@ always_ff@(posedge clk) begin
                 OUT_rvalid <= 1;
             end
         end
+
+        if (IN_we) begin
+            if ({IN_waddr, 2'b0} == ADDR + 16) begin
+                if (IN_wmask[0]) divider[7:0] <= IN_wdata[7:0];
+                if (IN_wmask[1]) divider[15:8] <= IN_wdata[15:8];
+            end
+        end
     end
 end
 endmodule

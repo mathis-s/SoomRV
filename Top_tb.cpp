@@ -1,4 +1,5 @@
 // #define TRACE
+// #define DUMP_FLAT
 // #define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
@@ -776,12 +777,7 @@ int main(int argc, char** argv)
 #ifdef DUMP_FLAT
     {
         FILE* f = fopen("binary_flat.bin", "w");
-        for (size_t i = 0; i < (1 << 24); i++)
-            if (i <= 65536/*(numInstrBytes / 4)*/)
-            {
-                fwrite(&pram[i], sizeof(uint32_t), 1, f);
-                //fprintf(f, "%.8x\n", pram[i]);
-            }
+        fwrite(&pram[0], sizeof(uint32_t), 65536, f);
         fclose(f);
     }
 #endif
