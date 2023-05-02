@@ -15,6 +15,7 @@ module CacheInterface
     // Streaming
     input wire IN_valid,
     input wire[31:0] IN_data,
+    output reg OUT_valid,
     output reg[31:0] OUT_data,
     
 
@@ -63,6 +64,7 @@ always_comb begin
     OUT_CACHE_addr = 'x;
     OUT_CACHE_data = 'x;
     
+    OUT_valid = 0;
     OUT_data = 'x;
     
     if (active) begin
@@ -80,6 +82,7 @@ always_comb begin
         if (!isWrite && IN_valid) begin
             readFromBuffer = (readBufferCnt != 0);
             OUT_data = readFromBuffer ? readBuffer[readBufferOutputIdx] : IN_CACHE_data;
+            OUT_valid = 1;
         end
         
         // Reads are buffered, fill buffer if not full

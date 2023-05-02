@@ -259,7 +259,7 @@ always_ff@(posedge clk) begin
             flushActive <= 0;
             flushWaiting <= 1;
         end
-        else if (flushWaiting && IN_SQ_empty && !uops[0].valid && !uops[1].valid) begin
+        else if (flushWaiting && IN_SQ_empty && !uops[0].valid && !uops[1].valid && !OUT_uopLd.valid && !OUT_uopSt.valid && state == IDLE) begin
             flushWaiting <= 0;
             flushActive <= 1;
             flushIter <= 0;

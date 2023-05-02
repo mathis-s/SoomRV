@@ -41,6 +41,7 @@ MemoryController memc
     .OUT_EXT_oen(MEMC_EXTMEM_oen),
     .OUT_EXT_en(EXTMEM_en),
     .OUT_EXT_bus(EXTMEM_busOut),
+    .IN_EXT_stall(EXTMEM_stall),
     .IN_EXT_bus(EXTMEM_bus)
 );
 
@@ -52,12 +53,14 @@ wire EXTMEM_oen;
 wire[31:0] EXTMEM_busOut;
 wire[31:0] EXTMEM_bus;
 wire EXTMEM_en;
+wire EXTMEM_stall;
 ExternalMemorySim extMem
 (
     .clk(clk),
     .en(EXTMEM_en && !rst),
 
     .OUT_oen(EXTMEM_oen),
+    .OUT_stall(EXTMEM_stall),
     .IN_bus(EXTMEM_busOut),
     .OUT_bus(EXTMEM_bus)
 );

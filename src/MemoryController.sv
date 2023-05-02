@@ -17,6 +17,7 @@ module MemoryController#(parameter NUM_CACHES=2)
     output wire OUT_EXT_oen,
     output wire OUT_EXT_en,
     output wire[31:0] OUT_EXT_bus,
+    input wire IN_EXT_stall,
     input wire[31:0] IN_EXT_bus
     
 );
@@ -84,6 +85,7 @@ CacheInterface cacheIF
     
     .IN_valid(MEM_IF_advance),
     .IN_data(memoryIFdata),
+    .OUT_valid(),
     .OUT_data(outDataCacheIF),
     
     .OUT_CACHE_id(idCacheIF),
@@ -115,6 +117,7 @@ MemoryInterface memoryIF
     .OUT_EXT_oen(OUT_EXT_oen),
     .OUT_EXT_en(OUT_EXT_en),
     .OUT_EXT_bus(OUT_EXT_bus),
+    .IN_EXT_stall(IN_EXT_stall),
     .IN_EXT_bus(IN_EXT_bus)
 );
 
@@ -131,7 +134,7 @@ always_ff@(posedge clk) begin
     else begin
         
         case(state)
-            
+        
             // Idle
             0: begin
                 if (IN_ctrl.cmd != MEMC_NONE) begin
@@ -163,9 +166,7 @@ always_ff@(posedge clk) begin
                     state <= 0;
                     OUT_stat.result <= 'x;
                 end
-                
-                //lastProgress <= {lastProgress[$bits(lastProgress)-2:0], MEM_IF_advance};
-                //if (lastProgress[$bits(lastProgress)-1])
+
                 if (MEM_IF_advance)
                     OUT_stat.progress <= OUT_stat.progress + 1;
             end

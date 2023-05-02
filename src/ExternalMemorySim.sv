@@ -5,6 +5,7 @@ module ExternalMemorySim#(parameter SIZE=(1<<24))
     input wire clk,
     input wire en,
     output wire OUT_oen,
+    output reg OUT_stall,
     input wire[31:0] IN_bus,
     output wire[31:0] OUT_bus
 );
@@ -25,15 +26,27 @@ initial state = 0;
 
 reg[2:0] waitCycles;
 
+
 always_ff@(posedge clk) begin
+    
+    OUT_stall <= 0;
+
     case (state)
-        
         // lookup
         0: begin
             if (en) begin
                 addr <= inBus;
-                waitCycles <= 1;
-                state <= 1;
+                // Write
+                if (IN_bus[31] == 1) begin
+                    //waitCycles <= 0;
+                    state <= 2;
+                end
+                // Read
+                else begin
+                    // Request one delay cycle such that the read isn't comb
+                    OUT_stall <= 1;
+                    state <= 3;
+                end
             end
             oen <= 0;
         end

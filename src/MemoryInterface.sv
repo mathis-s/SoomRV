@@ -20,6 +20,7 @@ module MemoryInterface
     output reg OUT_EXT_oen,
     output reg OUT_EXT_en,
     output reg[31:0] OUT_EXT_bus,
+    input wire IN_EXT_stall,
     input wire[31:0] IN_EXT_bus
 );
 
@@ -28,47 +29,60 @@ reg isWrite;
 
 reg[LEN_BITS-1:0] lenCnt;
 reg[2:0] waitCycles;
+reg[29:0] addr;
 
 assign OUT_busy = active;
 
-always_comb begin
-
+/*always_comb begin
     OUT_advance = !rst && active && waitCycles == 0;
     OUT_data = 'x;
     
     if (OUT_advance && !isWrite)
-        OUT_data = IN_EXT_bus;
-end
+        OUT_data = IN_EXT_bus; // should probably register this...
+end*/
 
 always_ff@(posedge clk) begin
     
     OUT_EXT_en <= 0;
+    OUT_advance <= 0;
+    OUT_data <= 'x;
     
     if (rst) begin
         OUT_EXT_oen <= 1;
         active <= 0;
     end
     else begin
-        
         if (!active && IN_en) begin
-            OUT_EXT_oen <= 1;
-            OUT_EXT_bus <= {IN_write, 1'b0, IN_addr};
+            
+            if (!IN_write) begin
+                OUT_EXT_en <= 1;
+                OUT_EXT_oen <= 1;
+                OUT_EXT_bus <= {IN_write, IN_len == 128, IN_addr};
+            end
             
             lenCnt <= IN_len;
             isWrite <= IN_write;
-            
+            addr <= IN_addr;
             active <= 1;
-            
-            OUT_EXT_en <= 1;
             
             if (IN_write)
                 waitCycles <= 2;
             else
-                waitCycles <= 4;
+                waitCycles <= 1;
         end
         else if (active) begin
             
-            OUT_EXT_en <= 1;
+            if (isWrite) begin
+                if (waitCycles <= 1) begin
+                    OUT_EXT_en <= 1;
+                end
+                if (waitCycles == 1) begin
+                    OUT_EXT_oen <= 1;
+                    OUT_EXT_bus <= {isWrite, IN_len == 128, addr};
+                    OUT_advance <= 1;
+                end
+            end
+            if (!isWrite) OUT_EXT_en <= 1;
 
             if (waitCycles != 0) begin
                 waitCycles <= waitCycles - 1;
@@ -78,17 +92,27 @@ always_ff@(posedge clk) begin
                 end
             end
             else begin
-                
+                // Write
                 if (isWrite) begin
-                    OUT_EXT_bus <= IN_data;
-                    if (lenCnt == 1) active <= 0;
-                    else lenCnt <= lenCnt - 1;
+                    OUT_advance <= !IN_EXT_stall;
+                    if (OUT_advance) begin
+                        OUT_EXT_bus <= IN_data;
+                        if (lenCnt == 1) active <= 0;
+                        else lenCnt <= lenCnt - 1;
+                    end
                 end
+                // Read
                 else begin
-                    if (lenCnt <= 2) OUT_EXT_en <= 0;
-                    
-                    if (lenCnt == 1) active <= 0;
-                    else lenCnt <= lenCnt - 1;
+                    if (!IN_EXT_stall) begin
+                        OUT_advance <= 1;
+                        OUT_data <= IN_EXT_bus;
+                        
+                        if (lenCnt <= 2) 
+                            OUT_EXT_en <= 0;
+
+                        if (lenCnt == 1) active <= 0;
+                        else lenCnt <= lenCnt - 1;
+                    end 
                 end
             end
         end
