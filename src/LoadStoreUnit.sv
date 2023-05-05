@@ -10,7 +10,7 @@ module LoadStoreUnit
     input ST_UOp IN_uopSt,
     
     IF_Mem.HOST IF_mem,
-    IF_Mem.HOST IF_mmio,
+    IF_MMIO.HOST IF_mmio,
     
     // Forwarded data from store queue
     input wire[3:0] IN_SQ_lookupMask,
@@ -63,8 +63,9 @@ always_comb begin
     
     OUT_stStall = 0;
     
-    IF_mmio.raddr = IN_uopLd.addr[31:2];
-    IF_mmio.waddr = IN_uopSt.addr[31:2];
+    IF_mmio.raddr = IN_uopLd.addr;
+    IF_mmio.rsize = IN_uopLd.size;
+    IF_mmio.waddr = IN_uopSt.addr;
     
     IF_mem.raddr = IN_uopLd.addr[31:2];
     IF_mem.waddr = IN_uopSt.addr[31:2];

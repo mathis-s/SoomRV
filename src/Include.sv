@@ -743,3 +743,33 @@ interface IF_Mem();
         output rdata, rbusy, wbusy
     );
 endinterface
+
+interface IF_MMIO();
+    
+    localparam ADDR_LEN=32;
+    
+    logic we;
+    logic[ADDR_LEN-1:0] waddr;
+    logic[31:0] wdata;
+    logic[3:0] wmask;
+    
+    logic re;
+    logic[ADDR_LEN-1:0] raddr;
+    logic[1:0] rsize;
+    logic[31:0] rdata;
+    
+    logic rbusy;
+    logic wbusy;
+    
+    modport HOST
+    (
+        output we, waddr, wdata, wmask, re, raddr, rsize,
+        input rdata, rbusy, wbusy
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wdata, wmask, re, raddr, rsize,
+        output rdata, rbusy, wbusy
+    );
+endinterface

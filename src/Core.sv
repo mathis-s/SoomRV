@@ -5,7 +5,7 @@ module Core
     input wire en,
 
     IF_Mem.HOST IF_mem,
-    IF_Mem.HOST IF_mmio,
+    IF_MMIO.HOST IF_mmio,
     IF_CSR_MMIO.CSR IF_csr_mmio,
     
     output wire[27:0] OUT_instrAddr,

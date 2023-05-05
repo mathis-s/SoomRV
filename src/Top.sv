@@ -66,7 +66,7 @@ ExternalMemorySim extMem
 );
 
 IF_Mem IF_mem();
-IF_Mem IF_mmio();
+IF_MMIO IF_mmio();
 IF_CSR_MMIO IF_csr_mmio();
 
 CacheIF CORE_DC_if;

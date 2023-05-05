@@ -66,13 +66,13 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mtime <= 0;
         mtimecmp <= 0;
-        divCnt <= 99;
+        divCnt <= 124;
     end
     else begin
         
         if (divCnt == 0) begin
-            mtime <= mtime + 1;
-            divCnt <= 99;
+            mtime <= mtime + 6;
+            divCnt <= 124;
         end
         else divCnt <= divCnt - 1;
         
@@ -103,14 +103,14 @@ module SPI#(parameter ADDR=32'hFF000000)
     input wire rst,
 
     input wire IN_re,
-    input wire[29:0] IN_raddr,
+    input wire[31:0] IN_raddr,
     output reg[31:0] OUT_rdata,
     output wire OUT_rbusy,
     output reg OUT_rvalid,
 
     input wire IN_we,
     input wire[3:0] IN_wmask,
-    input wire[29:0] IN_waddr,
+    input wire[31:0] IN_waddr,
     input wire[31:0] IN_wdata,
     
     output reg OUT_SPI_cs,
@@ -151,18 +151,18 @@ always_ff@(posedge clk) begin
     end
     else begin            
         if (IN_re) begin
-            if ({IN_raddr, 2'b0} == ADDR) begin
+            if (IN_raddr == ADDR) begin
                 OUT_rdata <= {24'b0, readData};
                 readValid <= 0;
                 OUT_rvalid <= 1;
             end
-            if ({IN_raddr, 2'b0} == ADDR+4) begin
+            if (IN_raddr == ADDR+5) begin
                 OUT_rdata <= 32'h6000 | (readValid ? 32'h0100 : 32'h0);
                 OUT_rvalid <= 1;
             end
         end
         if (IN_we) begin
-            if ({IN_waddr, 2'b0} == ADDR) begin
+            if (IN_waddr == ADDR) begin
                 case (IN_wmask)
                     default: begin
                         spiCnt <= 32;
@@ -207,21 +207,21 @@ module UART#(parameter ADDR=32'hFF000000)
     input wire rst,
 
     input wire IN_re,
-    input wire[29:0] IN_raddr,
+    input wire[31:0] IN_raddr,
     output reg[31:0] OUT_rdata,
     output wire OUT_rbusy,
     output reg OUT_rvalid,
 
     input wire IN_we,
     input wire[3:0] IN_wmask,
-    input wire[29:0] IN_waddr,
+    input wire[31:0] IN_waddr,
     input wire[31:0] IN_wdata,
     
     output wire OUT_uartTX,
     input wire IN_uartRX
 );
 
-reg[15:0] divider = 87;
+reg[15:0] divisor = 36;
 
 wire[7:0] UART_rdata;
 wire UART_readReady;
@@ -229,22 +229,22 @@ Uart#(.CLOCK_DIVIDER_WIDTH(16)) uart
 (
     .reset_i(rst),
     .clock_i(clk),
-    .clock_divider_i(divider),
+    .clock_divider_i(divisor),
     .serial_i(IN_uartRX),
     .serial_o(OUT_uartTX),
     
     .data_i(IN_wdata[7:0]),
     .data_o(UART_rdata),
 
-    .write_i(IN_we && {IN_waddr, 2'b0} == ADDR && IN_wmask[0]),
+    .write_i(IN_we && IN_waddr == ADDR && IN_wmask[0]),
     .write_busy_o(OUT_rbusy),
     
     .read_ready_o(UART_readReady),
-    .ack_i(IN_re && {IN_raddr, 2'b0} == ADDR),
+    .ack_i(IN_re && IN_raddr == ADDR),
 
     .two_stop_bits_i(0),
     .parity_bit_i(0),
-    .parity_even_i()
+    .parity_even_i(0)
 
 );
 
@@ -253,15 +253,15 @@ always_ff@(posedge clk) begin
     OUT_rvalid <= 0;
 
     if (rst) begin
-        divider <= 87; // 115200 baud @ 10MHz
+        divisor <= 36;
     end
     else begin            
         if (IN_re) begin
-            if ({IN_raddr, 2'b0} == ADDR) begin
+            if (IN_raddr == ADDR) begin
                 OUT_rdata <= {24'b0, UART_rdata};
                 OUT_rvalid <= 1;
             end
-            if ({IN_raddr, 2'b0} == ADDR+4) begin
+            if (IN_raddr == ADDR+5) begin
                 OUT_rdata <= 32'h6000 | (UART_readReady ? 32'h0100 : 32'h0);
                 OUT_rvalid <= 1;
             end
@@ -269,8 +269,8 @@ always_ff@(posedge clk) begin
 
         if (IN_we) begin
             if ({IN_waddr, 2'b0} == ADDR + 16) begin
-                if (IN_wmask[0]) divider[7:0] <= IN_wdata[7:0];
-                if (IN_wmask[1]) divider[15:8] <= IN_wdata[15:8];
+                if (IN_wmask[0]) divisor[7:0] <= IN_wdata[7:0];
+                if (IN_wmask[1]) divisor[15:8] <= IN_wdata[15:8];
             end
         end
     end

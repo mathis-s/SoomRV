@@ -4,7 +4,7 @@ module MMIO
     input wire clk,
     input wire rst,
     
-    IF_Mem.MEM IF_mem,
+    IF_MMIO.MEM IF_mem,
     
     output reg OUT_SPI_cs,
     output reg OUT_SPI_clk,
@@ -25,8 +25,8 @@ module MMIO
 reg reReg;
 reg weReg;
 reg[3:0] wmReg;
-reg[29:0] writeAddrReg;
-reg[29:0] readAddrReg;
+reg[31:0] writeAddrReg;
+reg[31:0] readAddrReg;
 reg[31:0] dataReg;
 
 assign IF_mem.rbusy = 0;
@@ -41,14 +41,14 @@ ACLINT aclint
     .rst(rst),
     
     .IN_re(reReg),
-    .IN_raddr(readAddrReg),
+    .IN_raddr(readAddrReg[31:2]),
     .OUT_rdata(aclintData),
     .OUT_rbusy(aclintBusy),
     .OUT_rvalid(aclintRValid),
     
     .IN_we(weReg),
     .IN_wmask(wmReg),
-    .IN_waddr(writeAddrReg),
+    .IN_waddr(writeAddrReg[31:2]),
     .IN_wdata(dataReg),
     
     .OUT_mtime(OUT_csrIf.mtime),
@@ -119,14 +119,14 @@ SysCon#(.ADDR(`SYSCON_ADDR)) sysCon
     .rst(rst),
     
     .IN_re(reReg),
-    .IN_raddr(readAddrReg),
+    .IN_raddr(readAddrReg[31:2]),
     .OUT_rdata(sysConData),
     .OUT_rbusy(sysConBusy),
     .OUT_rvalid(sysConRValid),
     
     .IN_we(weReg),
     .IN_wmask(wmReg),
-    .IN_waddr(writeAddrReg),
+    .IN_waddr(writeAddrReg[31:2]),
     .IN_wdata(dataReg),
     
     .OUT_powerOff(OUT_powerOff),
@@ -152,8 +152,8 @@ always_ff@(posedge clk) begin
         reReg <= !IF_mem.re;
         weReg <= !IF_mem.we;
         wmReg <= IF_mem.wmask;
-        readAddrReg <= IF_mem.raddr[29:0];
-        writeAddrReg <= IF_mem.waddr[29:0];
+        readAddrReg <= IF_mem.raddr;
+        writeAddrReg <= IF_mem.waddr;
         dataReg <= IF_mem.wdata;
     end
 

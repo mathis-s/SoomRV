@@ -98,7 +98,7 @@ always_comb begin
         end
     end
     
-    if (IN_uopLd.valid && !IN_stall[0] &&
+    if (IN_uopLd.valid && !IN_stall[0] && !delayLoad &&
         $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
             (IN_uopSt.size == 2 ||
@@ -153,7 +153,8 @@ always_ff@(posedge clk) begin
             end
             
             // Delete entries that have been committed
-            else if (entries[deqIndex].valid && $signed(commitSqN - entries[deqIndex].sqN) > 0) begin
+            else if (entries[deqIndex].valid && entries[deqIndex].issued && $signed(commitSqN - entries[deqIndex].sqN) > 0) begin
+                assert(entries[deqIndex].issued);
                 entries[deqIndex].valid <= 0;
                 baseIndex = baseIndex + 1;
             end
