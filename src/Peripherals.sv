@@ -66,13 +66,16 @@ always_ff@(posedge clk) begin
     if (rst) begin
         mtime <= 0;
         mtimecmp <= 0;
-        divCnt <= 124;
+        //divCnt <= 124;
+        divCnt <= 99;
     end
     else begin
         
         if (divCnt == 0) begin
-            mtime <= mtime + 6;
-            divCnt <= 124;
+            //mtime <= mtime + 6;
+            mtime <= mtime + 1;
+            //divCnt <= 124;
+            divCnt <= 99;
         end
         else divCnt <= divCnt - 1;
         

@@ -102,12 +102,12 @@ always_comb begin
         INT_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
         INT_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
         INT_FSGNJX_S: resC = {srcA[31] ^ srcB[31], srcA[30:0]};
-        INT_F_ADDI_BEQ,
-        INT_F_ADDI_BNE,
-        INT_F_ADDI_BLT,
-        INT_F_ADDI_BGE,
-        INT_F_ADDI_BLTU,
-        INT_F_ADDI_BGEU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
+        //INT_F_ADDI_BEQ,
+        //INT_F_ADDI_BNE,
+        //INT_F_ADDI_BLT,
+        //INT_F_ADDI_BGE,
+        //INT_F_ADDI_BLTU,
+        //INT_F_ADDI_BGEU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
         default: resC = 32'bx;
     endcase
     
@@ -131,12 +131,12 @@ always_comb begin
         INT_BGE: branchTaken = !lessThan;
         INT_BLTU: branchTaken = lessThanU;
         INT_BGEU: branchTaken = !lessThanU;
-        INT_F_ADDI_BEQ:  branchTaken = (resC == srcB); 
-        INT_F_ADDI_BNE:  branchTaken = (resC != srcB); 
-        INT_F_ADDI_BLT:  branchTaken = $signed(resC < srcB); 
-        INT_F_ADDI_BGE:  branchTaken = !($signed(resC < srcB)); 
-        INT_F_ADDI_BLTU: branchTaken = (resC < srcB); 
-        INT_F_ADDI_BGEU: branchTaken = !(resC < srcB); 
+        //INT_F_ADDI_BEQ:  branchTaken = (resC == srcB); 
+        //INT_F_ADDI_BNE:  branchTaken = (resC != srcB); 
+        //INT_F_ADDI_BLT:  branchTaken = $signed(resC < srcB); 
+        //INT_F_ADDI_BGE:  branchTaken = !($signed(resC < srcB)); 
+        //INT_F_ADDI_BLTU: branchTaken = (resC < srcB); 
+        //INT_F_ADDI_BGEU: branchTaken = !(resC < srcB); 
         default: branchTaken = 0;
     endcase
     
@@ -147,13 +147,13 @@ always_comb begin
         IN_uop.opcode == INT_BLT ||
         IN_uop.opcode == INT_BGE ||
         IN_uop.opcode == INT_BLTU ||
-        IN_uop.opcode == INT_BGEU ||
-        IN_uop.opcode == INT_F_ADDI_BEQ ||
-        IN_uop.opcode == INT_F_ADDI_BNE ||
-        IN_uop.opcode == INT_F_ADDI_BLT ||
-        IN_uop.opcode == INT_F_ADDI_BGE ||
-        IN_uop.opcode == INT_F_ADDI_BLTU ||
-        IN_uop.opcode == INT_F_ADDI_BGEU);
+        IN_uop.opcode == INT_BGEU);// ||
+        //IN_uop.opcode == INT_F_ADDI_BEQ ||
+        //IN_uop.opcode == INT_F_ADDI_BNE ||
+        //IN_uop.opcode == INT_F_ADDI_BLT ||
+        //IN_uop.opcode == INT_F_ADDI_BGE ||
+        //IN_uop.opcode == INT_F_ADDI_BLTU ||
+        //IN_uop.opcode == INT_F_ADDI_BGEU);
         
 end
 
@@ -200,39 +200,37 @@ always_ff@(posedge clk) begin
                     OUT_btUpdate.clean <= 0;
                     OUT_btUpdate.valid <= 1;
                 end
-                
-                if (branchTaken) begin
-                    OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                    OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                end
-                else if (IN_uop.compressed) begin
-                    OUT_branch.dstPC <= pcPlus2;
-                    OUT_btUpdate.dst <= pcPlus2;
-                end
-                else begin
-                    OUT_branch.dstPC <= pcPlus4;
-                    OUT_btUpdate.dst <= pcPlus4;
-                end
-                
-                if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL)
+                if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL) begin
+                    if (branchTaken) begin
+                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                    end
+                    else if (IN_uop.compressed) begin
+                        OUT_branch.dstPC <= pcPlus2;
+                        OUT_btUpdate.dst <= pcPlus2;
+                    end
+                    else begin
+                        OUT_branch.dstPC <= pcPlus4;
+                        OUT_btUpdate.dst <= pcPlus4;
+                    end
                     OUT_branch.taken <= 1;
-
+                end
             end
             else if (IN_uop.opcode == INT_JALR) begin
                 OUT_branch.dstPC <= srcA + srcB;
                 OUT_branch.taken <= 1;
             end
             // Check speculated return address
-            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR) begin
+            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                 if (srcA != srcB) begin
                     OUT_branch.dstPC <= srcA;
                     OUT_branch.taken <= 1;
                     
-                    if (IN_uop.opcode == INT_V_JALR) begin
+                    if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                         OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
                         OUT_btUpdate.dst <= srcA[31:0];
                         OUT_btUpdate.isJump <= 1;
-                        OUT_btUpdate.isCall <= 0; // TODO
+                        OUT_btUpdate.isCall <= (IN_uop.opcode == INT_V_JALR);
                         OUT_btUpdate.compressed <= IN_uop.compressed;
                         OUT_btUpdate.clean <= 0;
                         OUT_btUpdate.valid <= 1;

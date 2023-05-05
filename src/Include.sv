@@ -110,14 +110,9 @@ typedef enum logic[5:0]
     INT_FSGNJN_S,
     INT_FSGNJX_S,
     
-    INT_F_ADDI_BEQ,
-    INT_F_ADDI_BNE,
-    INT_F_ADDI_BLT,
-    INT_F_ADDI_BGE,
-    INT_F_ADDI_BLTU,
-    INT_F_ADDI_BGEU,
     INT_V_RET,
-    INT_V_JALR
+    INT_V_JALR,
+    INT_V_JR
 } OPCode_INT;
 
 typedef enum logic[5:0]

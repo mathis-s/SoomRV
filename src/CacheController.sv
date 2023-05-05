@@ -38,7 +38,7 @@ LD_UOp LMQ_ld;
 LD_UOp uopLd;
 assign uopLd = LMQ_ld.valid ? LMQ_ld : IN_uopLd;
 assign OUT_uopLdSq = uopLd;
-LoadMissQueue loadMissQueue
+LoadMissQueue#(2, CLSIZE_E) loadMissQueue
 (
     .clk(clk),
     .rst(rst),
@@ -144,9 +144,6 @@ always_comb begin
     end
 end
 
-wire[$clog2(LEN)-1:0] evictIdx = OUT_memc.sramAddr[CLSIZE_E-2+:$clog2(LEN)];
-wire[$clog2(ASSOC)-1:0] evictAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2+:$clog2(ASSOC)];
-
 reg isMgmt[TOTAL_UOPS-1:0];
 reg isMMIO[TOTAL_UOPS-1:0];
 reg isCacheHit[TOTAL_UOPS-1:0];
@@ -208,8 +205,12 @@ end
 
 enum logic[2:0]
 {
-    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE
+    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE, REPLACE_RQ, REPLACE_ACTIVE
 } state;
+
+reg[29:0] replaceOpNewAddr;
+wire[$clog2(LEN)-1:0] curOpIdx = OUT_memc.sramAddr[CLSIZE_E-2+:$clog2(LEN)];
+wire[$clog2(ASSOC)-1:0] curOpAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2+:$clog2(ASSOC)];
 
 always_ff@(posedge clk) begin
     reg temp = 0;
@@ -237,8 +238,8 @@ always_ff@(posedge clk) begin
             LOAD_ACTIVE: begin
                 if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
                     state <= IDLE;
-                    ctable[evictIdx][evictAssocIdx].valid <= 1;
-                    ctable[evictIdx][evictAssocIdx].addr <= OUT_memc.extAddr[29:$clog2(LEN)+CLSIZE_E-2];
+                    ctable[curOpIdx][curOpAssocIdx].valid <= 1;
+                    ctable[curOpIdx][curOpAssocIdx].addr <= OUT_memc.extAddr[29:$clog2(LEN)+CLSIZE_E-2];
                 end
             end
             EVICT_RQ: begin
@@ -250,6 +251,23 @@ always_ff@(posedge clk) begin
             EVICT_ACTIVE: begin
                 if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
                     state <= IDLE;
+                end
+            end
+            REPLACE_RQ: begin
+                if (IN_memc.busy && IN_memc.rqID == 0) begin
+                    OUT_memc.cmd <= MEMC_NONE;
+                    state <= REPLACE_ACTIVE;
+                end
+            end
+            REPLACE_ACTIVE: begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
+                    state <= LOAD_RQ;
+                    // sramAddr stays the same
+                    OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
+                    OUT_memc.extAddr <= replaceOpNewAddr;
+                    OUT_memc.cacheID <= 0;
+                    OUT_memc.rqID <= 0;
+                    replaceOpNewAddr <= 'x;
                 end
             end
         endcase
@@ -369,10 +387,10 @@ always_ff@(posedge clk) begin
                         ctable[cacheIdx[i]][cacheHitIdx[i]].used <= 1;
                     end
                     else begin // if (isCachePassthru[i])
-                        outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, evictAssocIdx, evictIdx, uops[i].addr[CLSIZE_E-1:0]};
+                        outUops[i].addr <= {{{32-CLSIZE_E-$clog2(SIZE)}{1'b0}}, curOpAssocIdx, curOpIdx, uops[i].addr[CLSIZE_E-1:0]};
 
-                        if (!uops[i].isLoad) ctable[evictIdx][evictAssocIdx].dirty <= 1;
-                        ctable[evictIdx][evictAssocIdx].used <= 1;
+                        if (!uops[i].isLoad) ctable[curOpIdx][curOpAssocIdx].dirty <= 1;
+                        ctable[curOpIdx][curOpAssocIdx].used <= 1;
                     end
 
                     if (i == 0) outLdUOp_r <= uopLd;
@@ -398,12 +416,13 @@ always_ff@(posedge clk) begin
                     
                     // Evict if dirty
                     if (dirty && !cacheFreeAvail[i]) begin
-                        state <= EVICT_RQ;
+                        state <= REPLACE_RQ;
                         OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         OUT_memc.sramAddr <= {cacheEvictIdx[i], cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
                         OUT_memc.extAddr <= {ctable[cacheIdx[i]][cacheEvictIdx[i]].addr, cacheIdx[i], {(CLSIZE_E-2){1'b0}}};
                         OUT_memc.cacheID <= 0;
                         OUT_memc.rqID <= 0;
+                        replaceOpNewAddr <= {uops[i].addr[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
                         temp = 1;
                     end
                     // Load immediately if clean or free avail

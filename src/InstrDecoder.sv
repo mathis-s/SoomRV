@@ -461,7 +461,7 @@ always_comb begin
                         if (uop.imm == 0) begin
                             isIndirBranch = 1;
                             isReturn = (uop.rs0 == 1);
-                            uop.opcode = (uop.rs0 == 1) ? INT_V_RET : INT_V_JALR;
+                            uop.opcode = (uop.rs0 == 1) ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
                             
                             if (IN_instrs[i].predTaken)
                                 uop.imm = {IN_instrs[i].predTarget, 1'b0};
@@ -545,7 +545,7 @@ always_comb begin
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         /* verilator lint_off ALWCOMBORDER */
-                        if (!invalidEnc && DO_FUSE && i != 0 && 
+                        /*if (!invalidEnc && DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
                             uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0 && uopsComb[i-1].imm != 0) begin
                             
@@ -564,7 +564,7 @@ always_comb begin
                                 7: uop.opcode = INT_F_ADDI_BGEU;
                             endcase
                         end
-                        else begin
+                        else*/ begin
                             case (instr.funct3)
                                 0: uop.opcode = INT_BEQ;
                                 1: uop.opcode = INT_BNE;
@@ -1238,7 +1238,7 @@ always_comb begin
                         isBranch = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
-                        if (DO_FUSE && i != 0 && 
+                        /*if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
                             uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
                             
@@ -1246,7 +1246,7 @@ always_comb begin
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
                             validMask[i-1] = 0;
                             uop.opcode = INT_F_ADDI_BEQ;
-                        end
+                        end*/
                         
                         invalidEnc = 0;
                     end
@@ -1262,7 +1262,7 @@ always_comb begin
                         isBranch = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
-                        if (DO_FUSE && i != 0 && 
+                        /*if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
                             uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
                             
@@ -1270,7 +1270,7 @@ always_comb begin
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
                             validMask[i-1] = 0;
                             uop.opcode = INT_F_ADDI_BNE;
-                        end
+                        end*/
                         invalidEnc = 0;
                     end
                     // c.li 
@@ -1396,7 +1396,7 @@ always_comb begin
                         
                         isIndirBranch = 1;
                         isReturn = (i16.cr.rd_rs1 == 1);
-                        uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JALR;
+                        uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JR;
                         uop.immB = 1;
                         
                         if (IN_instrs[i].predTaken)
@@ -1551,8 +1551,6 @@ always_comb begin
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
                     OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                     OUT_decBranch.dst = IN_lateRetAddr;
-
-                    // TODO: squash following ops to prevent retUpd_c from being polluted with wrong path info?
                 end
             end
         end
