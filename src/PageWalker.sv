@@ -20,6 +20,8 @@ enum logic[1:0]
     IDLE, WAIT_FOR_LOAD
 } state;
 
+wire[31:0] nextLookup = {IN_ldResUOp.data[29:10], pageWalkAddr[21:12], 2'b0};
+
 always_ff@(posedge clk) begin
     
     OUT_res.valid <= 0;
@@ -53,7 +55,7 @@ always_ff@(posedge clk) begin
                 end
                 else if (IN_ldResUOp.valid) begin
                     // Pointer to next page
-                    reg[31:0] nextLookup = {IN_ldResUOp.data[29:10], pageWalkAddr[21:12], 2'b0};
+                    
                     if (IN_ldResUOp.data[3:0] == 4'b0001 && IN_ldResUOp.data[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
                         
                         OUT_ldUOp.valid <= 1;

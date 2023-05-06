@@ -49,15 +49,16 @@ endfunction
 Stage uopLd_0;
 Stage uopLd_1;
 
-assign OUT_loadFwdValid = uopLd_0.valid || (IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111);
-assign OUT_loadFwdTag = uopLd_0.valid ? uopLd_0.tagDst : IN_uopLd.tagDst;
+wire forwardUOpLd_0 = (uopLd_0.valid && !uopLd_0.external);
+assign OUT_loadFwdValid = forwardUOpLd_0 || (!IN_uopLd.external && IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111);
+assign OUT_loadFwdTag = forwardUOpLd_0 ? uopLd_0.tagDst : IN_uopLd.tagDst;
 
 always_comb begin
     IF_mmio.wdata = IF_mem.wdata;
     IF_mmio.wmask = IF_mem.wmask;
 end
 
-wire doRead = IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111;
+wire doRead = IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111;
 
 always_comb begin
     

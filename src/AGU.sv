@@ -21,7 +21,7 @@ module AGU
 
 reg pageWalkActive;
 reg pageWalkAccepted;
-assign OUT_stall = IN_stall || pageWalkActive;
+assign OUT_stall = IN_stall || pageWalkActive || waitForPWComplete;
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
 
@@ -69,6 +69,8 @@ always_comb begin
     end
 end
 
+reg waitForPWComplete;
+
 always_ff@(posedge clk) begin
     
     OUT_pw.valid <= 0;
@@ -78,13 +80,20 @@ always_ff@(posedge clk) begin
         OUT_aguOp.valid <= 0;
         OUT_uop.valid <= 0;
         pageWalkActive <= 0;
+        waitForPWComplete <= 0;
     end
     else begin
-        if (pageWalkActive) begin
+        if (waitForPWComplete) begin
+            if (!IN_pw.busy || IN_pw.rqID != RQ_ID)
+                waitForPWComplete <= 0;
+        end
+        else if (pageWalkActive) begin
             if ((!IN_branch.taken || $signed(OUT_aguOp.sqN - IN_branch.sqN) <= 0)) begin
                 
                 if (!pageWalkAccepted) begin
-                    if (IN_pw.busy && IN_pw.rqID == RQ_ID) pageWalkAccepted <= 1;
+                    if (IN_pw.busy && IN_pw.rqID == RQ_ID) begin
+                        pageWalkAccepted <= 1;
+                    end
                     else begin
                         OUT_pw.valid <= 1;
                         OUT_pw.rootPPN <= IN_vmem.rootPPN;
@@ -156,6 +165,8 @@ always_ff@(posedge clk) begin
                 end
             end
             else begin
+                waitForPWComplete <= pageWalkActive;
+                pageWalkAccepted <= 0;
                 pageWalkActive <= 0;
             end
         end

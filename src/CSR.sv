@@ -507,7 +507,7 @@ always_comb begin
             rdata = (IN_uop.imm[11:0] == CSR_hpmcounter5) ? mhpmcounter5[31:0] : mhpmcounter5[63:32];
         end
 
-        CSR_misa: rdata = 32'b01_0000_11100000100010000000000100;
+        CSR_misa: rdata = 32'b01_0000_00100101000001000100000111;
         CSR_marchid: rdata = 32'h50087501;
         CSR_mimpid: rdata = 32'h50087532;
         CSR_mstatus: rdata = mstatus;
