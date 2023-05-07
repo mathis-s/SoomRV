@@ -152,7 +152,11 @@ always_ff@(posedge clk) begin
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_PF;
                     end
                     
-                    if (IN_pw.result[31:30] != 2'b0 || !`IS_LEGAL_ADDR({IN_pw.result[29:10], 12'b0})) begin
+                    if (IN_pw.result[31:30] != 2'b0 || 
+                        !`IS_LEGAL_ADDR(IN_pw.isSuperPage ? 
+                            {IN_pw.result[29:20], OUT_aguOp.addr[21:0]} : 
+                            {IN_pw.result[29:10], OUT_aguOp.addr[11:0]})) begin
+
                         OUT_aguOp.exception <= AGU_ACCESS_FAULT;
                         if (!LOAD_AGU) OUT_uop.flags <= FLAGS_ST_AF;
                     end

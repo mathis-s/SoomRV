@@ -445,7 +445,7 @@ FPU fpu
 );
 
 RES_UOp CSR_uop;
-TrapControlState CSR_trapControl;
+TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
 STAT_VMem CSR_vmem;
 CSR csr

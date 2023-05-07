@@ -50,7 +50,7 @@ Stage uopLd_0;
 Stage uopLd_1;
 
 wire forwardUOpLd_0 = (uopLd_0.valid && !uopLd_0.external);
-assign OUT_loadFwdValid = forwardUOpLd_0 || (!IN_uopLd.external && IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111);
+assign OUT_loadFwdValid = forwardUOpLd_0 || (!IN_uopLd.external && IN_uopLd.valid && IN_SQ_lookupMask == 4'b1111 && !uopLd_0.valid);
 assign OUT_loadFwdTag = forwardUOpLd_0 ? uopLd_0.tagDst : IN_uopLd.tagDst;
 
 always_comb begin

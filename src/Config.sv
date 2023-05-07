@@ -27,7 +27,6 @@
 
 // PC at reset
 `define ENTRY_POINT (32'h8000_0000)
-//`define ENTRY_POINT (32'h8000_0000 + 2247620)
 
 
 // PMAs
@@ -35,7 +34,7 @@
     ((addr) < 32'h8000_0000)
     
 `define IS_MMIO_PMA_W(addr) \
-    `IS_MMIO_PMA({addr, 2'b0})
+    `IS_MMIO_PMA({(addr), 2'b0})
 
 `define SPI_ADDR 32'h1000_0000
 `define UART_ADDR 32'h1100_0000
@@ -45,8 +44,8 @@
 
 // 64 MiB main memory (TODO: make adjustable!)
 `define IS_LEGAL_ADDR(addr) \
-    ((addr >= 32'h80000000 && addr < 32'h84000000) || \
-    (`IS_MMIO_PMA(addr) && addr >= 32'h10000000 && addr < 32'h12000000))
+    (((addr) >= 32'h80000000 && (addr) < 32'h84000000) || \
+    (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
 
 
 //`define ENABLE_UART

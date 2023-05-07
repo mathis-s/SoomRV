@@ -747,7 +747,8 @@ always_ff@(posedge clk) begin
                 mstatus.mie <= mstatus.mpie;
                 priv <= mstatus.mpp;
                 mstatus.mpp <= PRIV_USER;
-                mstatus.mprv <= 0;
+                if (mstatus.mpp != PRIV_MACHINE)
+                    mstatus.mprv <= 0;
                 
                 retvec <= mepc[31:1];
             end
@@ -840,7 +841,7 @@ always_ff@(posedge clk) begin
                             
                             CSR_mtvec: begin
                                 mtvec.base <= wdata[31:2];
-                                mtvec.mode[0] <= wdata[0];
+                                //mtvec.mode[0] <= wdata[0];
                             end
                             CSR_menvcfg: begin
                                 MEnvCfg_t temp = wdata;
@@ -901,7 +902,7 @@ always_ff@(posedge clk) begin
                             CSR_stval: stval <= wdata;
                             CSR_stvec: begin
                                 stvec.base <= wdata[31:2];
-                                stvec.mode[0] <= wdata[0];
+                                //stvec.mode[0] <= wdata[0];
                             end
                             
                             CSR_sip: begin
