@@ -98,7 +98,7 @@ always_comb begin
     
     // So synthesis doesn't generate latches...
     for (integer i = 0; i < WIDTH; i=i+1)
-        deqAddrsSorted[i] = 4'bx;
+        deqAddrsSorted[i] = 'x;
     
     // Sort the sequence by least significant bits
     for (integer i = 0; i < WIDTH; i=i+1)

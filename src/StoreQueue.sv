@@ -108,6 +108,10 @@ always_ff@(posedge clk) begin
     
     didCSRwrite <= 0;
     doingEnqueue = 0;
+    if (!IN_stallLd) begin
+        OUT_lookupMask <= 'x;
+        OUT_lookupData <= 'x;
+    end
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin

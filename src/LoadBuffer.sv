@@ -21,7 +21,7 @@ module LoadBuffer
     output SqN OUT_maxLoadSqN
 );
 
-localparam TAG_SIZE = $bits(Tag) - $clog2(NUM_ENTRIES);
+localparam TAG_SIZE = $bits(SqN) - $clog2(NUM_ENTRIES);
 
 typedef struct packed
 {

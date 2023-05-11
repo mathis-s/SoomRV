@@ -282,7 +282,7 @@ always_ff@(posedge clk) begin
         // Start Page Walk
         else if (pageWalkRequired && IN_en && !(OUT_branch.taken || IN_decBranch.taken) && fault == IF_FAULT_NONE) begin
             en1 <= 0;
-            if (!pageWalkActive && !IN_memc.busy) begin
+            if (!pageWalkActive && !IN_pw.busy) begin
                 pageWalkActive <= 1;
                 pageWalkAccepted <= 0;
                 pageWalkVPN <= pcVPN;

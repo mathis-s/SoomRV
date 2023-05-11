@@ -58,7 +58,8 @@ always_comb begin
     IF_mmio.wmask = IF_mem.wmask;
 end
 
-wire doRead = IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && IN_SQ_lookupMask != 4'b1111;
+wire doRead = IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) &&
+    (IN_SQ_lookupMask != 4'b1111 || IN_uopLd.external);
 
 always_comb begin
     
@@ -144,22 +145,29 @@ always_comb begin
         
         default: result = data;
     endcase
-
-    OUT_uopLd.result = result;
-    OUT_uopLd.tagDst = uopLd_1.tagDst;
-    OUT_uopLd.sqN = uopLd_1.sqN;
-    case (uopLd_1.exception)
-        AGU_NO_EXCEPTION: OUT_uopLd.flags = FLAGS_NONE;
-        AGU_ADDR_MISALIGN: OUT_uopLd.flags = FLAGS_LD_MA;
-        AGU_ACCESS_FAULT: OUT_uopLd.flags = FLAGS_LD_AF;
-        AGU_PAGE_FAULT: OUT_uopLd.flags = FLAGS_LD_PF;
-    endcase
-    OUT_uopLd.doNotCommit = uopLd_1.doNotCommit;
-
-    OUT_uopPwLd.data = result;
-
+    
+    OUT_uopLd = 'x;
+    OUT_uopPwLd = 'x;
+    
     OUT_uopLd.valid = uopLd_1.valid && !uopLd_1.external;
     OUT_uopPwLd.valid = uopLd_1.valid && uopLd_1.external;
+    
+    if (OUT_uopLd.valid) begin
+        OUT_uopLd.result = result;
+        OUT_uopLd.tagDst = uopLd_1.tagDst;
+        OUT_uopLd.sqN = uopLd_1.sqN;
+        case (uopLd_1.exception)
+            AGU_NO_EXCEPTION: OUT_uopLd.flags = FLAGS_NONE;
+            AGU_ADDR_MISALIGN: OUT_uopLd.flags = FLAGS_LD_MA;
+            AGU_ACCESS_FAULT: OUT_uopLd.flags = FLAGS_LD_AF;
+            AGU_PAGE_FAULT: OUT_uopLd.flags = FLAGS_LD_PF;
+        endcase
+        OUT_uopLd.doNotCommit = uopLd_1.doNotCommit;
+    end
+    
+    if (OUT_uopPwLd.valid) begin
+        OUT_uopPwLd.data = result;
+    end
 end
 
 always_ff@(posedge clk) begin
@@ -179,7 +187,7 @@ always_ff@(posedge clk) begin
         if (IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             
             // Loads that are entirely forwarded from the store queue can be written back one cycle earlier.
-            if (IN_SQ_lookupMask == 4'b1111 && !(uopLd_0.valid && (!IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) && !IN_uopLd.external) begin
+            if (IN_SQ_lookupMask == 4'b1111 && !(uopLd_0.valid && (uopLd_0.external || !IN_branch.taken || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0)) && !IN_uopLd.external) begin
                 uopLd_1 <= ToStage(IN_uopLd);
                 uopLd_1.wmask <= IN_SQ_lookupMask;
                 uopLd_1.data <= IN_SQ_lookupData;

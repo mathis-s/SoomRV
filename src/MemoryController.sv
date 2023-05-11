@@ -165,6 +165,7 @@ always_ff@(posedge clk) begin
                 if (!MEMIF_busy && !CACHEIF_busy) begin
                     state <= 0;
                     OUT_stat.result <= 'x;
+                    OUT_stat.busy <= 0;
                 end
 
                 if (MEM_IF_advance)

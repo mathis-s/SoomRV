@@ -30,7 +30,7 @@ typedef struct packed
     logic[30:0] predTarget;
     BHist_t history;
     RetStackIdx_t rIdx;
-    logic[7:0][15:0] instr;
+    logic[NUM_INSTRS_IN-1:0][15:0] instr;
 } PDEntry;
 
 PDEntry buffer[BUF_SIZE-1:0];
@@ -39,7 +39,6 @@ reg[$clog2(BUF_SIZE)-1:0] bufIndexIn;
 reg[$clog2(BUF_SIZE)-1:0] bufIndexOut;
 reg[$clog2(NUM_INSTRS_IN)-1:0] subIndexOut;
 
-// TODO: Make this based on bufIndexIn/bufIndexOut
 reg[$clog2(BUF_SIZE):0] freeEntries;
 
 always_ff@(posedge clk) begin

@@ -224,7 +224,7 @@ typedef enum logic[11:0]
     CSR_mhpmcounter30h,
     CSR_mhpmcounter31h=12'hB9F,
     
-    CSR_mcounterinhibit=12'h320,
+    CSR_mcountinhibit=12'h320,
     CSR_mhpmevent3=12'h323,
     CSR_mhpmevent4=12'h324,
     CSR_mhpmevent5=12'h325,
@@ -325,7 +325,7 @@ reg[15:0] mideleg;
 reg[15:0] mip;
 reg[15:0] mie;
 reg[5:0] mcounteren;
-reg[5:0] mcounterinhibit;
+reg[5:0] mcountinhibit;
 
 typedef struct packed
 {
@@ -527,7 +527,7 @@ always_comb begin
         CSR_mhpmcounter5h: rdata = mhpmcounter5[63:32];
         
         CSR_mcounteren: rdata = {26'b0, mcounteren};
-        CSR_mcounterinhibit: rdata = {26'b0, mcounterinhibit};
+        CSR_mcountinhibit: rdata = {26'b0, mcountinhibit};
         
         CSR_mtvec: rdata = mtvec;
         CSR_medeleg: rdata = {16'b0, medeleg};
@@ -663,27 +663,27 @@ always_ff@(posedge clk) begin
         // Other implicit writes
         fflags <= fflags | IN_fpNewFlags;
         
-        if (!mcounterinhibit[0])
+        if (!mcountinhibit[0])
             mcycle <= mcycle + 1;
         
-        if (!mcounterinhibit[2]) begin
+        if (!mcountinhibit[2]) begin
             reg[2:0] temp = 0;
             for (integer i = 0; i < 4; i=i+1)
                 if (IN_commitValid[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
         
-        if (!mcounterinhibit[3]) begin
+        if (!mcountinhibit[3]) begin
             reg[2:0] temp = 0;
             for (integer i = 0; i < 4; i=i+1)
                 if (IN_commitBranch[i]) temp = temp + 1;
             mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
         end
         
-        if (!mcounterinhibit[4] && IN_branchMispr)
+        if (!mcountinhibit[4] && IN_branchMispr)
             mhpmcounter4 <= mhpmcounter4 + 1;
             
-        if (!mcounterinhibit[5] && IN_branch.taken)
+        if (!mcountinhibit[5] && IN_branch.taken)
             mhpmcounter5 <= mhpmcounter5 + 1;
         
         // MTIP
@@ -699,7 +699,7 @@ always_ff@(posedge clk) begin
         mcycle <= 0;
         minstret <= 0;
         mcounteren <= 0;
-        mcounterinhibit <= 0;
+        mcountinhibit <= 0;
         mtvec <= 0;
         mepc <= 0;
         mcause <= 0;
@@ -834,9 +834,11 @@ always_ff@(posedge clk) begin
                             CSR_mhpmcounter5h: mhpmcounter5[63:32] <= wdata;
                             
                             CSR_mcounteren: mcounteren[5:0] <= wdata[5:0];
-                            CSR_mcounterinhibit: begin
-                                mcounterinhibit[0] <= wdata[0];
-                                mcounterinhibit[5:2] <= wdata[5:2];
+                            CSR_mcountinhibit: begin
+                                mcountinhibit[0] <= wdata[0];
+                                // We monitor minstret in the simulator to detect stalls.
+                                //mcountinhibit[5:2] <= wdata[5:2];
+                                mcountinhibit[5:3] <= wdata[5:3];
                             end
                             
                             CSR_mtvec: begin
