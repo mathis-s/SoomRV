@@ -536,12 +536,19 @@ typedef struct packed
 {
     logic[31:0] addr;
     logic[21:0] rootPPN;
+    
+    logic supervUserMemory;
+    logic makeExecReadable;
+    PrivLevel priv;
+    
     logic valid;
 } PageWalkRq;
 
 typedef struct packed
 {
-    logic[31:0] result;
+    logic[19:0] vpn;
+    logic[21:0] ppn;
+    logic pageFault;
     logic isSuperPage;
     logic[1:0] rqID;
     logic valid;
@@ -766,5 +773,25 @@ interface IF_MMIO();
     (
         input we, waddr, wdata, wmask, re, raddr, rsize,
         output rdata, rbusy, wbusy
+    );
+endinterface
+
+interface IF_TLB();
+    logic[19:0] virt;
+    logic valid;
+    logic fault;
+    logic hit;
+    logic[19:0] phy;
+
+    modport AGU
+    (
+        output virt, valid,
+        input hit, phy, fault
+    );
+
+    modport TLB
+    (
+        input virt, valid,
+        output hit, phy, fault
     );
 endinterface

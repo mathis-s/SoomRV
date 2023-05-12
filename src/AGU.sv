@@ -98,79 +98,29 @@ always_ff@(posedge clk) begin
                         OUT_pw.valid <= 1;
                         OUT_pw.rootPPN <= IN_vmem.rootPPN;
                         OUT_pw.addr <= OUT_aguOp.addr;
+                        OUT_pw.supervUserMemory <= IN_vmem.supervUserMemory;
+                        OUT_pw.makeExecReadable <= IN_vmem.makeExecReadable;
+                        OUT_pw.priv <= IN_vmem.priv;
                     end
                 end
                 else if (IN_pw.valid) begin
 
                     AGU_Exception exception_c = AGU_NO_EXCEPTION;
-                    
-                    begin // Check for Page Fault
-                        if (!IN_pw.result[0] ||
-                            (IN_vmem.priv == PRIV_USER && !IN_pw.result[4]) ||
-                            (IN_vmem.priv == PRIV_SUPERVISOR && IN_pw.result[4] && !IN_vmem.supervUserMemory) ||
-                            (!IN_pw.result[6]) || // access but accessed not set
-                            (!LOAD_AGU && !IN_pw.result[7]) // write but dirty not set
-                        ) begin
-                            exception_c = AGU_PAGE_FAULT;
-                        end
-
-                        if (LOAD_AGU) begin
-                            case (IN_pw.result[3:1])
-                                /*inv*/ 3'b000,
-                                /*rfu*/ 3'b010,
-                                /*rfu*/ 3'b110: exception_c = AGU_PAGE_FAULT;
-                                /*xo*/  3'b100: begin
-                                    if (!IN_vmem.makeExecReadable) 
-                                        exception_c = AGU_PAGE_FAULT;
-                                end
-                                /*ro*/  3'b001,
-                                /*rw*/  3'b011,
-                                /*rx*/  3'b101,
-                                /*rwx*/ 3'b111: begin end
-                            endcase
-                        end
-                        else begin // StoreAGU
-                            case (IN_pw.result[3:1])
-                                /*ro*/  3'b001,
-                                /*xo*/  3'b100,
-                                /*rx*/  3'b101,
-                                /*inv*/ 3'b000,
-                                /*rfu*/ 3'b010,
-                                /*rfu*/ 3'b110: begin
-                                    exception_c = AGU_PAGE_FAULT;
-                                end
-                                /*rw*/  3'b011,
-                                /*rwx*/ 3'b111: begin end
-                            endcase
-                        end
-                        
-                        if (IN_pw.isSuperPage && IN_pw.result[19:10] != 0) begin
-                            exception_c = AGU_PAGE_FAULT;
-                        end
-                    end
-                    
-                    if (exception_c == AGU_NO_EXCEPTION) begin                        
-                        // Check for access fault
-                        if (IN_pw.result[31:30] != 2'b0 || 
+                    if (IN_pw.pageFault)
+                        exception_c = AGU_PAGE_FAULT;
+                    else if (IN_pw.ppn[21:20] != 2'b0 || 
                             !`IS_LEGAL_ADDR(IN_pw.isSuperPage ? 
-                                {IN_pw.result[29:20], OUT_aguOp.addr[21:0]} : 
-                                {IN_pw.result[29:10], OUT_aguOp.addr[11:0]})) begin
-                            
-                            exception_c = AGU_ACCESS_FAULT;
-                            $display("SoomRV: ld/st page walk access fault virt=%x phy=%x lpte=%x", 
-                                OUT_aguOp.addr, 
-                                IN_pw.isSuperPage ? 
-                                    {IN_pw.result[29:20], OUT_aguOp.addr[21:0]} : 
-                                    {IN_pw.result[29:10], OUT_aguOp.addr[11:0]},
-                                IN_pw.result);
-                        end
-                        else begin
-                            // Register translated address
-                            if (IN_pw.isSuperPage)
-                                OUT_aguOp.addr[31:22] <= IN_pw.result[29:20];
-                            else
-                                OUT_aguOp.addr[31:12] <= IN_pw.result[29:10];
-                        end
+                                {IN_pw.ppn[19:10], OUT_aguOp.addr[21:0]} : 
+                                {IN_pw.ppn[19:0], OUT_aguOp.addr[11:0]})) begin
+
+                        exception_c = AGU_ACCESS_FAULT;
+                    end
+                    else begin
+                        // Register translated address
+                        if (IN_pw.isSuperPage)
+                            OUT_aguOp.addr[31:22] <= IN_pw.ppn[19:10];
+                        else
+                            OUT_aguOp.addr[31:12] <= IN_pw.ppn[19:0];
                     end
                     
                     OUT_aguOp.valid <= 1;

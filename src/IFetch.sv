@@ -245,6 +245,10 @@ always_ff@(posedge clk) begin
                 OUT_pw.rootPPN <= IN_vmem.rootPPN;
                 OUT_pw.addr[31:12] <= pageWalkVPN;
                 OUT_pw.addr[11:0] <= 'x;
+                
+                OUT_pw.supervUserMemory <= IN_vmem.supervUserMemory;
+                OUT_pw.makeExecReadable <= IN_vmem.makeExecReadable;
+                OUT_pw.priv <= IN_vmem.priv;
             end
         end
         // Finalize Page Walk
@@ -253,31 +257,15 @@ always_ff@(posedge clk) begin
             pageWalkAccepted <= 0;
             lastVPN <= pageWalkVPN;
             
-            pcPPN <= IN_pw.result[29:10];
+            pcPPN <= IN_pw.ppn[19:0];
             pcPPNsuperpage <= IN_pw.isSuperPage;
             lastVPN_valid <= 1;
-            
+
             pcPPNfault <= IF_FAULT_NONE;
-            
-            case (IN_pw.result[3:1])
-                    /*inv*/ 3'b000,
-                    /*ro*/  3'b001,
-                    /*rfu*/ 3'b010,
-                    /*rw*/  3'b011,
-                    /*rfu*/ 3'b110: pcPPNfault <= IF_PAGE_FAULT;
-                    
-                    /*xo*/  3'b100,
-                    /*rx*/  3'b101,
-                    /*rwx*/ 3'b111: begin end
-            endcase
-            
-            if ((IN_pw.isSuperPage && IN_pw.result[19:10] != 0) ||
-                (!IN_pw.result[0]) ||
-                (IN_vmem.priv == PRIV_USER && !IN_pw.result[4]) ||
-                (IN_vmem.priv == PRIV_SUPERVISOR && IN_pw.result[4]) ||
-                (!IN_pw.result[6])) 
-                
+            if (IN_pw.pageFault)
                 pcPPNfault <= IF_PAGE_FAULT;
+            else if (IN_pw.ppn[21:20] != 0)
+                pcPPNfault <= IF_ACCESS_FAULT;
         end
         // Start Page Walk
         else if (pageWalkRequired && IN_en && !(OUT_branch.taken || IN_decBranch.taken) && fault == IF_FAULT_NONE) begin
