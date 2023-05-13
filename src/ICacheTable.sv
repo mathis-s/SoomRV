@@ -57,7 +57,8 @@ enum logic[1:0]
 {
     IDLE,
     LOAD_RQ,
-    LOAD_ACTIVE
+    LOAD_ACTIVE,
+    FLUSH_WAIT
 } state;
 
 always_ff@(posedge clk) begin
@@ -66,7 +67,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
                 icacheTable[i][j].valid <= 0;
-        state <= IDLE;
+        state <= FLUSH_WAIT;
         OUT_memc.cmd <= MEMC_NONE;
     end
     else begin
@@ -76,6 +77,10 @@ always_ff@(posedge clk) begin
         end
 
         case (state)
+            FLUSH_WAIT: begin
+                if (!IN_memc.busy || IN_memc.rqID != 1)
+                    state <= IDLE;
+            end
             LOAD_RQ: begin
                 if (IN_memc.busy && IN_memc.rqID == 1) begin
                     OUT_memc.cmd <= MEMC_NONE;

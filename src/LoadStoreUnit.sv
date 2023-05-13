@@ -4,6 +4,7 @@ module LoadStoreUnit
     input wire rst,
     
     input BranchProv IN_branch,
+    output reg OUT_ldStall,
     output reg OUT_stStall,
     
     input LD_UOp IN_uopLd,
@@ -63,6 +64,7 @@ wire doRead = IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signe
 
 always_comb begin
     
+    OUT_ldStall = 0;
     OUT_stStall = 0;
     
     IF_mmio.raddr = IN_uopLd.addr;

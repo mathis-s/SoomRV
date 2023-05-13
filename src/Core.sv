@@ -519,7 +519,7 @@ CacheController cc
     
     .IN_branch(branch),
     .IN_SQ_empty(SQ_empty),
-    .IN_stall('{LSU_stStall, 1'b0}),
+    .IN_stall('{LSU_stStall, LSU_ldStall}),
     .OUT_stall('{CC_storeStall, CC_loadStall}),
 
     .IN_uopLd(LS_uopLd),
@@ -629,7 +629,7 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     .IN_disable(CC_storeStall),
-    .IN_stallLd(1'b0),
+    .IN_stallLd(LSU_ldStall),
     .OUT_empty(SQ_empty),
     
     .IN_uopSt(AGU_ST_uop),
@@ -650,6 +650,7 @@ StoreQueue sq
 
 wire LSU_loadFwdValid;
 Tag LSU_loadFwdTag;
+wire LSU_ldStall;
 wire LSU_stStall;
 PW_LD_RES_UOp LSU_PW_ldUOp;
 LoadStoreUnit lsu
@@ -658,6 +659,7 @@ LoadStoreUnit lsu
     .rst(rst),
     
     .IN_branch(branch),
+    .OUT_ldStall(LSU_ldStall),
     .OUT_stStall(LSU_stStall),
     
     .IN_uopLd(CC_uopLd),

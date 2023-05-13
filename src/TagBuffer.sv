@@ -113,6 +113,8 @@ always_ff@(posedge clk) begin
             tags[i].used <= 1'b0;
             tags[i].committed <= 1'b0;
         end
+        for (integer i = 0; i < NUM_ISSUE; i=i+1)
+            OUT_issueTagsValid[i] <= 0;
     end
     else begin
         if (IN_mispr) begin
