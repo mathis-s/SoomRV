@@ -74,14 +74,18 @@ always_ff@(posedge clk) begin
             
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
-        
-            if (IN_trapInstr.flags == FLAGS_FENCE || IN_trapInstr.flags == FLAGS_ORDERING || IN_trapInstr.flags == FLAGS_XRET) begin
+            
+            // Instructions requiring pipeline flush and MRET/SRET handling
+            if (IN_trapInstr.flags == FLAGS_FENCE || 
+                IN_trapInstr.flags == FLAGS_ORDERING || 
+                IN_trapInstr.flags == FLAGS_XRET ||
+                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_SFENCE_VMA)) 
+            ) begin
                 
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
                         memoryWait <= 1;
                         OUT_branch.dstPC <= nextInstr;
-                        OUT_flushTLB <= 1;
                     end
                     FLAGS_FENCE: begin
                         instrFence <= 1;
@@ -92,7 +96,11 @@ always_ff@(posedge clk) begin
                     FLAGS_XRET: begin
                         OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
                     end
-                    
+
+                    FLAGS_TRAP: begin // TRAP_V_SFENCE_VMA
+                        OUT_flushTLB <= 1;
+                        OUT_branch.dstPC <= nextInstr;
+                    end
                     default: begin end
                 endcase
                 
@@ -117,13 +125,15 @@ always_ff@(posedge clk) begin
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= 0;
             end
+
+
+            // Traps, Exceptions, Interrupts Handling
             else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)) begin
                 
                 reg[3:0] trapCause;
                 reg delegate;
-                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_INTERRUPT);//!(IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF);
+                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_INTERRUPT);
                         
-                // TODO: add all trap reasons
                 if (isInterrupt) begin
                     trapCause = IN_trapControl.interruptCause;
                 end
@@ -170,6 +180,8 @@ always_ff@(posedge clk) begin
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= 0;
             end
+
+            // Branch Prediction Updates
             else begin
                 if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
                     OUT_bpUpdate.valid <= 1;
@@ -181,25 +193,6 @@ always_ff@(posedge clk) begin
                     OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
                     OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
                 end
-                /*else assert(IN_trapInstr.flags == FLAGS_NONE || IN_trapInstr.flags == FLAGS_BRANCH);
-                
-                if (IN_trapControl.interruptPending && IN_trapInstr.allowInterrupt) begin
-                    OUT_trapInfo.valid <= 1;
-                    OUT_trapInfo.trapPC <= nextInstr;
-                    OUT_trapInfo.cause <= IN_trapControl.interruptCause;
-                    OUT_trapInfo.delegate <= IN_trapControl.interruptDelegate;
-                    OUT_trapInfo.isInterrupt <= 1;
-                    
-                    OUT_branch.dstPC <= {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
-                    OUT_branch.taken <= 1;
-                    OUT_branch.sqN <= IN_trapInstr.sqN;
-                    OUT_branch.flush <= 1;
-                    OUT_branch.history <= baseIndexHist;
-                    
-                    OUT_branch.storeSqN <= 0;
-                    OUT_branch.loadSqN <= 0;
-                    OUT_branch.fetchID <= 0;
-                end*/
             end
         end
     end

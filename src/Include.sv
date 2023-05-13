@@ -242,11 +242,15 @@ typedef enum logic[5:0]
     
 } OPCode_FU_CSR;
 
+// For decode-time traps, we use FLAGS_TRAP/FU_TRAP as an,
+// escape flag. The (unused) rd field then stores on of these fields
+// to specify the decode-time exception encountered.
+
+// All other exceptions are passed as result flags from
+// functional units to the ROB.
 typedef enum logic[5:0]
 {
-    // Only decode-time traps as executed using FU_TRAP
-    // All other exceptions are passed as result flags from
-    // functional units to the ROB.
+    // These are regular traps in RISC-V mcause encoding
     TRAP_I_ACC_MISAL = 0,
     TRAP_I_ACC_FAULT = 1,
     TRAP_ILLEGAL_INSTR = 2,
@@ -255,7 +259,9 @@ typedef enum logic[5:0]
     TRAP_ECALL_S = 9,
     TRAP_ECALL_M = 11,
     TRAP_I_PAGE_FAULT = 12,
-
+    
+    // These are not (regular) traps
+    TRAP_V_SFENCE_VMA = 15,
     TRAP_V_INTERRUPT = 16
     
 } OPCode_FU_TRAP;
