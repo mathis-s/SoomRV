@@ -15,7 +15,8 @@ module TrapHandler
     output BranchProv OUT_branch,
 
     input wire IN_MEM_busy,
-
+    
+    output reg OUT_flushTLB,
     output reg OUT_fence,
     output reg OUT_clearICache,
     output wire OUT_disableIFetch
@@ -53,6 +54,7 @@ always_ff@(posedge clk) begin
     OUT_branch.taken <= 0;
     OUT_trapInfo <= 'x;
     OUT_trapInfo.valid <= 0;
+    OUT_flushTLB <= 0;
     
     if (rst) begin
         memoryWait <= 0;
@@ -79,6 +81,7 @@ always_ff@(posedge clk) begin
                     FLAGS_ORDERING: begin
                         memoryWait <= 1;
                         OUT_branch.dstPC <= nextInstr;
+                        OUT_flushTLB <= 1;
                     end
                     FLAGS_FENCE: begin
                         instrFence <= 1;

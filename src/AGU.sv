@@ -12,6 +12,9 @@ module AGU
     input STAT_VMem IN_vmem,
     output PageWalkRq OUT_pw,
     input PageWalkRes IN_pw,
+
+    output TLB_Req OUT_tlb,
+    input TLB_Res IN_tlb,
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
@@ -31,6 +34,11 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
+    if (IN_vmem.sv32en && IN_tlb.hit && IN_tlb.fault) begin
+        except = AGU_PAGE_FAULT;
+        if (!LOAD_AGU) exceptFlags = FLAGS_ST_PF;
+    end
+
     if (!`IS_LEGAL_ADDR(addr) && !IN_vmem.sv32en) begin
         except = AGU_ACCESS_FAULT;
         if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
@@ -68,6 +76,19 @@ always_comb begin
         endcase
     end
 end
+
+always_comb begin
+    OUT_tlb.valid = 
+        (IN_vmem.sv32en) &&
+        !(rst) && 
+        !(waitForPWComplete) && 
+        !(pageWalkActive) && 
+        (!IN_stall && en && IN_uop.valid /*&& (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)*/);
+    
+    OUT_tlb.vpn = addr[31:12];
+end
+
+wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr;
 
 reg waitForPWComplete;
 
@@ -145,7 +166,7 @@ always_ff@(posedge clk) begin
         end
         else if (!IN_stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             
-            OUT_aguOp.addr <= addr;
+            OUT_aguOp.addr <= phyAddr;
             OUT_aguOp.pc <= IN_uop.pc;
             OUT_aguOp.tagDst <= IN_uop.tagDst;
             OUT_aguOp.sqN <= IN_uop.sqN;
@@ -157,7 +178,8 @@ always_ff@(posedge clk) begin
             OUT_aguOp.rIdx <= IN_uop.bpi.rIdx;
             OUT_aguOp.exception <= except;
             
-            if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION) begin
+            if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION && !IN_tlb.hit) begin
+                OUT_aguOp.addr <= addr;
                 OUT_aguOp.valid <= 0;
                 OUT_uop.valid <= 0;
                 pageWalkActive <= 1;
@@ -211,7 +233,7 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop.tagDst <= IN_uop.tagDst;
                 OUT_uop.sqN <= IN_uop.sqN;
-                OUT_uop.result <= addr;
+                OUT_uop.result <= phyAddr;
                 OUT_uop.doNotCommit <= 0;
                 
                 // HACKY: Successful SC return value has already been handled
@@ -229,7 +251,7 @@ always_ff@(posedge clk) begin
                 case (IN_uop.opcode)
                     LSU_SB, LSU_SB_I: begin
                         OUT_aguOp.size <= 0;
-                        case (addr[1:0]) 
+                        case (phyAddr[1:0]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0001;
                                 OUT_aguOp.data <= IN_uop.srcB;
@@ -251,7 +273,7 @@ always_ff@(posedge clk) begin
 
                     LSU_SH, LSU_SH_I: begin
                         OUT_aguOp.size <= 1;
-                        case (addr[1]) 
+                        case (phyAddr[1]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0011;
                                 OUT_aguOp.data <= IN_uop.srcB;

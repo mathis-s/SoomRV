@@ -30,11 +30,13 @@ wire[31:0] nextLookup = {IN_ldResUOp.data[29:10], pageWalkAddr[21:12], 2'b0};
 reg pageFault_c;
 reg isSuperPage_c;
 reg[21:0] ppn_c;
+reg[2:0] rwx_c;
 always_comb begin
     reg[31:0] pte = IN_ldResUOp.data;
     isSuperPage_c = pageWalkIter;
     pageFault_c = 0;
     ppn_c = pte[31:10];
+    rwx_c = 'x;
     
     if (!pte[0] ||
         (priv == PRIV_USER && !pte[4]) ||
@@ -93,6 +95,8 @@ always_comb begin
     if (isSuperPage_c && pte[19:10] != 0) begin
         pageFault_c = 1;
     end
+
+    if (!pageFault_c) rwx_c = {pte[1], pte[2], pte[3]};
 end
 
 always_ff@(posedge clk) begin
@@ -153,6 +157,7 @@ always_ff@(posedge clk) begin
                         OUT_res.pageFault <= pageFault_c;
                         OUT_res.ppn <= ppn_c;
                         OUT_res.vpn <= pageWalkAddr[31:12];
+                        OUT_res.rwx <= rwx_c;
                         state <= IDLE;
                     end
                 end

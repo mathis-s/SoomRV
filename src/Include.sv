@@ -550,6 +550,7 @@ typedef struct packed
     logic[21:0] ppn;
     logic pageFault;
     logic isSuperPage;
+    logic[2:0] rwx;
     logic[1:0] rqID;
     logic valid;
     logic busy;
@@ -776,22 +777,15 @@ interface IF_MMIO();
     );
 endinterface
 
-interface IF_TLB();
-    logic[19:0] virt;
+typedef struct packed
+{
+    logic[19:0] vpn;
     logic valid;
+} TLB_Req;
+
+typedef struct packed
+{
+    logic[19:0] ppn;
     logic fault;
     logic hit;
-    logic[19:0] phy;
-
-    modport AGU
-    (
-        output virt, valid,
-        input hit, phy, fault
-    );
-
-    modport TLB
-    (
-        input virt, valid,
-        output hit, phy, fault
-    );
-endinterface
+} TLB_Res;
