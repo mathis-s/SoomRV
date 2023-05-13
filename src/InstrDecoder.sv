@@ -338,13 +338,8 @@ always_comb begin
                                     invalidEnc = 0;
                                 end
                                 else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
-                                    //uop.rs0 = instr.rs0;
-                                    //uop.rs1 = instr.rs1;
-                                    
-                                    // sfence.vma
-                                    uop.fu = FU_INT;
-                                    uop.opcode = INT_SYS;
-                                    uop.imm = {28'bx, FLAGS_ORDERING};
+                                    uop.fu = FU_TRAP;
+                                    uop.opcode = TRAP_V_SFENCE_VMA;
                                     invalidEnc = 0;
                                 end
                                 else if (instr.funct7 == 7'b0001011 && instr.rd == 0) begin

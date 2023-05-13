@@ -58,6 +58,7 @@ SRC_FILES = \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
 	src/LoadMissQueue.sv \
+	src/TLB.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

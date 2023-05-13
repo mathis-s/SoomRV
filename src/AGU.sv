@@ -12,6 +12,9 @@ module AGU
     input STAT_VMem IN_vmem,
     output PageWalkRq OUT_pw,
     input PageWalkRes IN_pw,
+
+    output TLB_Req OUT_tlb,
+    input TLB_Res IN_tlb,
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
@@ -31,6 +34,11 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
+    if (IN_vmem.sv32en && IN_tlb.hit && IN_tlb.fault) begin
+        except = AGU_PAGE_FAULT;
+        if (!LOAD_AGU) exceptFlags = FLAGS_ST_PF;
+    end
+
     if (!`IS_LEGAL_ADDR(addr) && !IN_vmem.sv32en) begin
         except = AGU_ACCESS_FAULT;
         if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
@@ -69,6 +77,19 @@ always_comb begin
     end
 end
 
+always_comb begin
+    OUT_tlb.valid = 
+        (IN_vmem.sv32en) &&
+        !(rst) && 
+        !(waitForPWComplete) && 
+        !(pageWalkActive) && 
+        (!IN_stall && en && IN_uop.valid /*&& (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)*/);
+    
+    OUT_tlb.vpn = addr[31:12];
+end
+
+wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr;
+
 reg waitForPWComplete;
 
 always_ff@(posedge clk) begin
@@ -98,79 +119,29 @@ always_ff@(posedge clk) begin
                         OUT_pw.valid <= 1;
                         OUT_pw.rootPPN <= IN_vmem.rootPPN;
                         OUT_pw.addr <= OUT_aguOp.addr;
+                        OUT_pw.supervUserMemory <= IN_vmem.supervUserMemory;
+                        OUT_pw.makeExecReadable <= IN_vmem.makeExecReadable;
+                        OUT_pw.priv <= IN_vmem.priv;
                     end
                 end
                 else if (IN_pw.valid) begin
 
                     AGU_Exception exception_c = AGU_NO_EXCEPTION;
-                    
-                    begin // Check for Page Fault
-                        if (!IN_pw.result[0] ||
-                            (IN_vmem.priv == PRIV_USER && !IN_pw.result[4]) ||
-                            (IN_vmem.priv == PRIV_SUPERVISOR && IN_pw.result[4] && !IN_vmem.supervUserMemory) ||
-                            (!IN_pw.result[6]) || // access but accessed not set
-                            (!LOAD_AGU && !IN_pw.result[7]) // write but dirty not set
-                        ) begin
-                            exception_c = AGU_PAGE_FAULT;
-                        end
-
-                        if (LOAD_AGU) begin
-                            case (IN_pw.result[3:1])
-                                /*inv*/ 3'b000,
-                                /*rfu*/ 3'b010,
-                                /*rfu*/ 3'b110: exception_c = AGU_PAGE_FAULT;
-                                /*xo*/  3'b100: begin
-                                    if (!IN_vmem.makeExecReadable) 
-                                        exception_c = AGU_PAGE_FAULT;
-                                end
-                                /*ro*/  3'b001,
-                                /*rw*/  3'b011,
-                                /*rx*/  3'b101,
-                                /*rwx*/ 3'b111: begin end
-                            endcase
-                        end
-                        else begin // StoreAGU
-                            case (IN_pw.result[3:1])
-                                /*ro*/  3'b001,
-                                /*xo*/  3'b100,
-                                /*rx*/  3'b101,
-                                /*inv*/ 3'b000,
-                                /*rfu*/ 3'b010,
-                                /*rfu*/ 3'b110: begin
-                                    exception_c = AGU_PAGE_FAULT;
-                                end
-                                /*rw*/  3'b011,
-                                /*rwx*/ 3'b111: begin end
-                            endcase
-                        end
-                        
-                        if (IN_pw.isSuperPage && IN_pw.result[19:10] != 0) begin
-                            exception_c = AGU_PAGE_FAULT;
-                        end
-                    end
-                    
-                    if (exception_c == AGU_NO_EXCEPTION) begin                        
-                        // Check for access fault
-                        if (IN_pw.result[31:30] != 2'b0 || 
+                    if (IN_pw.pageFault)
+                        exception_c = AGU_PAGE_FAULT;
+                    else if (IN_pw.ppn[21:20] != 2'b0 || 
                             !`IS_LEGAL_ADDR(IN_pw.isSuperPage ? 
-                                {IN_pw.result[29:20], OUT_aguOp.addr[21:0]} : 
-                                {IN_pw.result[29:10], OUT_aguOp.addr[11:0]})) begin
-                            
-                            exception_c = AGU_ACCESS_FAULT;
-                            $display("SoomRV: ld/st page walk access fault virt=%x phy=%x lpte=%x", 
-                                OUT_aguOp.addr, 
-                                IN_pw.isSuperPage ? 
-                                    {IN_pw.result[29:20], OUT_aguOp.addr[21:0]} : 
-                                    {IN_pw.result[29:10], OUT_aguOp.addr[11:0]},
-                                IN_pw.result);
-                        end
-                        else begin
-                            // Register translated address
-                            if (IN_pw.isSuperPage)
-                                OUT_aguOp.addr[31:22] <= IN_pw.result[29:20];
-                            else
-                                OUT_aguOp.addr[31:12] <= IN_pw.result[29:10];
-                        end
+                                {IN_pw.ppn[19:10], OUT_aguOp.addr[21:0]} : 
+                                {IN_pw.ppn[19:0], OUT_aguOp.addr[11:0]})) begin
+
+                        exception_c = AGU_ACCESS_FAULT;
+                    end
+                    else begin
+                        // Register translated address
+                        if (IN_pw.isSuperPage)
+                            OUT_aguOp.addr[31:22] <= IN_pw.ppn[19:10];
+                        else
+                            OUT_aguOp.addr[31:12] <= IN_pw.ppn[19:0];
                     end
                     
                     OUT_aguOp.valid <= 1;
@@ -195,7 +166,7 @@ always_ff@(posedge clk) begin
         end
         else if (!IN_stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             
-            OUT_aguOp.addr <= addr;
+            OUT_aguOp.addr <= phyAddr;
             OUT_aguOp.pc <= IN_uop.pc;
             OUT_aguOp.tagDst <= IN_uop.tagDst;
             OUT_aguOp.sqN <= IN_uop.sqN;
@@ -207,7 +178,8 @@ always_ff@(posedge clk) begin
             OUT_aguOp.rIdx <= IN_uop.bpi.rIdx;
             OUT_aguOp.exception <= except;
             
-            if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION) begin
+            if (IN_vmem.sv32en && except == AGU_NO_EXCEPTION && !IN_tlb.hit) begin
+                OUT_aguOp.addr <= addr;
                 OUT_aguOp.valid <= 0;
                 OUT_uop.valid <= 0;
                 pageWalkActive <= 1;
@@ -261,7 +233,7 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop.tagDst <= IN_uop.tagDst;
                 OUT_uop.sqN <= IN_uop.sqN;
-                OUT_uop.result <= addr;
+                OUT_uop.result <= phyAddr;
                 OUT_uop.doNotCommit <= 0;
                 
                 // HACKY: Successful SC return value has already been handled
@@ -279,7 +251,7 @@ always_ff@(posedge clk) begin
                 case (IN_uop.opcode)
                     LSU_SB, LSU_SB_I: begin
                         OUT_aguOp.size <= 0;
-                        case (addr[1:0]) 
+                        case (phyAddr[1:0]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0001;
                                 OUT_aguOp.data <= IN_uop.srcB;
@@ -301,7 +273,7 @@ always_ff@(posedge clk) begin
 
                     LSU_SH, LSU_SH_I: begin
                         OUT_aguOp.size <= 1;
-                        case (addr[1]) 
+                        case (phyAddr[1]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0011;
                                 OUT_aguOp.data <= IN_uop.srcB;

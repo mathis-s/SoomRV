@@ -536,6 +536,18 @@ CacheController cc
     .OUT_fenceBusy(CC_fenceBusy)
 );
 
+TLB_Req TLB_rqs[1:0];
+TLB_Res TLB_res[1:0];
+TLB#(2) dtlb
+(
+    .clk(clk),
+    .rst(rst),
+    .clear(TH_flushTLB),
+    .IN_pw(PW_res),
+    .IN_rqs(TLB_rqs),
+    .OUT_res(TLB_res)
+);
+
 AGU_UOp AGU_LD_uop /* verilator public */;
 PageWalkRq LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
@@ -550,6 +562,9 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .IN_vmem(CSR_vmem),
     .OUT_pw(LDAGU_PW_rq),
     .IN_pw(PW_res),
+    
+    .OUT_tlb(TLB_rqs[1]),
+    .IN_tlb(TLB_res[1]),
 
     .IN_uop(LD_uop[2]),
     .OUT_aguOp(AGU_LD_uop),
@@ -570,6 +585,9 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
     .IN_vmem(CSR_vmem),
     .OUT_pw(STAGU_PW_rq),
     .IN_pw(PW_res),
+
+    .OUT_tlb(TLB_rqs[0]),
+    .IN_tlb(TLB_res[0]),
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
@@ -763,6 +781,7 @@ ROB rob
 
 wire MEMSUB_busy = !SQ_empty || IN_memc.busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
 
+wire TH_flushTLB;
 wire TH_startFence;
 wire TH_disableIFetch;
 wire TH_clearICache;
@@ -783,6 +802,7 @@ TrapHandler trapHandler
     
     .IN_MEM_busy(MEMSUB_busy),
     
+    .OUT_flushTLB(TH_flushTLB),
     .OUT_fence(TH_startFence),
     .OUT_clearICache(TH_clearICache),
     .OUT_disableIFetch(TH_disableIFetch)
