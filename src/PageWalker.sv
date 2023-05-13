@@ -106,11 +106,13 @@ always_ff@(posedge clk) begin
     if (rst) begin
         OUT_ldUOp.valid <= 0;
         state <= IDLE;
+        OUT_res.busy <= 0;
     end
     else begin
 
         case (state)
             default: begin
+                OUT_res.busy <= 0;
                 for (integer i = 0; i < NUM_RQS; i=i+1) begin
                     if (IN_rqs[i].valid) begin
                         
