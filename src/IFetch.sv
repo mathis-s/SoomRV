@@ -46,6 +46,13 @@ module IFetch
     input STAT_MemC IN_memc
 );
 
+// these are virtual addresses when address translation is active
+reg[30:0] pc;
+reg[30:0] pcLast;
+wire[31:0] pcFull = {pc, 1'b0};
+
+wire[31:0] phyPCFull = {physicalPC, 1'b0};
+
 BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 (
     .clk(clk),
@@ -127,7 +134,7 @@ ICacheTable ict
     .clk(clk),
     .rst(rst || IN_clearICache),
     .IN_lookupValid(tryReadICache),
-    .IN_lookupPC(physicalPC),
+    .IN_lookupPC(phyPCFull),
     
     .OUT_lookupAddress(OUT_instrAddr),
     .OUT_stall(icacheStall),
@@ -156,12 +163,6 @@ always_comb begin
     for (integer i = 0; i < NUM_BLOCKS; i=i+1)
         OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
 end
-
-// these are virtual addresses when address translation is active
-reg[30:0] pc;
-reg[30:0] pcLast;
-wire[31:0] pcFull = {pc, 1'b0};
-wire[31:0] phyPCFull = {physicalPC, 1'b0};
 
 // virtual page number
 // If this has changed, we do a page walk to find the new PPN

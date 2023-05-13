@@ -18,10 +18,10 @@ module Core
 
 
 always_comb begin
-    if (PC_MC_if.cmd != MEMC_NONE)
-        OUT_memc = PC_MC_if;
-    else
+    if (CC_MC_if.cmd != MEMC_NONE)
         OUT_memc = CC_MC_if;
+    else
+        OUT_memc = PC_MC_if;
 end
 
 localparam NUM_WBS = 4;

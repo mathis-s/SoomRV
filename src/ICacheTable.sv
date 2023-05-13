@@ -1,19 +1,11 @@
 
-typedef struct packed
-{
-    logic[22:0] addr;
-    logic valid;
-    logic used;
-} ICacheTableEntry;
-
-
-module ICacheTable#(parameter NUM_ICACHE_LINES=8)
+module ICacheTable#(parameter NUM_ICACHE_LINES=32, parameter ASSOC=2, parameter CLSIZE_E=7)
 (
     input wire clk,
     input wire rst,
     
     input wire IN_lookupValid,
-    input wire[30:0] IN_lookupPC,
+    input wire[31:0] IN_lookupPC,
     
     output reg[27:0] OUT_lookupAddress,
     output wire OUT_stall,
@@ -22,81 +14,100 @@ module ICacheTable#(parameter NUM_ICACHE_LINES=8)
     input STAT_MemC IN_memc
 );
 
-ICacheTableEntry icacheTable[NUM_ICACHE_LINES-1:0];
+localparam LEN = NUM_ICACHE_LINES / ASSOC;
+localparam ENTRY_ADDR_LEN = 32 - CLSIZE_E - $clog2(LEN);
+
+typedef struct packed
+{
+    logic[ENTRY_ADDR_LEN-1:0] addr;
+    logic valid;
+} ICacheTableEntry;
+
+ICacheTableEntry icacheTable[LEN-1:0][ASSOC-1:0];
+reg[$clog2(ASSOC)-1:0] counters[LEN-1:0];
+
 reg cacheEntryFound;
-reg[$clog2(NUM_ICACHE_LINES)-1:0] cacheEntryIndex;
+
+reg[$clog2(LEN)-1:0] cacheIndex;
+reg[$clog2(ASSOC)-1:0] cacheAssocIndex;
 always_comb begin
+    cacheIndex = IN_lookupPC[CLSIZE_E+:$clog2(LEN)];
     cacheEntryFound = 0;
-    cacheEntryIndex = 0;
-    OUT_lookupAddress = 28'bx;
-    for (integer i = 0; i < NUM_ICACHE_LINES; i=i+1) begin
-        if (icacheTable[i].valid && icacheTable[i].addr == IN_lookupPC[30:8]) begin
-            OUT_lookupAddress = {i[22:0], IN_lookupPC[7:3]};
+    cacheAssocIndex = 0;
+    OUT_lookupAddress = 0;
+
+    for (integer i = 0; i < ASSOC; i=i+1) begin
+        if (icacheTable[cacheIndex][i].valid && 
+            icacheTable[cacheIndex][i].addr == IN_lookupPC[31:CLSIZE_E+$clog2(LEN)]
+        ) begin
+            OUT_lookupAddress[CLSIZE_E+$clog2(NUM_ICACHE_LINES)-5:0] = 
+                {i[$clog2(ASSOC)-1:0], cacheIndex, IN_lookupPC[CLSIZE_E-1:4]};
             cacheEntryFound = 1;
-            cacheEntryIndex = i[$clog2(NUM_ICACHE_LINES)-1:0];
+            cacheAssocIndex = i[$clog2(ASSOC)-1:0];
         end
-    end
-    
-    if (0 && loading && !waitCycle && IN_lookupPC[30:8] == loadAddr[30:8] && {lastProgress, 1'b0} > {IN_lookupPC[7:2], 2'b11}) begin
-        cacheEntryFound = 1;
-        cacheEntryIndex = lruPointer;
     end
 end
 
-assign OUT_stall = (!cacheEntryFound || loading) && IN_lookupValid;
-reg[$clog2(NUM_ICACHE_LINES)-1:0] lruPointer;
+assign OUT_stall = (!cacheEntryFound || state != IDLE) && IN_lookupValid;
 
-reg[30:0] loadAddr;
-reg loading;
-reg waitCycle;
-reg[6:0] lastProgress;
+reg[$clog2(ASSOC)-1:0] loadAssocIdx;
+reg[$clog2(LEN)-1:0] loadIdx;
+
+enum logic[1:0]
+{
+    IDLE,
+    LOAD_RQ,
+    LOAD_ACTIVE
+} state;
 
 always_ff@(posedge clk) begin
-    
-    waitCycle <= 0;
-    lastProgress <= IN_memc.progress[6:0];
-    OUT_memc.cmd <= MEMC_NONE;
-    
+
     if (rst) begin
-        for (integer i = 0; i < NUM_ICACHE_LINES; i=i+1)
-            icacheTable[i].valid <= 0;
-        lruPointer <= 0;
-        loading <= 0;
+        for (integer i = 0; i < LEN; i=i+1)
+            for (integer j = 0; j < ASSOC; j=j+1)
+                icacheTable[i][j].valid <= 0;
+        state <= IDLE;
+        OUT_memc.cmd <= MEMC_NONE;
     end
     else begin
-        // Mark entries as used
-        if (IN_lookupValid && cacheEntryFound)
-            icacheTable[cacheEntryIndex].used <= 1;
-        
-        if (loading && IN_memc.rqID != 1 && IN_memc.busy) begin
-            loading <= 0;
+        if (IN_lookupValid && cacheEntryFound) begin
+            if (counters[cacheIndex] == cacheAssocIndex)
+                counters[cacheIndex] <= counters[cacheIndex] + 1;
         end
-        // Finish current load
-        else if (loading && !IN_memc.busy && !waitCycle) begin
-            icacheTable[lruPointer].addr <= loadAddr[30:8];
-            icacheTable[lruPointer].valid <= 1;
-            icacheTable[lruPointer].used <= 1;
-            lruPointer <= lruPointer + 1;
-            loading <= 0;
-        end
-        // Cache Miss, start load
-        else if (!loading && !IN_memc.busy && !cacheEntryFound) begin
-            OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-            OUT_memc.sramAddr <= {lruPointer, 7'b0};
-            OUT_memc.extAddr <= {IN_lookupPC[30:8], 7'b0};
-            OUT_memc.cacheID <= 1;
-            OUT_memc.rqID <= 1;
-            icacheTable[lruPointer].valid <= 0;
-            loadAddr <= IN_lookupPC;
-            loading <= 1;
-            waitCycle <= 1;
-        end
-        else begin
-            if (icacheTable[lruPointer].valid && icacheTable[lruPointer].used)
-                lruPointer <= lruPointer + 1;
-        end
+
+        case (state)
+            LOAD_RQ: begin
+                if (IN_memc.busy && IN_memc.rqID == 1) begin
+                    OUT_memc.cmd <= MEMC_NONE;
+                    state <= LOAD_ACTIVE;
+                end
+            end
+            LOAD_ACTIVE: begin
+                if (!IN_memc.busy) begin
+                    state <= IDLE;
+                    icacheTable[loadIdx][loadAssocIdx].valid <= 1;
+                end
+            end
+            default: begin
+                state <= IDLE;
+                if (!cacheEntryFound) begin
+                    OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
+                    OUT_memc.sramAddr <= {counters[cacheIndex], cacheIndex, {(CLSIZE_E-2){1'b0}}};
+                    OUT_memc.extAddr <= {IN_lookupPC[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
+                    OUT_memc.cacheID <= 1;
+                    OUT_memc.rqID <= 1;
+
+                    loadIdx <= cacheIndex;
+                    loadAssocIdx <= counters[cacheIndex];
+
+                    icacheTable[cacheIndex][counters[cacheIndex]].addr <= IN_lookupPC[31:CLSIZE_E+$clog2(LEN)];
+                    icacheTable[cacheIndex][counters[cacheIndex]].valid <= 0;
+
+                    state <= LOAD_RQ;
+                end
+            end
+        endcase
     end
 end
-
 
 endmodule
