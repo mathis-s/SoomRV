@@ -326,10 +326,10 @@ always_ff@(posedge clk) begin
                 outUops[i].valid <= 0;
             end
             
-            if (uops[i].valid && !flushActive) begin
+            if (uops[i].valid && !flushActive && !stall[i]) begin
                 
                 // Cache Management Ops
-                if (isMgmt[i] && state == IDLE && !stall[i]) begin
+                if (isMgmt[i] && state == IDLE) begin
 
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
                     for (integer j = 0; j < TOTAL_UOPS; j=j+1)
@@ -364,7 +364,7 @@ always_ff@(posedge clk) begin
                 end
 
                 // MMIO
-                else if (isMMIO[i] && !stall[i]) begin
+                else if (isMMIO[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 1;
                     outUops[i].valid <= 1;
@@ -373,7 +373,7 @@ always_ff@(posedge clk) begin
                 end
 
                 // Regular load/store, cache hit
-                else if ((isCacheHit[i] || isCachePassthru[i]) && !stall[i]) begin
+                else if ((isCacheHit[i] || isCachePassthru[i])) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 0;
                     outUops[i].valid <= 1;
@@ -441,6 +441,7 @@ always_ff@(posedge clk) begin
                         temp = 1;
                     end
                 end
+                
             end
         end
     end
