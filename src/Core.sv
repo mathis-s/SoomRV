@@ -18,7 +18,9 @@ module Core
 
 
 always_comb begin
-    if (CC_MC_if.cmd != MEMC_NONE)
+    if (LSU_MC_if.cmd != MEMC_NONE)
+        OUT_memc = LSU_MC_if;
+    else if (CC_MC_if.cmd != MEMC_NONE)
         OUT_memc = CC_MC_if;
     else
         OUT_memc = PC_MC_if;
@@ -653,6 +655,8 @@ Tag LSU_loadFwdTag;
 wire LSU_ldStall;
 wire LSU_stStall;
 PW_LD_RES_UOp LSU_PW_ldUOp;
+
+CTRL_MemC LSU_MC_if;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -664,12 +668,15 @@ LoadStoreUnit lsu
     
     .IN_uopLd(CC_uopLd),
     .IN_uopSt(CC_uopSt),
-
-    .IF_mem(IF_mem),
-    .IF_mmio(IF_mmio),
     
     .IN_SQ_lookupMask(SQ_lookupMask),
     .IN_SQ_lookupData(SQ_lookupData),
+
+    .OUT_memc(LSU_MC_if),
+    .IN_memc(IN_memc),
+    
+    .IF_mem(IF_mem),
+    .IF_mmio(IF_mmio),
     
     .OUT_uopLd(wbUOp[2]),
     .OUT_uopPwLd(LSU_PW_ldUOp),

@@ -25,7 +25,7 @@ reg[1:0] state = 2'b00;
 initial state = 0;
 
 reg[2:0] waitCycles;
-
+reg[31:0] mmioDummy = 0;
 
 always_ff@(posedge clk) begin
     
@@ -34,6 +34,7 @@ always_ff@(posedge clk) begin
     case (state)
         // lookup
         0: begin
+            oen <= 0;
             if (en) begin
                 addr <= inBus;
                 // Write
@@ -43,12 +44,20 @@ always_ff@(posedge clk) begin
                 end
                 // Read
                 else begin
-                    // Request one delay cycle such that the read isn't comb
-                    OUT_stall <= 1;
-                    state <= 3;
+                    if (IN_bus[29] == 0) begin // MMIO read
+                        outBus <= mmioDummy;
+                        mmioDummy <= mmioDummy + 1;
+                        OUT_stall <= 0;
+                        state <= 0;
+                        oen <= 1;
+                    end
+                    else begin
+                        // Request one delay cycle such that the read isn't comb
+                        OUT_stall <= 1;
+                        state <= 3;
+                    end
                 end
             end
-            oen <= 0;
         end
         
         // wait cycles

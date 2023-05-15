@@ -52,6 +52,11 @@ always_comb begin
             extAddr = IN_ctrl.extAddr;
             accessLength = IN_ctrl.cacheID ? 32 : 32;
         end
+        else if (IN_ctrl.cmd == MEMC_READ_SINGLE || IN_ctrl.cmd == MEMC_WRITE_SINGLE) begin
+            enableExt = 1;
+            extAddr = IN_ctrl.extAddr;
+            accessLength = 1;
+        end
     end
 end
 
@@ -122,6 +127,8 @@ MemoryInterface memoryIF
 );
 
 reg[3:0] lastProgress;
+reg outputResult;
+
 always_ff@(posedge clk) begin
     
     OUT_stat.resultValid <= 0;
@@ -134,17 +141,22 @@ always_ff@(posedge clk) begin
     else begin
         
         case(state)
-        
             // Idle
             0: begin
                 if (IN_ctrl.cmd != MEMC_NONE) begin
                     
                     // Interface
                     case (IN_ctrl.cmd)
-                    
+                        
+                        MEMC_WRITE_SINGLE,
                         MEMC_CP_CACHE_TO_EXT,
                         MEMC_CP_EXT_TO_CACHE: begin
                             state <= 1;
+                            outputResult <= 0;
+                        end
+                        MEMC_READ_SINGLE: begin
+                            state <= 1;
+                            outputResult <= 1;
                         end
                         
                         default: assert(0);
@@ -168,8 +180,14 @@ always_ff@(posedge clk) begin
                     OUT_stat.busy <= 0;
                 end
 
-                if (MEM_IF_advance)
+                if (MEM_IF_advance) begin
                     OUT_stat.progress <= OUT_stat.progress + 1;
+                    if (outputResult) begin
+                        OUT_stat.result <= memoryIFdata;
+                        OUT_stat.resultValid <= 1;
+                    end
+                end
+                
             end
         endcase
     
