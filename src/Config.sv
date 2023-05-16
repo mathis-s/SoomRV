@@ -40,13 +40,12 @@
 `define SYSCON_ADDR 32'h1110_0000
 `define MTIME_ADDR 32'h1100_bff8
 `define MTIMECMP_ADDR 32'h1100_4000
+//`define ENABLE_UART
 
 // External MMIO starts here
-`define EXT_MMIO_START_ADDR 32'h1120_000
+`define EXT_MMIO_START_ADDR 32'h1120_0000
 
 // 64 MiB main memory (TODO: make adjustable!) or MMIO
 `define IS_LEGAL_ADDR(addr) \
     (((addr) >= 32'h80000000 && (addr) < 32'h84000000) || \
     (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
-
-//`define ENABLE_UART

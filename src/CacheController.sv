@@ -214,6 +214,7 @@ wire[$clog2(ASSOC)-1:0] curOpAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2
 
 always_ff@(posedge clk) begin
     reg temp = 0;
+    OUT_memc.data <= 'x;
 
     if (rst) begin
         OUT_memc.cmd <= MEMC_NONE;

@@ -37,6 +37,7 @@ reg[7:0] accessLength;
 reg enableCache;
 reg enableExt;
 reg[29:0] extAddr;
+reg extIsWrite;
 
 always_comb begin
     
@@ -44,8 +45,10 @@ always_comb begin
     enableExt = 0;
     accessLength = 'x;
     extAddr = 'x;
+    extIsWrite = 'x;
     
     if (!rst && state == 0) begin
+        extIsWrite = IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_WRITE_SINGLE;
         if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
             enableCache = 1;
             enableExt = 1;
@@ -104,19 +107,20 @@ CacheInterface cacheIF
 wire MEM_IF_advance;
 wire[31:0] memoryIFdata;
 wire MEMIF_busy;
+reg[31:0] writeData;
 MemoryInterface memoryIF
 (
     .clk(clk),
     .rst(rst),
     
     .IN_en(state == 0 && IN_ctrl.cmd != MEMC_NONE),
-    .IN_write(IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT),
+    .IN_write(extIsWrite),
     .IN_len(accessLength),
     .IN_addr(extAddr),
     .OUT_busy(MEMIF_busy),
     
     .OUT_advance(MEM_IF_advance),
-    .IN_data(outDataCacheIF),
+    .IN_data(useWriteData ? writeData : outDataCacheIF),
     .OUT_data(memoryIFdata),
     
     .OUT_EXT_oen(OUT_EXT_oen),
@@ -128,6 +132,7 @@ MemoryInterface memoryIF
 
 reg[3:0] lastProgress;
 reg outputResult;
+reg useWriteData;
 
 always_ff@(posedge clk) begin
     
@@ -148,15 +153,22 @@ always_ff@(posedge clk) begin
                     // Interface
                     case (IN_ctrl.cmd)
                         
-                        MEMC_WRITE_SINGLE,
                         MEMC_CP_CACHE_TO_EXT,
                         MEMC_CP_EXT_TO_CACHE: begin
                             state <= 1;
                             outputResult <= 0;
+                            useWriteData <= 0;
+                        end
+                        MEMC_WRITE_SINGLE: begin
+                            state <= 1;
+                            outputResult <= 0;
+                            useWriteData <= 1;
+                            writeData <= IN_ctrl.data;
                         end
                         MEMC_READ_SINGLE: begin
                             state <= 1;
                             outputResult <= 1;
+                            useWriteData <= 0;
                         end
                         
                         default: assert(0);

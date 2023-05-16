@@ -62,7 +62,7 @@ enum logic[1:0]
 } state;
 
 always_ff@(posedge clk) begin
-
+    OUT_memc.data <= 'x;
     if (rst) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)

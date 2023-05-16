@@ -5,7 +5,7 @@ module LoadStoreUnit
     
     input BranchProv IN_branch,
     output wire OUT_ldStall,
-    output reg OUT_stStall,
+    output wire OUT_stStall,
     
     input LD_UOp IN_uopLd,
     input ST_UOp IN_uopSt,
@@ -26,6 +26,10 @@ module LoadStoreUnit
     output wire OUT_loadFwdValid,
     output Tag OUT_loadFwdTag
 );
+
+wire BLSU_stStall;
+reg stStall;
+assign OUT_stStall = BLSU_stStall || stStall;
 
 typedef struct packed
 {
@@ -54,7 +58,9 @@ Stage uopLd_1;
 
 assign OUT_ldStall = BLSU_ldStall;
 
-wire isCacheBypassLdUOp = IN_uopLd.isMMIO && IN_uopLd.addr >= `EXT_MMIO_START_ADDR;
+wire isCacheBypassLdUOp = IN_uopLd.valid && IN_uopLd.isMMIO && IN_uopLd.addr >= `EXT_MMIO_START_ADDR;
+wire isCacheBypassStUOp = IN_uopSt.valid && IN_uopSt.isMMIO && IN_uopSt.addr >= `EXT_MMIO_START_ADDR;
+
 wire BLSU_ldStall;
 LD_UOp BLSU_uopLd;
 wire[31:0] BLSU_ldResult;
@@ -70,7 +76,11 @@ BypassLSU bypassLSU
     .OUT_ldStall(BLSU_ldStall),
     .IN_uopLd(IN_uopLd),
 
-    .IN_stall(uopLd_1.valid),
+    .IN_uopStEn(isCacheBypassStUOp),
+    .OUT_stStall(BLSU_stStall),
+    .IN_uopSt(IN_uopSt),
+
+    .IN_ldStall(uopLd_1.valid),
     .OUT_uopLd(BLSU_uopLd),
     .OUT_ldData(BLSU_ldResult),
 
@@ -92,7 +102,7 @@ wire doRead = IN_uopLd.valid && (IN_uopLd.external || !IN_branch.taken || $signe
 
 always_comb begin
     
-    OUT_stStall = 0;
+    stStall = 0;
     
     IF_mmio.raddr = IN_uopLd.addr;
     IF_mmio.rsize = IN_uopLd.size;
@@ -118,20 +128,20 @@ always_comb begin
     end
 
     // Store
-    if (IN_uopSt.valid) begin
+    if (IN_uopSt.valid && !isCacheBypassStUOp) begin
         if (IN_uopSt.isMMIO) begin
-            OUT_stStall = IF_mmio.wbusy;
-            IF_mmio.we = OUT_stStall;
+            stStall = IF_mmio.wbusy;
+            IF_mmio.we = stStall;
         end
         else begin
             
             // do not issue two ops at the same address at once
             // FIXME: compare only as many bits as required
             if (doRead && !IN_uopLd.isMMIO && IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2]) begin
-                OUT_stStall = 1;
+                stStall = 1;
             end
             else begin
-                OUT_stStall = IF_mem.wbusy;
+                stStall = IF_mem.wbusy;
                 IF_mem.we = 0;
             end
         end

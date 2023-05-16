@@ -55,6 +55,7 @@ always_ff@(posedge clk) begin
                         // Request one delay cycle such that the read isn't comb
                         OUT_stall <= 1;
                         state <= 3;
+                        oen <= 1;
                     end
                 end
             end
@@ -69,8 +70,14 @@ always_ff@(posedge clk) begin
         // write
         2: begin
             if (en) begin
-                mem[addr[$clog2(SIZE)-1:0]] <= inBus;
-                addr[29:0] <= addr[29:0] + 1;
+                // MMIO
+                if (addr[29] == 0) begin
+                    mmioDummy <= inBus;
+                end
+                else begin
+                    mem[addr[$clog2(SIZE)-1:0]] <= inBus;
+                    addr[28:0] <= addr[28:0] + 1;
+                end
             end
             else state <= 0;
         end
