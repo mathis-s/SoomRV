@@ -326,10 +326,10 @@ always_ff@(posedge clk) begin
                 outUops[i].valid <= 0;
             end
             
-            if (uops[i].valid && !flushActive && !stall[i]) begin
-                
+            if (uops[i].valid && !flushActive) begin
+
                 // Cache Management Ops
-                if (isMgmt[i] && state == IDLE) begin
+                if (isMgmt[i] && state == IDLE && !stall[i]) begin
 
                     reg dirty = ctable[cacheIdx[i]][cacheHitIdx[i]].dirty;
                     for (integer j = 0; j < TOTAL_UOPS; j=j+1)
@@ -364,7 +364,7 @@ always_ff@(posedge clk) begin
                 end
 
                 // MMIO
-                else if (isMMIO[i]) begin
+                else if (isMMIO[i] && !stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 1;
                     outUops[i].valid <= 1;
@@ -373,7 +373,7 @@ always_ff@(posedge clk) begin
                 end
 
                 // Regular load/store, cache hit
-                else if ((isCacheHit[i] || isCachePassthru[i])) begin
+                else if ((isCacheHit[i] || isCachePassthru[i]) && !stall[i]) begin
                     outUops[i] <= uops[i];
                     outUops[i].isMMIO <= 0;
                     outUops[i].valid <= 1;
@@ -396,9 +396,8 @@ always_ff@(posedge clk) begin
                     if (i == 0) outLdUOp_r <= uopLd;
                     if (i == 1) outStUOp_r <= IN_uopSt;
                 end
-
                 // Evict/Clean/Load cache line
-                else if (!cacheHit[i] && state == IDLE && !temp) begin
+                else if (isCacheMiss[i] && state == IDLE && !temp) begin
                     
                     reg dirty = ctable[cacheIdx[i]][cacheEvictIdx[i]].dirty;
                     for (integer j = 0; j < TOTAL_UOPS; j=j+1)
