@@ -609,6 +609,8 @@ LoadBuffer lb
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
 
+    .IN_SQ_done(SQ_done),
+
     .OUT_uopLd(LB_uopLd),
     
     .IN_branch(branch),
@@ -621,6 +623,7 @@ wire CSR_we;
 wire[31:0] CSR_dataOut;
 
 wire SQ_empty;
+wire SQ_done;
 ST_UOp SQ_uop;
 wire[3:0] SQ_lookupMask;
 wire[31:0] SQ_lookupData;
@@ -630,9 +633,10 @@ StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
-    .IN_disable(CC_storeStall),
+    .IN_stallSt(CC_storeStall),
     .IN_stallLd(LSU_ldStall),
     .OUT_empty(SQ_empty),
+    .OUT_done(SQ_done),
     
     .IN_uopSt(AGU_ST_uop),
     .IN_uopLd(CC_SQ_uopLd),

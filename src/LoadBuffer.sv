@@ -13,6 +13,8 @@ module LoadBuffer
     input AGU_UOp IN_uopLd,
     input AGU_UOp IN_uopSt,
 
+    input wire IN_SQ_done,
+
     output LD_UOp OUT_uopLd,
     
     input BranchProv IN_branch,
@@ -146,7 +148,7 @@ always_ff@(posedge clk) begin
         end
         else begin
             // Issue Late Ops
-            if (entries[deqIndex].valid && !entries[deqIndex].issued && commitSqN == entries[deqIndex].sqN && !lateLoadUOp.valid) begin
+            if (entries[deqIndex].valid && !entries[deqIndex].issued && commitSqN == entries[deqIndex].sqN && !lateLoadUOp.valid && IN_SQ_done) begin
                 // can we just pretend that the op was committed here to speed things up? commit should be guaranteed.
                 lateLoadUOp <= entries[deqIndex];
                 entries[deqIndex].issued <= 1;
