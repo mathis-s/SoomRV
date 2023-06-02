@@ -13,7 +13,6 @@
 #include "VTop_RF.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable__N8.h"
-#include "VTop_RenameTable__N4_NB2.h"
 #include "VTop_Top.h"
 #include "VTop_CSR.h"
 #include "VTop_ROB.h"
