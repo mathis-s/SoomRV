@@ -15,10 +15,11 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 - TAGE Branch Predictor
 - Supports Instruction and Data Cache
 - Implements RISC-V Supervisor Spec (M, S and U Mode, Virtual Memory)
-- Currently scores 8.333 DMIPS/MHz at 2.209 IPC
+- Currently scores 10.256 DMIPS/MHz at 2.721 IPC (`-march=rv32imac_zicsr_zba_zbb -O3 -finline-limit=128`, using `strcmp` implemented in `test_programs/entry.s`)
 
 ## Simulating
 1. Install the [RV32 Linux Toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator (at least version 5.0).
 2. Run `make setup` to build submodules.
 3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces)
-4. Run `./obj_dir/VTop <assembly file>` to execute the code in `<assembly file>`. For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone.
+4. Run `./obj_dir/VTop <assembly file>` to execute the code in `<assembly file>`.  
+For example, run `./obj_dir/VTop test_programs/dhry_1.s 2>/dev/null` to run Dhrystone (`stderr` contains Spike debug output).
