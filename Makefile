@@ -78,7 +78,7 @@ trace:
 
 setup:
 	git submodule update --init --recursive
-	cd riscv-isa-sim && ./configure
+	cd riscv-isa-sim && ./configure --with-boost=no --with-boost-asio=no --with-boost-regex=no
 	make -j $(nproc) -C riscv-isa-sim
 	
 clean:
