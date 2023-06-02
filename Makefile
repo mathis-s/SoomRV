@@ -69,11 +69,16 @@ SRC_FILES = \
 	hardfloat/mulRecFN.v \
 	hardfloat/HardFloat_rawFN.v
 
-decoder_tb:
+obj_dir/VTop:
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
 trace:
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_TRACE_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
+setup:
+	git submodule update --init --recursive
+	cd riscv-isa-sim && ./configure
+	make -j $(nproc) -C riscv-isa-sim
+	
 clean:
 	rm -r obj_dir

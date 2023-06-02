@@ -41,11 +41,7 @@ jobs:
         sudo make install
         
     - name: Build Spike
-      run: |
-        cd riscv-isa-sim
-        ./configure
-        make -j `nproc`
-        cd ..
+      run: make setup
         
     - name: Compile
       run: make -j `nproc`
