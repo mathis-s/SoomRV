@@ -82,4 +82,4 @@ setup:
 	make -j $(nproc) -C riscv-isa-sim
 	
 clean:
-	rm -r obj_dir
+	$(RM) -r obj_dir
