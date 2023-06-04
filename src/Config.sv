@@ -42,7 +42,8 @@
 `define MTIMECMP_ADDR 32'h1100_4000
 //`define ENABLE_UART
 
-// External MMIO starts here
+// External MMIO
+`define ENABLE_EXT_MMIO 0
 `define EXT_MMIO_START_ADDR 32'h1120_0000
 
 // 64 MiB main memory (TODO: make adjustable!) or MMIO
