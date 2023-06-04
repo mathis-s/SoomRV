@@ -71,7 +71,7 @@ SRC_FILES = \
 	hardfloat/mulRecFN.v \
 	hardfloat/HardFloat_rawFN.v
 
-obj_dir/VTop:
+soomrv:
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
 trace:

@@ -13,7 +13,7 @@ module TLB#(parameter NUM_RQ=1, parameter SIZE=8, parameter ASSOC=4, parameter I
     input wire rst,
     input wire clear,
     
-    input PageWalkRes IN_pw,
+    input PageWalk_Res IN_pw,
     input TLB_Req IN_rqs[NUM_RQ-1:0],
     output TLB_Res OUT_res[NUM_RQ-1:0]
 );

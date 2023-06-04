@@ -25,7 +25,7 @@ module IFetch
     output wire OUT_PERFC_branchMispr,
     output BranchProv OUT_branch,
     
-    input ReturnDecUpd IN_retDecUpd,
+    input ReturnDecUpdate IN_retDecUpd,
     input DecodeBranchProv IN_decBranch,
     
     input wire IN_clearICache,
@@ -38,12 +38,12 @@ module IFetch
     output IF_Instr OUT_instrs,
     output wire[30:0] OUT_lateRetAddr,
     
-    input STAT_VMem IN_vmem,
-    output PageWalkRq OUT_pw,
-    input PageWalkRes IN_pw,
+    input VirtMemState IN_vmem,
+    output PageWalk_Req OUT_pw,
+    input PageWalk_Res IN_pw,
     
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc
 );
 
 // these are virtual addresses when address translation is active

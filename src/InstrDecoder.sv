@@ -206,7 +206,7 @@ module InstrDecoder
     input wire IN_enCustom,
     
     output DecodeBranchProv OUT_decBranch,
-    output ReturnDecUpd OUT_retUpd,
+    output ReturnDecUpdate OUT_retUpd,
     output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
@@ -227,7 +227,7 @@ Instr16 i16;
 I32 i32;
 
 BTUpdate btUpdate_c;
-ReturnDecUpd retUpd_c;
+ReturnDecUpdate retUpd_c;
 
 D_UOp uopsComb[NUM_UOPS-1:0];
 reg[3:0] validMask;

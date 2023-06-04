@@ -21,7 +21,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     output TrapControlState OUT_trapControl,
     output wire[2:0] OUT_fRoundMode,
     
-    output STAT_VMem OUT_vmem,
+    output VirtMemState OUT_vmem,
     
     output RES_UOp OUT_uop
 );

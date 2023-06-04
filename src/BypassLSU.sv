@@ -17,8 +17,8 @@ module BypassLSU#(parameter RQ_ID = 2)
     output LD_UOp OUT_uopLd,
     output reg[31:0] OUT_ldData,
 
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc
 );
 
 reg[31:0] result;

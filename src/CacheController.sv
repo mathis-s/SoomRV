@@ -22,8 +22,8 @@ module CacheController
     input ST_UOp IN_uopSt,
     output ST_UOp OUT_uopSt,
     
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc,
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc,
     
     input wire IN_fence,
     output wire OUT_fenceBusy

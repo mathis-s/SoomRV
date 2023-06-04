@@ -12,8 +12,8 @@ module Core
     output wire OUT_instrReadEnable,
     input wire[127:0] IN_instrRaw,
         
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc
 );
 
 
@@ -52,8 +52,8 @@ FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
 wire PC_stall;
 
-CTRL_MemC PC_MC_if;
-PageWalkRq PC_PW_rq;
+MemController_Req PC_MC_if;
+PageWalk_Req PC_PW_rq;
 IFetch ifetch
 (
     .clk(clk),
@@ -128,7 +128,7 @@ PreDecode preDec
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
 DecodeBranchProv DEC_decBranch;
-ReturnDecUpd DEC_retUpd;
+ReturnDecUpdate DEC_retUpd;
 InstrDecoder idec
 (
     .clk(clk),
@@ -449,7 +449,7 @@ FPU fpu
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
-STAT_VMem CSR_vmem;
+VirtMemState CSR_vmem;
 CSR csr
 (
     .clk(clk),
@@ -477,7 +477,7 @@ CSR csr
 
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
 
-PageWalkRes PW_res;
+PageWalk_Res PW_res;
 wire CC_PW_LD_stall;
 PW_LD_UOp PW_LD_uop;
 PageWalker pageWalker
@@ -512,7 +512,7 @@ ST_UOp CC_uopSt;
 LD_UOp CC_SQ_uopLd;
 wire CC_storeStall;
 wire CC_loadStall;
-CTRL_MemC CC_MC_if;
+MemController_Req CC_MC_if;
 wire CC_fenceBusy;
 CacheController cc
 (
@@ -551,7 +551,7 @@ TLB#(2) dtlb
 );
 
 AGU_UOp AGU_LD_uop /* verilator public */;
-PageWalkRq LDAGU_PW_rq;
+PageWalk_Req LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
@@ -574,7 +574,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 );
 
 AGU_UOp AGU_ST_uop /* verilator public */;
-PageWalkRq STAGU_PW_rq;
+PageWalk_Req STAGU_PW_rq;
 AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 (
     .clk(clk),
@@ -660,7 +660,7 @@ wire LSU_ldStall;
 wire LSU_stStall;
 PW_LD_RES_UOp LSU_PW_ldUOp;
 
-CTRL_MemC LSU_MC_if;
+MemController_Req LSU_MC_if;
 LoadStoreUnit lsu
 (
     .clk(clk),

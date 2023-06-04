@@ -3,8 +3,8 @@ module MemoryController#(parameter NUM_CACHES=2)
     input wire clk,
     input wire rst,
     
-    input CTRL_MemC IN_ctrl,
-    output STAT_MemC OUT_stat,
+    input MemController_Req IN_ctrl,
+    output MemController_Res OUT_stat,
     
     //output reg[NUM_CACHES-1:0] OUT_CACHE_used,
     output reg OUT_CACHE_we[NUM_CACHES-1:0],

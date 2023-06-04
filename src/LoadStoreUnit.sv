@@ -17,8 +17,8 @@ module LoadStoreUnit
     IF_Mem.HOST IF_mem,
     IF_MMIO.HOST IF_mmio,
 
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc,
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc,
     
     output RES_UOp OUT_uopLd,
     output PW_LD_RES_UOp OUT_uopPwLd,

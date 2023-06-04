@@ -23,7 +23,7 @@ module BranchPredictor
     output wire[30:0] OUT_lateRetAddr,
     
     output PredBranch OUT_predBr,
-    input ReturnDecUpd IN_retDecUpd,
+    input ReturnDecUpdate IN_retDecUpd,
     
     // Branch XU interface
     input BTUpdate IN_btUpdates[NUM_IN-1:0],

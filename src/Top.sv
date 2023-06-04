@@ -21,8 +21,8 @@ module Top
 wire[1:0] MC_DC_used = {!MC_DC_if[1].ce, !MC_DC_if[0].ce};
 CacheIF MC_DC_if[1:0];
 
-CTRL_MemC MemC_ctrl;
-STAT_MemC MemC_stat;
+MemController_Req MemC_ctrl;
+MemController_Res MemC_stat;
 MemoryController memc
 (
     .clk(clk),

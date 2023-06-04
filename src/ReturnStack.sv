@@ -18,7 +18,7 @@ module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_P
 
     output RetStackIdx_t OUT_curIdx,
     output PredBranch OUT_predBr,
-    input ReturnDecUpd IN_returnUpd
+    input ReturnDecUpdate IN_returnUpd
 );
 
 localparam RET_PRED_LEN = RET_PRED_SIZE / RET_PRED_ASSOC;

@@ -10,8 +10,8 @@ module ICacheTable#(parameter NUM_ICACHE_LINES=32, parameter ASSOC=2, parameter 
     output reg[27:0] OUT_lookupAddress,
     output wire OUT_stall,
     
-    output CTRL_MemC OUT_memc,
-    input STAT_MemC IN_memc
+    output MemController_Req OUT_memc,
+    input MemController_Res IN_memc
 );
 
 localparam LEN = NUM_ICACHE_LINES / ASSOC;

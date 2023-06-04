@@ -1,34 +1,3 @@
-typedef enum logic[2:0]
-{
-    MEMC_NONE,
-    MEMC_CP_CACHE_TO_EXT,
-    MEMC_CP_EXT_TO_CACHE,
-    MEMC_PAGE_WALK,
-    MEMC_READ_SINGLE,
-    MEMC_WRITE_SINGLE
-} MemCCmd;
-
-typedef struct packed
-{
-    MemCCmd cmd;
-    logic[31:0] data;
-    logic[9:0] sramAddr;
-    logic[29:0] extAddr;
-    logic[0:0] cacheID;
-    logic[2:0] rqID;
-} CTRL_MemC;
-
-typedef struct packed
-{
-    logic[9:0] progress;
-    
-    logic[31:0] result;
-    logic resultValid;
-    
-    logic[2:0] rqID;
-    logic busy;
-} STAT_MemC;
-
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
@@ -38,26 +7,6 @@ typedef logic[2:0] FetchOff_t;
 typedef logic[11:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 typedef logic[1:0] RetStackIdx_t;
-
-typedef struct packed
-{
-    logic[30:0] addr;
-    RetStackIdx_t idx;
-    logic isCall;
-    logic isRet;
-    logic compr;
-    logic cleanRet;
-    logic valid;
-} ReturnDecUpd;
-
-typedef struct packed
-{
-    logic[30:0] dst;
-    FetchOff_t offs;
-    logic compr;
-    logic isJump;
-    logic valid;
-} PredBranch;
 
 typedef enum logic[5:0]
 {
@@ -331,6 +280,46 @@ typedef enum logic[1:0]
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
+typedef enum logic[2:0]
+{
+    MEMC_NONE,
+    MEMC_CP_CACHE_TO_EXT,
+    MEMC_CP_EXT_TO_CACHE,
+    MEMC_PAGE_WALK,
+    MEMC_READ_SINGLE,
+    MEMC_WRITE_SINGLE
+} MemC_Cmd;
+
+typedef struct packed
+{
+    MemC_Cmd cmd;
+    logic[31:0] data;
+    logic[9:0] sramAddr;
+    logic[29:0] extAddr;
+    logic[0:0] cacheID;
+    logic[2:0] rqID;
+} MemController_Req;
+
+typedef struct packed
+{
+    logic[9:0] progress;
+    
+    logic[31:0] result;
+    logic resultValid;
+    
+    logic[2:0] rqID;
+    logic busy;
+} MemController_Res;
+
+typedef struct packed
+{
+    logic[30:0] dst;
+    FetchOff_t offs;
+    logic compr;
+    logic isJump;
+    logic valid;
+} PredBranch;
+
 typedef struct packed
 {
     logic predicted;
@@ -371,6 +360,17 @@ typedef struct packed
     RetStackIdx_t rIdx;
     logic taken;
 } BranchProv;
+
+typedef struct packed
+{
+    logic[30:0] addr;
+    RetStackIdx_t idx;
+    logic isCall;
+    logic isRet;
+    logic compr;
+    logic cleanRet;
+    logic valid;
+} ReturnDecUpdate;
 
 typedef struct packed
 {
@@ -549,7 +549,7 @@ typedef struct packed
     PrivLevel priv;
     
     logic valid;
-} PageWalkRq;
+} PageWalk_Req;
 
 typedef struct packed
 {
@@ -559,9 +559,22 @@ typedef struct packed
     logic isSuperPage;
     logic[2:0] rwx;
     logic[1:0] rqID;
-    logic valid;
     logic busy;
-} PageWalkRes;
+    logic valid;
+} PageWalk_Res;
+
+typedef struct packed
+{
+    logic[19:0] vpn;
+    logic valid;
+} TLB_Req;
+
+typedef struct packed
+{
+    logic[19:0] ppn;
+    logic fault;
+    logic hit;
+} TLB_Res;
 
 typedef struct packed
 {
@@ -683,7 +696,7 @@ typedef struct packed
     logic[1:0] cbie;
     logic cbcfe;
     PrivLevel priv;
-} STAT_VMem;
+} VirtMemState;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
@@ -698,30 +711,6 @@ interface IF_CSR_MMIO;
     (
         output mtime,
         output mtimecmp
-    );
-endinterface
-
-interface IF_MemC;
-    logic ce;
-    logic we;
-    
-    logic[0:0] cacheID;
-    logic[9:0] sramAddr;
-    logic[29:0] extAddr;
-    
-    logic[9:0] progress;
-    logic busy;
-    
-    modport CON
-    (
-        input ce, we, cacheID, sramAddr, extAddr,
-        output progress, busy
-    );
-    
-    modport CORE
-    (
-        output ce, we, cacheID, sramAddr, extAddr,
-        input progress, busy
     );
 endinterface
 
@@ -783,16 +772,3 @@ interface IF_MMIO();
         output rdata, rbusy, wbusy
     );
 endinterface
-
-typedef struct packed
-{
-    logic[19:0] vpn;
-    logic valid;
-} TLB_Req;
-
-typedef struct packed
-{
-    logic[19:0] ppn;
-    logic fault;
-    logic hit;
-} TLB_Res;

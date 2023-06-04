@@ -9,9 +9,9 @@ module AGU
     
     input BranchProv IN_branch,
     
-    input STAT_VMem IN_vmem,
-    output PageWalkRq OUT_pw,
-    input PageWalkRes IN_pw,
+    input VirtMemState IN_vmem,
+    output PageWalk_Req OUT_pw,
+    input PageWalk_Res IN_pw,
 
     output TLB_Req OUT_tlb,
     input TLB_Res IN_tlb,
