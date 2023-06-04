@@ -269,7 +269,7 @@ typedef enum logic[5:0]
 
 typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 
-typedef enum bit[3:0] 
+typedef enum logic[3:0] 
 {
     // Flags that do not cause a flush or trap
     FLAGS_NONE, FLAGS_BRANCH,
@@ -297,7 +297,7 @@ typedef enum bit[3:0]
 
 // Floating Point Ops use a different flag encoding to store
 // floating point exceptions
-typedef enum bit[3:0] 
+typedef enum logic[3:0] 
 {
     FLAGS_FP_NX = FLAGS_LD_MA, 
     FLAGS_FP_UF = FLAGS_LD_AF, 
@@ -333,43 +333,43 @@ typedef enum logic[1:0]
 
 typedef struct packed
 {
-    bit predicted;
-    bit taken;
-    bit[2:0] tageID;
-    bit altPred;
+    logic predicted;
+    logic taken;
+    logic[2:0] tageID;
+    logic altPred;
     RetStackIdx_t rIdx;
-    bit isJump;
+    logic isJump;
 } BranchPredInfo;
 
 typedef struct packed
 {
-    bit[31:0] src;
-    bit[31:0] dst;
-    bit isJump;
-    bit isCall;
-    bit compressed;
-    bit clean;
-    bit valid;
+    logic[31:0] src;
+    logic[31:0] dst;
+    logic isJump;
+    logic isCall;
+    logic compressed;
+    logic clean;
+    logic valid;
 } BTUpdate;
 
 typedef struct packed
 {
-    bit[30:0] src;
-    bit[30:0] dst;
-    bit valid;
+    logic[30:0] src;
+    logic[30:0] dst;
+    logic valid;
 } IndirBranchInfo;
 
 typedef struct packed
 {
-    bit[31:0] dstPC;
+    logic[31:0] dstPC;
     SqN sqN;
     SqN storeSqN;
     SqN loadSqN;
-    bit flush;
+    logic flush;
     FetchID_t fetchID;
     BHist_t history;
     RetStackIdx_t rIdx;
-    bit taken;
+    logic taken;
 } BranchProv;
 
 typedef struct packed
@@ -383,8 +383,8 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit[30:0] pc;
-    bit[2:0] branchPos;
+    logic[30:0] pc;
+    logic[2:0] branchPos;
     BranchPredInfo bpi;
     BHist_t hist;
 } PCFileEntry;
@@ -500,12 +500,12 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit[31:0] result;
+    logic[31:0] result;
     Tag tagDst;
     SqN sqN;
     Flags flags;
     logic doNotCommit;
-    bit valid;
+    logic valid;
 } RES_UOp;
 
 typedef enum logic[1:0] 
@@ -611,15 +611,15 @@ typedef struct packed
 
 typedef struct packed
 {
-    bit allowInterrupt;
+    logic allowInterrupt;
     Flags flags;
     Tag tag;
     SqN sqN;
     RegNm name;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
-    bit compressed;
-    bit valid;
+    logic compressed;
+    logic valid;
     
 } Trap_UOp;
 

@@ -20,13 +20,13 @@ module BranchTargetBuffer
 
 typedef struct packed
 {
-    bit isJump;
-    bit isCall; // TODO unify fields
-    bit compr;
-    bit used;
-    bit valid;
-    bit[30:0] dst;
-    bit[`BTB_TAG_SIZE-1:0] src;
+    logic isJump;
+    logic isCall; // TODO unify fields
+    logic compr;
+    logic used;
+    logic valid;
+    logic[30:0] dst;
+    logic[`BTB_TAG_SIZE-1:0] src;
 } BTBEntry;
 
 localparam LENGTH = `BTB_ENTRIES / `BTB_ASSOC;

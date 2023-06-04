@@ -3,13 +3,13 @@ typedef struct packed
 {
     Flags flags;
     Tag tag;
-    bit sqN_msb;
+    logic sqN_msb;
     RegNm name; // also used to differentiate between decode-time exceptions (these have no dst anyways)
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
-    bit isFP;
-    bit compressed;
-    bit valid;
+    logic isFP;
+    logic compressed;
+    logic valid;
 } ROBEntry;
 
 module ROB

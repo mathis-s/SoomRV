@@ -21,16 +21,16 @@ module Multiply
 
 typedef struct packed
 {
-    bit[31:0] srcA;
-    bit[31:0] srcB;
-    bit[63:0] res;
-    bit invert;
-    bit high;
+    logic[31:0] srcA;
+    logic[31:0] srcB;
+    logic[63:0] res;
+    logic invert;
+    logic high;
     
     Tag tagDst;
     RegNm nmDst;
     SqN sqN;
-    bit valid;
+    logic valid;
 } MulPS;
 
 

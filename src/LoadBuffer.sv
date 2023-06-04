@@ -29,13 +29,13 @@ typedef struct packed
 {
     SqN sqN;
     Tag tagDst;
-    bit[TAG_SIZE-1:0] highLdSqN;
-    bit[1:0] size;
-    bit[31:0] addr;
-    bit signExtend;
-    bit doNotCommit; // could encode doNotCommit as size == 3
-    bit issued;
-    bit valid;
+    logic[TAG_SIZE-1:0] highLdSqN;
+    logic[1:0] size;
+    logic[31:0] addr;
+    logic signExtend;
+    logic doNotCommit; // could encode doNotCommit as size == 3
+    logic issued;
+    logic valid;
 } LBEntry;
 
 LBEntry entries[NUM_ENTRIES-1:0];

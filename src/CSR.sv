@@ -281,35 +281,35 @@ reg[63:0] mhpmcounter5; // total mispredicts
 
 typedef struct packed
 {
-    bit sd; // state dirty (0)
-    bit[7:0] wpri23; // (0)
-    bit tsr; // trap sret
-    bit tw; // timeout wait (1 -> illegal instr on wfi)
-    bit tvm; // trap virtual memory
-    bit mxr; // make executable readable, 0 if s mode not supported
-    bit sum; // permit supervisor user memory access
-    bit mprv; // memory privilege (1 -> ld/st memory access via mode in MPP), 0 if u mode not supported
-    bit[1:0] xs; // extended register state (0)
-    bit[1:0] fs_; // floating point register state (0)
+    logic sd; // state dirty (0)
+    logic[7:0] wpri23; // (0)
+    logic tsr; // trap sret
+    logic tw; // timeout wait (1 -> illegal instr on wfi)
+    logic tvm; // trap virtual memory
+    logic mxr; // make executable readable, 0 if s mode not supported
+    logic sum; // permit supervisor user memory access
+    logic mprv; // memory privilege (1 -> ld/st memory access via mode in MPP), 0 if u mode not supported
+    logic[1:0] xs; // extended register state (0)
+    logic[1:0] fs_; // floating point register state (0)
     PrivLevel mpp; // machine prior privilege
-    bit[1:0] vs; // vector register state (0)
-    bit spp; // supervisor prior privilege 
-    bit mpie; // machine prior interrupt enable
-    bit ube; // user big endian (0)
-    bit spie; // supervisor prior interrupt enable
-    bit wpri4; // (0)
-    bit mie; // machine interrupt enable
-    bit wpri2; // (0)
-    bit sie; // supervisor interrupt enable
-    bit wpri0; // (0)
+    logic[1:0] vs; // vector register state (0)
+    logic spp; // supervisor prior privilege 
+    logic mpie; // machine prior interrupt enable
+    logic ube; // user big endian (0)
+    logic spie; // supervisor prior interrupt enable
+    logic wpri4; // (0)
+    logic mie; // machine interrupt enable
+    logic wpri2; // (0)
+    logic sie; // supervisor interrupt enable
+    logic wpri0; // (0)
 } MStatus_t;
 
 MStatus_t mstatus;
 
 typedef struct packed
 {
-    bit[29:0] base;
-    bit[1:0] mode;
+    logic[29:0] base;
+    logic[1:0] mode;
 } TVec_t;
 
 TVec_t mtvec;

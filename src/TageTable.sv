@@ -31,9 +31,9 @@ module TageTable
 
 typedef struct packed
 {
-    bit[TAG_SIZE-1:0] tag;
-    bit[USF_SIZE-1:0] useful;
-    bit[CNT_SIZE-1:0] counter;
+    logic[TAG_SIZE-1:0] tag;
+    logic[USF_SIZE-1:0] useful;
+    logic[CNT_SIZE-1:0] counter;
 } TageEntry;
 
 TageEntry entries[SIZE-1:0];
@@ -92,7 +92,7 @@ always_ff@(posedge clk) begin
         end
     end
     
-    // Clear low or high bit of useful counters alternatingly periodically
+    // Clear low or high logic of useful counters alternatingly periodically
     if (decrCnt == 0) begin
         for (integer i = 0; i < SIZE; i=i+1)
             entries[i].useful[decrBit] <= 0;

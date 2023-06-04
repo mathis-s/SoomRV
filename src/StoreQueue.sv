@@ -1,12 +1,12 @@
 typedef struct packed
 {
-    bit valid;
-    bit ready;
+    logic valid;
+    logic ready;
     SqN sqN;
-    bit[29:0] addr;
-    bit[31:0] data;
+    logic[29:0] addr;
+    logic[31:0] data;
     // wmask == 0 is escape sequence for special operations
-    bit[3:0] wmask;
+    logic[3:0] wmask;
 } SQEntry;
 
 module StoreQueue

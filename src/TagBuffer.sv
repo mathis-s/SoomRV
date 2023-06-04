@@ -1,7 +1,7 @@
 typedef struct packed
 {
-    bit used;
-    bit committed;
+    logic used;
+    logic committed;
 } TagBufEntry;
 
 module TagBuffer

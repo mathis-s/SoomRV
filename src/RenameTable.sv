@@ -37,8 +37,8 @@ localparam NUM_TAGS = (1 << (TAG_SIZE - 1));
 
 typedef struct packed
 {
-    bit[TAG_SIZE-1:0] comTag;
-    bit[TAG_SIZE-1:0] specTag;
+    logic[TAG_SIZE-1:0] comTag;
+    logic[TAG_SIZE-1:0] specTag;
 } RATEntry;
 
 RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
