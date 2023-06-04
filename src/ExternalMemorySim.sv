@@ -39,14 +39,12 @@ always_ff@(posedge clk) begin
                 addr <= inBus;
                 // Write
                 if (IN_bus[31] == 1) begin
-                    //waitCycles <= 0;
                     state <= 2;
                 end
                 // Read
                 else begin
                     if (IN_bus[29] == 0) begin // MMIO read
                         outBus <= mmioDummy;
-                        mmioDummy <= mmioDummy + 1;
                         OUT_stall <= 0;
                         state <= 0;
                         oen <= 1;
@@ -86,7 +84,7 @@ always_ff@(posedge clk) begin
         3: begin
             if (en) begin
                 outBus <= mem[addr[$clog2(SIZE)-1:0]];
-                addr[29:0] <= addr[29:0] + 1;
+                addr[28:0] <= addr[28:0] + 1;
                 oen <= 1;
             end
             else begin 
