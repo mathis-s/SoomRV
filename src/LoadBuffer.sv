@@ -147,18 +147,31 @@ always_ff@(posedge clk) begin
             end
         end
         else begin
-            // Issue Late Ops
-            if (entries[deqIndex].valid && !entries[deqIndex].issued && commitSqN == entries[deqIndex].sqN && !lateLoadUOp.valid && IN_SQ_done) begin
-                // can we just pretend that the op was committed here to speed things up? commit should be guaranteed.
+            // Issue Late Loads
+            // We do not have the same problem as below with multiple commits here, 
+            // as the ROB can't commit beyond the load we issue with this,
+            // and will need more than a cycle after this runs to commit anything again.
+            if (entries[deqIndex].valid && !entries[deqIndex].issued && 
+                commitSqN == entries[deqIndex].sqN && !lateLoadUOp.valid && IN_SQ_done
+            ) begin
                 lateLoadUOp <= entries[deqIndex];
                 entries[deqIndex].issued <= 1;
             end
             
-            // Delete entries that have been committed
-            else if (entries[deqIndex].valid && entries[deqIndex].issued && $signed(commitSqN - entries[deqIndex].sqN) > 0) begin
-                assert(entries[deqIndex].issued);
-                entries[deqIndex].valid <= 0;
-                baseIndex = baseIndex + 1;
+            // Delete entries that have been committed. To keep pace with ROB commit speed, 
+            // we have to be able to delete 4 entries per cycle. The alternative to this
+            // would be marking entries as "committed", and ignoring their SqN then.
+            // TODO: Analyze, what's better after synthesis?
+            else begin
+                reg temp = 1;
+                for (integer i = 0; i < 4; i=i+1) begin
+                    reg[$clog2(NUM_ENTRIES)-1:0] index = deqIndex + i[$clog2(NUM_ENTRIES)-1:0];
+                    if (temp && entries[index].valid && entries[index].issued && $signed(commitSqN - entries[index].sqN) > 0) begin
+                        entries[index].valid <= 0;
+                        baseIndex = baseIndex + 1;
+                    end
+                    else temp = 0;
+                end
             end
         end
         // Insert new entries, check stores

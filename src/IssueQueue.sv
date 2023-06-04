@@ -73,7 +73,6 @@ typedef struct packed
 } R_ST_UOp;
 
 R_ST_UOp queue[SIZE-1:0];
-reg valid[SIZE-1:0];
 
 reg[$clog2(SIZE):0] insertIndex;
 reg[32:0] reservedWBs;
