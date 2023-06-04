@@ -1,9 +1,6 @@
 //#define TRACE
 //#define DUMP_FLAT
-#include "riscv/csrs.h"
-#include "riscv/trap.h"
-#include <memory>
-// #define KONATA
+//#define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -26,6 +23,7 @@
 #include <array>
 #include <cstring>
 #include <map>
+#include <memory>
 
 #include "riscv/cfg.h"
 #include "riscv/decode.h"
@@ -35,6 +33,9 @@
 #include "riscv/mmu.h"
 #include "riscv/processor.h"
 #include "riscv/simif.h"
+#include "riscv/csrs.h"
+#include "riscv/memtracer.h"
+#include "riscv/trap.h"
 
 struct Inst
 {
@@ -182,7 +183,7 @@ class SpikeSimif : public simif_t
         processor->set_mmu_capability(IMPL_MMU_SV32);
         processor->set_debug(false);
         processor->get_state()->XPR.reset();
-        processor->set_privilege(3);
+        processor->set_privilege(3, false);
         processor->enable_log_commits();
 
         std::array csrs_to_reset = {
@@ -235,10 +236,14 @@ class SpikeSimif : public simif_t
         return *cfg;
     }
 
-    uint32_t get_phy_addr (uint32_t addr)
+    uint32_t get_phy_addr (uint32_t addr, access_type type)
     {
-        uint32_t satp = processor->get_csr(CSR_SATP);
-        if (!(satp >> 31)) return addr;
+        try
+        {
+            return (uint32_t)processor->get_mmu()->translate(
+                processor->get_mmu()->generate_access_info(addr, type, (xlate_flags_t){}), 1);
+        } catch(mem_trap_t) {}
+        return addr;
     }
 
     virtual int cosim_instr(const Inst& inst)
@@ -246,13 +251,13 @@ class SpikeSimif : public simif_t
 
         uint32_t initialSpikePC = get_pc();
         uint32_t instSIM;
-
+    
         try
         {
             instSIM = processor->get_mmu()->load_insn(initialSpikePC).insn.bits();
         } catch (mem_trap_t) { instSIM = 0; }
 
-        // failed sc.w (TODO: what if address is invalid?)
+        // failed sc.w
         if (((instSIM & 0b11111'00'00000'00000'111'00000'1111111) == 0b00011'00'00000'00000'010'00000'0101111) &&
             ReadRegister(inst.rd) != 0)
         {
@@ -266,10 +271,7 @@ class SpikeSimif : public simif_t
             processor->get_state()->minstret->bump(1);
         }
         else
-        {
             processor->step(1);
-        }
-        
 
         // TODO: Use this for adjusting WARL behaviour
         auto writes = processor->get_state()->log_reg_write;
@@ -283,33 +285,20 @@ class SpikeSimif : public simif_t
         auto mem_reads = processor->get_state()->log_mem_read;
         for (auto read : mem_reads)
         {
-            //try
-            //{
-            //    std::get<0>(read) = (uint32_t)processor->get_mmu()->translate(std::get<0>(read), 1, LOAD, 0);
-            //} catch(mem_trap_t) {}
+            std::get<0>(read) = get_phy_addr(std::get<0>(read), LOAD);
 
             uint32_t addr = std::get<0>(read);
             addr &= ~3;
-
-            switch (addr)
-            {
-            case 0x1100bff8:
-            case 0x1100bffc:
-            case 0x11004000:
-            case 0x11004004:
-            case 0x10000000:
-            case 0x10000004:
-            case 0x11100000:
-            case 0x11200000:
+            
+            // MMIO is passed through
+            if (addr >= 0x10000000 && addr < 0x12000000)
                 mem_pass_thru = true;
-                break; 
-            }
         }
         
         bool writeValid = true;
         for (auto write : processor->get_state()->log_mem_write)
         {
-
+            std::get<0>(write) = get_phy_addr(std::get<0>(write), STORE);
         }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
@@ -362,61 +351,17 @@ class SpikeSimif : public simif_t
     }
 
     void take_trap(bool interrupt, reg_t cause, reg_t epc, bool delegate)
-    {
-        // taken from spike riscv/processor.cc: take_trap (which is private ...)
-        auto& state = *processor->get_state();
-        if (delegate)
+    {   
+        class soomrv_trap_t : public trap_t
         {
-            processor->set_virt(false);
-            reg_t vector = (state.stvec->read() & 1) && interrupt ? 4 * cause : 0;
-            state.pc = (state.stvec->read() & ~(reg_t)1) + vector;
-            state.scause->write(cause | (interrupt ? 0x80000000 : 0));
-            state.sepc->write(epc);
-            state.stval->write(0);
-            //state.htval->write(t.get_tval2());
-            //state.htinst->write(t.get_tinst());
+          public:
+            bool has_tval() override { return true; }
+            reg_t get_tval() override { return 0; }
+            soomrv_trap_t(reg_t which) : trap_t(which) {}
+        };
 
-            reg_t s = state.sstatus->read();
-            s = set_field(s, MSTATUS_SPIE, get_field(s, MSTATUS_SIE));
-            s = set_field(s, MSTATUS_SPP, state.prv);
-            s = set_field(s, MSTATUS_SIE, 0);
-            state.sstatus->write(s);
-            /*if (extension_enabled('H')) {
-            s = state.hstatus->read();
-            if (curr_virt)
-                s = set_field(s, HSTATUS_SPVP, state.prv);
-            s = set_field(s, HSTATUS_SPV, curr_virt);
-            s = set_field(s, HSTATUS_GVA, t.has_gva());
-            state.hstatus->write(s);
-            }*/
-            processor->set_privilege(PRV_S);
-        }
-        else
-        {
-            processor->set_virt(false);
-            const reg_t vector = (state.mtvec->read() & 1) && interrupt ? 4 * cause : 0;
-            const reg_t trap_handler_address = (state.mtvec->read() & ~(reg_t)1) + vector;
-            // RNMI exception vector is implementation-defined.  Since we don't model
-            // RNMI sources, the feature isn't very useful, so pick an invalid address.
-            const reg_t rnmi_trap_handler_address = 0;
-            const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
-            state.pc = !nmie ? rnmi_trap_handler_address : trap_handler_address;
-            state.mepc->write(epc);
-            state.mcause->write(cause | (interrupt ? 0x80000000 : 0));
-            state.mtval->write(0);
-            // state.mtval2->write(0);
-            // state.mtinst->write(t.get_tinst());
-
-            reg_t s = state.mstatus->read();
-            s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
-            s = set_field(s, MSTATUS_MPP, state.prv);
-            s = set_field(s, MSTATUS_MIE, 0);
-            // s = set_field(s, MSTATUS_MPV, curr_virt);
-            // s = set_field(s, MSTATUS_GVA, t.has_gva());
-            state.mstatus->write(s);
-            if (state.mstatush) state.mstatush->write(s >> 32); // log mstatush change
-            processor->set_privilege(PRV_M);
-        }
+        soomrv_trap_t trap(cause | (interrupt ? 0x80000000 : 0));
+        processor->take_trap(trap, epc);
     }
 
     std::string disasm (uint32_t instr)
