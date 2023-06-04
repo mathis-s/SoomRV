@@ -286,7 +286,7 @@ typedef struct packed
     bit tsr; // trap sret
     bit tw; // timeout wait (1 -> illegal instr on wfi)
     bit tvm; // trap virtual memory
-    bit mxr; // make exectuable readable, 0 if s mode not supported
+    bit mxr; // make executable readable, 0 if s mode not supported
     bit sum; // permit supervisor user memory access
     bit mprv; // memory privilege (1 -> ld/st memory access via mode in MPP), 0 if u mode not supported
     bit[1:0] xs; // extended register state (0)
