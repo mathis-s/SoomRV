@@ -22,7 +22,7 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 2. Run `make setup` to build submodules.
 3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces)
 4. Run `./obj_dir/VTop <assembly file>` to execute the code in `<assembly file>`.  
-For example, run `./obj_dir/VTop test_programs/dhry_1.s 2>/dev/null` to run Dhrystone (`stderr` contains Spike debug output).
+For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone.
 
 ## License
 SoomRV is released under the MIT License. Use of this source code is governed by a MIT-style license that can be found in the `LICENSE` file.
@@ -30,4 +30,3 @@ SoomRV is released under the MIT License. Use of this source code is governed by
 ### External Source Code
 * `riscv-isa-sim` (aka `Spike`): released under the 3-Clause BSD License, used in conjunction with the simulator.
 * `hardfloat`: released under the 3-Clause BSD License.
-
