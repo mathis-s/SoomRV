@@ -70,7 +70,8 @@ always_ff@(posedge clk) begin
             if (en) begin
                 // MMIO
                 if (addr[29] == 0) begin
-                    mmioDummy <= inBus;
+                    for (integer i = 0; i < 4; i=i+1)
+                        if (addr[29-4+i]) mmioDummy[8*i+:8] <= inBus[8*i+:8];
                 end
                 else begin
                     mem[addr[$clog2(SIZE)-1:0]] <= inBus;

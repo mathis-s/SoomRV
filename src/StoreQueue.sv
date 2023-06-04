@@ -102,6 +102,8 @@ always_comb begin
     end
 end
 
+assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
+
 reg flushing;
 assign OUT_flush = flushing;
 reg doingEnqueue;
@@ -126,12 +128,9 @@ always_ff@(posedge clk) begin
         OUT_empty <= 1;
         OUT_uopSt.valid <= 0;
         flushing <= 0;
-        OUT_done <= 1;
     end
     
     else begin
-        
-        OUT_done <= (empty || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
 
         // Set entries of committed instructions to ready
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -162,8 +161,6 @@ always_ff@(posedge clk) begin
                 if ($signed(IN_curSqN - entries[i].sqN) > 0)
                     entries[i-1].ready <= 1;
             end
-            
-            OUT_done <= 0;
 
             evicted[1] <= entries[0];
             evicted[0] <= evicted[1];

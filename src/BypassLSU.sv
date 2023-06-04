@@ -38,7 +38,8 @@ enum logic[2:0]
 } state;
 
 always_comb begin
-    OUT_ldStall = IN_uopLd.valid && IN_uopLdEn && state != IDLE;
+    OUT_stStall = (IN_uopSt.valid && IN_uopStEn && state != IDLE);
+    OUT_ldStall = IN_uopLd.valid && IN_uopLdEn && (state != IDLE || (IN_uopSt.valid && !OUT_stStall));
 
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
@@ -48,10 +49,6 @@ always_comb begin
         OUT_uopLd = activeLd;
         OUT_ldData = result;
     end
-end
-
-always_comb begin
-    OUT_stStall = (IN_uopSt.valid && IN_uopStEn && state != IDLE) || (IN_uopLdEn && !OUT_ldStall);
 end
 
 always_ff@(posedge clk) begin
@@ -67,32 +64,39 @@ always_ff@(posedge clk) begin
             activeLd <= 'x;
             activeLd.valid <= 0;
         end
-
+        
         case (state)
             default: begin
                 state <= IDLE;
-                if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall && 
-                    (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
-                ) begin
-                    activeLd <= IN_uopLd;
-
-                    OUT_memc.cmd <= MEMC_READ_SINGLE;
-                    OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= IN_uopLd.addr[31:2];
-                    OUT_memc.cacheID <= 'x;
-                    OUT_memc.rqID <= RQ_ID;
-
-                    state <= LOAD_RQ;
-                end
-                else if (IN_uopSt.valid && IN_uopStEn && !OUT_stStall) begin
+                if (IN_uopSt.valid && IN_uopStEn && !OUT_stStall) begin
                     OUT_memc.cmd <= MEMC_WRITE_SINGLE;
                     OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= IN_uopSt.addr[31:2];
+                    OUT_memc.extAddr <= {/*MMIO*/ 1'b0, IN_uopSt.wmask, /*ADDR*/ IN_uopSt.addr[26:2]};
                     OUT_memc.cacheID <= 'x;
                     OUT_memc.rqID <= RQ_ID;
                     OUT_memc.data <= IN_uopSt.data;
 
                     state <= STORE_RQ;
+                end
+                else if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall && 
+                    (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
+                ) begin
+                    reg[3:0] rmask;
+    
+                    case (IN_uopLd.size)
+                        0: rmask = (4'b1 << IN_uopLd.addr[1:0]);
+                        1: rmask = ((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
+                        default: rmask = 4'b1111;
+                    endcase
+
+                    OUT_memc.cmd <= MEMC_READ_SINGLE;
+                    OUT_memc.sramAddr <= 'x;
+                    OUT_memc.extAddr <= {/*MMIO*/ 1'b0, rmask, /*ADDR*/ IN_uopLd.addr[26:2]};
+                    OUT_memc.cacheID <= 'x;
+                    OUT_memc.rqID <= RQ_ID;
+
+                    state <= LOAD_RQ;
+                    activeLd <= IN_uopLd;
                 end
             end
             LOAD_RQ: begin
