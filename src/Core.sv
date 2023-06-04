@@ -18,7 +18,9 @@ module Core
 
 
 always_comb begin
-    if (CC_MC_if.cmd != MEMC_NONE)
+    if (LSU_MC_if.cmd != MEMC_NONE)
+        OUT_memc = LSU_MC_if;
+    else if (CC_MC_if.cmd != MEMC_NONE)
         OUT_memc = CC_MC_if;
     else
         OUT_memc = PC_MC_if;
@@ -607,6 +609,8 @@ LoadBuffer lb
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
 
+    .IN_SQ_done(SQ_done),
+
     .OUT_uopLd(LB_uopLd),
     
     .IN_branch(branch),
@@ -619,6 +623,7 @@ wire CSR_we;
 wire[31:0] CSR_dataOut;
 
 wire SQ_empty;
+wire SQ_done;
 ST_UOp SQ_uop;
 wire[3:0] SQ_lookupMask;
 wire[31:0] SQ_lookupData;
@@ -628,9 +633,10 @@ StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
-    .IN_disable(CC_storeStall),
+    .IN_stallSt(CC_storeStall),
     .IN_stallLd(LSU_ldStall),
     .OUT_empty(SQ_empty),
+    .OUT_done(SQ_done),
     
     .IN_uopSt(AGU_ST_uop),
     .IN_uopLd(CC_SQ_uopLd),
@@ -653,6 +659,8 @@ Tag LSU_loadFwdTag;
 wire LSU_ldStall;
 wire LSU_stStall;
 PW_LD_RES_UOp LSU_PW_ldUOp;
+
+CTRL_MemC LSU_MC_if;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -664,12 +672,15 @@ LoadStoreUnit lsu
     
     .IN_uopLd(CC_uopLd),
     .IN_uopSt(CC_uopSt),
-
-    .IF_mem(IF_mem),
-    .IF_mmio(IF_mmio),
     
     .IN_SQ_lookupMask(SQ_lookupMask),
     .IN_SQ_lookupData(SQ_lookupData),
+
+    .OUT_memc(LSU_MC_if),
+    .IN_memc(IN_memc),
+    
+    .IF_mem(IF_mem),
+    .IF_mmio(IF_mmio),
     
     .OUT_uopLd(wbUOp[2]),
     .OUT_uopPwLd(LSU_PW_ldUOp),

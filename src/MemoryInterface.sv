@@ -88,7 +88,7 @@ always_ff@(posedge clk) begin
                 waitCycles <= waitCycles - 1;
                 if (waitCycles == 1) begin
                     OUT_EXT_oen <= isWrite;
-                    if (lenCnt <= 2) OUT_EXT_en <= 0;
+                    if (lenCnt <= 2 && !isWrite) OUT_EXT_en <= 0;
                 end
             end
             else begin
@@ -110,7 +110,10 @@ always_ff@(posedge clk) begin
                         if (lenCnt <= 2) 
                             OUT_EXT_en <= 0;
 
-                        if (lenCnt == 1) active <= 0;
+                        if (lenCnt == 1) begin
+                            active <= 0;
+                            OUT_EXT_oen <= 1;
+                        end
                         else lenCnt <= lenCnt - 1;
                     end 
                 end

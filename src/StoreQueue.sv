@@ -16,9 +16,10 @@ module StoreQueue
 (
     input wire clk,
     input wire rst,
-    input wire IN_disable,
+    input wire IN_stallSt,
     input wire IN_stallLd,
     output reg OUT_empty,
+    output reg OUT_done,
     
     input AGU_UOp IN_uopSt,
     input LD_UOp IN_uopLd,
@@ -101,11 +102,12 @@ always_comb begin
     end
 end
 
+assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
+
 reg flushing;
 assign OUT_flush = flushing;
 reg doingEnqueue;
 always_ff@(posedge clk) begin
-    
     didCSRwrite <= 0;
     doingEnqueue = 0;
     if (!IN_stallLd) begin
@@ -129,15 +131,16 @@ always_ff@(posedge clk) begin
     end
     
     else begin
-        
+
         // Set entries of committed instructions to ready
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if ($signed(IN_curSqN - entries[i].sqN) > 0)
+            if ($signed(IN_curSqN - entries[i].sqN) > 0) begin
                 entries[i].ready <= 1;
+            end
         end
         
         // Dequeue
-        if (!IN_disable && entries[0].valid && !IN_branch.taken && entries[0].ready &&
+        if (!IN_stallSt && entries[0].valid && !IN_branch.taken && entries[0].ready &&
             // Don't issue Memory Mapped IO ops while IO is not ready
             (!(didCSRwrite) || `IS_MMIO_PMA_W(entries[0].addr))) begin
                 
@@ -158,11 +161,11 @@ always_ff@(posedge clk) begin
                 if ($signed(IN_curSqN - entries[i].sqN) > 0)
                     entries[i-1].ready <= 1;
             end
-                
+
             evicted[1] <= entries[0];
             evicted[0] <= evicted[1];
         end
-        else if (!IN_disable) OUT_uopSt.valid <= 0;
+        else if (!IN_stallSt) OUT_uopSt.valid <= 0;
         
         // Invalidate
         if (IN_branch.taken) begin

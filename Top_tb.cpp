@@ -300,6 +300,7 @@ class SpikeSimif : public simif_t
             case 0x10000000:
             case 0x10000004:
             case 0x11100000:
+            case 0x11200000:
                 mem_pass_thru = true;
                 break; 
             }

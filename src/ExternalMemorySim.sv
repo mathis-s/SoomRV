@@ -25,7 +25,7 @@ reg[1:0] state = 2'b00;
 initial state = 0;
 
 reg[2:0] waitCycles;
-
+reg[31:0] mmioDummy = 0;
 
 always_ff@(posedge clk) begin
     
@@ -34,21 +34,29 @@ always_ff@(posedge clk) begin
     case (state)
         // lookup
         0: begin
+            oen <= 0;
             if (en) begin
                 addr <= inBus;
                 // Write
                 if (IN_bus[31] == 1) begin
-                    //waitCycles <= 0;
                     state <= 2;
                 end
                 // Read
                 else begin
-                    // Request one delay cycle such that the read isn't comb
-                    OUT_stall <= 1;
-                    state <= 3;
+                    if (IN_bus[29] == 0) begin // MMIO read
+                        outBus <= mmioDummy;
+                        OUT_stall <= 0;
+                        state <= 0;
+                        oen <= 1;
+                    end
+                    else begin
+                        // Request one delay cycle such that the read isn't comb
+                        OUT_stall <= 1;
+                        state <= 3;
+                        oen <= 1;
+                    end
                 end
             end
-            oen <= 0;
         end
         
         // wait cycles
@@ -60,8 +68,15 @@ always_ff@(posedge clk) begin
         // write
         2: begin
             if (en) begin
-                mem[addr[$clog2(SIZE)-1:0]] <= inBus;
-                addr[29:0] <= addr[29:0] + 1;
+                // MMIO
+                if (addr[29] == 0) begin
+                    for (integer i = 0; i < 4; i=i+1)
+                        if (addr[29-4+i]) mmioDummy[8*i+:8] <= inBus[8*i+:8];
+                end
+                else begin
+                    mem[addr[$clog2(SIZE)-1:0]] <= inBus;
+                    addr[28:0] <= addr[28:0] + 1;
+                end
             end
             else state <= 0;
         end
@@ -70,7 +85,7 @@ always_ff@(posedge clk) begin
         3: begin
             if (en) begin
                 outBus <= mem[addr[$clog2(SIZE)-1:0]];
-                addr[29:0] <= addr[29:0] + 1;
+                addr[28:0] <= addr[28:0] + 1;
                 oen <= 1;
             end
             else begin 

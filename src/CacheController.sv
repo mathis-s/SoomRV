@@ -188,18 +188,21 @@ end
 CommonUOp outUops[TOTAL_UOPS-1:0];
 ST_UOp outStUOp_r;
 LD_UOp outLdUOp_r;
-always_comb begin
+reg[1:0] invalidate;
 
+always_comb begin
     OUT_uopLd = outLdUOp_r;
     OUT_uopLd.valid = outUops[0].valid;
     OUT_uopLd.addr = outUops[0].addr;
     OUT_uopLd.isMMIO = outUops[0].isMMIO;
     OUT_uopLd.external = outUops[0].external;
+    invalidate[0] = !IN_stall[0] || (IN_branch.taken && $signed(outLdUOp_r.sqN - IN_branch.sqN) >= 0);
 
     OUT_uopSt = outStUOp_r;
     OUT_uopSt.valid = outUops[1].valid;
     OUT_uopSt.addr = outUops[1].addr;
     OUT_uopSt.isMMIO = outUops[1].isMMIO;
+    invalidate[1] = !IN_stall[1];
     //OUT_uopSt.external = outUops[1].external;
 end
 
@@ -214,6 +217,7 @@ wire[$clog2(ASSOC)-1:0] curOpAssocIdx = OUT_memc.sramAddr[CLSIZE_E+$clog2(LEN)-2
 
 always_ff@(posedge clk) begin
     reg temp = 0;
+    OUT_memc.data <= 'x;
 
     if (rst) begin
         OUT_memc.cmd <= MEMC_NONE;
@@ -225,7 +229,7 @@ always_ff@(posedge clk) begin
         end
     end
     else begin
-        
+
         // Evict/Load State Machine
         case (state)
             default: state <= IDLE;
@@ -321,7 +325,7 @@ always_ff@(posedge clk) begin
         // Incoming UOps handling
         for (integer i = 0; i < TOTAL_UOPS; i=i+1) begin
             
-            if (!IN_stall[i]) begin
+            if (invalidate[i]) begin
                 outUops[i] <= 'x;
                 outUops[i].valid <= 0;
             end
