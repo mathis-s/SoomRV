@@ -150,6 +150,8 @@ always_ff@(posedge clk) begin
                     end
                     
                     OUT_aguOp.valid <= 1;
+                    OUT_aguOp.exception <= exception_c;
+
                     if (!LOAD_AGU) begin
                         OUT_uop.valid <= 1;
                         case (exception_c)
