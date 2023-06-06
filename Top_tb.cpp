@@ -139,13 +139,11 @@ class SpikeSimif : public simif_t
                 case CSR_TIME:
                 case CSR_TIMEH:
                 
-                case CSR_STVAL:
                 // TODO: these two only differ in warl behaviour,
                 // adjust on write instead of read.
                 case CSR_MCOUNTINHIBIT:
                 case CSR_SATP:
 
-                case CSR_MTVAL:
                 case CSR_MIP:
 
                 case CSR_MVENDORID:

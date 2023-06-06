@@ -192,6 +192,24 @@ typedef enum logic[5:0]
     
 } OPCode_FU_CSR;
 
+// Trap Cause Encodings straight from Privilege Spec
+typedef enum logic[3:0]
+{
+    RVP_TRAP_IF_MA   = 0,
+    RVP_TRAP_IF_AF   = 1,
+    RVP_TRAP_ILLEGAL = 2,
+    RVP_TRAP_BREAK   = 3,
+    RVP_TRAP_LD_MA   = 4,
+    RVP_TRAP_LD_AF   = 5,
+    RVP_TRAP_ST_MA   = 6,
+    RVP_TRAP_ST_AF   = 7,
+    RVP_TRAP_ECALL_U = 8,
+    RVP_TRAP_ECALL_S = 9,
+    RVP_TRAP_IF_PF   = 12,
+    RVP_TRAP_LD_PF   = 13,
+    RVP_TRAP_ST_PF   = 15
+} RVPTrapCause;
+
 // For decode-time traps, we use FLAGS_TRAP/FU_TRAP as an,
 // escape flag. The (unused) rd field then stores on of these fields
 // to specify the decode-time exception encountered.
@@ -672,6 +690,11 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] tval;
+} TValState;
+
+typedef struct packed
+{
     logic[31:0] trapPC;
     logic isInterrupt;
     logic[3:0] cause;
@@ -697,6 +720,13 @@ typedef struct packed
     logic cbcfe;
     PrivLevel priv;
 } VirtMemState;
+
+typedef struct packed
+{
+    logic[31:0] tval;
+    SqN sqN;
+    logic valid;
+} TValProv;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;

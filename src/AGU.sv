@@ -16,10 +16,13 @@ module AGU
     output TLB_Req OUT_tlb,
     input TLB_Res IN_tlb,
     
+    output TValProv OUT_tvalProv,
+    
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
     output RES_UOp OUT_uop
 );
+
 
 
 reg pageWalkActive;
@@ -89,13 +92,14 @@ always_comb begin
 end
 
 wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr;
-
 reg waitForPWComplete;
 
 always_ff@(posedge clk) begin
-    
+
     OUT_pw.valid <= 0;
     OUT_uop.valid <= 0;
+    OUT_tvalProv <= 'x;
+    OUT_tvalProv.valid <= 0;
     
     if (rst) begin
         OUT_aguOp.valid <= 0;
@@ -104,6 +108,7 @@ always_ff@(posedge clk) begin
         waitForPWComplete <= 0;
     end
     else begin
+
         if (waitForPWComplete) begin
             if (!IN_pw.busy || IN_pw.rqID != RQ_ID)
                 waitForPWComplete <= 0;
@@ -154,6 +159,13 @@ always_ff@(posedge clk) begin
                             AGU_ADDR_MISALIGN: assert(0);
                         endcase
                     end
+
+                    if (exception_c != AGU_NO_EXCEPTION) begin
+                        OUT_tvalProv.valid <= 1;
+                        OUT_tvalProv.sqN <= OUT_aguOp.sqN;
+                        OUT_tvalProv.tval <= OUT_aguOp.addr;
+                    end
+
                     pageWalkActive <= 0;
                     OUT_pw.valid <= 0;
                 end
@@ -186,6 +198,13 @@ always_ff@(posedge clk) begin
                 pageWalkAccepted <= 0;
             end 
             else begin
+
+                if (except != AGU_NO_EXCEPTION) begin
+                    OUT_tvalProv.valid <= 1;
+                    OUT_tvalProv.sqN <= IN_uop.sqN;
+                    OUT_tvalProv.tval <= addr;
+                end
+
                 OUT_aguOp.valid <= 1;
                 OUT_uop.valid <= !LOAD_AGU;
             end

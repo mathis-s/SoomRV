@@ -446,6 +446,18 @@ FPU fpu
     .OUT_uop(FPU_uop)
 );
 
+TValProv TVS_tvalProvs[1:0];
+TValState TVS_tvalState;
+TValSelect tvalSelect
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_branch(branch),
+    .IN_commitSqN(ROB_curSqN),
+    .IN_tvalProvs(TVS_tvalProvs),
+    .OUT_tvalState(TVS_tvalState)
+);
+
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
@@ -465,7 +477,9 @@ CSR csr
     .IN_mispredFlush(mispredFlush),
     
     .IF_mmio(IF_csr_mmio),
-    
+
+    .IN_tvalState(TVS_tvalState),
+
     .IN_trapInfo(TH_trapInfo),
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
@@ -564,6 +578,8 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .IN_vmem(CSR_vmem),
     .OUT_pw(LDAGU_PW_rq),
     .IN_pw(PW_res),
+
+    .OUT_tvalProv(TVS_tvalProvs[0]),
     
     .OUT_tlb(TLB_rqs[1]),
     .IN_tlb(TLB_res[1]),
@@ -587,6 +603,8 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
     .IN_vmem(CSR_vmem),
     .OUT_pw(STAGU_PW_rq),
     .IN_pw(PW_res),
+    
+    .OUT_tvalProv(TVS_tvalProvs[1]),
 
     .OUT_tlb(TLB_rqs[0]),
     .IN_tlb(TLB_res[0]),

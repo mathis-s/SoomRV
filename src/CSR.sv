@@ -8,7 +8,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input BranchProv IN_branch,
     
     input wire[4:0] IN_fpNewFlags,
-    
+
     // for perf counters
     input wire[3:0] IN_commitValid,
     input wire[3:0] IN_commitBranch,
@@ -16,6 +16,8 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input wire IN_mispredFlush,
     
     IF_CSR_MMIO.CSR IF_mmio,
+    
+    input TValState IN_tvalState,
     
     input TrapInfoUpdate IN_trapInfo,
     output TrapControlState OUT_trapControl,
@@ -269,7 +271,6 @@ typedef enum logic[3:0]
 
 PrivLevel priv;
 
-
 reg[4:0] fflags;
 reg[2:0] frm;
 
@@ -420,10 +421,10 @@ always_comb begin
     end
     
     OUT_vmem.cbcfe = 
-        !(
+    !(
         (priv != PRIV_MACHINE && !menvcfg.cbcfe) ||
         (priv == PRIV_USER && !senvcfg.cbcfe)
-        );
+    );
         
     if ((priv != PRIV_MACHINE && menvcfg.cbie == 0) ||
         (priv == PRIV_USER && senvcfg.cbie == 0))
@@ -633,6 +634,25 @@ always_ff@(posedge clk) begin
     
         // CSR writes on trap/interrupt
         if (IN_trapInfo.valid) begin
+            
+            reg[31:0] tval = 0;
+
+            if (!IN_trapInfo.isInterrupt)
+                case (IN_trapInfo.cause)
+                    RVP_TRAP_IF_PF,
+                    RVP_TRAP_IF_AF,
+                    RVP_TRAP_BREAK: tval = IN_trapInfo.trapPC;
+
+                    RVP_TRAP_LD_MA,
+                    RVP_TRAP_LD_AF,
+                    RVP_TRAP_LD_PF,
+                    RVP_TRAP_ST_MA,
+                    RVP_TRAP_ST_AF,
+                    RVP_TRAP_ST_PF: tval = IN_tvalState.tval;
+
+                    default: ;
+                endcase
+
             if (IN_trapInfo.delegate) begin
                 mstatus.spie <= mstatus.sie;
                 mstatus.sie <= 0;
@@ -640,7 +660,7 @@ always_ff@(posedge clk) begin
                 sepc <= IN_trapInfo.trapPC;
                 scause[3:0] <= IN_trapInfo.cause;
                 scause[31] <= IN_trapInfo.isInterrupt;
-                stval <= 0;
+                stval <= tval;
                 
                 priv <= PRIV_SUPERVISOR;
             end
@@ -652,7 +672,7 @@ always_ff@(posedge clk) begin
                 mcause[3:0] <= IN_trapInfo.cause;
                 mcause[4] <= 0;
                 mcause[31] <= IN_trapInfo.isInterrupt;
-                mtval <= 0;
+                mtval <= tval;
                 
                 priv <= PRIV_MACHINE;
             end

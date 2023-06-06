@@ -140,22 +140,22 @@ always_ff@(posedge clk) begin
                 else begin
                     case (IN_trapInstr.flags)
                         FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
-                        FLAGS_LD_MA: trapCause = 4;
-                        FLAGS_LD_AF: trapCause = 5;
-                        FLAGS_LD_PF: trapCause = 13;
-                        FLAGS_ST_MA: trapCause = 6;
-                        FLAGS_ST_AF: trapCause = 7;
-                        FLAGS_ST_PF: trapCause = 15;
-                        FLAGS_ILLEGAL_INSTR: trapCause = 2; 
-                        default: trapCause = 7;
+                        FLAGS_LD_MA: trapCause = RVP_TRAP_LD_MA;
+                        FLAGS_LD_AF: trapCause = RVP_TRAP_LD_AF;
+                        FLAGS_LD_PF: trapCause = RVP_TRAP_LD_PF;
+                        FLAGS_ST_MA: trapCause = RVP_TRAP_ST_MA;
+                        FLAGS_ST_AF: trapCause = RVP_TRAP_ST_AF;
+                        FLAGS_ST_PF: trapCause = RVP_TRAP_ST_PF;
+                        FLAGS_ILLEGAL_INSTR: trapCause = RVP_TRAP_ILLEGAL;
+                        default: ;
                     endcase
                     
                     // Distinguish between ecall in different priv levels
                     if (trapCause == 4'(TRAP_ECALL_M)) begin
                         case (IN_trapControl.priv)
-                            PRIV_SUPERVISOR: trapCause = 4'(TRAP_ECALL_S);
-                            PRIV_USER: trapCause = 4'(TRAP_ECALL_U);
-                            default: begin end
+                            PRIV_SUPERVISOR: trapCause = RVP_TRAP_ECALL_S;
+                            PRIV_USER: trapCause = RVP_TRAP_ECALL_U;
+                            default: ;
                         endcase
                     end
                 end
