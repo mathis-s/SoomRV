@@ -92,7 +92,7 @@ always_ff@(posedge clk) begin
         end
     end
     
-    // Clear low or high logic of useful counters alternatingly periodically
+    // Clear low or high bit of useful counters alternatingly periodically
     if (decrCnt == 0) begin
         for (integer i = 0; i < SIZE; i=i+1)
             entries[i].useful[decrBit] <= 0;
