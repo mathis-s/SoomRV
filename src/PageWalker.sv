@@ -14,11 +14,7 @@ module PageWalker#(parameter NUM_RQS=3)
 
 reg[0:0] pageWalkIter;
 reg[31:0] pageWalkAddr;
-reg sum;
-reg makeExecReadable;
 reg[1:0] rqID;
-
-PrivLevel priv;
 
 enum logic[1:0] 
 {
@@ -31,72 +27,41 @@ reg pageFault_c;
 reg isSuperPage_c;
 reg[21:0] ppn_c;
 reg[2:0] rwx_c;
+reg[3:0] dagu_c;
 always_comb begin
     reg[31:0] pte = IN_ldResUOp.data;
     isSuperPage_c = pageWalkIter;
     pageFault_c = 0;
     ppn_c = pte[31:10];
     rwx_c = 'x;
+    dagu_c = 'x;
     
-    if (!pte[0] ||
-        (priv == PRIV_USER && !pte[4]) ||
-        (priv == PRIV_SUPERVISOR && pte[4] && !sum) ||
-        (!pte[6]) || // access but accessed not set
-        ((rqID == 1) && !pte[7]) // write but dirty not set
+    // We can already do a few simple checks for
+    // page faults here. Checks involving permissions
+    // are done later though, as permissions might chance.
+    if (!pte[0] || // not valid
+        !pte[6]    // accessed not set
     ) begin
         pageFault_c = 1;
     end
-
-    case (rqID)
-        2: begin // LoadAGU
-            case (pte[3:1])
-                /*inv*/ 3'b000,
-                /*rfu*/ 3'b010,
-                /*rfu*/ 3'b110: pageFault_c = 1;
-                /*xo*/  3'b100: begin
-                    if (!makeExecReadable) 
-                        pageFault_c = 1;
-                end
-                /*ro*/  3'b001,
-                /*rw*/  3'b011,
-                /*rx*/  3'b101,
-                /*rwx*/ 3'b111: ;
-            endcase
-        end
-        1: begin // StoreAGU
-            case (pte[3:1])
-                /*ro*/  3'b001,
-                /*xo*/  3'b100,
-                /*rx*/  3'b101,
-                /*inv*/ 3'b000,
-                /*rfu*/ 3'b010,
-                /*rfu*/ 3'b110: begin
-                    pageFault_c = 1;
-                end
-                /*rw*/  3'b011,
-                /*rwx*/ 3'b111: ;
-            endcase
-        end
-        0: begin // IFetch
-            case (pte[3:1])
-                /*inv*/ 3'b000,
-                /*ro*/  3'b001,
-                /*rfu*/ 3'b010,
-                /*rw*/  3'b011,
-                /*rfu*/ 3'b110: pageFault_c = 1;
-                
-                /*xo*/  3'b100,
-                /*rx*/  3'b101,
-                /*rwx*/ 3'b111: ;
-            endcase
-        end
-    endcase
     
+    // misaligned super page
     if (isSuperPage_c && pte[19:10] != 0) begin
         pageFault_c = 1;
     end
 
-    if (!pageFault_c) rwx_c = {pte[1], pte[2], pte[3]};
+    case (pte[3:1])
+        default: ;
+        /*inv*/ 3'b000,
+        /*rfu*/ 3'b010,
+        /*rfu*/ 3'b110: pageFault_c = 1;
+    endcase
+
+    if (!pageFault_c) begin
+        // allow write only if dirty
+        rwx_c = {pte[1], pte[2] && pte[7], pte[3]};
+        dagu_c = pte[7:4];
+    end
 end
 
 always_ff@(posedge clk) begin
@@ -119,9 +84,6 @@ always_ff@(posedge clk) begin
                         state <= WAIT_FOR_LOAD;
                         pageWalkIter <= 1;
                         pageWalkAddr <= IN_rqs[i].addr;
-                        sum <= IN_rqs[i].supervUserMemory;
-                        makeExecReadable <= IN_rqs[i].makeExecReadable;
-                        priv <= IN_rqs[i].priv;
                         rqID <= i[1:0];
 
                         OUT_ldUOp.valid <= 1;
@@ -160,6 +122,9 @@ always_ff@(posedge clk) begin
                         OUT_res.ppn <= ppn_c;
                         OUT_res.vpn <= pageWalkAddr[31:12];
                         OUT_res.rwx <= rwx_c;
+
+                        OUT_res.global <= dagu_c[1];
+                        OUT_res.user <= dagu_c[0];
                         state <= IDLE;
                     end
                 end

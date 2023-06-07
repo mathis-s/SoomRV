@@ -561,11 +561,6 @@ typedef struct packed
 {
     logic[31:0] addr;
     logic[21:0] rootPPN;
-    
-    logic supervUserMemory;
-    logic makeExecReadable;
-    PrivLevel priv;
-    
     logic valid;
 } PageWalk_Req;
 
@@ -573,10 +568,16 @@ typedef struct packed
 {
     logic[19:0] vpn;
     logic[21:0] ppn;
+
     logic pageFault;
     logic isSuperPage;
+    
+    logic global;
+    logic user;
+
     logic[2:0] rwx;
     logic[1:0] rqID;
+
     logic busy;
     logic valid;
 } PageWalk_Res;
@@ -591,6 +592,8 @@ typedef struct packed
 {
     logic[19:0] ppn;
     logic fault;
+    logic[2:0] rwx;
+    logic user;
     logic hit;
 } TLB_Res;
 

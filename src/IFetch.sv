@@ -107,11 +107,32 @@ wire pageWalkRequired = IN_vmem.sv32en_ifetch &&
 wire[30:0] physicalPC = IN_vmem.sv32en_ifetch ? {pcPPN[19:10], (pcPPNsuperpage ? pc[20:11] : pcPPN[9:0]), pc[10:0]} : pc;
 
 
-// When first encountering a fault, we output a single fake fault instruction.
-// Thus ifetch is still enabled during this first fault cycle.
-wire fetchIsFault = (IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE) ||
-                    `IS_MMIO_PMA(phyPCFull) ||
-                    IN_interruptPending;
+IFetchFault fault_c;
+reg fetchIsFault;
+always_comb begin
+    fault_c = IF_FAULT_NONE;
+
+    if (IN_vmem.sv32en_ifetch && pcPPNfault == IF_PAGE_FAULT)
+        fault_c = IF_PAGE_FAULT;
+
+    else if (IN_vmem.sv32en_ifetch && (
+        (IN_vmem.priv == PRIV_USER && !pcPPNuser) ||
+        (IN_vmem.priv == PRIV_SUPERVISOR && pcPPNuser))
+    ) begin
+        fault_c = IF_PAGE_FAULT;
+    end
+
+    else if (IN_vmem.sv32en_ifetch && pcPPNfault == IF_ACCESS_FAULT)
+        fault_c = IF_ACCESS_FAULT;
+
+    else if (`IS_MMIO_PMA(phyPCFull))
+        fault_c = IF_ACCESS_FAULT;
+
+    else if (IN_interruptPending)
+        fault_c = IF_INTERRUPT;
+    
+    fetchIsFault = fault_c != IF_FAULT_NONE;
+end
 
 wire baseEn = IN_en && 
     (IN_ROB_curFetchID != fetchID);
@@ -122,6 +143,8 @@ wire tryReadICache =
     !fetchIsFault &&
     !pageWalkRequired;
 
+// When first encountering a fault, we output a single fake fault instruction.
+// Thus ifetch is still enabled during this first fault cycle.
 wire ifetchEn = 
     baseEn &&
     (!icacheStall || fetchIsFault);
@@ -174,6 +197,7 @@ reg[19:0] lastVPN;
 // used for instruction lookup
 reg[19:0] pcPPN;
 reg pcPPNsuperpage;
+reg pcPPNuser;
 IFetchFault pcPPNfault;
 
 IFetchFault fault;
@@ -246,10 +270,6 @@ always_ff@(posedge clk) begin
                 OUT_pw.rootPPN <= IN_vmem.rootPPN;
                 OUT_pw.addr[31:12] <= pageWalkVPN;
                 OUT_pw.addr[11:0] <= 'x;
-                
-                OUT_pw.supervUserMemory <= IN_vmem.supervUserMemory;
-                OUT_pw.makeExecReadable <= IN_vmem.makeExecReadable;
-                OUT_pw.priv <= IN_vmem.priv;
             end
         end
         // Finalize Page Walk
@@ -260,10 +280,11 @@ always_ff@(posedge clk) begin
             
             pcPPN <= IN_pw.ppn[19:0];
             pcPPNsuperpage <= IN_pw.isSuperPage;
+            pcPPNuser <= IN_pw.user;
             lastVPN_valid <= 1;
 
             pcPPNfault <= IF_FAULT_NONE;
-            if (IN_pw.pageFault)
+            if (IN_pw.pageFault || !IN_pw.rwx[0])
                 pcPPNfault <= IF_PAGE_FAULT;
             else if (IN_pw.ppn[21:20] != 0)
                 pcPPNfault <= IF_ACCESS_FAULT;
@@ -324,12 +345,7 @@ always_ff@(posedge clk) begin
                     multipleLast <= 1;
                     branchPosLast <= pc[2:0];
 
-                    if (IN_vmem.sv32en_ifetch && pcPPNfault != IF_FAULT_NONE)
-                        fault <= pcPPNfault;
-                    else if (`IS_MMIO_PMA(phyPCFull))
-                        fault <= IF_ACCESS_FAULT;
-                    else // if (IN_interruptPending)
-                        fault <= IF_INTERRUPT;
+                    fault <= fault_c;
                 end
                 // Valid Fetch
                 else begin

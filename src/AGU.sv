@@ -23,13 +23,23 @@ module AGU
     output RES_UOp OUT_uop
 );
 
+localparam STORE_AGU = !LOAD_AGU;
 
+function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user);
+    logic r;
+    r = (LOAD_AGU  && !(pte_rwx[2] || (pte_rwx[0] && IN_vmem.makeExecReadable))) ||
+        (STORE_AGU && !pte_rwx[1]) ||
+        (IN_vmem.priv == PRIV_USER && !pte_user) ||
+        (IN_vmem.priv == PRIV_SUPERVISOR && pte_user && !IN_vmem.supervUserMemory);
+    return r;
+endfunction
 
 reg pageWalkActive;
 reg pageWalkAccepted;
 assign OUT_stall = IN_stall || pageWalkActive || waitForPWComplete;
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
+wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr; // super is already handled in TLB
 
 Flags exceptFlags;
 AGU_Exception except;
@@ -37,14 +47,15 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
-    if (IN_vmem.sv32en && IN_tlb.hit && IN_tlb.fault) begin
+    if (IN_vmem.sv32en && IN_tlb.hit && 
+        (IN_tlb.fault || IsPermFault(IN_tlb.rwx, IN_tlb.user))
+    ) begin
         except = AGU_PAGE_FAULT;
-        if (!LOAD_AGU) exceptFlags = FLAGS_ST_PF;
+        if (STORE_AGU) exceptFlags = FLAGS_ST_PF;
     end
-
-    if (!`IS_LEGAL_ADDR(addr) && !IN_vmem.sv32en) begin
+    else if (!`IS_LEGAL_ADDR(phyAddr) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
         except = AGU_ACCESS_FAULT;
-        if (!LOAD_AGU) exceptFlags = FLAGS_ST_AF;
+        if (STORE_AGU) exceptFlags = FLAGS_ST_AF;
     end
 
     // Misalign has higher priority than access fault
@@ -63,19 +74,19 @@ always_comb begin
     end
     else begin
         case (IN_uop.opcode)
-        LSU_SB_I, LSU_SB: begin end
-        LSU_SH_I, LSU_SH: begin
-            if (addr[0]) begin
-                except = AGU_ADDR_MISALIGN;
-                exceptFlags = FLAGS_ST_MA;
+            LSU_SB_I, LSU_SB: begin end
+            LSU_SH_I, LSU_SH: begin
+                if (addr[0]) begin
+                    except = AGU_ADDR_MISALIGN;
+                    exceptFlags = FLAGS_ST_MA;
+                end
             end
-        end
-        default: begin
-            if (addr[0] || addr[1]) begin
-                except = AGU_ADDR_MISALIGN;
-                exceptFlags = FLAGS_ST_MA;
+            default: begin
+                if (addr[0] || addr[1]) begin
+                    except = AGU_ADDR_MISALIGN;
+                    exceptFlags = FLAGS_ST_MA;
+                end
             end
-        end
         endcase
     end
 end
@@ -91,7 +102,7 @@ always_comb begin
     OUT_tlb.vpn = addr[31:12];
 end
 
-wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr;
+
 reg waitForPWComplete;
 
 always_ff@(posedge clk) begin
@@ -124,9 +135,6 @@ always_ff@(posedge clk) begin
                         OUT_pw.valid <= 1;
                         OUT_pw.rootPPN <= IN_vmem.rootPPN;
                         OUT_pw.addr <= OUT_aguOp.addr;
-                        OUT_pw.supervUserMemory <= IN_vmem.supervUserMemory;
-                        OUT_pw.makeExecReadable <= IN_vmem.makeExecReadable;
-                        OUT_pw.priv <= IN_vmem.priv;
                     end
                 end
                 else if (IN_pw.valid) begin
@@ -134,11 +142,14 @@ always_ff@(posedge clk) begin
                     AGU_Exception exception_c = AGU_NO_EXCEPTION;
                     if (IN_pw.pageFault)
                         exception_c = AGU_PAGE_FAULT;
+                    else if (IsPermFault(IN_pw.rwx, IN_pw.user)) begin
+                        exception_c = AGU_PAGE_FAULT;
+                    end
                     else if (IN_pw.ppn[21:20] != 2'b0 || 
                             !`IS_LEGAL_ADDR(IN_pw.isSuperPage ? 
                                 {IN_pw.ppn[19:10], OUT_aguOp.addr[21:0]} : 
-                                {IN_pw.ppn[19:0], OUT_aguOp.addr[11:0]})) begin
-
+                                {IN_pw.ppn[19:0], OUT_aguOp.addr[11:0]})
+                    ) begin
                         exception_c = AGU_ACCESS_FAULT;
                     end
                     else begin
@@ -152,7 +163,7 @@ always_ff@(posedge clk) begin
                     OUT_aguOp.valid <= 1;
                     OUT_aguOp.exception <= exception_c;
 
-                    if (!LOAD_AGU) begin
+                    if (STORE_AGU) begin
                         OUT_uop.valid <= 1;
                         case (exception_c)
                             AGU_NO_EXCEPTION: ;
@@ -169,6 +180,7 @@ always_ff@(posedge clk) begin
                     end
 
                     pageWalkActive <= 0;
+                    pageWalkAccepted <= 0;
                     OUT_pw.valid <= 0;
                 end
             end
@@ -200,7 +212,6 @@ always_ff@(posedge clk) begin
                 pageWalkAccepted <= 0;
             end 
             else begin
-
                 if (except != AGU_NO_EXCEPTION) begin
                     OUT_tvalProv.valid <= 1;
                     OUT_tvalProv.sqN <= IN_uop.sqN;
@@ -208,7 +219,7 @@ always_ff@(posedge clk) begin
                 end
 
                 OUT_aguOp.valid <= 1;
-                OUT_uop.valid <= !LOAD_AGU;
+                OUT_uop.valid <= STORE_AGU;
             end
                 
             if (LOAD_AGU) begin

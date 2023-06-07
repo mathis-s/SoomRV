@@ -411,6 +411,7 @@ always_comb begin
     OUT_vmem.sv32en = satp.mode;
     OUT_vmem.priv = epm;
     OUT_vmem.makeExecReadable = mstatus.mxr;
+    OUT_vmem.supervUserMemory = 0;
 
     if (epm == PRIV_MACHINE) begin
         OUT_vmem.sv32en_ifetch = 0;

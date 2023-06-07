@@ -1,12 +1,3 @@
-typedef struct packed
-{
-    logic[19:0] virt;
-    logic[19:0] phy;
-    logic isSuper;
-    logic[2:0] rwx;
-    logic valid;
-} TLB_NewEntry;
-
 module TLB#(parameter NUM_RQ=1, parameter SIZE=8, parameter ASSOC=4, parameter IS_IFETCH=0)
 (
     input wire clk,
@@ -20,13 +11,14 @@ module TLB#(parameter NUM_RQ=1, parameter SIZE=8, parameter ASSOC=4, parameter I
 
 localparam LEN = SIZE / ASSOC;
 localparam VIRT_LEN = 20 - $clog2(LEN);
-localparam LEN_PERMS = IS_IFETCH ? 1 : 2;
 typedef struct packed
 {
     logic[VIRT_LEN-1:0] vpn;
     logic[19:0] ppn;
     logic isSuper;
-    logic[LEN_PERMS-1:0] perms; // 0 is invalid
+    logic user;
+    logic global;
+    logic[2:0] rwx; // 0 is invalid
 } TLBEntry;
 
 TLBEntry tlb[LEN-1:0][ASSOC-1:0];
@@ -42,13 +34,14 @@ always_comb begin
         
         if (IN_rqs[i].valid)
             for (integer j = 0; j < ASSOC; j=j+1)
-                if (tlb[idx][j].perms != 0 && 
+                if (tlb[idx][j].rwx != 0 && 
                     (tlb[idx][j].isSuper ? 
                         tlb[idx][j].vpn[19-$clog2(LEN):10-$clog2(LEN)] == IN_rqs[i].vpn[19:10] :
                         tlb[idx][j].vpn == IN_rqs[i].vpn[19:$clog2(LEN)])
-                ) begin    
-                    // read must be i == 1, write == 0
-                    OUT_res[i].fault = !IS_IFETCH && !tlb[idx][j].perms[i];
+                ) begin
+                    OUT_res[i].fault = 0;
+                    OUT_res[i].rwx = tlb[idx][j].rwx;
+                    OUT_res[i].user = tlb[idx][j].user;
                     OUT_res[i].hit = 1;
                     OUT_res[i].ppn = tlb[idx][j].isSuper ? {tlb[idx][j].ppn[19:10], IN_rqs[i].vpn[9:0]} : tlb[idx][j].ppn;
                     
@@ -61,24 +54,29 @@ always_ff@(posedge clk) begin
     if (rst || clear) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
-                tlb[i][j].perms <= 0;
+                tlb[i][j].rwx <= 0;
     end
     else begin
 
         // FIXME: Currently, we might double insert if both AGUs tlb miss on the same address.
-        if (IN_pw.valid && !IN_pw.pageFault && IN_pw.ppn[21:20] == 0 && 
+        if (IN_pw.valid && !IN_pw.pageFault && IN_pw.ppn[21:20] == 0 &&
+            // only cache useful translations
+            (IS_IFETCH ? (IN_pw.rwx[0] != 0) : (IN_pw.rwx[2:1] != 0)) &&
+            // disambiguate between ifetch and regular ld/st
             (IS_IFETCH ? IN_pw.rqID == 0 : IN_pw.rqID != 0)
         ) begin
             reg[$clog2(LEN)-1:0] idx = IN_pw.vpn[$clog2(LEN)-1:0];
             reg[$clog2(ASSOC)-1:0] assocIdx = counters[idx];
             
-            assert(IS_IFETCH ? IN_pw.rwx[0] : (IN_pw.rwx[2:1] != 0));
-            /* verilator lint_off WIDTHEXPAND */
-            tlb[idx][assocIdx].perms <= IS_IFETCH ? IN_pw.rwx[0] : IN_pw.rwx[2:1];
-            /* verilator lint_on WIDTHEXPAND */
+            tlb[idx][assocIdx].rwx <= IN_pw.rwx;
+            
             tlb[idx][assocIdx].isSuper <= IN_pw.isSuperPage;
+
             tlb[idx][assocIdx].ppn <= IN_pw.ppn[19:0];
             tlb[idx][assocIdx].vpn <= IN_pw.vpn[19:$clog2(LEN)];
+
+            tlb[idx][assocIdx].global <= IN_pw.global;
+            tlb[idx][assocIdx].user <= IN_pw.user;
         end
 
         for (integer i = 0; i < LEN; i=i+1)

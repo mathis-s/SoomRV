@@ -66,6 +66,14 @@ main:
     lw a0, 2(a0)
     li a0, 16
     sw a0, 2(a0)
+    li a0, 32
+    sw a0, 2(a0)
+    li a0, 64
+    sw a0, 2(a0)
+    li a0, 128
+    sw a0, 2(a0)
+    li a0, 4
+    sw a0, 2(a0)
     
     # regular trap
     ecall
