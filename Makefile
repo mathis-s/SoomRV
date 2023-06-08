@@ -62,6 +62,7 @@ SRC_FILES = \
 	src/TLB.sv \
 	src/BypassLSU.sv \
 	src/TValSelect.sv \
+	src/SoC.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
