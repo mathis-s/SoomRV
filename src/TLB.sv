@@ -17,7 +17,7 @@ typedef struct packed
     logic[19:0] ppn;
     logic isSuper;
     logic user;
-    logic global;
+    logic globl;
     logic[2:0] rwx; // 0 is invalid
 } TLBEntry;
 
@@ -75,7 +75,7 @@ always_ff@(posedge clk) begin
             tlb[idx][assocIdx].ppn <= IN_pw.ppn[19:0];
             tlb[idx][assocIdx].vpn <= IN_pw.vpn[19:$clog2(LEN)];
 
-            tlb[idx][assocIdx].global <= IN_pw.global;
+            tlb[idx][assocIdx].globl <= IN_pw.globl;
             tlb[idx][assocIdx].user <= IN_pw.user;
         end
 

@@ -35,16 +35,18 @@
     `IS_MMIO_PMA({(addr), 2'b0})
 
 // Internal MMIO mappings
-`define SPI_ADDR 32'h1000_0000
-`define UART_ADDR 32'h1100_0000
 `define SYSCON_ADDR 32'h1110_0000
 `define MTIME_ADDR 32'h1100_bff8
 `define MTIMECMP_ADDR 32'h1100_4000
-//`define ENABLE_UART
+
 
 // External MMIO
-`define ENABLE_EXT_MMIO 0
-`define EXT_MMIO_START_ADDR 32'h1120_0000
+// - IS_MMIO_PMA must be true for this range.
+// - The upper three bits are not passed on to
+//   the external memory controller.
+`define ENABLE_EXT_MMIO 1
+`define EXT_MMIO_START_ADDR 32'h1000_0000
+`define EXT_MMIO_END_ADDR   32'h1100_0000
 
 // 64 MiB main memory (TODO: make adjustable!) or MMIO
 `define IS_LEGAL_ADDR(addr) \

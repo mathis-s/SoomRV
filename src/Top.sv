@@ -13,8 +13,6 @@ module Top
     input wire rst,
     input wire en,
 
-    output wire OUT_uartTx,
-    input wire IN_uartRx,
     output wire OUT_halt
 );
 
@@ -178,14 +176,6 @@ MMIO mmio
     .rst(rst),
 
     .IF_mem(IF_mmio),
-
-    .OUT_SPI_cs(),
-    .OUT_SPI_clk(),
-    .OUT_SPI_mosi(),
-    .IN_SPI_miso(1'b0),
-
-    .OUT_uartTx(OUT_uartTx),
-    .IN_uartRx(IN_uartRx),
     
     .OUT_powerOff(OUT_halt),
     .OUT_reboot(),

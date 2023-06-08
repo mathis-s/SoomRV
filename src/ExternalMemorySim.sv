@@ -1,4 +1,7 @@
 
+// Address for the simulated 8250 UART stub
+// This must be between EXT_MMIO_START_ADDR and EXT_MMIO_END_ADDR!
+`define SERIAL_ADDR 32'h1000_0000
 
 module ExternalMemorySim#(parameter SIZE=(1<<24))
 (
@@ -44,7 +47,14 @@ always_ff@(posedge clk) begin
                 // Read
                 else begin
                     if (IN_bus[29] == 0) begin // MMIO read
-                        outBus <= mmioDummy;
+                        
+                        reg[3:0] rmask = IN_bus[28:25];
+
+                        if (rmask == 4'b0010 && ({IN_bus[29:0], 2'b0} & (~32'h78000000)) == ((`SERIAL_ADDR + 4) & (~32'h78000000)))
+                            outBus <= 32'h6000;//| (readValid ? 32'h0100 : 32'h0);
+                        else
+                            outBus <= mmioDummy;
+
                         OUT_stall <= 0;
                         state <= 0;
                         oen <= 1;
@@ -70,8 +80,16 @@ always_ff@(posedge clk) begin
             if (en) begin
                 // MMIO
                 if (addr[29] == 0) begin
-                    for (integer i = 0; i < 4; i=i+1)
-                        if (addr[29-4+i]) mmioDummy[8*i+:8] <= inBus[8*i+:8];
+
+                    reg[3:0] rmask = addr[28:25];
+                    if (rmask == 4'b0001 && ({addr[29:0], 2'b0} & (~32'h78000000)) == (`SERIAL_ADDR & (~32'h78000000))) begin
+                        $write("%c", IN_bus[7:0]);
+                        $fflush(32'h80000001);
+                    end
+                    else begin
+                        for (integer i = 0; i < 4; i=i+1)
+                            if (addr[29-4+i]) mmioDummy[8*i+:8] <= inBus[8*i+:8];
+                    end
                 end
                 else begin
                     mem[addr[$clog2(SIZE)-1:0]] <= inBus;

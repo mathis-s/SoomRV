@@ -572,7 +572,7 @@ typedef struct packed
     logic pageFault;
     logic isSuperPage;
     
-    logic global;
+    logic globl;
     logic user;
 
     logic[2:0] rwx;

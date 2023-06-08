@@ -123,7 +123,7 @@ always_ff@(posedge clk) begin
                         OUT_res.vpn <= pageWalkAddr[31:12];
                         OUT_res.rwx <= rwx_c;
 
-                        OUT_res.global <= dagu_c[1];
+                        OUT_res.globl <= dagu_c[1];
                         OUT_res.user <= dagu_c[0];
                         state <= IDLE;
                     end

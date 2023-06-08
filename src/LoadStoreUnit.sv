@@ -58,8 +58,12 @@ Stage uopLd_1;
 
 assign OUT_ldStall = BLSU_ldStall;
 
-wire isCacheBypassLdUOp = `ENABLE_EXT_MMIO && IN_uopLd.valid && IN_uopLd.isMMIO && IN_uopLd.addr >= `EXT_MMIO_START_ADDR;
-wire isCacheBypassStUOp = `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && IN_uopSt.addr >= `EXT_MMIO_START_ADDR;
+wire isCacheBypassLdUOp = 
+    `ENABLE_EXT_MMIO && IN_uopLd.valid && IN_uopLd.isMMIO && 
+    IN_uopLd.addr >= `EXT_MMIO_START_ADDR && IN_uopLd.addr < `EXT_MMIO_END_ADDR;
+wire isCacheBypassStUOp = 
+    `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && 
+    IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
 
 wire BLSU_ldStall;
 LD_UOp BLSU_uopLd;
