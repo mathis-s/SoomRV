@@ -111,7 +111,8 @@ class SpikeSimif : public simif_t
         // pass through some HPM counter reads
         // WARNING: this explicitly stops us from testing
         // mcounterinhibit for these!
-        if ((i.inst & 0b1111111) == 0b1110011) switch ((i.inst >> 12) & 0b11)
+        if ((i.inst & 0b1111111) == 0b1110011) 
+            switch ((i.inst >> 12) & 0b111)
             {
             case 0b001:
             case 0b010:
@@ -245,6 +246,12 @@ class SpikeSimif : public simif_t
         return addr;
     }
 
+    void write_reg (int i, uint32_t data)
+    {
+        // this NEEDS to be sign-extended!
+        processor->get_state()->XPR.write(i, (int32_t)data);
+    }
+
     virtual int cosim_instr(const Inst& inst)
     {
 
@@ -302,7 +309,7 @@ class SpikeSimif : public simif_t
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
         {
-            processor->get_state()->XPR.write(inst.rd, inst.result);
+            write_reg(inst.rd, inst.result);
         }
 
         if (inst.interrupt == Inst::IR_KEEP)
