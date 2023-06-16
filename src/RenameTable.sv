@@ -42,7 +42,7 @@ typedef struct packed
 } RATEntry;
 
 RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
-reg[NUM_TAGS-1:0] tagAvail;
+reg[NUM_TAGS-1:0] tagAvail /*verilator public*/;
 
 always_comb begin
     for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin

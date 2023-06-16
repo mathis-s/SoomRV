@@ -27,7 +27,7 @@ module TagBuffer
     input wire[6:0] IN_commitTagDst[NUM_COMMIT-1:0]
 );
 
-TagBufEntry tags[63:0];
+TagBufEntry tags[63:0] /*verilator public*/;
 
 reg mispredWait;
 

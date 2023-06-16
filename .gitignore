@@ -9,3 +9,9 @@ text.bin
 src_v
 !test_programs/entry.o
 *.txt
+test_programs/linux/*
+!test_programs/linux/Makefile
+!test_programs/linux/*.config
+!test_programs/linux/device_tree.*
+*.backup
+*.backup_cosim

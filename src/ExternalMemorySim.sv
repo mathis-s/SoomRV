@@ -28,7 +28,9 @@ reg[1:0] state = 2'b00;
 initial state = 0;
 
 reg[2:0] waitCycles;
-reg[31:0] mmioDummy = 0;
+reg inputAvail /*verilator public*/ = 0;
+reg[7:0] inputByte /*verilator public*/;
+reg[31:0] mmioDummy;
 
 always_ff@(posedge clk) begin
     
@@ -50,8 +52,12 @@ always_ff@(posedge clk) begin
                         
                         reg[3:0] rmask = IN_bus[28:25];
 
-                        if (rmask == 4'b0010 && ({IN_bus[29:0], 2'b0} & (~32'h78000000)) == ((`SERIAL_ADDR + 4) & (~32'h78000000)))
-                            outBus <= 32'h6000;//| (readValid ? 32'h0100 : 32'h0);
+                        if (rmask == 4'b0001 && ({IN_bus[29:0], 2'b0} & (~32'h78000000)) == ((`SERIAL_ADDR) & (~32'h78000000))) begin
+                            outBus <= {24'b0, inputAvail ? inputByte : 8'b0};
+                            inputAvail <= 0;
+                        end
+                        else if (rmask == 4'b0010 && ({IN_bus[29:0], 2'b0} & (~32'h78000000)) == ((`SERIAL_ADDR + 4) & (~32'h78000000)))
+                            outBus <= 32'h6000 | (inputAvail ? 32'h0100 : 32'h0);
                         else
                             outBus <= mmioDummy;
 
@@ -83,7 +89,7 @@ always_ff@(posedge clk) begin
 
                     reg[3:0] rmask = addr[28:25];
                     if (rmask == 4'b0001 && ({addr[29:0], 2'b0} & (~32'h78000000)) == (`SERIAL_ADDR & (~32'h78000000))) begin
-                        $write("%c", IN_bus[7:0]);
+                        $write("%c", IN_bus[7:0] & 8'd127);
                         $fflush(32'h80000001);
                     end
                     else begin

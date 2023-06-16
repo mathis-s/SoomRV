@@ -1,11 +1,11 @@
 VERILATOR_FLAGS = \
-	--cc --build --threads 2 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
+	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --x-assign unique --x-initial unique -O3 -sv \
 	-CFLAGS "-march=native" \
 	-LDFLAGS "-ldl" \
 	-MAKEFLAGS -j16
 
-VERILATOR_CFG = --exe Top_tb.cpp ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
+VERILATOR_CFG = --exe Top_tb.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
 VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 64 -CFLAGS -DTRACE
 
@@ -73,16 +73,24 @@ SRC_FILES = \
 	hardfloat/mulRecFN.v \
 	hardfloat/HardFloat_rawFN.v
 
+.PHONY: soomrv
 soomrv:
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
-trace:
-	verilator $(VERILATOR_FLAGS) $(VERILATOR_TRACE_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
+.PHONY: linux
+linux: soomrv
+	make -C test_programs/linux
+	./obj_dir/VTop --device-tree=test_programs/linux/device_tree.dtb --backup-file=soomrv.backup test_programs/linux/linux_image.elf
 
+.PHONY: trace
+trace: VERILATOR_FLAGS += $(VERILATOR_TRACE_FLAGS)
+trace: soomrv
+
+.PHONY: setup
 setup:
 	git submodule update --init --recursive
 	cd riscv-isa-sim && ./configure --with-boost=no --with-boost-asio=no --with-boost-regex=no
 	make -j $(nproc) -C riscv-isa-sim
-	
+.PHONY: clean
 clean:
 	$(RM) -r obj_dir
