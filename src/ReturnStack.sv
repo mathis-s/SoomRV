@@ -1,4 +1,4 @@
-module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=8, parameter RET_PRED_ASSOC=2, parameter RET_PRED_TAG_LEN=8)
+module ReturnStack#(parameter SIZE=4, parameter RET_PRED_SIZE=16, parameter RET_PRED_ASSOC=2, parameter RET_PRED_TAG_LEN=10)
 (
     input wire clk,
     input wire rst,
@@ -27,8 +27,8 @@ typedef struct packed
 {
     logic[RET_PRED_TAG_LEN-1:0] tag;
     FetchOff_t offs; // offset of second halfword if 32 bit, otherwise first
-    logic used;
     logic compr;
+    logic used;
     logic valid;
 } RetPredEntry;
 
@@ -41,18 +41,34 @@ FetchOff_t lookupOffs;
 reg[$clog2(RET_PRED_LEN)-1:0] decodeIdx;
 reg[RET_PRED_TAG_LEN-1:0] decodeTag;
 FetchOff_t decodeOffs;
+
+reg[$clog2(RET_PRED_ASSOC)-1:0] insertAssocIdx;
+reg insertAssocIdxValid;
+localparam PC_SHIFT = $bits(FetchOff_t);
 always_comb begin
-    lookupIdx = IN_pc[$bits(FetchOff_t)+:$clog2(RET_PRED_LEN)];
-    lookupTag = IN_pc[$clog2(RET_PRED_LEN)+$bits(FetchOff_t)+:RET_PRED_TAG_LEN];
+    lookupIdx = IN_pc[PC_SHIFT+:$clog2(RET_PRED_LEN)] ^ IN_pc[3+PC_SHIFT+:$clog2(RET_PRED_LEN)];
+    lookupTag = IN_pc[PC_SHIFT+:RET_PRED_TAG_LEN] ^ IN_pc[RET_PRED_TAG_LEN+PC_SHIFT+:RET_PRED_TAG_LEN];
     lookupOffs = IN_pc[$bits(FetchOff_t)-1:0];
 
-    decodeIdx = IN_returnUpd.addr[$bits(FetchOff_t)+:$clog2(RET_PRED_LEN)];
-    decodeTag = IN_returnUpd.addr[$clog2(RET_PRED_LEN)+$bits(FetchOff_t)+:RET_PRED_TAG_LEN];
+    decodeIdx = IN_returnUpd.addr[PC_SHIFT+:$clog2(RET_PRED_LEN)] ^ IN_returnUpd.addr[3+PC_SHIFT+:$clog2(RET_PRED_LEN)];
+    decodeTag = IN_returnUpd.addr[PC_SHIFT+:RET_PRED_TAG_LEN] ^ IN_returnUpd.addr[RET_PRED_TAG_LEN+PC_SHIFT+:RET_PRED_TAG_LEN];
     decodeOffs = IN_returnUpd.addr[$bits(FetchOff_t)-1:0];
+    
+    insertAssocIdxValid = 0;
+    insertAssocIdx = 'x;
+    for (integer i = 0; i < RET_PRED_ASSOC; i=i+1)
+        if (!rtable[decodeIdx][i].used || !rtable[decodeIdx][i].valid) begin
+            insertAssocIdx = i[$clog2(RET_PRED_ASSOC)-1:0];
+            insertAssocIdxValid = 1;
+        end
 end
 
+reg[30:0] rstackBackup;
+reg[1:0] rstackBackupIdx;
 
 reg[30:0] rstack[SIZE-1:0];
+
+reg qindex;
 RetStackIdx_t rindex;
 reg[$clog2(RET_PRED_ASSOC)-1:0] lookupAssocIdx;
 always_comb begin
@@ -101,9 +117,10 @@ always_ff@(posedge clk) begin
 
         if (IN_returnUpd.valid) begin
             if (IN_returnUpd.cleanRet) begin
-                // TODO: only clean with matching tag
-                for (integer i = 0; i < RET_PRED_LEN; i=i+1)
-                    rtable[decodeIdx][i].valid <= 0;
+                for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
+                    if (rtable[decodeIdx][i].tag == decodeTag)
+                        rtable[decodeIdx][i].valid <= 0;
+                end
             end
             else if (IN_returnUpd.isCall) begin
                 rstack[IN_returnUpd.idx + 1] <= IN_returnUpd.addr + 1;
@@ -113,27 +130,25 @@ always_ff@(posedge clk) begin
                 rindex <= IN_returnUpd.idx - 1;
 
                 // Try to insert into rtable
-                // FIXME: this might double insert
-                begin
-                    reg inserted = 0;
-                    for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
-                        if (!inserted && (!rtable[decodeIdx][i].valid || !rtable[decodeIdx][i].used)) begin
-                            inserted = 1;
-                            rtable[decodeIdx][i].valid <= 1;
-                            rtable[decodeIdx][i].tag <= decodeTag;
-                            rtable[decodeIdx][i].compr <= IN_returnUpd.compr;
-                            rtable[decodeIdx][i].offs <= decodeOffs;
-                            rtable[decodeIdx][i].used <= 0;
-                        end
-                    end
+                if (insertAssocIdxValid) begin
+                    rtable[decodeIdx][insertAssocIdx].valid <= 1;
+                    rtable[decodeIdx][insertAssocIdx].tag <= decodeTag;
+                    rtable[decodeIdx][insertAssocIdx].compr <= IN_returnUpd.compr;
+                    rtable[decodeIdx][insertAssocIdx].offs <= decodeOffs;
+                    rtable[decodeIdx][insertAssocIdx].used <= 1;
                 end
-
+                else begin
+                    for (integer i = 0; i < RET_PRED_ASSOC; i=i+1)
+                        rtable[decodeIdx][i].used <= 0;
+                end
             end
         end
         else begin
             if (OUT_predBr.valid && (!IN_brValid || IN_brOffs >= OUT_predBr.offs)) begin
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
                 rindex <= rindex - 1;
+                rstackBackup <= OUT_predBr.dst;
+                rstackBackupIdx <= rindex;
             end
             else if (IN_brValid && IN_isCall) begin
                 rstack[rindex + 1] <= {IN_pc[30:$bits(FetchOff_t)], IN_brOffs} + 1;
