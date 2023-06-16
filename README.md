@@ -14,15 +14,32 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 - Fully Out-of-Order Load/Store
 - TAGE Branch Predictor
 - Supports Instruction and Data Cache
-- Implements RISC-V Supervisor Spec (M, S and U Mode, Virtual Memory)
+- Implements RISC-V Privileged Spec (M/S/U mode, virtual memory, boots Linux)
 - Currently scores 10.256 DMIPS/MHz at 2.721 IPC (`-march=rv32imac_zicsr_zba_zbb -O3 -finline-limit=128`, using `strcmp` implemented in `test_programs/entry.s`)
 
 ## Simulating
 1. Install the [RV32 Linux Toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator (at least version 5.0).
 2. Run `make setup` to build submodules.
 3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces)
-4. Run `./obj_dir/VTop <assembly file>` to execute the code in `<assembly file>`.  
+4. To run bare-metal code, use `./obj_dir/VTop <assembly file>`.  
 For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone.
+5. To build and run Linux, use `make linux`.  
+Building Linux and booting it in simulation takes at least a few hours!
+
+### Console
+The console input is line-buffered for easier input at the low speed of simulation. Within Linux,
+you will thus see all input lines twice.
+
+### Save/Restore (experimental)
+While running, the simulator will save its state about once a minute if 
+`--backup-file=<NAME>.backup` is specified. Simulation can then be restarted
+at the backup by running `./obj_dir/VTop <NAME>.backup`. The file name must
+end with `.backup`. If cosim is enabled, a matching `.backup_cosim` file will
+be written/read as well.
+
+This is on by default for `make linux`. To restart a crashed or closed Linux boot
+at the last checkpoint, use e.g. `./obj_dir/VTop soomrv.backup --backup-file=soomrv2.backup`.
+(There seem to be some spurious segfaults in the Verilator-generated code.)
 
 ## License
 SoomRV is released under the MIT License. Use of this source code is governed by a MIT-style license that can be found in the `LICENSE` file.
