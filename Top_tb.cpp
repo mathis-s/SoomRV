@@ -619,7 +619,7 @@ void LogPredec(Inst& inst)
 #ifdef KONATA
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
     fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc,
-            (simif.disasm(inst.inst).c_str());
+            simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
