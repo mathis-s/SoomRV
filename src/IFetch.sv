@@ -29,6 +29,7 @@ module IFetch
     input DecodeBranchProv IN_decBranch,
     
     input wire IN_clearICache,
+    input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate IN_bpUpdate,
     
@@ -101,11 +102,25 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_bpUpdate(IN_bpUpdate)
 );
 
+TLB_Req TLB_req;
+always_comb begin
+    TLB_req.vpn = pcVPN;
+    TLB_req.valid = baseEn && !fetchIsFault;
+end
+TLB_Res TLB_res;
+TLB#(1, 8, 4, 1) itlb
+(
+    .clk(clk),
+    .rst(rst),
+    .clear(IN_clearICache || IN_flushTLB),
+    .IN_pw(IN_pw),
+    .IN_rqs('{TLB_req}),
+    .OUT_res('{TLB_res})
+);
 wire pageWalkRequired = IN_vmem.sv32en_ifetch && 
     ((pcPPNsuperpage ? (pcVPN[19:10] != lastVPN[19:10]) : (pcVPN != lastVPN)) || !lastVPN_valid);
 
 wire[30:0] physicalPC = IN_vmem.sv32en_ifetch ? {pcPPN[19:10], (pcPPNsuperpage ? pc[20:11] : pcPPN[9:0]), pc[10:0]} : pc;
-
 
 IFetchFault fault_c;
 reg fetchIsFault;
@@ -250,7 +265,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         
-        if (IN_clearICache) begin
+        if (IN_clearICache || IN_flushTLB) begin
             lastVPN_valid <= 0;
             pageWalkAccepted <= 0;
             pageWalkActive <= 0;
@@ -289,9 +304,18 @@ always_ff@(posedge clk) begin
             else if (IN_pw.ppn[21:20] != 0)
                 pcPPNfault <= IF_ACCESS_FAULT;
         end
-        // Start Page Walk
         else if (pageWalkRequired && IN_en && !(OUT_branch.taken || IN_decBranch.taken) && fault == IF_FAULT_NONE) begin
-            if (!pageWalkActive && !IN_pw.busy) begin
+            // Check if TLB hit
+            if (TLB_res.hit) begin
+                pcPPN <= TLB_res.isSuper ? {TLB_res.ppn[19:10], 10'b0} : TLB_res.ppn;
+                pcPPNfault <= (TLB_res.fault || !TLB_res.rwx[0]) ? IF_PAGE_FAULT : IF_FAULT_NONE;
+                pcPPNsuperpage <= TLB_res.isSuper;
+                pcPPNuser <= TLB_res.user;
+                lastVPN <= pcVPN;
+                lastVPN_valid <= 1;
+            end
+            // Otherwise, start page walk
+            else if (!pageWalkActive && !IN_pw.busy) begin
                 pageWalkActive <= 1;
                 pageWalkAccepted <= 0;
                 pageWalkVPN <= pcVPN;

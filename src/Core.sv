@@ -78,6 +78,7 @@ IFetch ifetch
     .IN_decBranch(DEC_decBranch),
     
     .IN_clearICache(TH_clearICache),
+    .IN_flushTLB(TH_flushTLB),
     .IN_btUpdates(BP_btUpdates),
     .IN_bpUpdate(TH_bpUpdate),
     
