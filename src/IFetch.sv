@@ -3,7 +3,8 @@ module IFetch
     parameter NUM_UOPS=3,
     parameter NUM_BLOCKS=8,
     parameter NUM_BP_UPD=3,
-    parameter NUM_BRANCH_PROVS=4
+    parameter NUM_BRANCH_PROVS=4,
+    parameter RQ_ID=0
 )
 (
     input wire clk,
@@ -246,6 +247,7 @@ PCFile#($bits(PCFileEntry)) pcFile
 
 reg pageWalkActive;
 reg pageWalkAccepted;
+reg waitForPWComplete;
 reg[19:0] pageWalkVPN;
 
 reg en1;
@@ -262,23 +264,30 @@ always_ff@(posedge clk) begin
         pageWalkAccepted <= 0;
         fault <= IF_FAULT_NONE;
         pcPPNfault <= IF_FAULT_NONE;
+        waitForPWComplete <= 0;
     end
     else begin
         
-        if (IN_clearICache || IN_flushTLB) begin
-            lastVPN_valid <= 0;
-            pageWalkAccepted <= 0;
-            pageWalkActive <= 0;
-        end
-
         if (IN_en) begin
             outInstrs_r <= 'x;
             outInstrs_r.valid <= 0;
         end
-
+        
+        // TLB Flush
+        if (IN_clearICache || IN_flushTLB) begin
+            lastVPN_valid <= 0;
+            waitForPWComplete <= pageWalkActive;
+            pageWalkAccepted <= 0;
+            pageWalkActive <= 0;
+        end
+        // Wait until stale page walk is completed
+        else if (waitForPWComplete) begin
+            if (!IN_pw.busy || IN_pw.rqID != RQ_ID)
+                waitForPWComplete <= 0;
+        end
         // Page Walk request was accepted
-        if (!pageWalkAccepted && pageWalkActive) begin
-            if (IN_pw.busy && IN_pw.rqID == 0)
+        else if (!pageWalkAccepted && pageWalkActive) begin
+            if (IN_pw.busy && IN_pw.rqID == RQ_ID)
                 pageWalkAccepted <= 1;
             else begin
                 OUT_pw.valid <= 1;
