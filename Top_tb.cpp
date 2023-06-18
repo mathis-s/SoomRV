@@ -1,6 +1,4 @@
 // #define TRACE
-#include <asm-generic/ioctls.h>
-#include <sys/ioctl.h>
 // #define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
@@ -23,11 +21,13 @@
 #include "verilated_vcd_c.h"
 #endif
 #include <array>
+#include <asm-generic/ioctls.h>
 #include <cstring>
 #include <exception>
 #include <getopt.h>
 #include <map>
 #include <memory>
+#include <sys/ioctl.h>
 
 #include "riscv/cfg.h"
 #include "riscv/csrs.h"
@@ -87,6 +87,8 @@ uint32_t ReadRegister(uint32_t rid);
 
 class SpikeSimif : public simif_t
 {
+  public:
+    bool doRestore = false;
 
   private:
     std::unique_ptr<isa_parser_t> isa_parser;
@@ -96,9 +98,6 @@ class SpikeSimif : public simif_t
     std::vector<std::string> errors;
     cfg_t* cfg;
     std::map<size_t, processor_t*> harts;
-    uint64_t mtime;
-    uint64_t mtimecmp;
-    bool restorePC = false;
 
     bool compare_state()
     {
@@ -266,12 +265,6 @@ class SpikeSimif : public simif_t
 
     virtual int cosim_instr(const Inst& inst)
     {
-        if (restorePC)
-        {
-            restorePC = 0;
-            processor->get_state()->pc = inst.pc;
-        }
-
         uint32_t initialSpikePC = get_pc();
         uint32_t instSIM;
 
@@ -401,9 +394,10 @@ class SpikeSimif : public simif_t
         return processor->get_disassembler()->disassemble(instr);
     }
 
-    void restore_from_top()
+    void restore_from_top(Inst& inst)
     {
-        restorePC = true;
+        doRestore = false;
+        processor->get_state()->pc = inst.pc;
 
         for (size_t i = 0; i < 32; i++)
             write_reg(i, ReadRegister(i));
@@ -576,10 +570,12 @@ void Exit(int code)
 
 void LogCommit(Inst& inst)
 {
+#ifdef COSIM
+    if (simif.doRestore) simif.restore_from_top(inst);
+#endif
     if (inst.interrupt == Inst::IR_SQUASH)
     {
 #ifdef COSIM
-        // printf("INTERRUPT %.8x\n", inst.pc);
         simif.take_trap(true, inst.interruptCause, inst.pc, inst.interruptDelegate);
 #endif
     }
@@ -618,8 +614,7 @@ void LogPredec(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
-    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc,
-            simif.disasm(inst.inst).c_str());
+    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
@@ -893,6 +888,16 @@ void restore_model(std::string fileName)
     if (fread(&state, sizeof(state), 1, f) != 1)
         abort();
     fclose(f);
+    
+    long offset = state.insts[state.lastComSqN].id;
+    for (size_t i = 0; i < 128; i++)
+        state.insts[i].id -= offset;
+    for (size_t i = 0; i < 4; i++)
+    {
+        state.pd[i].id -= offset;
+        state.de[i].id -= offset;
+    }
+    state.id -= offset;
 #endif
 }
 
@@ -929,6 +934,7 @@ static void ParseArgs(int argc, char** argv, Args& args)
 
     if (args.progFile.empty())
     {
+        // clang-format off
         fprintf(stderr,
                 "usage: %s [options] <ELF BINARY>.elf|<BACKUP FILE>.backup|<ASSEMBLY FILE>\n"
                 "Options:\n"
@@ -936,6 +942,7 @@ static void ParseArgs(int argc, char** argv, Args& args)
                 "\t" "--backup-file, -b: Periodically save state in specified file. Reload by specifying backup file as program.\n"
                 "\t" "--dump-mem, -o:    Dump memory into output file after loading binary.\n"
                 , argv[0]);
+        // clang-format on
         exit(-1);
     }
 }
@@ -1041,7 +1048,7 @@ int main(int argc, char** argv)
     if (args.restoreSave)
     {
         restore_model(args.progFile);
-        simif.restore_from_top();
+        simif.doRestore = true;
     }
     else
     {
@@ -1062,7 +1069,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (args.deviceTreeAddr != 0)
+    if (args.deviceTreeAddr != 0 && !args.restoreSave)
         WriteRegister(11, args.deviceTreeAddr);
 
     uint64_t lastMInstret = core->csr->minstret;
