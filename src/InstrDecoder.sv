@@ -212,13 +212,6 @@ module InstrDecoder
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
 
-reg RS_inValid;
-reg[30:0] RS_inData;
-
-reg RS_outValid = 0;
-reg RS_inPop;
-reg[30:0] RS_outData = 0;
-
 
 D_UOp uop;
 reg invalidEnc;
@@ -240,9 +233,6 @@ always_comb begin
     retUpd_c = 'x;
     retUpd_c.valid = 0;
     
-    RS_inValid = 0;
-    RS_inData = 31'bx;
-    RS_inPop = 0;
     OUT_decBranch = 'x;
     OUT_decBranch.taken = 0;
     validMask = 4'b1111;
@@ -452,23 +442,22 @@ always_comb begin
                         uop.rs0 = instr.rs0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
+                        // actual RISC-V instr immediate is encoded in imm12
+                        uop.imm12 = instr[31:20];
 
-                        if (uop.imm == 0) begin
-                            isIndirBranch = 1;
-                            isReturn = (uop.rs0 == 1);
-                            uop.opcode = (uop.rs0 == 1) ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
-                            
-                            if (IN_instrs[i].predTaken)
-                                uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                            else if (isReturn)
-                                uop.imm = {IN_lateRetAddr, 1'b0};
-                            else 
-                                uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        end
-                        else begin
-                            uop.opcode = INT_JALR; 
-                        end
-
+                        isIndirBranch = 1;
+                        isReturn = (uop.rs0 == 1 && uop.imm12 == 0);
+                        uop.opcode = isReturn ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
+                        
+                        // the regular imm field is used to pass the speculated
+                        // destination (for the ALU to check)
+                        if (IN_instrs[i].predTaken)
+                            uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                        else if (isReturn)
+                            uop.imm = {IN_lateRetAddr, 1'b0};
+                        else 
+                            uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
+                        
                         invalidEnc = 0;
                     end
                     `OPC_LOAD: begin
@@ -1216,9 +1205,6 @@ always_comb begin
                         isCall = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
-                        RS_inValid = 1;
-                        RS_inData = IN_instrs[i].pc + 1;
-
                         invalidEnc = 0;
                     end
                     // c.beqz
@@ -1393,6 +1379,7 @@ always_comb begin
                         isReturn = (i16.cr.rd_rs1 == 1);
                         uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JR;
                         uop.immB = 1;
+                        uop.imm12 = 0;
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
@@ -1400,7 +1387,6 @@ always_comb begin
                             uop.imm = {IN_lateRetAddr, 1'b0};
                         else 
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        
 
                         invalidEnc = 0;
                     end
@@ -1413,6 +1399,7 @@ always_comb begin
                         isIndirBranch = 1;
                         uop.opcode = INT_V_JALR;
                         uop.immB = 1;
+                        uop.imm12 = 0;
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};

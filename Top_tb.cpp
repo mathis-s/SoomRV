@@ -690,7 +690,7 @@ void LogInstructions()
     {
         if (!core->stall[i] && core->RV_uopValid[i])
         {
-            uint32_t sqn = ExtractField<4>(core->RV_uop[i], 103 - (32 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
+            uint32_t sqn = ExtractField<4>(core->RV_uop[i], 115 - (32 + 12 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
             LogIssue(state.insts[sqn]);
         }
     }
@@ -816,14 +816,14 @@ void LogInstructions()
                     LogRename(state.insts[sqn]);
                 }
 
-        // Decoded (TODO: decBranch)
+        // Decode
         if (core->frontendEn && !core->RN_stall)
         {
             for (size_t i = 0; i < 4; i++)
                 if (top->Top->soc->core->DE_uop[i].at(0) & (1 << 0))
                 {
                     state.de[i] = state.pd[i];
-                    state.de[i].rd = ExtractField(core->DE_uop[i], 68 - 32 - 5 - 5 - 1 - 5, 5);
+                    state.de[i].rd = ExtractField(core->DE_uop[i], 80 - 32 - 12 - 5 - 5 - 1 - 5, 5);
                     LogDecode(state.de[i]);
                 }
                 else

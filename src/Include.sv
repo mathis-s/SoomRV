@@ -29,7 +29,6 @@ typedef enum logic[5:0]
     INT_LUI,
     INT_AUIPC,
     INT_JAL,
-    INT_JALR,
     INT_SYS,
     INT_SH1ADD,
     INT_SH2ADD,
@@ -442,6 +441,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
+    logic[11:0] imm12; // only used for jalr
     logic[4:0] rs0;
     logic[4:0] rs1;
     logic immB;
@@ -457,6 +457,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
+    logic[11:0] imm12; // only used for jalr (on int ports)
     logic availA;
     Tag tagA;
     logic availB;
@@ -478,6 +479,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] imm;
+    logic[11:0] imm12;
     logic availA;
     Tag tagA;
     logic availB;

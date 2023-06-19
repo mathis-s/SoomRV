@@ -68,6 +68,15 @@ always_ff@(posedge clk) begin
             if (!IN_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
                 OUT_uop[i].imm <= IN_uop[i].imm;
+                
+                // jalr uses a different encoding
+                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT && 
+                    (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)
+                ) begin
+                    OUT_uop[i].imm <= 'x;
+                    OUT_uop[i].imm[11:0] <= IN_uop[i].imm12;
+                end
+
                 OUT_uop[i].sqN <= IN_uop[i].sqN;
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
@@ -170,7 +179,7 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
-                    // ZC is impossible as the atomic memory operand always comes from the Load port
+                    // ZC is impossible as the atomic memory operand always comes from load port
                     /*for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagC) begin
                             OUT_uop[i].srcC <= IN_zcFwdResult[j];
