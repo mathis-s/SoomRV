@@ -1,4 +1,11 @@
-module ReturnStack#(parameter SIZE=4, parameter RQSIZE=4, parameter RET_PRED_SIZE=32, parameter RET_PRED_ASSOC=2, parameter RET_PRED_TAG_LEN=10)
+module ReturnStack
+#(
+    parameter SIZE=4,
+    parameter RQSIZE=4,
+    parameter RET_PRED_SIZE=32,
+    parameter RET_PRED_ASSOC=2,
+    parameter RET_PRED_TAG_LEN=10
+)
 (
     input wire clk,
     input wire rst,
@@ -14,8 +21,9 @@ module ReturnStack#(parameter SIZE=4, parameter RQSIZE=4, parameter RET_PRED_SIZ
     input FetchOff_t IN_brOffs,
     input wire IN_isCall,
 
+    output reg[30:0] OUT_curRetAddr,
     // Low effort prediction for returns that are detected late, in decode.
-    output reg[30:0] OUT_lateRetAddr,
+    output wire[30:0] OUT_lateRetAddr,
 
     input wire IN_setIdx,
     input RetStackIdx_t IN_idx,
@@ -87,8 +95,9 @@ always_comb begin
 
     OUT_curIdx = rindex;
     OUT_predBr.dst = rstack[rindex];
-    OUT_lateRetAddr = rstack[rindex];
-    
+    //OUT_lateRetAddr = rstack[rindex];
+    OUT_curRetAddr = rstack[rindex];
+
     OUT_predBr.isJump = 1;
     OUT_predBr.valid = 0;
     OUT_predBr.offs = 'x;
@@ -111,10 +120,11 @@ always_comb begin
     end
 end
 
+assign OUT_lateRetAddr = OUT_curRetAddr;
+
 reg recoveryInProgress;
 FetchID_t recoveryID;
 FetchID_t recoveryBase;
-
 FetchID_t lastInvalComFetchID;
 
 always_ff@(posedge clk) begin
@@ -207,7 +217,7 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else begin
+        else if (!IN_setIdx && IN_valid) begin
             if (OUT_predBr.valid && (!IN_brValid || IN_brOffs >= OUT_predBr.offs)) begin
                 
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;

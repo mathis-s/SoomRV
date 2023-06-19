@@ -428,6 +428,7 @@ typedef struct packed
     logic[31:0] instr;
     logic[30:0] pc;
     logic[30:0] predTarget;
+    logic targetIsRetAddr;
     BHist_t history;
     RetStackIdx_t rIdx;
     logic predTaken;

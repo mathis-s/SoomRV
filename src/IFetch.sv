@@ -74,9 +74,9 @@ wire BP_branchTaken;
 BHist_t BP_branchHistory;
 BranchPredInfo BP_info;
 wire BP_multipleBranches;
-
 PredBranch predBr;
 wire BP_stall;
+wire[30:0] BP_curRetAddr;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 (
     .clk(clk),
@@ -99,6 +99,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
     .OUT_multipleBranches(BP_multipleBranches),
+    .OUT_curRetAddr(BP_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
     
     .OUT_predBr(predBr),
@@ -228,6 +229,7 @@ FetchID_t fetchIDlast;
 BHist_t histLast;
 BranchPredInfo infoLast;
 reg[2:0] branchPosLast;
+reg[30:0] returnAddrPredLast;
 reg multipleLast;
 
 PCFileEntry PCF_writeData;
@@ -362,7 +364,11 @@ always_ff@(posedge clk) begin
                 outInstrs_r.predPos <= infoLast.predicted ? branchPosLast : 3'b111;
                 outInstrs_r.firstValid <= pcLast[2:0];
                 outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : (3'b111);
-                outInstrs_r.predTarget <= infoLast.taken ? pc : 'x;
+                // If no branch was predicted, we use the predTarget field to store
+                // the current return address. In case a unpredicted return is found
+                // in decode, this is a slightly better target prediction than lateReturnAddr
+                // at decode time, as lateRetAddr might change until then.
+                outInstrs_r.predTarget <= infoLast.taken ? pc : returnAddrPredLast;
                 outInstrs_r.history <= histLast;
                 outInstrs_r.rIdx <= infoLast.rIdx;
             
@@ -392,6 +398,7 @@ always_ff@(posedge clk) begin
                     pcLast <= pc;
                     branchPosLast <= predBr.offs;
                     multipleLast <= BP_multipleBranches;
+                    returnAddrPredLast <= BP_curRetAddr;
                     
                     if (predBr.valid) begin
                         if (predBr.isJump || BP_branchTaken) begin

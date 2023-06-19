@@ -842,11 +842,11 @@ void LogInstructions()
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
                     state.pd[i].id = state.id++;
-                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 119 - 31 - 32, 31) << 1;
-                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 119 - 32, 32);
+                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 31 - 32, 31) << 1;
+                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32, 32);
                     state.pd[i].fetchID = ExtractField(top->Top->soc->core->PD_instrs[i], 4, 5);
                     state.pd[i].retIdx =
-                        ExtractField(top->Top->soc->core->PD_instrs[i], 119 - 32 - 31 - 31 - 12 - 2, 2);
+                        ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
                     if ((state.pd[i].inst & 3) != 3)
                         state.pd[i].inst &= 0xffff;
 

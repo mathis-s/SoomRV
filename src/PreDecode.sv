@@ -88,6 +88,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= (buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut);
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
+                        OUT_instrs[i].targetIsRetAddr <= !buffer[bufIndexOut].predTaken;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
                         OUT_instrs[i].rIdx <= buffer[bufIndexOut].rIdx;
                         OUT_instrs[i].is16bit <= 0;
@@ -113,6 +114,7 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
                         OUT_instrs[i].predTarget <= buffer[bufIndexOut].predTarget;
+                        OUT_instrs[i].targetIsRetAddr <= !buffer[bufIndexOut].predTaken;
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].predInvalid <= invalidBranch;
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
