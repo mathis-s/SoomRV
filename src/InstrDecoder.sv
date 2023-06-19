@@ -1465,9 +1465,16 @@ always_comb begin
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
-                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
+
+                    if (isCall && !isReturn)
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx + 1;
+                    else if (!isCall && isReturn)
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx - 1;
+                    else
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                 
                     // Delete matching return prediction entries
+                    // TODO: Only clean if this actuall was an invalid return pred
                     retUpd_c.valid = 1;
                     retUpd_c.cleanRet = 1;
                     retUpd_c.compr = uop.compressed;
@@ -1528,6 +1535,8 @@ always_comb begin
                         retUpd_c.isCall = 1;
                         retUpd_c.idx = IN_instrs[i].rIdx;
                         retUpd_c.addr = btUpdate_c.src[31:1];
+
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx + 1;
                     end
                 end
                 
@@ -1538,7 +1547,7 @@ always_comb begin
                     retUpd_c.compr = uop.compressed;
                     retUpd_c.isRet = 1;
                     retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
+                    retUpd_c.idx = IN_instrs[i].rIdx - 1;
                     retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
                     
                     OUT_decBranch.taken = 1;

@@ -76,20 +76,25 @@ BranchPredInfo BP_info;
 wire BP_multipleBranches;
 
 PredBranch predBr;
+wire BP_stall;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 (
     .clk(clk),
     .rst(rst),
+    .OUT_stall(BP_stall),
     
     .IN_clearICache(IN_clearICache),
     
     .IN_mispredFlush(IN_mispredFlush),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
+    .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
     .IN_misprHist(OUT_branch.taken ? OUT_branch.history : IN_decBranch.history),
     .IN_misprRIdx(OUT_branch.taken ? OUT_branch.rIdx : IN_decBranch.rIdx),
     
     .IN_pcValid(ifetchEn && fault == IF_FAULT_NONE && !pageWalkRequired),
     .IN_pc({pc, 1'b0}),
+    .IN_fetchID(fetchID),
+    .IN_comFetchID(IN_ROB_curFetchID),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
@@ -150,7 +155,7 @@ always_comb begin
     fetchIsFault = fault_c != IF_FAULT_NONE;
 end
 
-wire baseEn = IN_en && 
+wire baseEn = IN_en && !BP_stall &&
     (IN_ROB_curFetchID != fetchID);
 
 wire tryReadICache = 
@@ -397,7 +402,7 @@ always_ff@(posedge clk) begin
                             // There is a second branch in this block,
                             // go there.
                             if (BP_multipleBranches && predBr.offs != 3'b111) begin
-                                pc <=  {pc[30:3], predBr.offs + 3'b1};
+                                pc <= {pc[30:3], predBr.offs + 3'b1};
                             end
                             else begin
                                 pc <= {pc[30:3] + 28'b1, 3'b000};

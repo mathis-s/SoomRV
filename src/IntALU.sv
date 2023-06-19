@@ -226,6 +226,11 @@ always_ff@(posedge clk) begin
                 if (srcA != srcB) begin
                     OUT_branch.dstPC <= srcA;
                     OUT_branch.taken <= 1;
+
+                    if (IN_uop.opcode == INT_V_RET)
+                        OUT_branch.rIdx <= IN_uop.bpi.rIdx - 1;
+                    if (IN_uop.opcode == INT_V_JALR)
+                        OUT_branch.rIdx <= IN_uop.bpi.rIdx + 1;
                     
                     if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                         OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));

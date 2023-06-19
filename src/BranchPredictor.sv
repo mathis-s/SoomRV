@@ -5,17 +5,21 @@ module BranchPredictor
 (
     input wire clk,
     input wire rst,
-    
+    output wire OUT_stall,
+
     input wire IN_clearICache,
     
     input wire IN_mispredFlush,
     input wire IN_mispr,
+    input FetchID_t IN_misprFetchID,
     input BHist_t IN_misprHist,
     input RetStackIdx_t IN_misprRIdx,
     
     // IF interface
     input wire IN_pcValid,
     input wire[31:0] IN_pc,
+    input FetchID_t IN_fetchID,
+    input FetchID_t IN_comFetchID,
     output reg OUT_branchTaken,
     output BHist_t OUT_branchHistory,
     output BranchPredInfo OUT_branchInfo,
@@ -125,9 +129,13 @@ ReturnStack retStack
 (
     .clk(clk),
     .rst(rst),
+    .OUT_stall(OUT_stall),
 
     .IN_valid(IN_pcValid),
     .IN_pc(IN_pc[31:1]),
+    .IN_fetchID(IN_fetchID),
+    .IN_comFetchID(IN_comFetchID),
+    .IN_misprFetchID(IN_misprFetchID),
     .IN_brValid(BTB_br.valid),
     .IN_brOffs(BTB_br.offs),
     .IN_isCall(BTB_isCall),
