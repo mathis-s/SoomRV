@@ -274,11 +274,11 @@ PrivLevel priv;
 reg[4:0] fflags;
 reg[2:0] frm;
 
-reg[63:0] mcycle;
+reg[63:0] mcycle /*verilator public*/;
 reg[63:0] minstret /*verilator public*/;
-reg[63:0] mhpmcounter3; // branches
-reg[63:0] mhpmcounter4; // branch mispredicts
-reg[63:0] mhpmcounter5; // total mispredicts
+reg[63:0] mhpmcounter3 /*verilator public*/; // branches
+reg[63:0] mhpmcounter4 /*verilator public*/; // branch mispredicts
+reg[63:0] mhpmcounter5 /*verilator public*/; // total mispredicts
 
 typedef struct packed
 {
@@ -567,16 +567,19 @@ always_comb begin
         
         CSR_sip: begin
             rdata = 0;
-            rdata[1] = mip[1];
-            rdata[5] = mip[5];
-            rdata[9] = mip[9];
+            if (mideleg[1]) rdata[1] = mip[1];
+            if (mideleg[5]) rdata[5] = mip[5];
+            if (mideleg[9]) rdata[9] = mip[9];
         end
         
         CSR_sie: begin
             rdata = 0;
-            rdata[1] = mie[1];
-            rdata[5] = mie[5];
-            rdata[9] = mie[9];
+            if (mideleg[1]) rdata[1] = mie[1];
+            if (mideleg[3]) rdata[3] = mie[3];
+            if (mideleg[5]) rdata[5] = mie[5];
+            if (mideleg[7]) rdata[7] = mie[7];
+            if (mideleg[9]) rdata[9] = mie[9];
+            if (mideleg[11]) rdata[11] = mie[11];
         end
         
         CSR_satp: rdata = satp;
@@ -929,15 +932,21 @@ always_ff@(posedge clk) begin
                             end
                             
                             CSR_sip: begin
-                                mip[1] <= wdata[1]; // SSIP
-                                //mip[5] <= wdata[5]; // STIP
-                                //mip[9] <= wdata[9]; // SEIP
+                                if (mideleg[1]) mip[1] <= wdata[1];
+                                // mip[3] <= wdata[3];   // MSIP
+                                if (mideleg[5]) mip[5] <= wdata[5];
+                                //mip[7] <= wdata[7];    // timer
+                                if (mideleg[9]) mip[9] <= wdata[9];
+                                // mip[11] <= wdata[11]; // external
                             end
                             
                             CSR_sie: begin
-                                mie[1] <= wdata[1];
-                                mie[5] <= wdata[5];
-                                mie[9] <= wdata[9];
+                                if (mideleg[1]) mie[1] <= wdata[1];
+                                if (mideleg[3]) mie[3] <= wdata[3];
+                                if (mideleg[5]) mie[5] <= wdata[5];
+                                if (mideleg[7]) mie[7] <= wdata[7];
+                                if (mideleg[9]) mie[9] <= wdata[9];
+                                if (mideleg[11]) mie[11] <= wdata[11];
                             end
                             
                             CSR_satp: begin
