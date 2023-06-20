@@ -1095,7 +1095,7 @@ int main(int argc, char** argv)
             LogInstructions();
 
         // Input
-        if ((main_time & 0xfff) == 0)
+        if ((main_time & 0xff) == 0)
             HandleInput();
 
         // Hang Detection

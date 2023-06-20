@@ -59,7 +59,7 @@ always_ff@(posedge clk) begin
                         else if (rmask == 4'b0010 && ({IN_bus[29:0], 2'b0} & (~32'h78000000)) == ((`SERIAL_ADDR + 4) & (~32'h78000000)))
                             outBus <= 32'h6000 | (inputAvail ? 32'h0100 : 32'h0);
                         else
-                            outBus <= mmioDummy;
+                            outBus <= 0;
 
                         OUT_stall <= 0;
                         state <= 0;
