@@ -273,8 +273,8 @@ always_ff@(posedge clk) begin
 
         // Look up tags and availability of operands for new instructions
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            //OUT_uop[i].pc <= IN_uop[i].pc;
             OUT_uop[i].imm <= IN_uop[i].imm;
+            OUT_uop[i].imm12 <= IN_uop[i].imm12;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
             

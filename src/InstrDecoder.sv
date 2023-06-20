@@ -212,13 +212,6 @@ module InstrDecoder
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
 
-reg RS_inValid;
-reg[30:0] RS_inData;
-
-reg RS_outValid = 0;
-reg RS_inPop;
-reg[30:0] RS_outData = 0;
-
 
 D_UOp uop;
 reg invalidEnc;
@@ -240,9 +233,6 @@ always_comb begin
     retUpd_c = 'x;
     retUpd_c.valid = 0;
     
-    RS_inValid = 0;
-    RS_inData = 31'bx;
-    RS_inPop = 0;
     OUT_decBranch = 'x;
     OUT_decBranch.taken = 0;
     validMask = 4'b1111;
@@ -282,6 +272,8 @@ always_comb begin
             reg isCall = 0;
             reg isJump = 0;
             reg[30:0] branchTarget = 'x;
+            
+            reg[30:0] lateReturnAddr = IN_instrs[i].targetIsRetAddr ? IN_instrs[i].predTarget : IN_lateRetAddr;
             
             if (IN_instrs[i].predInvalid) begin
                 // A branch was predicted that is impossible considering actual instruction boundaries
@@ -448,27 +440,31 @@ always_comb begin
                         if (uop.rd == 0) uop.fu = FU_RN;
                     end
                     `OPC_JALR: begin
+
+                        reg rdIsLink = (instr.rd == 1 || instr.rd == 5);
+                        reg rs1IsLink = (instr.rs0 == 1 || instr.rs0 == 5);
+                        
                         uop.fu = FU_INT;
                         uop.rs0 = instr.rs0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
+                        // actual RISC-V instr immediate is encoded in imm12
+                        uop.imm12 = instr[31:20];
 
-                        if (uop.imm == 0) begin
-                            isIndirBranch = 1;
-                            isReturn = (uop.rs0 == 1);
-                            uop.opcode = (uop.rs0 == 1) ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
-                            
-                            if (IN_instrs[i].predTaken)
-                                uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                            else if (isReturn)
-                                uop.imm = {IN_lateRetAddr, 1'b0};
-                            else 
-                                uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        end
-                        else begin
-                            uop.opcode = INT_JALR; 
-                        end
-
+                        isIndirBranch = 1;
+                        isReturn = (uop.rs0 == 1 && uop.imm12 == 0);
+                        isCall = rdIsLink;
+                        uop.opcode = isReturn ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
+                        
+                        // the regular imm field is used to pass the speculated
+                        // destination (for the ALU to check)
+                        if (IN_instrs[i].predTaken)
+                            uop.imm = {IN_instrs[i].predTarget, 1'b0};
+                        else if (isReturn)
+                            uop.imm = {lateReturnAddr, 1'b0};
+                        else 
+                            uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
+                        
                         invalidEnc = 0;
                     end
                     `OPC_LOAD: begin
@@ -1216,9 +1212,6 @@ always_comb begin
                         isCall = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
 
-                        RS_inValid = 1;
-                        RS_inData = IN_instrs[i].pc + 1;
-
                         invalidEnc = 0;
                     end
                     // c.beqz
@@ -1393,14 +1386,14 @@ always_comb begin
                         isReturn = (i16.cr.rd_rs1 == 1);
                         uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JR;
                         uop.immB = 1;
+                        uop.imm12 = 0;
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
                         else if (isReturn)
-                            uop.imm = {IN_lateRetAddr, 1'b0};
+                            uop.imm = {lateReturnAddr, 1'b0};
                         else 
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        
 
                         invalidEnc = 0;
                     end
@@ -1411,8 +1404,10 @@ always_comb begin
                         uop.rd = 1;
                         
                         isIndirBranch = 1;
+                        isCall = 1;
                         uop.opcode = INT_V_JALR;
                         uop.immB = 1;
+                        uop.imm12 = 0;
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
@@ -1465,9 +1460,16 @@ always_comb begin
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
-                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
+
+                    if (isCall && !isReturn)
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx + 1;
+                    else if (!isCall && isReturn)
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx - 1;
+                    else
+                        OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                 
                     // Delete matching return prediction entries
+                    // TODO: Only clean if this actuall was an invalid return pred
                     retUpd_c.valid = 1;
                     retUpd_c.cleanRet = 1;
                     retUpd_c.compr = uop.compressed;
@@ -1518,19 +1520,27 @@ always_comb begin
                     btUpdate_c.dst = {branchTarget, 1'b0};
                     btUpdate_c.compressed = uop.compressed;
                     btUpdate_c.isJump = isJump;
-                    
-                    // Update return stack
-                    if (isCall) begin
-                        retUpd_c.valid = 1;
-                        retUpd_c.cleanRet = 0;
-                        retUpd_c.compr = uop.compressed;
-                        retUpd_c.isRet = 0;
-                        retUpd_c.isCall = 1;
-                        retUpd_c.idx = IN_instrs[i].rIdx;
-                        retUpd_c.addr = btUpdate_c.src[31:1];
-                    end
                 end
                 
+                // Update return stack
+                if (isCall) begin
+                    retUpd_c.valid = 1;
+                    retUpd_c.cleanRet = 0;
+                    retUpd_c.compr = uop.compressed;
+                    retUpd_c.isRet = 0;
+                    retUpd_c.isCall = 1;
+                    retUpd_c.idx = IN_instrs[i].rIdx;
+                    retUpd_c.addr = uop.compressed ? {IN_instrs[i].pc} : ({IN_instrs[i].pc} + 1);
+
+                    OUT_decBranch.rIdx = IN_instrs[i].rIdx + 1;
+                    
+                    if (isIndirBranch) begin
+                        OUT_decBranch.taken = 1;
+                        OUT_decBranch.history = IN_instrs[i].history;
+                        OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                        OUT_decBranch.dst = retUpd_c.addr;
+                    end
+                end
                 // Update return stack for non-predicted rets
                 else if (isReturn) begin
                     retUpd_c.valid = 1;
@@ -1538,14 +1548,14 @@ always_comb begin
                     retUpd_c.compr = uop.compressed;
                     retUpd_c.isRet = 1;
                     retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
+                    retUpd_c.idx = IN_instrs[i].rIdx - 1;
                     retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
                     
                     OUT_decBranch.taken = 1;
                     OUT_decBranch.history = IN_instrs[i].history;
                     OUT_decBranch.fetchID = IN_instrs[i].fetchID;
-                    OUT_decBranch.rIdx = IN_instrs[i].rIdx;
-                    OUT_decBranch.dst = IN_lateRetAddr;
+                    OUT_decBranch.rIdx = IN_instrs[i].rIdx - 1;
+                    OUT_decBranch.dst = lateReturnAddr;
                 end
             end
         end

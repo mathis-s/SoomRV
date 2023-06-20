@@ -51,6 +51,8 @@ module IssueQueue
 );
 
 localparam ID_LEN = $clog2(SIZE);
+localparam IMM_EXT = ((32 - IMM_BITS) > 0) ? (32 - IMM_BITS) : 0;
+localparam REGULAR_IMM_BITS = (IMM_BITS < 32) ? IMM_BITS : 32;
 
 
 typedef struct packed
@@ -185,7 +187,7 @@ always_ff@(posedge clk) begin
                         issued = 1;
                         OUT_valid <= 1;
                         
-                        OUT_uop.imm <= {{(32 - IMM_BITS){1'b0}}, queue[i].imm};
+                        OUT_uop.imm <= {{(IMM_EXT){1'b0}}, queue[i].imm[REGULAR_IMM_BITS-1:0]};
                         
                         OUT_uop.tagA <= queue[i].tags[0];
                         
@@ -217,6 +219,13 @@ always_ff@(posedge clk) begin
                         OUT_uop.loadSqN <= queue[i].loadSqN;
                         OUT_uop.fu <= queue[i].fu;
                         OUT_uop.compressed <= queue[i].compressed;
+
+                        if (IMM_BITS == 36 && FU0 == FU_INT) begin
+                            // verilator lint_off SELRANGE
+                            OUT_uop.imm12 <= {queue[i].imm[35:32], queue[i].imm[0], queue[i].tags[1]};
+                            // verilator lint_on SELRANGE
+                        end
+                        else OUT_uop.imm12 <= 'x;
                         
                         // Shift other ops forward
                         for (integer j = i; j < SIZE-1; j=j+1) begin
@@ -242,7 +251,8 @@ always_ff@(posedge clk) begin
                     
                     R_ST_UOp temp;
                     
-                    temp.imm = IN_uop[i].imm[IMM_BITS-1:0];
+                    temp.imm = 0;
+                    temp.imm[REGULAR_IMM_BITS-1:0] = IN_uop[i].imm[REGULAR_IMM_BITS-1:0];
                     
                     temp.avail[0] = IN_uop[i].availA;
                     temp.tags[0] = IN_uop[i].tagA;
@@ -288,14 +298,29 @@ always_ff@(posedge clk) begin
                         else temp.avail[2] = 1;
                         // verilator lint_on SELRANGE
                     end
-                    
                     if (FU0 == FU_ST || FU0 == FU_LD)
                         if (temp.fu == FU_ATOMIC) begin
                             temp.fu = FuncUnit'(FU0);
                         end
                     
+                    // Special handling for jalr
+                    if (IN_uop[i].fu == FU_INT && (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)) begin
+                        assert(IMM_BITS == 36);
+                        // verilator lint_off SELRANGE
+                        
+                        // Use {imm[0], tags[1]} to encode 8 bits of imm12
+                        temp.tags[1] = IN_uop[i].imm12[6:0];
+                        temp.imm[0] = IN_uop[i].imm12[7];
+
+                        // rest goes into upper 4 bits of 36 (!) immediate bits
+                        temp.imm[35:32] = IN_uop[i].imm12[11:8];
+
+                        // tags[1] is not used for register encoding, thus is always valid
+                        temp.avail[1] = 1;
+                        // verilator lint_on SELRANGE
+                    end
+
                     queue[insertIndex[ID_LEN-1:0]] <= temp;
-                    
                     insertIndex = insertIndex + 1;
                 end
             end

@@ -79,7 +79,6 @@ always_comb begin
         INT_V_JR,
         INT_V_RET,
         INT_V_JALR,
-        INT_JALR,
         INT_JAL: resC = (IN_uop.compressed ? pcPlus2 : pcPlus4);
         INT_SYS: resC = 32'bx;
         INT_SH1ADD: resC = srcB + (srcA << 1);
@@ -124,8 +123,7 @@ reg branchTaken;
 
 always_comb begin
     case (IN_uop.opcode)
-        INT_JAL,
-        INT_JALR: branchTaken = 1;
+        INT_JAL: branchTaken = 1;
         INT_BEQ: branchTaken = (srcA == srcB);
         INT_BNE: branchTaken = (srcA != srcB);
         INT_BLT: branchTaken = lessThan;
@@ -158,9 +156,29 @@ always_comb begin
         
 end
 
+reg indBranchCorrect;
+reg[31:0] indBranchDst;
+always_comb begin
+    indBranchCorrect = 'x;
+    indBranchDst = 'x;
+    case (IN_uop.opcode)
+        INT_V_RET: begin
+            indBranchDst = srcA;
+            indBranchDst[0] = 0;
+            indBranchCorrect = (indBranchDst[31:1] == srcB[31:1]);
+        end
+        INT_V_JALR,
+        INT_V_JR: begin
+            indBranchDst = (srcA + {{20{imm[11]}}, imm[11:0]});
+            indBranchDst[0] = 0;
+            indBranchCorrect = (indBranchDst[31:1] == srcB[31:1]);
+        end
+        default: ;
+    endcase
+end
+
 always_ff@(posedge clk) begin
     
-
     OUT_uop <= 'x;
     OUT_branch <= 'x;
     OUT_btUpdate <= 'x;
@@ -217,19 +235,20 @@ always_ff@(posedge clk) begin
                     OUT_branch.taken <= 1;
                 end
             end
-            else if (IN_uop.opcode == INT_JALR) begin
-                OUT_branch.dstPC <= srcA + srcB;
-                OUT_branch.taken <= 1;
-            end
             // Check speculated return address
             else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
-                if (srcA != srcB) begin
-                    OUT_branch.dstPC <= srcA;
+                if (!indBranchCorrect) begin
+                    OUT_branch.dstPC <= indBranchDst;
                     OUT_branch.taken <= 1;
+
+                    if (IN_uop.opcode == INT_V_RET)
+                        OUT_branch.rIdx <= IN_uop.bpi.rIdx - 1;
+                    if (IN_uop.opcode == INT_V_JALR)
+                        OUT_branch.rIdx <= IN_uop.bpi.rIdx + 1;
                     
                     if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                         OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
-                        OUT_btUpdate.dst <= srcA[31:0];
+                        OUT_btUpdate.dst <= indBranchDst;
                         OUT_btUpdate.isJump <= 1;
                         OUT_btUpdate.isCall <= (IN_uop.opcode == INT_V_JALR);
                         OUT_btUpdate.compressed <= IN_uop.compressed;
