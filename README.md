@@ -23,7 +23,7 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces)
 4. To run bare-metal code, use `./obj_dir/VTop <assembly file>`.  
 For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone.
-5. To build and run Linux, use `make linux`.  
+5. To build and run Linux, use `make linux`. Log in as `root`, no password.  
 Building Linux and booting it in simulation takes at least a few hours!
 
 ### Console
