@@ -19,7 +19,7 @@ typedef struct packed
     logic ce;
     logic we;
     logic[3:0] wm;
-    logic[29:0] addr;
+    logic[`CACHE_SIZE_E-3:0] addr;
     logic[31:0] data;
 } CacheIF;
 
@@ -39,7 +39,7 @@ MemoryController memc
     .OUT_CACHE_we('{MC_DC_if[1].we, MC_DC_if[0].we}),
     .OUT_CACHE_ce('{MC_DC_if[1].ce, MC_DC_if[0].ce}),
     .OUT_CACHE_wm('{MC_DC_if[1].wm, MC_DC_if[0].wm}),
-    .OUT_CACHE_addr('{MC_DC_if[1].addr[9:0], MC_DC_if[0].addr[9:0]}),
+    .OUT_CACHE_addr('{MC_DC_if[1].addr, MC_DC_if[0].addr}),
     .OUT_CACHE_data('{MC_DC_if[1].data, MC_DC_if[0].data}),
     .IN_CACHE_data('{32'bx, DC_dataOut}),
     
@@ -50,8 +50,6 @@ MemoryController memc
     .IN_EXT_bus(IN_bus)
 );
 
-assign MC_DC_if[0].addr[29:10] = 0;
-
 IF_Mem IF_mem();
 IF_MMIO IF_mmio();
 IF_CSR_MMIO IF_csr_mmio();
@@ -61,7 +59,7 @@ always_comb begin
     CORE_DC_if.ce = IF_mem.we;
     CORE_DC_if.we = IF_mem.we;
     CORE_DC_if.wm = IF_mem.wmask;
-    CORE_DC_if.addr = IF_mem.waddr;
+    CORE_DC_if.addr = IF_mem.waddr[`CACHE_SIZE_E-3:0];
     CORE_DC_if.data = IF_mem.wdata;
 end
 
@@ -105,35 +103,35 @@ wire[31:0] dcache_out1 = dcache_readSelect1[1] ? dcache1_out1 : dcache0_out1;
 
 wire[31:0] dcache0_out0;
 wire[31:0] dcache0_out1;
-MemRTL#(32, 512) dcache0
+MemRTL#(32, (1 << (`CACHE_SIZE_E - 3))) dcache0
 (
     .clk(clk),
     .IN_nce(!(!DC_if0.ce && DC_if0.addr[0] == 1'b0)),
     .IN_nwe(DC_if0.we),
-    .IN_addr(DC_if0.addr[9:1]),
+    .IN_addr(DC_if0.addr[(`CACHE_SIZE_E-3):1]),
     .IN_data(DC_if0.data),
     .IN_wm(DC_if0.wm),
     .OUT_data(dcache0_out0),
     
     .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 0)),
-    .IN_addr1(IF_mem.raddr[9:1]),
+    .IN_addr1(IF_mem.raddr[(`CACHE_SIZE_E-3):1]),
     .OUT_data1(dcache0_out1)
 );
 
 wire[31:0] dcache1_out0;
 wire[31:0] dcache1_out1;
-MemRTL#(32, 512) dcache1
+MemRTL#(32, (1 << (`CACHE_SIZE_E - 3))) dcache1
 (
     .clk(clk),
     .IN_nce(!(!DC_if1.ce && DC_if1.addr[0] == 1'b1)),
     .IN_nwe(DC_if1.we),
-    .IN_addr(DC_if1.addr[9:1]),
+    .IN_addr(DC_if1.addr[(`CACHE_SIZE_E-3):1]),
     .IN_data(DC_if1.data),
     .IN_wm(DC_if1.wm),
     .OUT_data(dcache1_out0),
     
     .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 1)),
-    .IN_addr1(IF_mem.raddr[9:1]),
+    .IN_addr1(IF_mem.raddr[(`CACHE_SIZE_E-3):1]),
     .OUT_data1(dcache1_out1)
 );
 
@@ -144,18 +142,18 @@ assign IF_mem.rdata = dcache_out1;
 assign IF_mem.rbusy = 1'b0;
 assign IF_mem.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
 
-MemRTL#(64, 512) icache
+MemRTL#(64, (1 << (`CACHE_SIZE_E - 3))) icache
 (
     .clk(clk),
     .IN_nce(MC_DC_used[1] ? MC_DC_if[1].ce : CORE_instrReadEnable),
     .IN_nwe(MC_DC_used[1] ? MC_DC_if[1].we : 1'b1),
-    .IN_addr(MC_DC_used[1] ? MC_DC_if[1].addr[9:1] : {CORE_instrReadAddress[7:0], 1'b1}),
+    .IN_addr(MC_DC_used[1] ? MC_DC_if[1].addr[(`CACHE_SIZE_E-3):1] : {CORE_instrReadAddress[(`CACHE_SIZE_E-5):0], 1'b1}),
     .IN_data({MC_DC_if[1].data, MC_DC_if[1].data}),
     .IN_wm({{4{MC_DC_if[1].addr[0]}}, {4{~MC_DC_if[1].addr[0]}}}),
     .OUT_data(CORE_instrReadData[127:64]),
     
     .IN_nce1(CORE_instrReadEnable),
-    .IN_addr1({CORE_instrReadAddress[7:0], 1'b0}),
+    .IN_addr1({CORE_instrReadAddress[(`CACHE_SIZE_E-5):0], 1'b0}),
     .OUT_data1(CORE_instrReadData[63:0])
 );
 

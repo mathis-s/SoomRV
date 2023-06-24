@@ -1,8 +1,8 @@
 module CacheController
 #(
-    parameter SIZE=32,
     parameter ASSOC=4,
     parameter CLSIZE_E=7,
+    parameter SIZE=(1<<(`CACHE_SIZE_E - CLSIZE_E)),
     localparam TOTAL_UOPS = 2
 )
 (

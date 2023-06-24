@@ -311,7 +311,7 @@ typedef struct packed
 {
     MemC_Cmd cmd;
     logic[31:0] data;
-    logic[9:0] sramAddr;
+    logic[`CACHE_SIZE_E-3:0] sramAddr;
     logic[29:0] extAddr;
     logic[0:0] cacheID;
     logic[2:0] rqID;

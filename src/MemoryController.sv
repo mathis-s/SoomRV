@@ -10,7 +10,7 @@ module MemoryController#(parameter NUM_CACHES=2)
     output reg OUT_CACHE_we[NUM_CACHES-1:0],
     output reg OUT_CACHE_ce[NUM_CACHES-1:0],
     output reg[3:0] OUT_CACHE_wm[NUM_CACHES-1:0],
-    output reg[9:0] OUT_CACHE_addr[NUM_CACHES-1:0],
+    output reg[`CACHE_SIZE_E-3:0] OUT_CACHE_addr[NUM_CACHES-1:0],
     output reg[31:0] OUT_CACHE_data[NUM_CACHES-1:0],
     input wire[31:0] IN_CACHE_data[NUM_CACHES-1:0],
     
@@ -67,7 +67,7 @@ wire CACHEIF_busy;
 
 wire CACHEIF_ce;
 wire CACHEIF_we;
-wire[9:0] CACHEIF_addr;
+wire[`CACHE_SIZE_E-3:0] CACHEIF_addr;
 wire[31:0] CACHEIF_data;
 always_comb begin
     for (integer i = 0; i < 2; i=i+1) begin
@@ -79,7 +79,7 @@ always_comb begin
     OUT_CACHE_ce[idCacheIF] = CACHEIF_ce;
     OUT_CACHE_we[idCacheIF] = CACHEIF_we;
 end
-CacheInterface cacheIF
+CacheInterface#(.ADDR_BITS(`CACHE_SIZE_E-2)) cacheIF
 (
     .clk(clk),
     .rst(rst),

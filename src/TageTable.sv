@@ -54,7 +54,7 @@ always_ff@(posedge clk) begin
          
     if (rst) begin
         decrCnt <= 0;
-`ifdef __ICARUS__
+`ifdef SYNC_RESET
         for (integer i = 0; i < SIZE; i=i+1)
             entries[i] <= '0;
 `endif

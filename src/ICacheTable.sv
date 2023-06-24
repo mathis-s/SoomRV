@@ -1,5 +1,5 @@
 
-module ICacheTable#(parameter NUM_ICACHE_LINES=32, parameter ASSOC=2, parameter CLSIZE_E=7)
+module ICacheTable#(parameter ASSOC=2, parameter CLSIZE_E=7, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-CLSIZE_E)))
 (
     input wire clk,
     input wire rst,
@@ -52,23 +52,28 @@ assign OUT_stall = (!cacheEntryFound || state != IDLE) && IN_lookupValid;
 
 reg[$clog2(ASSOC)-1:0] loadAssocIdx;
 reg[$clog2(LEN)-1:0] loadIdx;
+reg[$clog2(LEN)-1:0] cleanIdx;
 
-enum logic[1:0]
+enum logic[2:0]
 {
     IDLE,
     LOAD_RQ,
     LOAD_ACTIVE,
-    FLUSH_WAIT
+    FLUSH_WAIT,
+    CLEAN
 } state;
 
 always_ff@(posedge clk) begin
     OUT_memc.data <= 'x;
     if (rst) begin
-        for (integer i = 0; i < LEN; i=i+1)
-            for (integer j = 0; j < ASSOC; j=j+1)
-                icacheTable[i][j].valid <= 0;
-        state <= FLUSH_WAIT;
+        state <= CLEAN;
         OUT_memc.cmd <= MEMC_NONE;
+`ifdef SYNC_RESET
+    for (integer i = 0; i < LEN; i=i+1)
+        for (integer j = 0; j < ASSOC; j=j+1)
+            icacheTable[i][j].valid <= 0;
+    state <= FLUSH_WAIT;
+`endif
     end
     else begin
         if (IN_lookupValid && cacheEntryFound) begin
@@ -77,6 +82,19 @@ always_ff@(posedge clk) begin
         end
 
         case (state)
+`ifndef SYNC_RESET
+            CLEAN: begin
+                for (integer i = 0; i < ASSOC; i=i+1) begin
+                    icacheTable[cleanIdx][i] <= 'x;
+                    icacheTable[cleanIdx][i].valid <= 0;
+                end
+                if (cleanIdx == LEN - 1) begin
+                    state <= FLUSH_WAIT;
+                    cleanIdx <= 'x;
+                end
+                else cleanIdx <= cleanIdx + 1;
+            end
+`endif
             FLUSH_WAIT: begin
                 if (!IN_memc.busy || IN_memc.rqID != 1)
                     state <= IDLE;
