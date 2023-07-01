@@ -50,17 +50,18 @@ MemoryController memc
     .IN_EXT_bus(IN_bus)
 );
 
-IF_Mem IF_mem();
+IF_Cache IF_cache();
+IF_CTable IF_ct();
 IF_MMIO IF_mmio();
 IF_CSR_MMIO IF_csr_mmio();
 
 CacheIF CORE_DC_if;
 always_comb begin
-    CORE_DC_if.ce = IF_mem.we;
-    CORE_DC_if.we = IF_mem.we;
-    CORE_DC_if.wm = IF_mem.wmask;
-    CORE_DC_if.addr = IF_mem.waddr[`CACHE_SIZE_E-3:0];
-    CORE_DC_if.data = IF_mem.wdata;
+    CORE_DC_if.ce = IF_cache.we;
+    CORE_DC_if.we = IF_cache.we;
+    CORE_DC_if.wm = IF_cache.wmask;
+    CORE_DC_if.addr = {IF_cache.wassoc, IF_cache.waddr[11:2]};
+    CORE_DC_if.data = IF_cache.wdata;
 end
 
 wire CORE_instrReadEnable;
@@ -73,7 +74,8 @@ Core core
     .rst(rst),
     .en(en),
     
-    .IF_mem(IF_mem),
+    .IF_cache(IF_cache),
+    .IF_ct(IF_ct),
     .IF_mmio(IF_mmio),
     .IF_csr_mmio(IF_csr_mmio),
     
@@ -86,6 +88,8 @@ Core core
 );
 
 
+wire[9:0] CORE_raddr = IF_cache.raddr[11:2];
+
 wire[31:0] DC_dataOut;
 
 wire CacheIF DC_if0 = (MC_DC_used[0] && MC_DC_if[0].addr[0] == 0) ? MC_DC_if[0] : CORE_DC_if;
@@ -93,54 +97,71 @@ wire CacheIF DC_if1 = (MC_DC_used[0] && MC_DC_if[0].addr[0] == 1) ? MC_DC_if[0] 
 
 reg[1:0] dcache_readSelect0;
 reg[1:0] dcache_readSelect1;
+reg[1:0][$clog2(`CASSOC)-1:0] MEMC_readAssoc;
 always_ff@(posedge clk) begin
     dcache_readSelect0 <= {dcache_readSelect0[0], MC_DC_if[0].addr[0]};
-    dcache_readSelect1 <= {dcache_readSelect1[0], IF_mem.raddr[0]};
+    dcache_readSelect1 <= {dcache_readSelect1[0], CORE_raddr[0]};
+    MEMC_readAssoc <= {MEMC_readAssoc[0], MC_DC_if[0].addr[11:10]};
 end
 
-wire[31:0] dcache_out0 = dcache_readSelect0[1] ? dcache1_out0 : dcache0_out0;
-wire[31:0] dcache_out1 = dcache_readSelect1[1] ? dcache1_out1 : dcache0_out1;
+wire[`CASSOC-1:0][31:0] dcache_out0 = dcache_readSelect0[1] ? dcache1_out0 : dcache0_out0;
+wire[`CASSOC-1:0][31:0] dcache_out1 = dcache_readSelect1[1] ? dcache1_out1 : dcache0_out1;
 
-wire[31:0] dcache0_out0;
-wire[31:0] dcache0_out1;
-MemRTL#(32, (1 << (`CACHE_SIZE_E - 3))) dcache0
+wire[`CASSOC-1:0][31:0] dcache0_out0;
+wire[`CASSOC-1:0][31:0] dcache0_out1;
+MemRTL#(32 * `CASSOC, (1 << (`CACHE_SIZE_E - 3 - $clog2(`CASSOC)))) dcache0
 (
     .clk(clk),
     .IN_nce(!(!DC_if0.ce && DC_if0.addr[0] == 1'b0)),
     .IN_nwe(DC_if0.we),
-    .IN_addr(DC_if0.addr[(`CACHE_SIZE_E-3):1]),
-    .IN_data(DC_if0.data),
-    .IN_wm(DC_if0.wm),
+    .IN_addr(DC_if0.addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
+    .IN_data({4{DC_if0.data}}),
+    .IN_wm({12'b0, DC_if0.wm} << (DC_if0.addr[11:10] * 4)),
     .OUT_data(dcache0_out0),
     
-    .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 0)),
-    .IN_addr1(IF_mem.raddr[(`CACHE_SIZE_E-3):1]),
+    .IN_nce1(!(!IF_cache.re && CORE_raddr[0] == 0)),
+    .IN_addr1(CORE_raddr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
     .OUT_data1(dcache0_out1)
 );
 
-wire[31:0] dcache1_out0;
-wire[31:0] dcache1_out1;
-MemRTL#(32, (1 << (`CACHE_SIZE_E - 3))) dcache1
+wire[`CASSOC-1:0][31:0] dcache1_out0;
+wire[`CASSOC-1:0][31:0] dcache1_out1;
+MemRTL#(32 * `CASSOC, (1 << (`CACHE_SIZE_E - 3 - $clog2(`CASSOC)))) dcache1
 (
     .clk(clk),
     .IN_nce(!(!DC_if1.ce && DC_if1.addr[0] == 1'b1)),
     .IN_nwe(DC_if1.we),
-    .IN_addr(DC_if1.addr[(`CACHE_SIZE_E-3):1]),
-    .IN_data(DC_if1.data),
-    .IN_wm(DC_if1.wm),
+    .IN_addr(DC_if1.addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
+    .IN_data({4{DC_if1.data}}),
+    .IN_wm({12'b0, DC_if1.wm} << (DC_if1.addr[11:10] * 4)),
     .OUT_data(dcache1_out0),
     
-    .IN_nce1(!(!IF_mem.re && IF_mem.raddr[0] == 1)),
-    .IN_addr1(IF_mem.raddr[(`CACHE_SIZE_E-3):1]),
+    .IN_nce1(!(!IF_cache.re && CORE_raddr[0] == 1)),
+    .IN_addr1(CORE_raddr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
     .OUT_data1(dcache1_out1)
 );
 
+MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable
+(
+    .clk(clk),
+    .IN_nce(!(IF_ct.re[1] || IF_ct.we)),
+    .IN_nwe(!IF_ct.we),
+    .IN_addr({IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1]}[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+    .IN_data({4{IF_ct.wdata}}),
+    .IN_wm(1 << IF_ct.wassoc),
+    .OUT_data(IF_ct.rdata[1]),
+    
+    .IN_nce1(!IF_ct.re[0]),
+    .IN_addr1(IF_ct.raddr[0][11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+    .OUT_data1(IF_ct.rdata[0])
+);
 
-assign DC_dataOut = dcache_out0;
-assign IF_mem.rdata = dcache_out1;
 
-assign IF_mem.rbusy = 1'b0;
-assign IF_mem.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
+assign DC_dataOut = dcache_out0[MEMC_readAssoc[1]];
+assign IF_cache.rdata = dcache_out1;
+
+assign IF_cache.rbusy = 1'b0;
+assign IF_cache.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
 
 MemRTL#(64, (1 << (`CACHE_SIZE_E - 3))) icache
 (

@@ -49,7 +49,7 @@ SRC_FILES = \
 	src/TageTable.sv \
 	src/PCFile.sv \
 	src/TagePredictor.sv \
-	src/LoadStoreUnit.sv \
+	src/LoadStoreUnit2.sv \
 	src/ICacheTable.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
@@ -59,6 +59,7 @@ SRC_FILES = \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
 	src/LoadMissQueue.sv \
+	src/StoreMissQueue.sv \
 	src/TLB.sv \
 	src/BypassLSU.sv \
 	src/TValSelect.sv \

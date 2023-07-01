@@ -780,6 +780,71 @@ interface IF_Mem();
     );
 endinterface
 
+interface IF_Cache();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    logic[31:0] wdata;
+    logic[3:0] wmask;
+    
+    logic re;
+    logic[11:0] raddr;
+    logic[`CASSOC-1:0][31:0] rdata;
+    
+    logic rbusy;
+    logic wbusy;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, wmask, re, raddr,
+        input rdata, rbusy, wbusy
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, wmask, re, raddr,
+        output rdata, rbusy, wbusy
+    );
+endinterface
+
+typedef struct packed
+{
+    logic[19:0] addr;
+    logic valid;
+} CTEntry;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic[3:0] mask;
+    logic valid;
+} StFwdResult;
+
+interface IF_CTable();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    CTEntry wdata;
+    
+    logic re[1:0];
+    logic[11:0] raddr[1:0];
+    CTEntry[1:0][`CASSOC-1:0] rdata;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, re, raddr,
+        output rdata
+    );
+endinterface
+
 interface IF_MMIO();
     
     localparam ADDR_LEN=32;

@@ -29,10 +29,10 @@ struct packed
 } queue[SIZE-1:0];
 
 always_comb begin
-    OUT_full = 1;
+    OUT_full = 0;
     for (integer i = 0; i < SIZE; i=i+1) begin
-        if (!queue[i].ld.valid)
-            OUT_full = 0;
+        if (queue[i].ld.valid)
+            OUT_full = 1;
     end
 end
 
@@ -80,6 +80,7 @@ always_ff@(posedge clk) begin
         end  
 
         // Dequeue
+        // TODO: dequeue only one op when doing IN_ready dequeue (we can only handle one miss anyways)
         if (IN_dequeue || !(OUT_ld.external || !IN_branch.taken || $signed(OUT_ld.sqN - IN_branch.sqN) <= 0)) begin
             OUT_ld <= 'x;
             OUT_ld.valid <= 0;

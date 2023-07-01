@@ -1,7 +1,8 @@
 module MemRTL
 #(
     parameter WORD_SIZE=32,
-    parameter NUM_WORDS=1024
+    parameter NUM_WORDS=1024,
+    parameter WRITE_SIZE=8
 )
 (
     input wire clk,
@@ -10,7 +11,7 @@ module MemRTL
     input wire IN_nwe,
     input wire[$clog2(NUM_WORDS)-1:0] IN_addr,
     input wire[WORD_SIZE-1:0] IN_data,
-    input wire[(WORD_SIZE/8)-1:0] IN_wm,
+    input wire[(WORD_SIZE/WRITE_SIZE)-1:0] IN_wm,
     output reg[WORD_SIZE-1:0] OUT_data,
     
     input wire IN_nce1,
@@ -26,7 +27,7 @@ reg we_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr1_reg;
 reg[WORD_SIZE-1:0] data_reg;
-reg[(WORD_SIZE/8)-1:0] wm_reg;
+reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
 
 reg dbgMultiple;
 
@@ -44,9 +45,9 @@ always@(posedge clk) begin
     
     if (!ce_reg) begin
         if (!we_reg) begin
-            for (integer i = 0; i < WORD_SIZE/8; i=i+1) begin
+            for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
                 if (wm_reg[i])
-                    mem[addr_reg][(8*i)+:8] <= data_reg[(8*i)+:8];
+                    mem[addr_reg][(WRITE_SIZE*i)+:WRITE_SIZE] <= data_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
             end
             //$display("write %x to %x (%b)", data_reg, addr_reg, wm_reg);
             // OUT_data <= 0;
@@ -60,7 +61,7 @@ always@(posedge clk) begin
         OUT_data1 <= mem[addr1_reg];
     end
     
-    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg) begin
+    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg && 0) begin
         $display("Warning: Multiple %m accesses at same address %x, we=%b", addr_reg, we_reg);
         dbgMultiple <= 1;
         OUT_data1 <= 'x;

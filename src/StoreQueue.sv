@@ -30,8 +30,9 @@ module StoreQueue
     
     output ST_UOp OUT_uopSt,
     
-    output reg[31:0] OUT_lookupData,
-    output reg[3:0] OUT_lookupMask,
+    output StFwdResult OUT_fwd,
+    //output reg[31:0] OUT_lookupData,
+    //output reg[3:0] OUT_lookupMask,
     
     output wire OUT_flush,
     output SqN OUT_maxStoreSqN
@@ -53,7 +54,7 @@ always_comb begin
     end
 end
 
-SQEntry evicted[1:0];
+SQEntry evicted[3:0];
 
 reg[3:0] lookupMask;
 reg[31:0] lookupData;
@@ -70,7 +71,7 @@ always_comb begin
     
     lookupData = 32'bx;
     
-    for (integer i = 0; i < 2; i=i+1) begin
+    for (integer i = 0; i < 4; i=i+1) begin
         if (/*IN_uopLd.isLoad && */evicted[i].valid && evicted[i].addr == IN_uopLd.addr[31:2] && !`IS_MMIO_PMA_W(evicted[i].addr)) begin
             if (evicted[i].wmask[0])
                 lookupData[7:0] = evicted[i].data[7:0];
@@ -104,16 +105,17 @@ end
 
 assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
 
+StFwdResult fwd;
+
 reg flushing;
 assign OUT_flush = flushing;
 reg doingEnqueue;
 always_ff@(posedge clk) begin
     didCSRwrite <= 0;
     doingEnqueue = 0;
-    if (!IN_stallLd) begin
-        OUT_lookupMask <= 'x;
-        OUT_lookupData <= 'x;
-    end
+    fwd <= 'x;
+    fwd.valid <= 0;
+    OUT_fwd <= fwd;
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -122,6 +124,8 @@ always_ff@(posedge clk) begin
         
         evicted[0].valid <= 0;
         evicted[1].valid <= 0;
+        evicted[2].valid <= 0;
+        evicted[3].valid <= 0;
         
         baseIndex = 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
@@ -154,7 +158,7 @@ always_ff@(posedge clk) begin
             OUT_uopSt.addr <= {entries[0].addr, 2'b0};
             OUT_uopSt.data <= entries[0].data;
             OUT_uopSt.wmask <= entries[0].wmask;
-            OUT_uopSt.isMMIO <= 'x;
+            OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[0].addr);
             
             for (integer i = 1; i < NUM_ENTRIES; i=i+1) begin
                 entries[i-1] <= entries[i];
@@ -162,7 +166,9 @@ always_ff@(posedge clk) begin
                     entries[i-1].ready <= 1;
             end
 
-            evicted[1] <= entries[0];
+            evicted[3] <= entries[0];
+            evicted[2] <= evicted[3];
+            evicted[1] <= evicted[2];
             evicted[0] <= evicted[1];
         end
         else if (!IN_stallSt) OUT_uopSt.valid <= 0;
@@ -194,16 +200,17 @@ always_ff@(posedge clk) begin
         end
         
         if (flushing)
-            for (integer i = 0; i < 2; i=i+1)
+            for (integer i = 0; i < 4; i=i+1)
                 evicted[i].valid <= 0;
 
         OUT_empty <= empty && !doingEnqueue;
         if (OUT_empty) flushing <= 0;
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
-        if (!IN_stallLd && IN_uopLd.valid) begin
-            OUT_lookupData <= lookupData;
-            OUT_lookupMask <= lookupMask;
+        if (IN_uopLd.valid) begin
+            fwd.valid <= 1;
+            fwd.data <= lookupData;
+            fwd.mask <= lookupMask;
         end
     end
     
