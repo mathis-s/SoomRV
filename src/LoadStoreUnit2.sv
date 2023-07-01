@@ -1,25 +1,3 @@
-
-
-// LSU outputs one of this ops for both load and store
-// For load, data already contains 
-typedef struct packed
-{
-    logic[31:0] data;
-    
-    logic signExtend;
-    logic[1:0] size;
-
-    Tag tagDst;
-    SqN sqN;
-
-    logic doNotCommit;
-    logic external; // not part of normal execution, ignore sqn, tagDst and nmDst, don't commit
-    AGU_Exception exception;
-    logic isMMIO;
-
-    logic valid;
-} LSU_UOp;
-
 module LoadStoreUnit
 #(
     parameter ASSOC=4,
@@ -202,14 +180,13 @@ always_comb begin
         if (!isMMIO) begin
             for (integer i = 0; i < `CASSOC; i=i+1) begin
                 if (IF_ct.rdata[0][i].valid && IF_ct.rdata[0][i].addr == ld.addr[31:12]) begin
-                    //assert(!cacheHit); // multiple hits are invalid
+                    assert(!cacheHit); // multiple hits are invalid
                     cacheHit = 1;
                     cacheData = IF_cache.rdata[i];
                 end
             end
             
             if (cacheTransfer && cacheLoadAddr == ld.addr[31:CLSIZE_E]) begin
-                //assert(!cacheHit);
                 cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, ld.addr[CLSIZE_E-1:2]});
                 cacheData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
             end
