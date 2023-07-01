@@ -48,7 +48,7 @@ SRC_FILES = \
 	src/TageTable.sv \
 	src/PCFile.sv \
 	src/TagePredictor.sv \
-	src/LoadStoreUnit2.sv \
+	src/LoadStoreUnit.sv \
 	src/ICacheTable.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
