@@ -221,7 +221,7 @@ always_ff@(posedge clk) begin
                 OUT_aguOp.valid <= 1;
                 OUT_uop.valid <= STORE_AGU;
             end
-                
+            
             if (LOAD_AGU) begin
                 OUT_aguOp.isLoad <= 1;
                 OUT_aguOp.doNotCommit <= IN_uop.opcode >= ATOMIC_AMOSWAP_W;
@@ -229,8 +229,6 @@ always_ff@(posedge clk) begin
                 OUT_uop <= 'x;
                 OUT_uop.valid <= 0;
                 
-                // Exception fires on Null pointer or unaligned access
-                // (Unaligned is handled in software)
                 case (IN_uop.opcode)
                     LSU_LB: begin
                         OUT_aguOp.size <= 0;
