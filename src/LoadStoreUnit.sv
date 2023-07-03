@@ -92,7 +92,6 @@ ST_UOp SMQ_st;
 ST_UOp uopSt;
 assign uopSt = SMQ_st.valid ? SMQ_st : IN_uopSt;
 
-
 wire loadValid = uopLd.valid && (!IN_branch.taken || $signed(uopLd.sqN - IN_branch.sqN) <= 0);
 
 // Both load and store read from cache table
@@ -181,7 +180,7 @@ always_comb begin
     miss[0] = 'x;
     miss[0].valid = 0;
 
-    if (ld.valid) begin
+    if (ld.valid && !rst) begin
         reg cacheHit = 0;
         reg[31:0] cacheData = 'x;
         if (!isMMIO) begin
@@ -236,7 +235,7 @@ always_comb begin
                     cacheData[16*(ld.addr[1])+:16]};
 
                 2: OUT_uopLd.result = cacheData;
-                default: ;//assert(0);
+                default: assert(0);
             endcase
         end
         else begin
@@ -271,6 +270,8 @@ always_ff@(posedge clk) begin
 end
 
 // Store
+reg setDirty;
+reg[$clog2(SIZE)-1:0] setDirtyIdx;
 always_comb begin
     ST_UOp st = stOps[1];
     reg cacheHit = 0;
@@ -285,7 +286,10 @@ always_comb begin
     miss[1] = 'x;
     miss[1].valid = 0;
 
-    if (stOps[1].valid) begin
+    setDirty = 0;
+    setDirtyIdx = 'x;
+
+    if (stOps[1].valid && !rst) begin
         
         for (integer i = 0; i < `CASSOC; i=i+1) begin
             if (IF_ct.rdata[1][i].valid && IF_ct.rdata[1][i].addr == stOps[1].addr[31:12]) begin
@@ -329,6 +333,8 @@ always_comb begin
                 IF_cache.wassoc = cacheHitAssoc;
                 IF_cache.wdata = stOps[1].data;
                 IF_cache.wmask = stOps[1].wmask;
+                setDirty = 1;
+                setDirtyIdx = {cacheHitAssoc, stOps[1].addr[11:CLSIZE_E]};
             end
             else begin
                 miss[1].valid = 1;
@@ -444,6 +450,10 @@ always_comb begin
     end
 end
 
+// keep track of dirtyness here 
+// (otherwise, we would need a separate write port to cache table)
+reg[SIZE-1:0] dirty;
+
 // Cache<->Memory Transfer State Machine
 CacheMiss curCacheMiss;
 reg[$clog2(`CASSOC)-1:0] replaceAssoc;
@@ -458,18 +468,32 @@ always_ff@(posedge clk) begin
         cacheLoadAssoc <= 0;
     end
     else begin
+        
+        if (setDirty) dirty[setDirtyIdx] <= 1;
+
         case (state)
             IDLE: begin
                 reg temp = 0;
                 cacheTransfer <= 0;
                 for (integer i = 0; i < 2; i=i+1) begin
+
+                    reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:CLSIZE_E]};
+                    MissType missType = miss[i].mtype;
+
                     if (miss[i].valid && !temp) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
                         cacheTransfer <= 1;
                         
-                        case (miss[i].mtype)
+                        // if not dirty, do not copy back to main memory
+                        if (missType == REGULAR && !dirty[missIdx] && (!setDirty || setDirtyIdx != missIdx))
+                            missType = REGULAR_NO_EVICT;
+                        
+                        // new cache line is not dirty
+                        dirty[missIdx] <= 0;
+                        
+                        case (missType)
                             REGULAR: begin
                                 state <= REPLACE_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;

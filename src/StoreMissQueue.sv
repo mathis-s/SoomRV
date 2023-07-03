@@ -29,7 +29,7 @@ struct packed
 } queue[SIZE-1:0];
 
 
-assign OUT_full = free != 0;
+assign OUT_full = !(free > 3);
 
 always_ff@(posedge clk) begin
     
@@ -39,7 +39,7 @@ always_ff@(posedge clk) begin
         OUT_st.valid <= 0;
         inIdx <= 0;
         outIdx <= 0;
-        free <= 0;
+        free <= SIZE;
     end
     else begin
 
@@ -53,7 +53,7 @@ always_ff@(posedge clk) begin
 
         // Enqueue
         if (IN_st.valid && IN_enqueue) begin
-            assert(free != SIZE);
+            assert(free != 0);
             queue[inIdx].ready <= 0;
             queue[inIdx].st <= IN_st;
             inIdx <= inIdx + 1;
@@ -66,7 +66,7 @@ always_ff@(posedge clk) begin
             OUT_st.valid <= 0;
         end
         if ((!OUT_st.valid || IN_dequeue) && !(IN_st.valid && IN_enqueue)) begin
-            if (free != 0 && (queue[outIdx].ready || IN_ready)) begin
+            if (free != SIZE && (queue[outIdx].ready || IN_ready)) begin
                 assert(queue[outIdx].st.valid);
                 OUT_st <= queue[outIdx].st;
                 outIdx <= outIdx + 1;
