@@ -384,6 +384,10 @@ LoadMissQueue#(4, CLSIZE_E) loadMissQueue
 );
 
 wire SMQ_full;
+wire SMQ_enqueue = miss[1].valid ?
+    (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT) : 
+    IF_cache.wbusy;
+
 StoreMissQueue#(4, CLSIZE_E) storeMissQueue
 (
     .clk(clk),
@@ -398,8 +402,7 @@ StoreMissQueue#(4, CLSIZE_E) storeMissQueue
     .IN_cacheLoadAddr(cacheLoadAddr),
 
     .IN_st(stOps[1]),
-    // do not enqueue mgmt ops
-    .IN_enqueue((miss[1].valid || IF_cache.wbusy) && (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT)),
+    .IN_enqueue(SMQ_enqueue),
 
     .OUT_st(SMQ_st),
     .IN_dequeue(!stall[1] && SMQ_st.valid)

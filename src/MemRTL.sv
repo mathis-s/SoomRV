@@ -31,6 +31,11 @@ reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
 
 reg dbgMultiple;
 
+initial begin
+    for (integer i = 0; i < NUM_WORDS; i=i+1)
+        mem[i] = 0;
+end
+
 always@(posedge clk) begin
 
     dbgMultiple <= 0;
@@ -49,7 +54,7 @@ always@(posedge clk) begin
                 if (wm_reg[i])
                     mem[addr_reg][(WRITE_SIZE*i)+:WRITE_SIZE] <= data_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
             end
-            //$display("write %x to %x (%b)", data_reg, addr_reg, wm_reg);
+            // $display("[%d] %m: write %x to %x (%b)", $time(), data_reg, addr_reg, wm_reg);
             // OUT_data <= 0;
         end
         else begin
