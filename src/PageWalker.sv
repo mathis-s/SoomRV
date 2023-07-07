@@ -8,7 +8,7 @@ module PageWalker#(parameter NUM_RQS=3)
     
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
-    input PW_LD_RES_UOp IN_ldResUOp
+    input RES_UOp IN_ldResUOp
 );
 
 
@@ -21,7 +21,8 @@ enum logic[1:0]
     IDLE, WAIT_FOR_LOAD
 } state;
 
-wire[31:0] nextLookup = {IN_ldResUOp.data[29:10], pageWalkAddr[21:12], 2'b0};
+wire[31:0] nextLookup = {IN_ldResUOp.result[29:10], pageWalkAddr[21:12], 2'b0};
+wire ldResValid = IN_ldResUOp.valid && IN_ldResUOp.doNotCommit && IN_ldResUOp.sqN == 0 && IN_ldResUOp.tagDst == 0;
 
 reg pageFault_c;
 reg isSuperPage_c;
@@ -29,7 +30,7 @@ reg[21:0] ppn_c;
 reg[2:0] rwx_c;
 reg[3:0] dagu_c;
 always_comb begin
-    reg[31:0] pte = IN_ldResUOp.data;
+    reg[31:0] pte = IN_ldResUOp.result;
     isSuperPage_c = pageWalkIter;
     pageFault_c = 0;
     ppn_c = pte[31:10];
@@ -101,10 +102,10 @@ always_ff@(posedge clk) begin
                 if (OUT_ldUOp.valid) begin
                     if (!IN_ldStall) OUT_ldUOp.valid <= 0;
                 end
-                else if (IN_ldResUOp.valid) begin
+                else if (ldResValid) begin
                     // Pointer to next page
                     
-                    if (IN_ldResUOp.data[3:0] == 4'b0001 && IN_ldResUOp.data[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
+                    if (IN_ldResUOp.result[3:0] == 4'b0001 && IN_ldResUOp.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
                         
                         OUT_ldUOp.valid <= 1;
                         OUT_ldUOp.addr <= nextLookup;
@@ -114,7 +115,6 @@ always_ff@(posedge clk) begin
                         state <= WAIT_FOR_LOAD;
                     end
                     else begin
-                        // this really doesn't need a delay cycle...
                         OUT_res.busy <= 0;
                         OUT_res.valid <= 1;
                         OUT_res.isSuperPage <= isSuperPage_c;

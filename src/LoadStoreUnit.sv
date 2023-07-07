@@ -2,12 +2,16 @@ module LoadStoreUnit
 #(
     parameter ASSOC=4,
     parameter CLSIZE_E=7,
-    parameter SIZE=(1<<(`CACHE_SIZE_E - CLSIZE_E)),
+    parameter SIZE=(1<<(`CACHE_SIZE_E - `CLSIZE_E)),
     localparam TOTAL_UOPS = 2
 )
 (
     input wire clk,
     input wire rst,
+
+    input wire IN_flush,
+    input wire IN_SQ_empty,
+    output wire OUT_busy,
 
     input BranchProv IN_branch,
     output wire OUT_ldStall,
@@ -78,10 +82,10 @@ end
 
 // stall only affects start of ld/st pipelines.
 wire[1:0] stall;
-assign stall[0] = (OUT_ldStall && !LMQ_ld.valid) || cacheTableWrite;
-assign stall[1] = (OUT_stStall && !SMQ_st.valid) || cacheTableWrite;
-assign OUT_ldStall = (isCacheBypassLdUOp ? BLSU_ldStall : (LMQ_full || LMQ_ld.valid || cacheTableWrite)) && IN_uopLd.valid;
-assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (SMQ_full || SMQ_st.valid || cacheTableWrite)) && IN_uopSt.valid;
+assign stall[0] = (OUT_ldStall && !LMQ_ld.valid) || cacheTableWrite || flushActive;
+assign stall[1] = (OUT_stStall && !SMQ_st.valid) || cacheTableWrite || flushActive;
+assign OUT_ldStall = (isCacheBypassLdUOp ? BLSU_ldStall : (LMQ_full || LMQ_ld.valid || cacheTableWrite || flushActive)) && IN_uopLd.valid;
+assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (SMQ_full || SMQ_st.valid || cacheTableWrite || flushActive)) && IN_uopSt.valid;
 
 LD_UOp LMQ_ld;
 LD_UOp uopLd;
@@ -92,7 +96,7 @@ ST_UOp SMQ_st;
 ST_UOp uopSt;
 assign uopSt = SMQ_st.valid ? SMQ_st : IN_uopSt;
 
-wire loadValid = uopLd.valid && (!IN_branch.taken || $signed(uopLd.sqN - IN_branch.sqN) <= 0);
+wire loadValid = uopLd.valid && (!IN_branch.taken || uopLd.external || $signed(uopLd.sqN - IN_branch.sqN) <= 0);
 
 // Both load and store read from cache table
 always_comb begin
@@ -101,6 +105,12 @@ always_comb begin
     
     IF_ct.re[1] = uopSt.valid && !uopSt.isMMIO && !stall[1] && !ignoreSt;
     IF_ct.raddr[1] = uopSt.addr[11:0];
+    
+    // During a flush, we read from the cache table at the flush iterator
+    if (flushActive) begin
+        IF_ct.re[0] = !cacheTableWrite;
+        IF_ct.raddr[0] = {flushIdx, {`CLSIZE_E{1'b0}}};
+    end
 end
 
 // Loads also speculatively load from all possible locations
@@ -144,7 +154,7 @@ always_ff@(posedge clk) begin
         if (loadValid && !stall[0] && !ignoreLd)
             ldOps[0] <= uopLd;
         
-        if (ldOps[0].valid && (!IN_branch.taken || $signed(ldOps[0].sqN - IN_branch.sqN) <= 0))
+        if (ldOps[0].valid && (!IN_branch.taken || ldOps[0].external || $signed(ldOps[0].sqN - IN_branch.sqN) <= 0))
             ldOps[1] <= ldOps[0];
     end
 end
@@ -192,13 +202,13 @@ always_comb begin
                 end
             end
             
-            if (cacheTransfer && cacheLoadAddr == ld.addr[31:CLSIZE_E]) begin
-                cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, ld.addr[CLSIZE_E-1:2]});
+            if (cacheTransfer && cacheLoadAddr == ld.addr[31:`CLSIZE_E]) begin
+                cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2]});
                 cacheData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
             end
             
             // trying to access an address that is being evicted
-            if (cacheTransfer && cacheEvictAddr == ld.addr[31:CLSIZE_E]) begin
+            if (cacheTransfer && cacheEvictAddr == ld.addr[31:`CLSIZE_E]) begin
                 cacheHit = 0;
                 cacheData = 'x;
             end
@@ -299,13 +309,13 @@ always_comb begin
             end
         end
 
-        if (cacheTransfer && cacheLoadAddr == st.addr[31:CLSIZE_E]) begin
-            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[CLSIZE_E-1:2]});
+        if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
+            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
             cacheHitAssoc = cacheLoadAssoc;
         end
         
         // trying to access an address that is being evicted
-        if (cacheTransfer && cacheEvictAddr == st.addr[31:CLSIZE_E]) begin
+        if (cacheTransfer && cacheEvictAddr == st.addr[31:`CLSIZE_E]) begin
             cacheHit = 0;
         end
         
@@ -334,7 +344,7 @@ always_comb begin
                 IF_cache.wdata = stOps[1].data;
                 IF_cache.wmask = stOps[1].wmask;
                 setDirty = 1;
-                setDirtyIdx = {cacheHitAssoc, stOps[1].addr[11:CLSIZE_E]};
+                setDirtyIdx = {cacheHitAssoc, stOps[1].addr[11:`CLSIZE_E]};
             end
             else begin
                 miss[1].valid = 1;
@@ -349,20 +359,21 @@ end
 
 
 // Cache Transfer State Machine
-enum logic[2:0]
+enum logic[3:0]
 {
-    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE, REPLACE_RQ, REPLACE_ACTIVE
+    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE, REPLACE_RQ, REPLACE_ACTIVE,
+    FLUSH, FLUSH_RQ, FLUSH_ACTIVE, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
 } state;
 
 reg cacheTransfer;
 wire cacheLoadActive = (state == LOAD_ACTIVE);
-wire[CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[CLSIZE_E-2:0];
-wire[31-CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:CLSIZE_E];
-wire[31-CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:CLSIZE_E];
+wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
+wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
+wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
 reg[$clog2(ASSOC)-1:0] cacheLoadAssoc;
 
 wire LMQ_full;
-LoadMissQueue#(4, CLSIZE_E) loadMissQueue
+LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
 (
     .clk(clk),
     .rst(rst),
@@ -388,7 +399,7 @@ wire SMQ_enqueue = miss[1].valid ?
     (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT) : 
     IF_cache.wbusy;
 
-StoreMissQueue#(4, CLSIZE_E) storeMissQueue
+StoreMissQueue#(4, `CLSIZE_E) storeMissQueue
 (
     .clk(clk),
     .rst(rst),
@@ -451,11 +462,33 @@ always_comb begin
             end
         end
     end
+    else if (!rst && state == FLUSH) begin
+        if (!flushDone) begin
+            IF_ct.we = 1;
+            IF_ct.waddr = {flushIdx, {`CLSIZE_E{1'b0}}};
+            IF_ct.wassoc = flushAssocIdx;
+            IF_ct.wdata.addr = 0;
+            IF_ct.wdata.valid = 0;
+            cacheTableWrite = 1;
+        end
+    end
 end
 
 // keep track of dirtyness here 
 // (otherwise, we would need a separate write port to cache table)
 reg[SIZE-1:0] dirty;
+
+reg flushQueued;
+wire busy = (IN_uopLd.valid || IN_uopSt.valid || ldOps[0].valid || ldOps[1].valid || stOps[0].valid || stOps[1].valid);
+wire flushReady = IN_SQ_empty && !busy;
+wire flushActive = (
+    state == FLUSH || state == FLUSH_RQ || state == FLUSH_ACTIVE || 
+    state == FLUSH_READ0 || state == FLUSH_READ1);
+assign OUT_busy = busy || flushQueued || flushActive;
+
+reg flushDone;
+reg[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushIdx;
+reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 
 // Cache<->Memory Transfer State Machine
 CacheMiss curCacheMiss;
@@ -469,8 +502,11 @@ always_ff@(posedge clk) begin
         LSU_memc.cmd <= MEMC_NONE;
         cacheTransfer <= 0;
         cacheLoadAssoc <= 0;
+        flushQueued <= 0;
     end
     else begin
+
+        if (IN_flush) flushQueued <= 1;
         
         if (setDirty) dirty[setDirtyIdx] <= 1;
 
@@ -480,7 +516,7 @@ always_ff@(posedge clk) begin
                 cacheTransfer <= 0;
                 for (integer i = 0; i < 2; i=i+1) begin
 
-                    reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:CLSIZE_E]};
+                    reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
                     if (miss[i].valid && !temp) begin
@@ -500,8 +536,8 @@ always_ff@(posedge clk) begin
                             REGULAR: begin
                                 state <= REPLACE_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -510,8 +546,8 @@ always_ff@(posedge clk) begin
                             REGULAR_NO_EVICT: begin
                                 state <= LOAD_RQ;
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.extAddr <= {miss[i].missAddr[31:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -521,8 +557,8 @@ always_ff@(posedge clk) begin
                             MGMT_FLUSH: begin
                                 state <= EVICT_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -530,6 +566,17 @@ always_ff@(posedge clk) begin
                             
                             default: ; // MGMT_INVAL does not evict the cache line
                         endcase
+                    end
+                end
+
+                if (!temp) begin
+                    if (flushQueued && flushReady) begin
+                        state <= FLUSH_READ1;
+                        flushQueued <= 0;
+                        flushIdx <= 0;
+                        flushAssocIdx <= 0;
+                        flushDone <= 0;
+                        cacheTransfer <= 1;
                     end
                 end
             end
@@ -540,21 +587,21 @@ always_ff@(posedge clk) begin
                 end
             end
             LOAD_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
                     state <= IDLE;
                     cacheTransfer <= 0;
                 end
             end
-            EVICT_RQ: begin
+            FLUSH_RQ, EVICT_RQ: begin
                 if (IN_memc.busy && IN_memc.rqID == 0) begin
                     LSU_memc.cmd <= MEMC_NONE;
-                    state <= EVICT_ACTIVE;
+                    state <= (state == EVICT_RQ) ? EVICT_ACTIVE : FLUSH_ACTIVE;
                 end
             end
-            EVICT_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
-                    state <= IDLE;
-                    cacheTransfer <= 0;
+            FLUSH_ACTIVE, EVICT_ACTIVE: begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
+                    state <= (state == EVICT_ACTIVE) ? IDLE : FLUSH;
+                    if (state == EVICT_ACTIVE) cacheTransfer <= 0;
                 end
             end
             REPLACE_RQ: begin
@@ -564,13 +611,37 @@ always_ff@(posedge clk) begin
                 end
             end
             REPLACE_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (CLSIZE_E - 2))) begin
+                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
                     state <= LOAD_RQ;
                     // sramAddr stays the same
                     LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    LSU_memc.extAddr <= {curCacheMiss.missAddr[31:CLSIZE_E], {(CLSIZE_E-2){1'b0}}};
+                    LSU_memc.extAddr <= {curCacheMiss.missAddr[31:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
                     LSU_memc.cacheID <= 0;
                     LSU_memc.rqID <= 0;
+                end
+            end
+            FLUSH_READ0, FLUSH_READ1: begin
+                // wait two cycles to read from cache table...
+                state <= (state == FLUSH_READ0) ? FLUSH : FLUSH_READ0;
+            end
+            FLUSH: begin
+                if (flushDone) begin
+                    state <= IDLE;
+                    cacheTransfer <= 0;
+                end
+                else begin
+                    CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
+                    if (entry.valid && dirty[{flushAssocIdx, flushIdx}]) begin
+                        state <= FLUSH_RQ;
+                        LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                        LSU_memc.sramAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
+                        LSU_memc.extAddr <= {entry.addr, flushIdx, {(`CLSIZE_E-2){1'b0}}};
+                        LSU_memc.cacheID <= 0;
+                        LSU_memc.rqID <= 0;
+                        cacheLoadAssoc <= flushAssocIdx;
+                    end
+                    else if (&flushAssocIdx) state <= FLUSH_READ1;
+                    {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
                 end
             end
             default: state <= IDLE;

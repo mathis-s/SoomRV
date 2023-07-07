@@ -609,12 +609,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[31:0] data;
-    logic valid;
-} PW_LD_RES_UOp;
-
-typedef struct packed
-{
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;

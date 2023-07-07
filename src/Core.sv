@@ -504,7 +504,7 @@ PageWalker pageWalker
 
     .IN_ldStall(CC_PW_LD_stall),
     .OUT_ldUOp(PW_LD_uop),
-    .IN_ldResUOp(LSU_PW_ldUOp)
+    .IN_ldResUOp(wbUOp[2])
 );
 
 wire LS_AGULD_uopStall;
@@ -644,14 +644,17 @@ Tag LSU_loadFwdTag = 'x;
 wire CC_loadStall;
 wire CC_storeStall;
 LD_UOp CC_SQ_uopLd;
-wire CC_fenceBusy = 0;
-PW_LD_RES_UOp LSU_PW_ldUOp = '0;
+wire LSU_busy;
 
 MemController_Req LSU_MC_if;
 LoadStoreUnit lsu
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_flush(TH_startFence),
+    .IN_SQ_empty(SQ_empty),
+    .OUT_busy(LSU_busy),
     
     .IN_branch(branch),
     .OUT_ldStall(CC_loadStall),
@@ -671,11 +674,6 @@ LoadStoreUnit lsu
     .IN_memc(IN_memc),
 
     .OUT_uopLd(wbUOp[2])
-    //.OUT_uopPwLd(LSU_PW_ldUOp),
-    //.IN_SQ_empty(SQ_empty),
-    //.IN_fence(TH_startFence),
-    //.OUT_fenceBusy(CC_fenceBusy)
-    //.OUT_busy() // for memsub_busy
 );
 
 RES_UOp INT1_uop;
@@ -781,7 +779,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || IN_memc.busy || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
+wire MEMSUB_busy = !SQ_empty || IN_memc.busy || SQ_uop.valid || AGU_LD_uop.valid || LSU_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;
