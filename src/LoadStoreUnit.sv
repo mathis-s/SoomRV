@@ -14,10 +14,17 @@ module LoadStoreUnit
     output wire OUT_busy,
 
     input BranchProv IN_branch,
-    output wire OUT_ldStall,
+    output reg OUT_ldAGUStall,
+    output reg OUT_ldStall,
     output wire OUT_stStall,
+    
+    // regular loads come through these two
+    // structs. uopELd provides the lower 12 addr bits
+    // one cycle early.
+    input ELD_UOp IN_uopELd,
+    input LD_UOp IN_aguLd,
 
-    input LD_UOp IN_uopLd,
+    input LD_UOp IN_uopLd, // special loads (page walk, non-speculative)
     output LD_UOp OUT_uopLdSq,
 
     input ST_UOp IN_uopSt,
@@ -39,14 +46,14 @@ MemController_Req LSU_memc;
 assign OUT_memc = (LSU_memc.cmd != MEMC_NONE) ? LSU_memc : BLSU_memc;
 
 wire isCacheBypassLdUOp = 
-    `ENABLE_EXT_MMIO && IN_uopLd.valid && IN_uopLd.isMMIO && IN_uopLd.exception == AGU_NO_EXCEPTION &&
-    IN_uopLd.addr >= `EXT_MMIO_START_ADDR && IN_uopLd.addr < `EXT_MMIO_END_ADDR;
+    `ENABLE_EXT_MMIO && uopLd_0.valid && uopLd_0.isMMIO && uopLd_0.exception == AGU_NO_EXCEPTION &&
+    uopLd_0.addr >= `EXT_MMIO_START_ADDR && uopLd_0.addr < `EXT_MMIO_END_ADDR;
 wire isCacheBypassStUOp = 
     `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && 
     IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
 
-wire ignoreLd = isCacheBypassLdUOp && !LMQ_ld.valid;
-wire ignoreSt = isCacheBypassLdUOp && !SMQ_st.valid;
+wire ignoreLd = isCacheBypassLdUOp;
+wire ignoreSt = isCacheBypassStUOp && !SMQ_st.valid;
 
 wire BLSU_stStall;
 wire BLSU_ldStall;
@@ -60,7 +67,7 @@ BypassLSU bypassLSU
     .IN_branch(IN_branch),
     .IN_uopLdEn(isCacheBypassLdUOp),
     .OUT_ldStall(BLSU_ldStall),
-    .IN_uopLd(IN_uopLd),
+    .IN_uopLd(uopLd_0),
 
     .IN_uopStEn(isCacheBypassStUOp),
     .OUT_stStall(BLSU_stStall),
@@ -82,25 +89,21 @@ end
 
 // stall only affects start of ld/st pipelines.
 wire[1:0] stall;
-assign stall[0] = (OUT_ldStall && !LMQ_ld.valid) || cacheTableWrite || flushActive;
+assign stall[0] = cacheTableWrite || flushActive;
 assign stall[1] = (OUT_stStall && !SMQ_st.valid) || cacheTableWrite || flushActive;
-assign OUT_ldStall = (isCacheBypassLdUOp ? BLSU_ldStall : (LMQ_full || LMQ_ld.valid || cacheTableWrite || flushActive)) && IN_uopLd.valid;
 assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (SMQ_full || SMQ_st.valid || cacheTableWrite || flushActive)) && IN_uopSt.valid;
 
 LD_UOp LMQ_ld;
 LD_UOp uopLd;
-assign uopLd = LMQ_ld.valid ? LMQ_ld : IN_uopLd;
-assign OUT_uopLdSq = uopLd;
+assign OUT_uopLdSq = uopLd_0;
 
 ST_UOp SMQ_st;
 ST_UOp uopSt;
 assign uopSt = SMQ_st.valid ? SMQ_st : IN_uopSt;
 
-wire loadValid = uopLd.valid && (!IN_branch.taken || uopLd.external || $signed(uopLd.sqN - IN_branch.sqN) <= 0);
-
 // Both load and store read from cache table
 always_comb begin
-    IF_ct.re[0] = loadValid && !uopLd.isMMIO && uopLd.exception == AGU_NO_EXCEPTION && !stall[0] && !ignoreLd;
+    IF_ct.re[0] = uopLd.valid && !uopLd.isMMIO && uopLd.exception == AGU_NO_EXCEPTION;
     IF_ct.raddr[0] = uopLd.addr[11:0];
     
     IF_ct.re[1] = uopSt.valid && !uopSt.isMMIO && !stall[1] && !ignoreSt;
@@ -115,7 +118,7 @@ end
 
 // Loads also speculatively load from all possible locations
 always_comb begin
-    IF_cache.re = !(loadValid && !stall[0] && !uopLd.isMMIO && uopLd.exception == AGU_NO_EXCEPTION && !ignoreLd);
+    IF_cache.re = !(uopLd.valid && !uopLd.isMMIO && uopLd.exception == AGU_NO_EXCEPTION);
     IF_cache.raddr = uopLd.addr[11:0];
 end
 
@@ -134,6 +137,66 @@ always_comb begin
     end
 end
 
+// Select load to execute
+// 1. previous miss from load miss queue
+// 2. special load (page walk, non-speculative or external)
+// 3. regular load
+always_comb begin
+    uopLd = 'x;
+    uopLd.valid = 0;
+
+    OUT_ldStall = IN_uopLd.valid;
+    OUT_ldAGUStall = IN_uopELd.valid;
+    LMQ_dequeue = 0;
+    
+    // Only addr[11:0] is well defined, the rest is 
+    // still being calculated (for regular loads at least) and will
+    // only be available in the next cycle.
+
+    if (stall[0]) begin
+        // do not issue load
+    end
+    else if (LMQ_ld.valid && (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0)) begin
+        uopLd = LMQ_ld;
+        LMQ_dequeue = 1;
+    end
+    else if (IN_uopLd.valid && (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && !LMQ_full) begin
+        uopLd = IN_uopLd;
+        OUT_ldStall = 0;
+    end
+    else if (IN_uopELd.valid && !LMQ_full) begin
+        uopLd.valid = 1;
+        uopLd.external = 0;
+        uopLd.addr[11:0] = IN_uopELd.addr;
+
+        uopLd.isMMIO = 0; // assume that this is not MMIO such that cache is read
+        uopLd.exception = AGU_NO_EXCEPTION; // assume no exception
+
+        OUT_ldAGUStall = 0;
+    end
+end
+
+reg regularLd;
+always_ff@(posedge clk)
+    if (rst) regularLd <= 0;
+    else regularLd <= IN_uopELd.valid && !OUT_ldAGUStall;
+
+LD_UOp uopLd_0;
+always_comb begin
+    
+    uopLd_0 = ldOps[0];
+
+    // For regular loads, we only get the full address and other
+    // info now.
+    if (regularLd) begin
+        assert(!IN_aguLd.valid || IN_aguLd.addr[11:0] == uopLd_0.addr[11:0]);
+        uopLd_0 = 'x;
+        uopLd_0.valid = 0;
+        if (IN_aguLd.valid)
+            uopLd_0 = IN_aguLd;
+    end
+end
+
 // delay lines, waiting for cache response
 LD_UOp ldOps[1:0];
 ST_UOp stOps[1:0];
@@ -141,7 +204,7 @@ ST_UOp stOps[1:0];
 // Load Pipeline
 always_ff@(posedge clk) begin
     if (rst) begin
-        for (integer i = 0; i < 2; i=i+1)
+        for (integer i = 1; i < 3; i=i+1)
             ldOps[i].valid <= 0;
     end
     else begin
@@ -151,11 +214,11 @@ always_ff@(posedge clk) begin
         ldOps[1].valid <= 0;
         
         // Progress the delay line
-        if (loadValid && !stall[0] && !ignoreLd)
+        if (uopLd.valid)
             ldOps[0] <= uopLd;
         
-        if (ldOps[0].valid && (!IN_branch.taken || ldOps[0].external || $signed(ldOps[0].sqN - IN_branch.sqN) <= 0))
-            ldOps[1] <= ldOps[0];
+        if (uopLd_0.valid && (!IN_branch.taken || uopLd_0.external || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0) && !ignoreLd)
+            ldOps[1] <= uopLd_0;
     end
 end
 
@@ -371,6 +434,7 @@ wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
 wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
 wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
 reg[$clog2(ASSOC)-1:0] cacheLoadAssoc;
+reg LMQ_dequeue;
 
 wire LMQ_full;
 LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
@@ -391,7 +455,7 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .IN_enqueue(miss[0].valid),
 
     .OUT_ld(LMQ_ld),
-    .IN_dequeue(!stall[0] && LMQ_ld.valid)
+    .IN_dequeue(LMQ_dequeue)
 );
 
 wire SMQ_full;
@@ -479,7 +543,7 @@ end
 reg[SIZE-1:0] dirty;
 
 reg flushQueued;
-wire busy = (IN_uopLd.valid || IN_uopSt.valid || ldOps[0].valid || ldOps[1].valid || stOps[0].valid || stOps[1].valid);
+wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || ldOps[1].valid || stOps[0].valid || stOps[1].valid);
 wire flushReady = IN_SQ_empty && !busy;
 wire flushActive = (
     state == FLUSH || state == FLUSH_RQ || state == FLUSH_ACTIVE || 

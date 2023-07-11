@@ -20,6 +20,7 @@ module AGU
     
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
+    output ELD_UOp OUT_eldOp,
     output RES_UOp OUT_uop
 );
 
@@ -40,6 +41,18 @@ assign OUT_stall = IN_stall || pageWalkActive || waitForPWComplete;
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
 wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr; // super is already handled in TLB
+
+always_comb begin
+    OUT_eldOp = 'x; 
+    OUT_eldOp.valid =
+        !rst &&
+        !waitForPWComplete &&
+        !pageWalkActive &&
+        en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0);
+    
+    if (OUT_eldOp.valid)
+        OUT_eldOp.addr = addr[11:0];
+end
 
 Flags exceptFlags;
 AGU_Exception except;

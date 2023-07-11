@@ -9,12 +9,13 @@ module LoadBuffer
     
     input SqN commitSqN,
     
-    input wire IN_stall[1:0],
+    input wire IN_stall,
     input AGU_UOp IN_uopLd,
     input AGU_UOp IN_uopSt,
 
     input wire IN_SQ_done,
 
+    output LD_UOp OUT_uopAGULd,
     output LD_UOp OUT_uopLd,
     
     input BranchProv IN_branch,
@@ -48,39 +49,37 @@ LBEntry lateLoadUOp;
 reg issueLateLoad;
 reg delayLoad;
 always_comb begin
+    OUT_uopAGULd = 'x;
+    OUT_uopAGULd.valid = 0;
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
     
     issueLateLoad = 0;
     delayLoad = IN_uopLd.valid && `IS_MMIO_PMA(IN_uopLd.addr) && IN_uopLd.exception == AGU_NO_EXCEPTION;
     
-    // Regular loads pass through combinatorially
     if (!delayLoad) begin
-        OUT_uopLd.addr = IN_uopLd.addr; 
-        OUT_uopLd.signExtend = IN_uopLd.signExtend; 
-        OUT_uopLd.size = IN_uopLd.size; 
-        OUT_uopLd.tagDst = IN_uopLd.tagDst; 
-        OUT_uopLd.sqN = IN_uopLd.sqN; 
-        OUT_uopLd.doNotCommit = IN_uopLd.doNotCommit; 
-        OUT_uopLd.external = 0;
-        OUT_uopLd.exception = IN_uopLd.exception; 
-        OUT_uopLd.isMMIO = `IS_MMIO_PMA(IN_uopLd.addr); 
-        OUT_uopLd.valid = IN_uopLd.valid; 
+        OUT_uopAGULd.addr = IN_uopLd.addr; 
+        OUT_uopAGULd.signExtend = IN_uopLd.signExtend; 
+        OUT_uopAGULd.size = IN_uopLd.size; 
+        OUT_uopAGULd.tagDst = IN_uopLd.tagDst; 
+        OUT_uopAGULd.sqN = IN_uopLd.sqN; 
+        OUT_uopAGULd.doNotCommit = IN_uopLd.doNotCommit; 
+        OUT_uopAGULd.external = 0;
+        OUT_uopAGULd.exception = IN_uopLd.exception; 
+        OUT_uopAGULd.isMMIO = `IS_MMIO_PMA(IN_uopLd.addr); 
+        OUT_uopAGULd.valid = IN_uopLd.valid; 
     end
     
-    if (!OUT_uopLd.valid) begin
-        OUT_uopLd.addr = lateLoadUOp.addr; 
-        OUT_uopLd.signExtend = lateLoadUOp.signExtend; 
-        OUT_uopLd.size = lateLoadUOp.size; 
-        OUT_uopLd.tagDst = lateLoadUOp.tagDst; 
-        OUT_uopLd.sqN = lateLoadUOp.sqN; 
-        OUT_uopLd.doNotCommit = lateLoadUOp.doNotCommit; 
-        OUT_uopLd.external = 0;
-        OUT_uopLd.exception = AGU_NO_EXCEPTION;
-        OUT_uopLd.isMMIO = `IS_MMIO_PMA(lateLoadUOp.addr); 
-        OUT_uopLd.valid = lateLoadUOp.valid; 
-        issueLateLoad = 1;
-    end
+    OUT_uopLd.addr = lateLoadUOp.addr; 
+    OUT_uopLd.signExtend = lateLoadUOp.signExtend; 
+    OUT_uopLd.size = lateLoadUOp.size; 
+    OUT_uopLd.tagDst = lateLoadUOp.tagDst; 
+    OUT_uopLd.sqN = lateLoadUOp.sqN; 
+    OUT_uopLd.doNotCommit = lateLoadUOp.doNotCommit; 
+    OUT_uopLd.external = 0;
+    OUT_uopLd.exception = AGU_NO_EXCEPTION;
+    OUT_uopLd.isMMIO = `IS_MMIO_PMA(lateLoadUOp.addr); 
+    OUT_uopLd.valid = lateLoadUOp.valid; 
 end
 
 logic storeIsCollision;
@@ -100,7 +99,7 @@ always_comb begin
         end
     end
     
-    if (IN_uopLd.valid && !IN_stall[0] && !delayLoad &&
+    if (IN_uopLd.valid && !IN_stall && !delayLoad &&
         $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
             (IN_uopSt.size == 2 ||
@@ -125,7 +124,7 @@ always_ff@(posedge clk) begin
         lateLoadUOp.valid <= 0;
     end
     else begin
-        if (!IN_stall[0] && issueLateLoad) begin
+        if (!IN_stall) begin
             lateLoadUOp <= 'x;
             lateLoadUOp.valid <= 0;
         end
@@ -175,7 +174,7 @@ always_ff@(posedge clk) begin
             end
         end
         // Insert new entries, check stores
-        if (!IN_stall[0] && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
+        if (!IN_stall && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
             
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopLd.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].sqN <= IN_uopLd.sqN;
@@ -189,7 +188,7 @@ always_ff@(posedge clk) begin
             entries[index].valid <= 1;
         end
         
-        if (!IN_stall[1] && IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) < 0)) begin
+        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) < 0)) begin
             if (storeIsCollision) begin
                 // We reset back to the op after the store when a load collision occurs, even though you only need to
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load

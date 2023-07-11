@@ -534,13 +534,14 @@ TLB#(2) dtlb
 );
 
 AGU_UOp AGU_LD_uop /* verilator public */;
+ELD_UOp AGU_eLdUOp;
 PageWalk_Req LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
     .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
-    .IN_stall(LS_AGULD_uopStall),
+    .IN_stall(LSU_ldAGUStall),
     .OUT_stall(stall[2]),
     
     .IN_branch(branch),
@@ -555,6 +556,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 
     .IN_uop(LD_uop[2]),
     .OUT_aguOp(AGU_LD_uop),
+    .OUT_eldOp(AGU_eLdUOp),
     .OUT_uop()
 );
 
@@ -580,24 +582,27 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
+    .OUT_eldOp(),
     .OUT_uop(wbUOp[3])
 );
 
 
 SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd;
+LD_UOp LB_aguUOpLd;
 LoadBuffer lb
 (
     .clk(clk),
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_stall('{1'b0, LS_AGULD_uopStall}),
+    .IN_stall(LS_AGULD_uopStall),
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
 
     .IN_SQ_done(SQ_done),
-
+    
+    .OUT_uopAGULd(LB_aguUOpLd),
     .OUT_uopLd(LB_uopLd),
     
     .IN_branch(branch),
@@ -643,6 +648,7 @@ wire LSU_loadFwdValid = 0;
 Tag LSU_loadFwdTag = 'x;
 wire CC_loadStall;
 wire CC_storeStall;
+wire LSU_ldAGUStall;
 LD_UOp CC_SQ_uopLd;
 wire LSU_busy;
 
@@ -657,10 +663,14 @@ LoadStoreUnit lsu
     .OUT_busy(LSU_busy),
     
     .IN_branch(branch),
+    .OUT_ldAGUStall(LSU_ldAGUStall),
     .OUT_ldStall(CC_loadStall),
     .OUT_stStall(CC_storeStall),
     
-    .IN_uopLd(LS_uopLd),
+    .IN_uopELd(AGU_eLdUOp),
+    .IN_aguLd(LB_aguUOpLd),
+
+    .IN_uopLd(LB_uopLd),
     .OUT_uopLdSq(CC_SQ_uopLd),
     .IN_uopSt(SQ_uop),
     

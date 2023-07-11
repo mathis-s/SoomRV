@@ -105,17 +105,15 @@ end
 
 assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
 
-StFwdResult fwd;
-
 reg flushing;
 assign OUT_flush = flushing;
 reg doingEnqueue;
 always_ff@(posedge clk) begin
     didCSRwrite <= 0;
     doingEnqueue = 0;
-    fwd <= 'x;
-    fwd.valid <= 0;
-    OUT_fwd <= fwd;
+
+    OUT_fwd <= 'x;
+    OUT_fwd.valid <= 0;
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -208,9 +206,9 @@ always_ff@(posedge clk) begin
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
         if (IN_uopLd.valid) begin
-            fwd.valid <= 1;
-            fwd.data <= lookupData;
-            fwd.mask <= lookupMask;
+            OUT_fwd.valid <= 1;
+            OUT_fwd.data <= lookupData;
+            OUT_fwd.mask <= lookupMask;
         end
     end
     
