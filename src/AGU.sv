@@ -43,15 +43,27 @@ wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{
 wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr; // super is already handled in TLB
 
 always_comb begin
-    OUT_eldOp = 'x; 
-    OUT_eldOp.valid =
-        !rst &&
-        !waitForPWComplete &&
-        !pageWalkActive &&
-        en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0);
-    
-    if (OUT_eldOp.valid)
-        OUT_eldOp.addr = addr[11:0];
+    OUT_eldOp = 'x;
+
+    if (pageWalkActive) begin
+        OUT_eldOp.valid =
+            !rst &&
+            pageWalkAccepted &&
+            IN_pw.valid &&
+            (!IN_branch.taken || $signed(OUT_aguOp.sqN - IN_branch.sqN) <= 0);
+        if (OUT_eldOp.valid)
+            OUT_eldOp.addr = OUT_aguOp.addr[11:0];
+    end
+    else begin
+        OUT_eldOp.valid =
+            !rst &&
+            !waitForPWComplete &&
+            !pageWalkActive &&
+            en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0);
+        
+        if (OUT_eldOp.valid)
+            OUT_eldOp.addr = addr[11:0];
+    end
 end
 
 Flags exceptFlags;

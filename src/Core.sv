@@ -670,7 +670,7 @@ LoadStoreUnit lsu
     .IN_uopELd(AGU_eLdUOp),
     .IN_aguLd(LB_aguUOpLd),
 
-    .IN_uopLd(LB_uopLd),
+    .IN_uopLd(LS_uopLd),
     .OUT_uopLdSq(CC_SQ_uopLd),
     .IN_uopSt(SQ_uop),
     
