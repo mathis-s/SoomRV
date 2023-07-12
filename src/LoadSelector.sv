@@ -43,7 +43,7 @@ always_comb begin
         OUT_ldUOp.doNotCommit = IN_aguLd.doNotCommit;
         OUT_ldUOp.external = 0;
         OUT_ldUOp.exception = IN_aguLd.exception;
-        OUT_ldUOp.isMMIO = 0;
+        OUT_ldUOp.isMMIO = IN_aguLd.isMMIO;
         OUT_ldUOp.valid = IN_aguLd.valid;
 
         OUT_aguLdStall = IN_ldUOpStall;

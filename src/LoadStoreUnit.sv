@@ -81,12 +81,6 @@ BypassLSU bypassLSU
     .IN_memc(IN_memc)
 );
 
-always_comb begin
-    IF_mmio.re = 1;
-    IF_mmio.raddr = 0;
-    IF_mmio.rsize = 0;
-end
-
 // stall only affects start of ld/st pipelines.
 wire[1:0] stall;
 assign stall[0] = cacheTableWrite || flushActive;
@@ -120,21 +114,6 @@ end
 always_comb begin
     IF_cache.re = !(uopLd.valid && !uopLd.isMMIO && uopLd.exception == AGU_NO_EXCEPTION);
     IF_cache.raddr = uopLd.addr[11:0];
-end
-
-// Stores to internal MMIO are uncached, they run right away
-always_comb begin
-    IF_mmio.we = 1;
-    IF_mmio.waddr = 'x;
-    IF_mmio.wdata = 'x;
-    IF_mmio.wmask = 'x;
-
-    if (uopSt.valid && uopSt.isMMIO) begin
-        IF_mmio.we = 0;
-        IF_mmio.waddr = uopSt.addr;
-        IF_mmio.wdata = uopSt.data;
-        IF_mmio.wmask = uopSt.wmask;
-    end
 end
 
 // Select load to execute
@@ -197,6 +176,36 @@ always_comb begin
     end
 end
 
+// Load from internal MMIO
+// This is executed one cycle later than loads from cache
+// as internal MMIO only has a read delay of one cycle.
+always_comb begin
+    IF_mmio.re = 1;
+    IF_mmio.raddr = 'x;
+    IF_mmio.rsize = 'x;
+
+    if (uopLd_0.valid && uopLd_0.isMMIO && !ignoreLd) begin
+        IF_mmio.re = 0;
+        IF_mmio.raddr = uopLd_0.addr;
+        IF_mmio.rsize = uopLd_0.size;
+    end
+end
+
+// Stores to internal MMIO are uncached, they run right away
+always_comb begin
+    IF_mmio.we = 1;
+    IF_mmio.waddr = 'x;
+    IF_mmio.wdata = 'x;
+    IF_mmio.wmask = 'x;
+
+    if (uopSt.valid && uopSt.isMMIO) begin
+        IF_mmio.we = 0;
+        IF_mmio.waddr = uopSt.addr;
+        IF_mmio.wdata = uopSt.data;
+        IF_mmio.wmask = uopSt.wmask;
+    end
+end
+
 // delay lines, waiting for cache response
 LD_UOp ldOps[1:0];
 ST_UOp stOps[1:0];
@@ -243,9 +252,10 @@ CacheMiss miss[1:0];
 // Load Result Output
 always_comb begin
     // Load output is combination of ldOps[1] (the op that accessed cache 2 cycles ago)
-    // and the loaded result OR an MMIO load.
+    // and the loaded result (or an internal/external MMIO load).
     LD_UOp ld = ldOps[1].valid ? ldOps[1] : BLSU_uopLd;
-    reg isMMIO = !ldOps[1].valid;
+    reg isExtMMIO = !ldOps[1].valid;
+    reg isIntMMIO = ldOps[1].valid && ldOps[1].isMMIO;
     reg noEvict = !IF_ct.rdata[0][assocCnt].valid;
     
     OUT_uopLd = 'x;
@@ -255,33 +265,40 @@ always_comb begin
 
     if (ld.valid && !rst) begin
         reg cacheHit = 0;
-        reg[31:0] cacheData = 'x;
-        if (!isMMIO) begin
+        reg[31:0] readData = 'x;
+
+        if (isExtMMIO) begin
+            readData = BLSU_ldResult;
+        end
+        else if (isIntMMIO) begin
+            readData = IF_mmio.rdata;
+        end
+        else begin
             for (integer i = 0; i < `CASSOC; i=i+1) begin
                 if (IF_ct.rdata[0][i].valid && IF_ct.rdata[0][i].addr == ld.addr[31:12]) begin
                     assert(!cacheHit); // multiple hits are invalid
                     cacheHit = 1;
-                    cacheData = IF_cache.rdata[i];
+                    readData = IF_cache.rdata[i];
                 end
             end
             
             if (cacheTransfer && cacheLoadAddr == ld.addr[31:`CLSIZE_E]) begin
                 cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2]});
-                cacheData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
+                readData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
             end
             
             // trying to access an address that is being evicted
             if (cacheTransfer && cacheEvictAddr == ld.addr[31:`CLSIZE_E]) begin
                 cacheHit = 0;
-                cacheData = 'x;
+                readData = 'x;
             end
         end
 
-        if (cacheHit || ld.exception != AGU_NO_EXCEPTION || isMMIO) begin
+        if (cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) begin
             // Use forwarded store data if available
-            if (!isMMIO) begin
+            if (!(isExtMMIO || isIntMMIO)) begin
                 for (integer i = 0; i < `CASSOC; i=i+1) begin
-                    if (IN_stFwd.mask[i]) cacheData[i*8+:8] = IN_stFwd.data[i*8+:8];
+                    if (IN_stFwd.mask[i]) readData[i*8+:8] = IN_stFwd.data[i*8+:8];
                 end
             end
             
@@ -300,14 +317,14 @@ always_comb begin
 
             case (ld.size)
                 0: OUT_uopLd.result = 
-                    {{24{ld.signExtend ? cacheData[8*(ld.addr[1:0])+7] : 1'b0}},
-                    cacheData[8*(ld.addr[1:0])+:8]};
+                    {{24{ld.signExtend ? readData[8*(ld.addr[1:0])+7] : 1'b0}},
+                    readData[8*(ld.addr[1:0])+:8]};
 
                 1: OUT_uopLd.result = 
-                    {{16{ld.signExtend ? cacheData[16*(ld.addr[1])+15] : 1'b0}},
-                    cacheData[16*(ld.addr[1])+:16]};
+                    {{16{ld.signExtend ? readData[16*(ld.addr[1])+15] : 1'b0}},
+                    readData[16*(ld.addr[1])+:16]};
 
-                2: OUT_uopLd.result = cacheData;
+                2: OUT_uopLd.result = readData;
                 default: assert(0);
             endcase
         end
