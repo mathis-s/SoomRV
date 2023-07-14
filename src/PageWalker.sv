@@ -22,7 +22,7 @@ enum logic[1:0]
 } state;
 
 wire[31:0] nextLookup = {IN_ldResUOp.result[29:10], pageWalkAddr[21:12], 2'b0};
-wire ldResValid = IN_ldResUOp.valid && IN_ldResUOp.doNotCommit && IN_ldResUOp.sqN == 0 && IN_ldResUOp.tagDst == 0;
+wire ldResValid = IN_ldResUOp.valid && IN_ldResUOp.doNotCommit && IN_ldResUOp.sqN == 0 && IN_ldResUOp.tagDst == 7'h40;
 
 reg pageFault_c;
 reg isSuperPage_c;

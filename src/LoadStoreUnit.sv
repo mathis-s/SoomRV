@@ -52,7 +52,6 @@ wire isCacheBypassStUOp =
     `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && 
     IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
 
-wire ignoreLd = isCacheBypassLdUOp;
 wire ignoreSt = isCacheBypassStUOp && !SMQ_st.valid;
 
 wire BLSU_stStall;
@@ -135,15 +134,23 @@ always_comb begin
     if (stall[0]) begin
         // do not issue load
     end
-    else if (LMQ_ld.valid && (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0)) begin
+    else if (LMQ_ld.valid && 
+        (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0) &&
+        !(cacheTransfer && cacheLoadCurAddr == LMQ_ld.addr[11:2])
+    ) begin
         uopLd = LMQ_ld;
         LMQ_dequeue = 1;
     end
-    else if (IN_uopLd.valid && (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) && !LMQ_full) begin
+    else if (IN_uopLd.valid && !LMQ_full &&
+        (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) &&
+        !(cacheTransfer && cacheLoadCurAddr == IN_uopLd.addr[11:2])
+    ) begin
         uopLd = IN_uopLd;
         OUT_ldStall = 0;
     end
-    else if (IN_uopELd.valid && !LMQ_full) begin
+    else if (IN_uopELd.valid && !LMQ_full &&
+        !(cacheTransfer && cacheLoadCurAddr == IN_uopELd.addr[11:2])
+    ) begin
         uopLd.valid = 1;
         uopLd.external = 0;
         uopLd.addr[11:0] = IN_uopELd.addr;
@@ -184,7 +191,7 @@ always_comb begin
     IF_mmio.raddr = 'x;
     IF_mmio.rsize = 'x;
 
-    if (uopLd_0.valid && uopLd_0.isMMIO && !ignoreLd) begin
+    if (uopLd_0.valid && uopLd_0.isMMIO && !isCacheBypassLdUOp) begin
         IF_mmio.re = 0;
         IF_mmio.raddr = uopLd_0.addr;
         IF_mmio.rsize = uopLd_0.size;
@@ -210,6 +217,8 @@ end
 LD_UOp ldOps[1:0];
 ST_UOp stOps[1:0];
 
+reg loadWasExtIOBusy;
+
 // Load Pipeline
 always_ff@(posedge clk) begin
     if (rst) begin
@@ -226,8 +235,12 @@ always_ff@(posedge clk) begin
         if (uopLd.valid)
             ldOps[0] <= uopLd;
         
-        if (uopLd_0.valid && (!IN_branch.taken || uopLd_0.external || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0) && !ignoreLd)
+        if (uopLd_0.valid && (!IN_branch.taken || uopLd_0.external || $signed(uopLd_0.sqN - IN_branch.sqN) <= 0) &&
+            // if the BLSU is busy, we place the OP in the Load Miss Queue.
+            (!isCacheBypassLdUOp || BLSU_ldStall)) begin
             ldOps[1] <= uopLd_0;
+            loadWasExtIOBusy <= isCacheBypassLdUOp;
+        end
     end
 end
 
@@ -235,7 +248,7 @@ reg[$clog2(`CASSOC)-1:0] assocCnt;
 
 typedef enum logic[2:0]
 {
-    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH
+    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY
 } MissType;
 
 typedef struct packed
@@ -248,6 +261,12 @@ typedef struct packed
 } CacheMiss;
 
 CacheMiss miss[1:0];
+
+reg[`CLSIZE_E-2:0] lastCacheLoadProgress;
+reg[`CLSIZE_E-2:0] lastCacheLoadProgress0;
+always_ff@(posedge clk)
+    if (rst) lastCacheLoadProgress <= 'x;
+    else lastCacheLoadProgress <= cacheLoadProgress;
 
 // Load Result Output
 always_comb begin
@@ -283,7 +302,7 @@ always_comb begin
             end
             
             if (cacheTransfer && cacheLoadAddr == ld.addr[31:`CLSIZE_E]) begin
-                cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2]});
+                cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2]});
                 readData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
             end
             
@@ -294,7 +313,7 @@ always_comb begin
             end
         end
 
-        if (cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) begin
+        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && !loadWasExtIOBusy) begin
             // Use forwarded store data if available
             if (!(isExtMMIO || isIntMMIO)) begin
                 for (integer i = 0; i < `CASSOC; i=i+1) begin
@@ -330,7 +349,10 @@ always_comb begin
         end
         else begin
             miss[0].valid = 1;
-            miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
+            if (loadWasExtIOBusy)
+                miss[0].mtype = IO_BUSY;
+            else
+                miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
             miss[0].oldAddr = {IF_ct.rdata[0][assocCnt].addr, 12'b0};
             miss[0].missAddr = ld.addr;
             miss[0].assoc = assocCnt;
@@ -390,7 +412,7 @@ always_comb begin
         end
 
         if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
-            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
+            cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
             cacheHitAssoc = cacheLoadAssoc;
         end
         
@@ -450,6 +472,8 @@ wire cacheLoadActive = (state == LOAD_ACTIVE);
 wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
 wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
 wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
+wire[9:0] cacheLoadCurAddr = {curCacheMiss.missAddr[11:`CLSIZE_E], cacheLoadProgress[`CLSIZE_E-3:0]};
+
 reg[$clog2(ASSOC)-1:0] cacheLoadAssoc;
 reg LMQ_dequeue;
 
@@ -477,7 +501,7 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
 
 wire SMQ_full;
 wire SMQ_enqueue = miss[1].valid ?
-    (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT) : 
+    (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY) : 
     IF_cache.wbusy;
 
 StoreMissQueue#(4, `CLSIZE_E) storeMissQueue
@@ -512,7 +536,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (miss[i].valid && !temp) begin
+            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -600,7 +624,7 @@ always_ff@(posedge clk) begin
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (miss[i].valid && !temp) begin
+                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
