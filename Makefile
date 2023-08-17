@@ -58,7 +58,6 @@ SRC_FILES = \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
 	src/LoadMissQueue.sv \
-	src/StoreMissQueue.sv \
 	src/TLB.sv \
 	src/BypassLSU.sv \
 	src/TValSelect.sv \
