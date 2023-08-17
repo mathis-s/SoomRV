@@ -637,8 +637,9 @@ StoreQueue sq
     .IN_branch(branch),
     
     .OUT_uopSt(SQ_uop),
-    
     .OUT_fwd(SQ_fwd),
+
+    .IN_stAck(LSU_stAck),
     
     .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
@@ -653,6 +654,7 @@ LD_UOp CC_SQ_uopLd;
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
+ST_Ack LSU_stAck;
 LoadStoreUnit lsu
 (
     .clk(clk),
@@ -679,6 +681,7 @@ LoadStoreUnit lsu
     .IF_ct(IF_ct),
 
     .IN_stFwd(SQ_fwd),
+    .OUT_stAck(LSU_stAck),
     
     .OUT_memc(LSU_MC_if),
     .IN_memc(IN_memc),

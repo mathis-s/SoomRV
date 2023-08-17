@@ -34,6 +34,7 @@ module LoadStoreUnit
     IF_CTable.HOST IF_ct,
     
     input StFwdResult IN_stFwd,
+    output ST_Ack OUT_stAck,
 
     output MemController_Req OUT_memc,
     input MemController_Res IN_memc,
@@ -373,7 +374,7 @@ always_ff@(posedge clk) begin
         stOps[1].valid <= 0;
         
         // Progress the delay line
-        if (uopSt.valid && !uopSt.isMMIO && !stall[1] && !ignoreSt)
+        if (uopSt.valid && (isCacheBypassStUOp ? !BLSU_stStall : !stall[1]))
             stOps[0] <= uopSt;
         
         if (stOps[0].valid)
@@ -421,7 +422,10 @@ always_comb begin
             cacheHit = 0;
         end
         
-        if (st.wmask == 0) begin
+        if (st.isMMIO) begin
+            // nothing to do for MMIO
+        end
+        else if (st.wmask == 0) begin
             // Management Ops
             if (cacheHit) begin
                 miss[1].valid = 1;
@@ -502,7 +506,10 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
 wire SMQ_full;
 wire SMQ_enqueue = miss[1].valid ?
     (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY) : 
-    IF_cache.wbusy;
+    (!stOps[1].isMMIO && IF_cache.wbusy);
+
+assign OUT_stAck.id = stOps[1].id;
+assign OUT_stAck.valid = stOps[1].valid && !SMQ_enqueue;
 
 StoreMissQueue#(4, `CLSIZE_E) storeMissQueue
 (

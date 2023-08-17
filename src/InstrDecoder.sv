@@ -1469,7 +1469,7 @@ always_comb begin
                         OUT_decBranch.rIdx = IN_instrs[i].rIdx;
                 
                     // Delete matching return prediction entries
-                    // TODO: Only clean if this actuall was an invalid return pred
+                    // TODO: Only clean if this actually was an invalid return pred
                     retUpd_c.valid = 1;
                     retUpd_c.cleanRet = 1;
                     retUpd_c.compr = uop.compressed;
