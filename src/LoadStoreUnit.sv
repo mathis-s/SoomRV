@@ -53,7 +53,7 @@ wire isCacheBypassStUOp =
     `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && 
     IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
 
-wire ignoreSt = isCacheBypassStUOp && !SMQ_st.valid;
+wire ignoreSt = isCacheBypassStUOp;
 
 wire BLSU_stStall;
 wire BLSU_ldStall;
@@ -84,16 +84,15 @@ BypassLSU bypassLSU
 // stall only affects start of ld/st pipelines.
 wire[1:0] stall;
 assign stall[0] = cacheTableWrite || flushActive;
-assign stall[1] = (OUT_stStall && !SMQ_st.valid) || cacheTableWrite || flushActive;
-assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (SMQ_full || SMQ_st.valid || cacheTableWrite || flushActive)) && IN_uopSt.valid;
+assign stall[1] = (OUT_stStall) || cacheTableWrite || flushActive;
+assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) && IN_uopSt.valid;
 
 LD_UOp LMQ_ld;
 LD_UOp uopLd;
 assign OUT_uopLdSq = uopLd_0;
 
-ST_UOp SMQ_st;
 ST_UOp uopSt;
-assign uopSt = SMQ_st.valid ? SMQ_st : IN_uopSt;
+assign uopSt = IN_uopSt;
 
 // Both load and store read from cache table
 always_comb begin
@@ -249,7 +248,7 @@ reg[$clog2(`CASSOC)-1:0] assocCnt;
 
 typedef enum logic[2:0]
 {
-    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY
+    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT
 } MissType;
 
 typedef struct packed
@@ -362,6 +361,8 @@ always_comb begin
 end
 
 // Store Pipeline
+reg[1:0] stConflictMiss;
+reg[1:0] stConflictMiss_c;
 always_ff@(posedge clk) begin
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
@@ -374,11 +375,15 @@ always_ff@(posedge clk) begin
         stOps[1].valid <= 0;
         
         // Progress the delay line
-        if (uopSt.valid && (isCacheBypassStUOp ? !BLSU_stStall : !stall[1]))
+        if (uopSt.valid && (isCacheBypassStUOp ? !BLSU_stStall : !stall[1])) begin
             stOps[0] <= uopSt;
+            stConflictMiss[0] <= stConflictMiss_c[0];
+        end
         
-        if (stOps[0].valid)
+        if (stOps[0].valid) begin
             stOps[1] <= stOps[0];
+            stConflictMiss[1] <= stConflictMiss_c[1];
+        end
     end
 end
 
@@ -422,7 +427,14 @@ always_comb begin
             cacheHit = 0;
         end
         
-        if (st.isMMIO) begin
+        if (stConflictMiss[1]) begin
+            miss[1].valid = 1;
+            miss[1].oldAddr = 'x;
+            miss[1].missAddr = 'x;
+            miss[1].assoc = 'x;
+            miss[1].mtype = CONFLICT;
+        end
+        else if (st.isMMIO) begin
             // nothing to do for MMIO
         end
         else if (st.wmask == 0) begin
@@ -461,6 +473,15 @@ always_comb begin
             end
         end
     end
+end
+
+// Store Conflict Misses
+always_comb begin
+    stConflictMiss_c[0] = (SMQ_enqueue &&
+        stOps[1].addr[31:CLSIZE_E] == uopSt.addr[31:CLSIZE_E]);
+
+    stConflictMiss_c[1] = (SMQ_enqueue &&
+        stOps[1].addr[31:CLSIZE_E] == stOps[0].addr[31:CLSIZE_E]) || stConflictMiss[0];
 end
 
 
@@ -503,33 +524,14 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .IN_dequeue(LMQ_dequeue)
 );
 
-wire SMQ_full;
-wire SMQ_enqueue = miss[1].valid ?
-    (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY) : 
-    (!stOps[1].isMMIO && IF_cache.wbusy);
+wire SMQ_enqueue = stOps[1].valid &&
+    (miss[1].valid ?
+        (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT) : 
+        (!stOps[1].isMMIO && IF_cache.wbusy));
 
 assign OUT_stAck.id = stOps[1].id;
-assign OUT_stAck.valid = stOps[1].valid && !SMQ_enqueue;
-
-StoreMissQueue#(4, `CLSIZE_E) storeMissQueue
-(
-    .clk(clk),
-    .rst(rst),
-    
-    .IN_ready(state == IDLE),
-    
-    .OUT_full(SMQ_full),
-
-    .IN_cacheLoadActive(cacheLoadActive),
-    .IN_cacheLoadProgress(cacheLoadProgress),
-    .IN_cacheLoadAddr(cacheLoadAddr),
-
-    .IN_st(stOps[1]),
-    .IN_enqueue(SMQ_enqueue),
-
-    .OUT_st(SMQ_st),
-    .IN_dequeue(!stall[1] && SMQ_st.valid)
-);
+assign OUT_stAck.valid = stOps[1].valid;
+assign OUT_stAck.fail = SMQ_enqueue;
 
 // Cache Table Writes
 reg cacheTableWrite;
@@ -543,7 +545,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY) begin
+            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -587,7 +589,7 @@ always_comb begin
 end
 
 // keep track of dirtyness here 
-// (otherwise, we would need a separate write port to cache table)
+// (otherwise1 we would need a separate write port to cache table)
 reg[SIZE-1:0] dirty;
 
 reg flushQueued;
@@ -631,7 +633,7 @@ always_ff@(posedge clk) begin
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY) begin
+                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
@@ -643,6 +645,8 @@ always_ff@(posedge clk) begin
                         
                         // new cache line is not dirty
                         dirty[missIdx] <= 0;
+
+                        //if ({miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E){1'b0}}} == 32'h80003000) $display("[miss %d]", $time()); //267286
                         
                         case (missType)
                             REGULAR: begin

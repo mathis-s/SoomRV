@@ -641,6 +641,7 @@ typedef struct packed
 typedef struct packed
 {
     StID_t id;
+    logic fail;
     logic valid;
 } ST_Ack;
 

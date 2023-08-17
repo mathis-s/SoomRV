@@ -56,6 +56,7 @@ typedef struct packed
     SQEntry s;
     StID_t id;
     logic done;
+    logic issued;
 } EQEntry;
 EQEntry evicted[NUM_EVICTED-1:0];
 
@@ -112,6 +113,19 @@ assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSq
 
 StID_t storeIDCnt;
 
+reg allowDequeue;
+always_comb begin
+    allowDequeue = 1;
+    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+        if (evicted[i].s.valid && !evicted[i].issued && !evicted[i].done &&
+            evicted[i].s.addr == entries[0].addr)
+            allowDequeue = 0;
+    end
+
+    if (IN_stAck.valid && IN_stAck.fail)
+        allowDequeue = 0;
+end
+
 reg flushing;
 assign OUT_flush = flushing;
 always_ff@(posedge clk) begin
@@ -137,8 +151,13 @@ always_ff@(posedge clk) begin
     end
     
     else begin
+
         reg doingEnqueue = 0;
         reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
+        reg doNotIssueFromEvicted = 0;
+
+        if (!IN_stallSt)
+            OUT_uopSt.valid <= 0;
         
         // Set entries of committed instructions to ready
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -151,8 +170,11 @@ always_ff@(posedge clk) begin
         if (evicted[0].s.valid && evicted[0].done) begin
             for (integer i = 1; i < NUM_EVICTED; i=i+1) begin
                 evicted[i-1] <= evicted[i];
-                if (evicted[i].s.valid && IN_stAck.valid && evicted[i].id == IN_stAck.id)
-                    evicted[i-1].done <= 1;
+                if (evicted[i].s.valid && IN_stAck.valid && evicted[i].id == IN_stAck.id) begin
+                    evicted[i-1].done <= !IN_stAck.fail;
+                    evicted[i-1].issued <= 0;
+                end
+                doNotIssueFromEvicted = 1;
             end
             evicted[NUM_EVICTED-1] <= 'x;
             evicted[NUM_EVICTED-1].s.valid <= 0;
@@ -162,40 +184,56 @@ always_ff@(posedge clk) begin
         else if (IN_stAck.valid) begin
             for (integer i = 0; i < NUM_EVICTED; i=i+1)
                 if (evicted[i].s.valid && evicted[i].id == IN_stAck.id) begin
-                    evicted[i].done <= 1;
+                    evicted[i].done <= !IN_stAck.fail;
+                    evicted[i].issued <= 0;
                 end
         end
         
         // Dequeue
-        if (!IN_stallSt && entries[0].valid && !IN_branch.taken && entries[0].ready && nextEvictedIn < NUM_EVICTED) begin
+        if (!IN_stallSt) begin
+            // Try storing new op
+            if (entries[0].valid && !IN_branch.taken && 
+                entries[0].ready && nextEvictedIn < NUM_EVICTED &&
+                allowDequeue
+            ) begin
+                entries[NUM_ENTRIES-1].valid <= 0;
+            
+                if (!flushing)
+                    baseIndex = baseIndex + 1;
                 
-            entries[NUM_ENTRIES-1].valid <= 0;
-            
-            if (!flushing)
-                baseIndex = baseIndex + 1;
-            
-            OUT_uopSt.valid <= 1;
-            OUT_uopSt.id <= storeIDCnt;
-            OUT_uopSt.addr <= {entries[0].addr, 2'b0};
-            OUT_uopSt.data <= entries[0].data;
-            OUT_uopSt.wmask <= entries[0].wmask;
-            OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[0].addr);
-            
-            for (integer i = 1; i < NUM_ENTRIES; i=i+1) begin
-                entries[i-1] <= entries[i];
-                if ($signed(IN_curSqN - entries[i].sqN) > 0)
-                    entries[i-1].ready <= 1;
-            end
-            
-            evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[0];
-            evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].done <= 0;
-            evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= storeIDCnt;
-            nextEvictedIn = nextEvictedIn + 1;
+                OUT_uopSt.valid <= 1;
+                OUT_uopSt.id <= storeIDCnt;
+                OUT_uopSt.addr <= {entries[0].addr, 2'b0};
+                OUT_uopSt.data <= entries[0].data;
+                OUT_uopSt.wmask <= entries[0].wmask;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[0].addr);
+                
+                for (integer i = 1; i < NUM_ENTRIES; i=i+1) begin
+                    entries[i-1] <= entries[i];
+                    if ($signed(IN_curSqN - entries[i].sqN) > 0)
+                        entries[i-1].ready <= 1;
+                end
+                
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[0];
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].done <= 0;
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= storeIDCnt;
+                nextEvictedIn = nextEvictedIn + 1;
 
-            storeIDCnt <= storeIDCnt + 1;
+                storeIDCnt <= storeIDCnt + 1;
+            end
+
+            // Re-issue op that previously missed cache
+            else if (!doNotIssueFromEvicted && !evicted[0].done && evicted[0].s.valid && !evicted[0].issued) begin
+                OUT_uopSt.valid <= 1;
+                OUT_uopSt.id <= evicted[0].id;
+                OUT_uopSt.addr <= {evicted[0].s.addr, 2'b0};
+                OUT_uopSt.data <= evicted[0].s.data;
+                OUT_uopSt.wmask <= evicted[0].s.wmask;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[0].s.addr);
+                evicted[0].issued <= 1;
+            end
         end
-        else if (!IN_stallSt)
-            OUT_uopSt.valid <= 0;
         
         // Invalidate
         if (IN_branch.taken) begin
