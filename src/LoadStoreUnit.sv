@@ -262,12 +262,6 @@ typedef struct packed
 
 CacheMiss miss[1:0];
 
-reg[`CLSIZE_E-2:0] lastCacheLoadProgress;
-reg[`CLSIZE_E-2:0] lastCacheLoadProgress0;
-always_ff@(posedge clk)
-    if (rst) lastCacheLoadProgress <= 'x;
-    else lastCacheLoadProgress <= cacheLoadProgress;
-
 // Load Result Output
 always_comb begin
     // Load output is combination of ldOps[1] (the op that accessed cache 2 cycles ago)
@@ -313,7 +307,7 @@ always_comb begin
             end
         end
 
-        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && !loadWasExtIOBusy) begin
+        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && (!loadWasExtIOBusy || isExtMMIO)) begin
             // Use forwarded store data if available
             if (!(isExtMMIO || isIntMMIO)) begin
                 for (integer i = 0; i < `CASSOC; i=i+1) begin
@@ -417,15 +411,18 @@ always_comb begin
             end
         end
 
+        // trying to access an address that is being evicted or loaded
+        if (cacheHit && cacheTransfer && cacheTransferIdx == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}) begin
+            cacheHit = 0;
+            cacheHitAssoc = 'x;
+        end
+        
+        // do allow access to regions of memory that have been loaded already in the current transfer
         if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
             cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
             cacheHitAssoc = cacheLoadAssoc;
         end
         
-        // trying to access an address that is being evicted
-        if (cacheTransfer && cacheEvictAddr == st.addr[31:`CLSIZE_E]) begin
-            cacheHit = 0;
-        end
         
         if (stConflictMiss[1]) begin
             miss[1].valid = 1;
@@ -493,6 +490,7 @@ enum logic[3:0]
 } state;
 
 reg cacheTransfer;
+wire[$clog2(SIZE)-1:0] cacheTransferIdx = {curCacheMiss.assoc, curCacheMiss.missAddr[11:`CLSIZE_E]};
 wire cacheLoadActive = (state == LOAD_ACTIVE);
 wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
 wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
@@ -604,6 +602,9 @@ reg flushDone;
 reg[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushIdx;
 reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 
+
+reg[`CLSIZE_E-2:0] lastCacheLoadProgress;
+
 // Cache<->Memory Transfer State Machine
 CacheMiss curCacheMiss;
 reg[$clog2(`CASSOC)-1:0] replaceAssoc;
@@ -617,17 +618,20 @@ always_ff@(posedge clk) begin
         cacheTransfer <= 0;
         cacheLoadAssoc <= 0;
         flushQueued <= 0;
+        lastCacheLoadProgress <= 0;
     end
     else begin
 
         if (IN_flush) flushQueued <= 1;
-        
         if (setDirty) dirty[setDirtyIdx] <= 1;
+
+        lastCacheLoadProgress <= cacheLoadProgress;
 
         case (state)
             IDLE: begin
                 reg temp = 0;
                 cacheTransfer <= 0;
+                lastCacheLoadProgress <= 0;
                 for (integer i = 0; i < 2; i=i+1) begin
 
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
@@ -645,8 +649,6 @@ always_ff@(posedge clk) begin
                         
                         // new cache line is not dirty
                         dirty[missIdx] <= 0;
-
-                        //if ({miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E){1'b0}}} == 32'h80003000) $display("[miss %d]", $time()); //267286
                         
                         case (missType)
                             REGULAR: begin

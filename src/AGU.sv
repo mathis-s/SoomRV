@@ -21,7 +21,8 @@ module AGU
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
     output ELD_UOp OUT_eldOp,
-    output RES_UOp OUT_uop
+    output RES_UOp OUT_uop,
+    input wire IN_isDelayLoad
 );
 
 localparam STORE_AGU = !LOAD_AGU;
@@ -35,9 +36,15 @@ function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user);
     return r;
 endfunction
 
+// delayed loads stay in the LoadBuffer anyways,
+// so we can ignore the LSU's stall signal
+wire inStallMasked = IN_stall && !IN_isDelayLoad;
+
 reg pageWalkActive;
 reg pageWalkAccepted;
-assign OUT_stall = IN_stall || pageWalkActive || waitForPWComplete;
+reg eldIsPageWalkOp;
+assign OUT_stall = inStallMasked || eldIsPageWalkOp || waitForPWComplete;
+
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
 wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr; // super is already handled in TLB
@@ -45,11 +52,10 @@ wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, addr[11:0]} : addr; // super 
 always_comb begin
     OUT_eldOp = 'x;
 
-    if (pageWalkActive) begin
+    if (eldIsPageWalkOp) begin
         OUT_eldOp.valid =
             !rst &&
-            pageWalkAccepted &&
-            IN_pw.valid &&
+            ((pageWalkAccepted && IN_pw.valid) || !pageWalkActive) &&
             (!IN_branch.taken || $signed(OUT_aguOp.sqN - IN_branch.sqN) <= 0);
         if (OUT_eldOp.valid)
             OUT_eldOp.addr = OUT_aguOp.addr[11:0];
@@ -122,7 +128,7 @@ always_comb begin
         !(rst) && 
         !(waitForPWComplete) && 
         !(pageWalkActive) && 
-        (!IN_stall && en && IN_uop.valid /*&& (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)*/);
+        (!inStallMasked && en && IN_uop.valid /*&& (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)*/);
     
     OUT_tlb.vpn = addr[31:12];
 end
@@ -142,8 +148,12 @@ always_ff@(posedge clk) begin
         OUT_uop.valid <= 0;
         pageWalkActive <= 0;
         waitForPWComplete <= 0;
+        eldIsPageWalkOp <= 0;
     end
     else begin
+
+        if (eldIsPageWalkOp && !pageWalkActive && !inStallMasked)
+            eldIsPageWalkOp <= 0;
 
         if (waitForPWComplete) begin
             if (!IN_pw.busy || IN_pw.rqID != RQ_ID)
@@ -207,15 +217,17 @@ always_ff@(posedge clk) begin
                     pageWalkActive <= 0;
                     pageWalkAccepted <= 0;
                     OUT_pw.valid <= 0;
+                    eldIsPageWalkOp <= inStallMasked;
                 end
             end
             else begin
                 waitForPWComplete <= pageWalkActive;
                 pageWalkAccepted <= 0;
                 pageWalkActive <= 0;
+                eldIsPageWalkOp <= 0;
             end
         end
-        else if (!IN_stall && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+        else if (!inStallMasked && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0) && !eldIsPageWalkOp) begin
             
             OUT_aguOp.addr <= phyAddr;
             OUT_aguOp.pc <= IN_uop.pc;
@@ -234,6 +246,7 @@ always_ff@(posedge clk) begin
                 OUT_aguOp.valid <= 0;
                 OUT_uop.valid <= 0;
                 pageWalkActive <= 1;
+                eldIsPageWalkOp <= 1;
                 pageWalkAccepted <= 0;
             end 
             else begin
@@ -394,7 +407,7 @@ always_ff@(posedge clk) begin
                 endcase
             end
         end
-        else if (!IN_stall || (OUT_aguOp.valid && IN_branch.taken && $signed(OUT_aguOp.sqN - IN_branch.sqN) > 0))
+        else if ((!inStallMasked && !eldIsPageWalkOp) || (OUT_aguOp.valid && IN_branch.taken && $signed(OUT_aguOp.sqN - IN_branch.sqN) > 0))
             OUT_aguOp.valid <= 0;
     end
 end

@@ -12,6 +12,7 @@ module LoadBuffer
     input wire IN_stall,
     input AGU_UOp IN_uopLd,
     input AGU_UOp IN_uopSt,
+    output wire OUT_isDelayLoad,
 
     input wire IN_SQ_done,
 
@@ -48,6 +49,7 @@ wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 LBEntry lateLoadUOp;
 reg issueLateLoad;
 reg delayLoad;
+assign OUT_isDelayLoad = delayLoad;
 always_comb begin
     OUT_uopAGULd = 'x;
     OUT_uopAGULd.valid = 0;
@@ -174,7 +176,7 @@ always_ff@(posedge clk) begin
             end
         end
         // Insert new entries, check stores
-        if (!IN_stall && IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
+        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
             
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopLd.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].sqN <= IN_uopLd.sqN;
