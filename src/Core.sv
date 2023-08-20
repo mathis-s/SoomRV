@@ -4,7 +4,8 @@ module Core
     input wire rst,
     input wire en,
 
-    IF_Mem.HOST IF_mem,
+    IF_Cache.HOST IF_cache,
+    IF_CTable.HOST IF_ct,
     IF_MMIO.HOST IF_mmio,
     IF_CSR_MMIO.CSR IF_csr_mmio,
     
@@ -20,8 +21,6 @@ module Core
 always_comb begin
     if (LSU_MC_if.cmd != MEMC_NONE)
         OUT_memc = LSU_MC_if;
-    else if (CC_MC_if.cmd != MEMC_NONE)
-        OUT_memc = CC_MC_if;
     else
         OUT_memc = PC_MC_if;
 end
@@ -505,7 +504,7 @@ PageWalker pageWalker
 
     .IN_ldStall(CC_PW_LD_stall),
     .OUT_ldUOp(PW_LD_uop),
-    .IN_ldResUOp(LSU_PW_ldUOp)
+    .IN_ldResUOp(wbUOp[2])
 );
 
 wire LS_AGULD_uopStall;
@@ -522,37 +521,6 @@ LoadSelector loadSelector
     .OUT_ldUOp(LS_uopLd)
 );
 
-LD_UOp CC_uopLd;
-ST_UOp CC_uopSt;
-LD_UOp CC_SQ_uopLd;
-wire CC_storeStall;
-wire CC_loadStall;
-MemController_Req CC_MC_if;
-wire CC_fenceBusy;
-CacheController cc
-(
-    .clk(clk),
-    .rst(rst),
-    
-    .IN_branch(branch),
-    .IN_SQ_empty(SQ_empty),
-    .IN_stall('{LSU_stStall, LSU_ldStall}),
-    .OUT_stall('{CC_storeStall, CC_loadStall}),
-
-    .IN_uopLd(LS_uopLd),
-    .OUT_uopLdSq(CC_SQ_uopLd),
-    .OUT_uopLd(CC_uopLd),
-    
-    .IN_uopSt(SQ_uop),
-    .OUT_uopSt(CC_uopSt),
-    
-    .OUT_memc(CC_MC_if),
-    .IN_memc(IN_memc),
-    
-    .IN_fence(TH_startFence),
-    .OUT_fenceBusy(CC_fenceBusy)
-);
-
 TLB_Req TLB_rqs[1:0];
 TLB_Res TLB_res[1:0];
 TLB#(2) dtlb
@@ -566,13 +534,14 @@ TLB#(2) dtlb
 );
 
 AGU_UOp AGU_LD_uop /* verilator public */;
+ELD_UOp AGU_eLdUOp;
 PageWalk_Req LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
     .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
-    .IN_stall(LS_AGULD_uopStall),
+    .IN_stall(LSU_ldAGUStall),
     .OUT_stall(stall[2]),
     
     .IN_branch(branch),
@@ -587,7 +556,9 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 
     .IN_uop(LD_uop[2]),
     .OUT_aguOp(AGU_LD_uop),
-    .OUT_uop()
+    .OUT_eldOp(AGU_eLdUOp),
+    .OUT_uop(),
+    .IN_isDelayLoad(LB_isDelayLoad)
 );
 
 AGU_UOp AGU_ST_uop /* verilator public */;
@@ -612,24 +583,30 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
-    .OUT_uop(wbUOp[3])
+    .OUT_eldOp(),
+    .OUT_uop(wbUOp[3]),
+    .IN_isDelayLoad(1'bx)
 );
 
 
 SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd;
+LD_UOp LB_aguUOpLd;
+wire LB_isDelayLoad;
 LoadBuffer lb
 (
     .clk(clk),
     .rst(rst),
     .commitSqN(ROB_curSqN),
     
-    .IN_stall('{1'b0, LS_AGULD_uopStall}),
+    .IN_stall(LS_AGULD_uopStall),
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
+    .OUT_isDelayLoad(LB_isDelayLoad),
 
     .IN_SQ_done(SQ_done),
-
+    
+    .OUT_uopAGULd(LB_aguUOpLd),
     .OUT_uopLd(LB_uopLd),
     
     .IN_branch(branch),
@@ -644,8 +621,7 @@ wire[31:0] CSR_dataOut;
 wire SQ_empty;
 wire SQ_done;
 ST_UOp SQ_uop;
-wire[3:0] SQ_lookupMask;
-wire[31:0] SQ_lookupData;
+StFwdResult SQ_fwd;
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
 StoreQueue sq
@@ -653,7 +629,7 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     .IN_stallSt(CC_storeStall),
-    .IN_stallLd(LSU_ldStall),
+    .IN_stallLd(CC_loadStall),
     .OUT_empty(SQ_empty),
     .OUT_done(SQ_done),
     
@@ -665,47 +641,56 @@ StoreQueue sq
     .IN_branch(branch),
     
     .OUT_uopSt(SQ_uop),
-    
-    .OUT_lookupData(SQ_lookupData),
-    .OUT_lookupMask(SQ_lookupMask),
+    .OUT_fwd(SQ_fwd),
+
+    .IN_stAck(LSU_stAck),
     
     .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
 );
 
-wire LSU_loadFwdValid;
-Tag LSU_loadFwdTag;
-wire LSU_ldStall;
-wire LSU_stStall;
-PW_LD_RES_UOp LSU_PW_ldUOp;
+wire LSU_loadFwdValid = 0;
+Tag LSU_loadFwdTag = 'x;
+wire CC_loadStall;
+wire CC_storeStall;
+wire LSU_ldAGUStall;
+LD_UOp CC_SQ_uopLd;
+wire LSU_busy;
 
 MemController_Req LSU_MC_if;
+ST_Ack LSU_stAck;
 LoadStoreUnit lsu
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_flush(TH_startFence),
+    .IN_SQ_empty(SQ_empty),
+    .OUT_busy(LSU_busy),
     
     .IN_branch(branch),
-    .OUT_ldStall(LSU_ldStall),
-    .OUT_stStall(LSU_stStall),
+    .OUT_ldAGUStall(LSU_ldAGUStall),
+    .OUT_ldStall(CC_loadStall),
+    .OUT_stStall(CC_storeStall),
     
-    .IN_uopLd(CC_uopLd),
-    .IN_uopSt(CC_uopSt),
-    
-    .IN_SQ_lookupMask(SQ_lookupMask),
-    .IN_SQ_lookupData(SQ_lookupData),
+    .IN_uopELd(AGU_eLdUOp),
+    .IN_aguLd(LB_aguUOpLd),
 
+    .IN_uopLd(LS_uopLd),
+    .OUT_uopLdSq(CC_SQ_uopLd),
+    .IN_uopSt(SQ_uop),
+    
+    .IF_cache(IF_cache),
+    .IF_mmio(IF_mmio),
+    .IF_ct(IF_ct),
+
+    .IN_stFwd(SQ_fwd),
+    .OUT_stAck(LSU_stAck),
+    
     .OUT_memc(LSU_MC_if),
     .IN_memc(IN_memc),
-    
-    .IF_mem(IF_mem),
-    .IF_mmio(IF_mmio),
-    
-    .OUT_uopLd(wbUOp[2]),
-    .OUT_uopPwLd(LSU_PW_ldUOp),
-    
-    .OUT_loadFwdValid(LSU_loadFwdValid),
-    .OUT_loadFwdTag(LSU_loadFwdTag)
+
+    .OUT_uopLd(wbUOp[2])
 );
 
 RES_UOp INT1_uop;
@@ -811,7 +796,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || IN_memc.busy || CC_uopLd.valid || CC_uopSt.valid || SQ_uop.valid || AGU_LD_uop.valid || CC_fenceBusy;
+wire MEMSUB_busy = !SQ_empty || IN_memc.busy || SQ_uop.valid || AGU_LD_uop.valid || LSU_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;

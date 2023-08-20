@@ -2,7 +2,7 @@
 .globl main
 
 main: 
-    
+    mv s1, ra
     li s0, 4
     .loop_main:
         li a0, 42
@@ -70,5 +70,5 @@ main:
         addi a0, a0, -1
         bnez a0, .loop
     
-    
-    ebreak
+    mv ra, s1
+    ret

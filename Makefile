@@ -33,7 +33,6 @@ SRC_FILES = \
 	src/PopCnt.sv \
 	src/BranchSelector.sv \
 	src/PreDecode.sv \
-	src/CacheController.sv \
 	src/MemRTL.sv \
 	src/Top.sv \
 	src/MemoryController.sv \

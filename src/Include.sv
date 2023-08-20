@@ -7,6 +7,7 @@ typedef logic[2:0] FetchOff_t;
 typedef logic[11:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 typedef logic[1:0] RetStackIdx_t;
+typedef logic[1:0] StID_t;
 
 typedef enum logic[5:0]
 {
@@ -609,12 +610,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[31:0] data;
-    logic valid;
-} PW_LD_RES_UOp;
-
-typedef struct packed
-{
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;
@@ -629,12 +624,26 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[11:0] addr;
+    logic valid;
+} ELD_UOp; // early load address for VIPT
+
+typedef struct packed
+{
     logic[31:0] addr;
     logic[31:0] data;
     logic[3:0] wmask;
     logic isMMIO;
+    StID_t id;
     logic valid;
 } ST_UOp;
+
+typedef struct packed
+{
+    StID_t id;
+    logic fail;
+    logic valid;
+} ST_Ack;
 
 typedef struct packed
 {
@@ -777,6 +786,71 @@ interface IF_Mem();
     (
         input we, waddr, wdata, wmask, re, raddr,
         output rdata, rbusy, wbusy
+    );
+endinterface
+
+interface IF_Cache();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    logic[31:0] wdata;
+    logic[3:0] wmask;
+    
+    logic re;
+    logic[11:0] raddr;
+    logic[`CASSOC-1:0][31:0] rdata;
+    
+    logic rbusy;
+    logic wbusy;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, wmask, re, raddr,
+        input rdata, rbusy, wbusy
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, wmask, re, raddr,
+        output rdata, rbusy, wbusy
+    );
+endinterface
+
+typedef struct packed
+{
+    logic[19:0] addr;
+    logic valid;
+} CTEntry;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic[3:0] mask;
+    logic valid;
+} StFwdResult;
+
+interface IF_CTable();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    CTEntry wdata;
+    
+    logic re[1:0];
+    logic[11:0] raddr[1:0];
+    CTEntry[1:0][`CASSOC-1:0] rdata;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, re, raddr,
+        output rdata
     );
 endinterface
 

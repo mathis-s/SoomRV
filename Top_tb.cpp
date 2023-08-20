@@ -723,7 +723,7 @@ void LogInstructions()
     for (size_t i = 0; i < 4; i++)
     {
         // WB valid
-        if (core->wbUOp[i] & 1)
+        if ((core->wbUOp[i] & 1) && !(core->wbUOp[i] & 2))
         {
             uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
             uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7)) & 0xffff'ffff;

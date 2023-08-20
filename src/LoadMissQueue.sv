@@ -29,11 +29,12 @@ struct packed
 } queue[SIZE-1:0];
 
 always_comb begin
-    OUT_full = 1;
+    reg[$clog2(SIZE):0] free = SIZE;
     for (integer i = 0; i < SIZE; i=i+1) begin
-        if (!queue[i].ld.valid)
-            OUT_full = 0;
+        if (queue[i].ld.valid)
+            free = free - 1;
     end
+    OUT_full = !(free > 3);
 end
 
 always_ff@(posedge clk) begin
@@ -70,16 +71,12 @@ always_ff@(posedge clk) begin
                     assert(IN_ld.exception == AGU_NO_EXCEPTION);
                     queue[i].ld.exception <= AGU_NO_EXCEPTION;
                     queue[i].ready <= 0;
-
-                    //if (IN_cacheLoadActive &&
-                    //    IN_ld.addr[31:CLSIZE_E] == IN_cacheLoadAddr &&
-                    //    {1'b0, IN_ld.addr[CLSIZE_E-1:0]} < IN_cacheLoadProgress)
-                    //    queue[i].ready <= 1;
                 end
             end
         end  
 
         // Dequeue
+        // TODO: dequeue only one op when doing IN_ready dequeue (we can only handle one miss anyways)
         if (IN_dequeue || !(OUT_ld.external || !IN_branch.taken || $signed(OUT_ld.sqN - IN_branch.sqN) <= 0)) begin
             OUT_ld <= 'x;
             OUT_ld.valid <= 0;
