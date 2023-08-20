@@ -419,7 +419,7 @@ always_comb begin
         
         // do allow access to regions of memory that have been loaded already in the current transfer
         if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
-            cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
+            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
             cacheHitAssoc = cacheLoadAssoc;
         end
         
