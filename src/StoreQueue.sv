@@ -55,10 +55,18 @@ typedef struct packed
 {
     SQEntry s;
     StID_t id;
-    logic done;
     logic issued;
 } EQEntry;
 EQEntry evicted[NUM_EVICTED-1:0];
+
+ST_Ack stAck_r;
+always_ff@(posedge clk) begin
+    if (!rst) stAck_r <= IN_stAck;
+    else begin
+        stAck_r <= 'x;
+        stAck_r.valid <= 0;
+    end
+end
 
 reg[$clog2(NUM_EVICTED):0] evictedIn;
 
@@ -109,21 +117,61 @@ always_comb begin
     end
 end
 
-assign OUT_done = (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && !IN_stallSt;
+assign OUT_done = 
+    (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && 
+    evictedIn == 0 &&
+    !IN_stallSt;
 
-StID_t storeIDCnt;
-
+// Do not re-order stores before stores at the same address; and do not re-order MMIO stores.
 reg allowDequeue;
 always_comb begin
     allowDequeue = 1;
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].s.valid && !evicted[i].issued && !evicted[i].done &&
-            evicted[i].s.addr == entries[0].addr)
+        if (evicted[i].s.valid && !evicted[i].issued &&
+            ((evicted[i].s.addr == entries[0].addr) || (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[0].addr))))
             allowDequeue = 0;
     end
 
     if (IN_stAck.valid && IN_stAck.fail)
         allowDequeue = 0;
+    if (stAck_r.valid && stAck_r.fail)
+        allowDequeue = 0;
+end
+
+// Bitfield for tracking used/free evicted store IDs
+reg[NUM_EVICTED-1:0] evictedUsedIds;
+reg[$clog2(NUM_EVICTED)-1:0] evictedNextId;
+reg evictedNextIdValid;
+always_comb begin
+    evictedNextId = 'x;
+    evictedNextIdValid = 0;
+    for (integer i = NUM_EVICTED-1; i >= 0; i=i-1) begin
+        if (!evictedUsedIds[i]) begin
+            evictedNextId = i[$clog2(NUM_EVICTED)-1:0];
+            evictedNextIdValid = 1;
+        end
+    end
+    
+    // Re-use id from current ack if possible to avoid wait cycle
+    if (stAck_r.valid && !stAck_r.fail) begin
+        evictedNextId = stAck_r.id;
+        evictedNextIdValid = 1;
+    end
+end
+
+// Find index of entry corresponding to current store acknowledgement from LSU 
+reg[$clog2(NUM_EVICTED)-1:0] stAckIdx;
+reg stAckIdxValid;
+always_comb begin
+    stAckIdx = 'x;
+    stAckIdxValid = 0;
+    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+        if (stAck_r.valid && evicted[i].s.valid && evicted[i].id == stAck_r.id) begin
+            assert(!stAckIdxValid);
+            stAckIdx = i[$clog2(NUM_EVICTED)-1:0];
+            stAckIdxValid = 1;
+        end
+    end
 end
 
 reg flushing;
@@ -148,13 +196,13 @@ always_ff@(posedge clk) begin
         OUT_empty <= 1;
         OUT_uopSt.valid <= 0;
         flushing <= 0;
+        evictedUsedIds <= 0;
     end
     
     else begin
 
         reg doingEnqueue = 0;
         reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
-        reg doNotIssueFromEvicted = 0;
 
         if (!IN_stallSt)
             OUT_uopSt.valid <= 0;
@@ -166,27 +214,22 @@ always_ff@(posedge clk) begin
             end
         end
         
-        // Delete oldest entry from evicted if marked as executed
-        if (evicted[0].s.valid && evicted[0].done) begin
-            for (integer i = 1; i < NUM_EVICTED; i=i+1) begin
-                evicted[i-1] <= evicted[i];
-                if (evicted[i].s.valid && IN_stAck.valid && evicted[i].id == IN_stAck.id) begin
-                    evicted[i-1].done <= !IN_stAck.fail;
-                    evicted[i-1].issued <= 0;
+        // Delete entry from evicted if we get a positive store ack
+        if (stAck_r.valid) begin
+            assert(stAckIdxValid);
+            if (!stAck_r.fail) begin
+                for (integer i = 0; i < NUM_EVICTED-1; i=i+1) begin
+                    if (i >= stAckIdx) begin
+                        evicted[i] <= evicted[i+1];
+                    end
                 end
-                doNotIssueFromEvicted = 1;
+                evicted[NUM_EVICTED-1] <= 'x;
+                evicted[NUM_EVICTED-1].s.valid <= 0;
+                nextEvictedIn = nextEvictedIn - 1;
+                evictedUsedIds[stAck_r.id] <= 0;
             end
-            evicted[NUM_EVICTED-1] <= 'x;
-            evicted[NUM_EVICTED-1].s.valid <= 0;
-            nextEvictedIn = nextEvictedIn - 1;
-        end
-        // If a store has been executed successfully, mark it as such in evicted
-        else if (IN_stAck.valid) begin
-            for (integer i = 0; i < NUM_EVICTED; i=i+1)
-                if (evicted[i].s.valid && evicted[i].id == IN_stAck.id) begin
-                    evicted[i].done <= !IN_stAck.fail;
-                    evicted[i].issued <= 0;
-                end
+            else
+                evicted[stAckIdx].issued <= 0;
         end
         
         // Dequeue
@@ -196,13 +239,15 @@ always_ff@(posedge clk) begin
                 entries[0].ready && nextEvictedIn < NUM_EVICTED &&
                 allowDequeue
             ) begin
+                assert(evictedNextIdValid);
+
                 entries[NUM_ENTRIES-1].valid <= 0;
             
                 if (!flushing)
                     baseIndex = baseIndex + 1;
                 
                 OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= storeIDCnt;
+                OUT_uopSt.id <= evictedNextId;
                 OUT_uopSt.addr <= {entries[0].addr, 2'b0};
                 OUT_uopSt.data <= entries[0].data;
                 OUT_uopSt.wmask <= entries[0].wmask;
@@ -215,16 +260,15 @@ always_ff@(posedge clk) begin
                 end
                 
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[0];
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].done <= 0;
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= storeIDCnt;
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= evictedNextId;
                 nextEvictedIn = nextEvictedIn + 1;
-
-                storeIDCnt <= storeIDCnt + 1;
+                    
+                evictedUsedIds[evictedNextId] <= 1;
             end
 
             // Re-issue op that previously missed cache
-            else if (!doNotIssueFromEvicted && !evicted[0].done && evicted[0].s.valid && !evicted[0].issued) begin
+            else if (evicted[0].s.valid && !evicted[0].issued) begin
                 OUT_uopSt.valid <= 1;
                 OUT_uopSt.id <= evicted[0].id;
                 OUT_uopSt.addr <= {evicted[0].s.addr, 2'b0};

@@ -474,10 +474,10 @@ end
 
 // Store Conflict Misses
 always_comb begin
-    stConflictMiss_c[0] = (SMQ_enqueue &&
+    stConflictMiss_c[0] = (redoStore &&
         stOps[1].addr[31:CLSIZE_E] == uopSt.addr[31:CLSIZE_E]);
 
-    stConflictMiss_c[1] = (SMQ_enqueue &&
+    stConflictMiss_c[1] = (redoStore &&
         stOps[1].addr[31:CLSIZE_E] == stOps[0].addr[31:CLSIZE_E]) || stConflictMiss[0];
 end
 
@@ -522,14 +522,14 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .IN_dequeue(LMQ_dequeue)
 );
 
-wire SMQ_enqueue = stOps[1].valid &&
+wire redoStore = stOps[1].valid &&
     (miss[1].valid ?
         (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT) : 
         (!stOps[1].isMMIO && IF_cache.wbusy));
 
 assign OUT_stAck.id = stOps[1].id;
 assign OUT_stAck.valid = stOps[1].valid;
-assign OUT_stAck.fail = SMQ_enqueue;
+assign OUT_stAck.fail = redoStore;
 
 // Cache Table Writes
 reg cacheTableWrite;
