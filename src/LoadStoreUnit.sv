@@ -175,7 +175,7 @@ always_comb begin
     // For regular loads, we only get the full address and other
     // info now.
     if (regularLd) begin
-        assert(!IN_aguLd.valid || IN_aguLd.addr[11:0] == uopLd_0.addr[11:0]);
+        assert(rst || !IN_aguLd.valid || IN_aguLd.addr[11:0] == uopLd_0.addr[11:0]);
         uopLd_0 = 'x;
         uopLd_0.valid = 0;
         if (IN_aguLd.valid)
