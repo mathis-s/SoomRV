@@ -126,16 +126,21 @@ assign OUT_done =
 reg allowDequeue;
 always_comb begin
     allowDequeue = 1;
+    
+    // When a store cache miss occurs, collisions with any issued ops
+    // are handled by the LSU. We have to make sure not to issue any
+    // conflicting new ops though.
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].s.valid && !evicted[i].issued &&
+        if (evicted[i].s.valid &&
+
+            (!evicted[i].issued || 
+                // Forward negative store acks
+                (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
+                (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
+
             ((evicted[i].s.addr == entries[0].addr) || (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[0].addr))))
             allowDequeue = 0;
     end
-
-    if (IN_stAck.valid && IN_stAck.fail)
-        allowDequeue = 0;
-    if (stAck_r.valid && stAck_r.fail)
-        allowDequeue = 0;
 end
 
 // Bitfield for tracking used/free evicted store IDs
