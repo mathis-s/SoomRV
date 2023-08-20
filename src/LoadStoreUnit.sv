@@ -475,10 +475,13 @@ end
 // Store Conflict Misses
 always_comb begin
     stConflictMiss_c[0] = (redoStore &&
-        stOps[1].addr[31:CLSIZE_E] == uopSt.addr[31:CLSIZE_E]);
+        (stOps[1].addr[31:CLSIZE_E] == uopSt.addr[31:CLSIZE_E] ||
+            stOps[1].isMMIO && uopSt.isMMIO));
 
     stConflictMiss_c[1] = (redoStore &&
-        stOps[1].addr[31:CLSIZE_E] == stOps[0].addr[31:CLSIZE_E]) || stConflictMiss[0];
+        (stOps[1].addr[31:CLSIZE_E] == stOps[0].addr[31:CLSIZE_E] ||
+            (stOps[1].isMMIO && stOps[0].isMMIO))) || 
+        stConflictMiss[0];
 end
 
 
