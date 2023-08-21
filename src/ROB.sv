@@ -26,7 +26,6 @@ module ROB
     input wire rst,
 
     input R_UOp IN_uop[WIDTH_RN-1:0],
-    input wire IN_uopValid[WIDTH_RN-1:0],
     input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
     
     input wire IN_interruptPending /*verilator public*/,
@@ -61,7 +60,7 @@ always_comb begin
         
         for (integer j = 0; j < WIDTH_RN; j=j+1) begin
             // This could be one-hot...
-            if (IN_uopValid[j] && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
+            if (IN_uop[j].valid && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
                 rnUOpValidSorted[i] = 1;
                 rnUOpSorted[i] = IN_uop[j];
             end

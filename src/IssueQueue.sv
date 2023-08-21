@@ -23,7 +23,6 @@ module IssueQueue
     input wire IN_doNotIssueFU1,
     input wire IN_doNotIssueFU2,
     
-    input wire IN_uopValid[NUM_UOPS-1:0],
     input R_UOp IN_uop[NUM_UOPS-1:0],
     input wire IN_uopOrdering[NUM_UOPS-1:0],
     
@@ -37,16 +36,13 @@ module IssueQueue
     
     // All ops that are being issued (including OUT_uop)
     // For operand forwarding
-    input wire IN_issueValid[RESULT_BUS_COUNT-1:0],
     input IS_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
     
     input SqN IN_maxStoreSqN,
     input SqN IN_maxLoadSqN,
     input SqN IN_commitSqN,
     
-    output reg OUT_valid,
     output IS_UOp OUT_uop,
-    
     output reg OUT_full
 );
 
@@ -99,7 +95,7 @@ always_comb begin
         end
         
         for (integer j = 0; j < 2; j=j+1) begin
-            if (IN_issueValid[j] && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
+            if (IN_issueUOps[j].valid && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
                 if (IN_issueUOps[j].fu == FU_INT) begin
                     for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                         if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
@@ -119,7 +115,7 @@ end
 always_comb begin
     reg[$clog2(SIZE):0] count = 0;
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        if (IN_uopValid[i] && 
+        if (IN_uop[i].valid && 
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
             count = count + 1;
@@ -140,7 +136,7 @@ always_ff@(posedge clk) begin
         insertIndex = 0;
         reservedWBs <= 0;
         OUT_uop <= 'x;
-        OUT_valid <= 0;
+        OUT_uop.valid <= 0;
     end
     else if (IN_branch.taken) begin
         
@@ -154,7 +150,7 @@ always_ff@(posedge clk) begin
         insertIndex = newInsertIndex;
         if (!IN_stall || $signed(OUT_uop.sqN - IN_branch.sqN) > 0) begin
             OUT_uop <= 'x;
-            OUT_valid <= 0;
+            OUT_uop.valid <= 0;
         end
     end
     else begin
@@ -163,7 +159,7 @@ always_ff@(posedge clk) begin
         // Issue
         if (!IN_stall) begin
             OUT_uop <= 'x;
-            OUT_valid <= 0;
+            OUT_uop.valid <= 0;
             
             for (integer i = 0; i < SIZE; i=i+1) begin
                 if (i < insertIndex && !issued) begin
@@ -185,7 +181,7 @@ always_ff@(posedge clk) begin
                             queue[i].fu != FU_LD || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         
                         issued = 1;
-                        OUT_valid <= 1;
+                        OUT_uop.valid <= 1;
                         
                         OUT_uop.imm <= {{(IMM_EXT){1'b0}}, queue[i].imm[REGULAR_IMM_BITS-1:0]};
                         
@@ -245,7 +241,7 @@ always_ff@(posedge clk) begin
         // Enqueue
         if (frontEn && !IN_branch.taken) begin
             for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                if (IN_uopValid[i] && 
+                if (IN_uop[i].valid && 
                     ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                         IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
                     

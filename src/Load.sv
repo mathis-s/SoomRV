@@ -9,7 +9,6 @@ module Load
     input wire clk,
     input wire rst,
     
-    input wire IN_uopValid[NUM_UOPS-1:0],
     input IS_UOp IN_uop[NUM_UOPS-1:0],
 
     // Writeback Port (snoop) read
@@ -65,7 +64,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            if (!IN_stall[i] && IN_uopValid[i] && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
+            if (!IN_stall[i] && IN_uop[i].valid && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
                 OUT_uop[i].imm <= IN_uop[i].imm;
                 

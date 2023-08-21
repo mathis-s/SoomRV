@@ -712,9 +712,9 @@ void LogInstructions()
     // Issue
     for (size_t i = 0; i < 4; i++)
     {
-        if (!core->stall[i] && core->RV_uopValid[i])
+        if (!core->stall[i] && core->IS_uop[i][0] & 1)
         {
-            uint32_t sqn = ExtractField<4>(core->RV_uop[i], 115 - (32 + 12 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
+            uint32_t sqn = ExtractField<4>(core->IS_uop[i], 116 - (32 + 12 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
             LogIssue(state.insts[sqn]);
         }
     }
@@ -825,11 +825,11 @@ void LogInstructions()
         // Rename
         if (core->IQS_ready)
             for (size_t i = 0; i < 4; i++)
-                if (core->RN_uopValid[i])
+                if (core->RN_uop[i][0] & 1)
                 {
-                    int sqn = ExtractField<4>(core->RN_uop[i], 45, 7);
-                    int fu = ExtractField<4>(core->RN_uop[i], 1, 4);
-                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 45 - 7, 7);
+                    int sqn = ExtractField<4>(core->RN_uop[i], 46, 7);
+                    int fu = ExtractField<4>(core->RN_uop[i], 2, 4);
+                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 - 7, 7);
 
                     state.insts[sqn].valid = 1;
                     state.insts[sqn] = state.de[i];

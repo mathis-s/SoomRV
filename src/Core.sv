@@ -154,7 +154,6 @@ wire frontendEn /*verilator public*/ =
     !SQ_flush;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
-wire RN_uopValid[`DEC_WIDTH-1:0] /*verilator public*/;
 wire RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
@@ -182,7 +181,6 @@ Rename rn
     .IN_branchStoreSqN(branch.storeSqN),
     .IN_mispredFlush(mispredFlush),
 
-    .OUT_uopValid(RN_uopValid),
     .OUT_uop(RN_uop),
     .OUT_uopOrdering(RN_uopOrdering),
     .OUT_nextSqN(RN_nextSqN),
@@ -190,8 +188,7 @@ Rename rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-wire RV_uopValid[3:0] /*verilator public*/;
-IS_UOp RV_uop[3:0] /*verilator public*/;
+IS_UOp IS_uop[3:0] /*verilator public*/;
 
 wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
@@ -209,7 +206,6 @@ IssueQueue#(`IQ_0_SIZE,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) i
     .IN_doNotIssueFU1(DIV_doNotIssue),
     .IN_doNotIssueFU2(1'b0),
     
-    .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     .IN_uopOrdering(RN_uopOrdering),
     
@@ -220,15 +216,13 @@ IssueQueue#(`IQ_0_SIZE,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) i
     
     .IN_branch(branch),
     
-    .IN_issueValid(RV_uopValid),
-    .IN_issueUOps(RV_uop),
+    .IN_issueUOps(IS_uop),
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_valid(RV_uopValid[0]),
-    .OUT_uop(RV_uop[0]),
+    .OUT_uop(IS_uop[0]),
     .OUT_full(IQ0_full)
 );
 wire IQ1_full;
@@ -242,7 +236,6 @@ IssueQueue#(`IQ_1_SIZE,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4
     .IN_doNotIssueFU1(MUL_doNotIssue),
     .IN_doNotIssueFU2(FDIV_doNotIssue),
     
-    .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     .IN_uopOrdering(RN_uopOrdering),
     
@@ -253,15 +246,13 @@ IssueQueue#(`IQ_1_SIZE,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4
     
     .IN_branch(branch),
     
-    .IN_issueValid(RV_uopValid),
-    .IN_issueUOps(RV_uop),
+    .IN_issueUOps(IS_uop),
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_valid(RV_uopValid[1]),
-    .OUT_uop(RV_uop[1]),
+    .OUT_uop(IS_uop[1]),
     .OUT_full(IQ1_full)
 );
 wire IQ2_full;
@@ -275,7 +266,6 @@ IssueQueue#(`IQ_2_SIZE,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
     .IN_doNotIssueFU1(1'b0),
     .IN_doNotIssueFU2(1'b0),
     
-    .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     .IN_uopOrdering(RN_uopOrdering),
     
@@ -286,15 +276,13 @@ IssueQueue#(`IQ_2_SIZE,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
 
     .IN_branch(branch),
     
-    .IN_issueValid(RV_uopValid),
-    .IN_issueUOps(RV_uop),
+    .IN_issueUOps(IS_uop),
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_valid(RV_uopValid[2]),
-    .OUT_uop(RV_uop[2]),
+    .OUT_uop(IS_uop[2]),
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
@@ -308,7 +296,6 @@ IssueQueue#(`IQ_3_SIZE,3,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3
     .IN_doNotIssueFU1(1'b0),
     .IN_doNotIssueFU2(1'b0),
     
-    .IN_uopValid(RN_uopValid),
     .IN_uop(RN_uop),
     .IN_uopOrdering(RN_uopOrdering),
     
@@ -319,15 +306,13 @@ IssueQueue#(`IQ_3_SIZE,3,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3
     
     .IN_branch(branch),
     
-    .IN_issueValid(RV_uopValid),
-    .IN_issueUOps(RV_uop),
+    .IN_issueUOps(IS_uop),
     
     .IN_maxStoreSqN(SQ_maxStoreSqN),
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_valid(RV_uopValid[3]),
-    .OUT_uop(RV_uop[3]),
+    .OUT_uop(IS_uop[3]),
     .OUT_full(IQ3_full)
 );
 
@@ -364,8 +349,7 @@ Load ld
     .clk(clk),
     .rst(rst),
     
-    .IN_uopValid(RV_uopValid),
-    .IN_uop(RV_uop),
+    .IN_uop(IS_uop),
     
     .IN_wbHasResult(wbHasResult),
     .IN_wbUOp(wbUOp),
@@ -417,7 +401,7 @@ IntALU ialu
 
 wire DIV_busy;
 RES_UOp DIV_uop;
-wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && LD_uop[0].fu == FU_DIV) || (RV_uopValid[0] && RV_uop[0].fu == FU_DIV);
+wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && LD_uop[0].fu == FU_DIV) || (IS_uop[0].valid && IS_uop[0].fu == FU_DIV);
 Divide div
 (
     .clk(clk),
@@ -748,7 +732,7 @@ FMul fmul
 );
 
 wire FDIV_busy;
-wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && LD_uop[1].fu == FU_FDIV) || (RV_uopValid[1] && RV_uop[1].fu == FU_FDIV);
+wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && LD_uop[1].fu == FU_FDIV) || (IS_uop[1].valid && IS_uop[1].fu == FU_FDIV);
 RES_UOp FDIV_uop;
 FDiv fdiv
 (
@@ -778,7 +762,6 @@ ROB rob
     .clk(clk),
     .rst(rst),
     .IN_uop(RN_uop),
-    .IN_uopValid(RN_uopValid),
     .IN_wbUOps(wbUOp),
     
     .IN_interruptPending(CSR_trapControl.interruptPending),

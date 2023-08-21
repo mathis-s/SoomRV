@@ -30,7 +30,6 @@ module Rename
     input SqN IN_branchStoreSqN,
     input wire IN_mispredFlush,
     
-    output reg OUT_uopValid[WIDTH_ISSUE-1:0],
     output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
     // This is just an alternating bit that switches with each regular int op,
     // for assignment to issue queues.
@@ -253,7 +252,7 @@ always_ff@(posedge clk) begin
     
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
-            OUT_uopValid[i] <= 0;
+            OUT_uop[i].valid <= 0;
         end
     end
     else if (IN_branchTaken) begin
@@ -265,7 +264,7 @@ always_ff@(posedge clk) begin
         
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
-            OUT_uopValid[i] <= 0;
+            OUT_uop[i].valid <= 0;
         end
     end
 
@@ -300,7 +299,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if (IN_uop[i].valid) begin
                 
-                OUT_uopValid[i] <= 1;
+                OUT_uop[i].valid <= 1;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
@@ -333,7 +332,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 OUT_uop[i] <= 'x;
-                OUT_uopValid[i] <= 0;
+                OUT_uop[i].valid <= 0;
             end
         end
         counterSqN <= nextCounterSqN;
@@ -342,7 +341,7 @@ always_ff@(posedge clk) begin
     else if (!IN_stall) begin
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
-            OUT_uopValid[i] <= 0;
+            OUT_uop[i].valid <= 0;
         end
     end
     
@@ -353,7 +352,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_WR; i=i+1) begin
             if (IN_wbHasResult[i]) begin
                 for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
-                    if (OUT_uopValid[j]) begin
+                    if (OUT_uop[j].valid) begin
                         if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availA <= 1;
                         if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)

@@ -476,6 +476,7 @@ typedef struct packed
     SqN loadSqN;
     FuncUnit fu;
     logic compressed;
+    logic valid;
 } R_UOp;
 
 typedef struct packed
@@ -497,6 +498,7 @@ typedef struct packed
     SqN loadSqN;
     FuncUnit fu;
     logic compressed;
+    logic valid;
 } IS_UOp;
 
 
