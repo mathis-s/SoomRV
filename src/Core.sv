@@ -340,9 +340,7 @@ RF rf
 
 EX_UOp LD_uop[3:0] /*verilator public*/;
 
-wire[31:0] LD_zcFwdResult[1:0];
-Tag LD_zcFwdTag[1:0];
-wire LD_zcFwdValid[1:0];
+ZCForward LD_zcFwd[1:0];
 
 Load ld
 (
@@ -358,9 +356,7 @@ Load ld
     .IN_invalidateSqN(branch.sqN),
     .IN_stall(stall),
     
-    .IN_zcFwdResult(LD_zcFwdResult),
-    .IN_zcFwdTag(LD_zcFwdTag),
-    .IN_zcFwdValid(LD_zcFwdValid),
+    .IN_zcFwd(LD_zcFwd),
     
     .OUT_pcReadAddr(PC_readAddress[3:0]),
     .IN_pcReadData(PC_readData[3:0]),
@@ -391,9 +387,7 @@ IntALU ialu
     .OUT_btUpdate(BP_btUpdates[0]),
     .OUT_ibInfo(IBP_updates[0]),
     
-    .OUT_zcFwdResult(LD_zcFwdResult[0]),
-    .OUT_zcFwdTag(LD_zcFwdTag[0]),
-    .OUT_zcFwdValid(LD_zcFwdValid[0]),
+    .OUT_zcFwd(LD_zcFwd[0]),
     
     .OUT_uop(INT0_uop)
 );
@@ -695,9 +689,7 @@ IntALU ialu1
     .OUT_btUpdate(BP_btUpdates[1]),
     .OUT_ibInfo(IBP_updates[1]),
     
-    .OUT_zcFwdResult(LD_zcFwdResult[1]),
-    .OUT_zcFwdTag(LD_zcFwdTag[1]),
-    .OUT_zcFwdValid(LD_zcFwdValid[1]),
+    .OUT_zcFwd(LD_zcFwd[1]),
     
     .OUT_uop(INT1_uop)
 );

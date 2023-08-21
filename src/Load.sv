@@ -21,9 +21,7 @@ module Load
     input wire IN_stall[NUM_UOPS-1:0],
     
     // Zero cycle forward inputs
-    input wire[31:0] IN_zcFwdResult[NUM_ZC_FWDS-1:0],
-    input Tag IN_zcFwdTag[NUM_ZC_FWDS-1:0],
-    input wire IN_zcFwdValid[NUM_ZC_FWDS-1:0],
+    input ZCForward IN_zcFwd[NUM_ZC_FWDS-1:0],
     
     // PC File read
     output FetchID_t OUT_pcReadAddr[NUM_UOPS-1:0],
@@ -32,9 +30,6 @@ module Load
     // Register File read
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
     input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
-    
-    //output reg[5:0] OUT_rfReadAddr_fp[3:0],
-    //input wire[31:0] IN_rfReadData_fp[3:0],
 
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -126,8 +121,8 @@ always_ff@(posedge clk) begin
                     
                     // Try to forward zero cycle (TODO: one hot too)
                     for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagA) begin
-                            OUT_uop[i].srcA <= IN_zcFwdResult[j];
+                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagA) begin
+                            OUT_uop[i].srcA <= IN_zcFwd[j].result;
                             found = 1;
                         end
                     end
@@ -155,8 +150,8 @@ always_ff@(posedge clk) begin
                     
                     // Try to forward zero cycle (TODO: one hot too)
                     for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagB) begin
-                            OUT_uop[i].srcB <= IN_zcFwdResult[j];
+                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagB) begin
+                            OUT_uop[i].srcB <= IN_zcFwd[j].result;
                             found = 1;
                         end
                     end
@@ -180,8 +175,8 @@ always_ff@(posedge clk) begin
                     
                     // ZC is impossible as the atomic memory operand always comes from load port
                     /*for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwdValid[j] && IN_zcFwdTag[j] == IN_uop[i].tagC) begin
-                            OUT_uop[i].srcC <= IN_zcFwdResult[j];
+                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagC) begin
+                            OUT_uop[i].srcC <= IN_zcFwd[j].result;
                             found = 1;
                         end
                     end*/

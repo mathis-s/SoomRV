@@ -15,9 +15,7 @@ module IntALU
     output BTUpdate OUT_btUpdate,
     output IndirBranchInfo OUT_ibInfo,
     
-    output wire[31:0] OUT_zcFwdResult,
-    output Tag OUT_zcFwdTag,
-    output wire OUT_zcFwdValid,
+    output ZCForward OUT_zcFwd,
 
     output RES_UOp OUT_uop
 );
@@ -31,10 +29,9 @@ assign OUT_wbReq = IN_uop.valid && en;
 reg[31:0] resC;
 Flags flags;
 
-assign OUT_zcFwdResult = resC;
-assign OUT_zcFwdTag = IN_uop.tagDst;
-assign OUT_zcFwdValid = IN_uop.valid && en && !IN_uop.tagDst[$bits(Tag)-1];
-
+assign OUT_zcFwd.result = resC;
+assign OUT_zcFwd.tag = IN_uop.tagDst;
+assign OUT_zcFwd.valid = IN_uop.valid && en && !IN_uop.tagDst[$bits(Tag)-1];
 
 wire[5:0] resLzTz;
 
