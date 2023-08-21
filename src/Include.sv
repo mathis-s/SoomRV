@@ -658,7 +658,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic allowInterrupt;
     Flags flags;
     Tag tag;
     SqN sqN;

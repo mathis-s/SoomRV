@@ -770,7 +770,7 @@ assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_u
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
-wire[3:0] ROB_validRetire;
+wire[3:0] ROB_validRetire /*verilator public*/;
 wire[3:0] ROB_retireBranch;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 ROB rob

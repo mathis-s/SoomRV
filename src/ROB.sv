@@ -213,13 +213,16 @@ always_ff@(posedge clk) begin
                     OUT_comUOp[i].valid <= 1;
                     
                     // Synchronous exceptions do not increment minstret, but mret/sret do.
-                    OUT_PERFC_validRetire[i] <= (deqEntries[i].flags <= FLAGS_ORDERING) || deqEntries[i].flags == FLAGS_XRET
-                        || (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR);
+                    OUT_PERFC_validRetire[i] <= 
+                        (deqEntries[i].flags <= FLAGS_ORDERING) || 
+                        (deqEntries[i].flags == FLAGS_XRET) ||
+                        (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR) ||
+                        (deqEntries[i].flags == FLAGS_TRAP && deqEntries[i].name == RegNm'(TRAP_V_SFENCE_VMA));
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
                     
                     deqMask[id[1:0]] = 1;
-                                   
+                                    
                     if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR))) begin
                         
                         OUT_trapUOp.flags <= deqEntries[i].flags;
@@ -229,7 +232,6 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
-                        OUT_trapUOp.allowInterrupt <= 0;//IN_interruptPending;
                         OUT_trapUOp.valid <= 1;
                         
                         if (deqEntries[i].flags >= FLAGS_PRED_TAKEN)

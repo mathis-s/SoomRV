@@ -3,6 +3,12 @@
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
+#ifdef TRACE
+#define DEBUG_TIME 0
+#else
+#define DEBUG_TIME -1
+#endif
+
 #include "VTop.h"
 #include "VTop_CSR.h"
 #include "VTop_Core.h"
@@ -10,6 +16,7 @@
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
+#include "VTop_RenameTable.h"
 #include "VTop_RenameTable__N8.h"
 #include "VTop_SoC.h"
 #include "VTop_TagBuffer.h"
@@ -61,6 +68,7 @@ struct Inst
     uint8_t flags;
     uint8_t interruptCause;
     uint8_t retIdx;
+    bool incMinstret;
     bool interruptDelegate;
     enum InterruptType
     {
@@ -70,6 +78,28 @@ struct Inst
     } interrupt;
     bool valid;
 };
+
+struct FetchPacket
+{
+    uint32_t returnAddr[4];
+};
+
+struct
+{
+    uint32_t lastComSqN;
+    uint32_t id = 0;
+    uint32_t nextSqN;
+
+    uint64_t committed = 0;
+    Inst pd[4];
+    Inst de[4];
+    Inst insts[128];
+    FetchPacket fetches[32];
+    FetchPacket fetch0;
+    FetchPacket fetch1;
+} state;
+int curCycInstRet = 0;
+std::array<uint8_t, 32> regTagOverride;
 
 VTop* top; // Instantiation of model
 #ifdef TRACE
@@ -128,10 +158,6 @@ class SpikeSimif : public simif_t
                     uint32_t csrID = i.inst >> 20;
                     switch (csrID)
                     {
-                        // FIXME: minstret should be the same, barring
-                        // multiple commits per cycle. This is a bit overzealous.
-                        case CSR_MINSTRETH:
-                        case CSR_MINSTRET:
                         case CSR_CYCLE:
                         case CSR_CYCLEH:
                         case CSR_MCYCLE:
@@ -265,6 +291,7 @@ class SpikeSimif : public simif_t
 
     virtual int cosim_instr(const Inst& inst)
     {
+        if (main_time > DEBUG_TIME) processor->set_debug(true);
         uint32_t initialSpikePC = get_pc();
         uint32_t instSIM;
 
@@ -302,20 +329,23 @@ class SpikeSimif : public simif_t
         auto mem_reads = processor->get_state()->log_mem_read;
         for (auto read : mem_reads)
         {
-            std::get<0>(read) = get_phy_addr(std::get<0>(read), LOAD);
+            uint32_t phy = get_phy_addr(std::get<0>(read), LOAD);
+            
+            //if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
 
-            uint32_t addr = std::get<0>(read);
-            addr &= ~3;
-
+            
+            phy &= ~3;
             // MMIO is passed through
-            if (addr >= 0x10000000 && addr < 0x12000000)
+            if (phy >= 0x10000000 && phy < 0x12000000)
                 mem_pass_thru = true;
         }
 
         bool writeValid = true;
         for (auto write : processor->get_state()->log_mem_write)
         {
-            std::get<0>(write) = get_phy_addr(std::get<0>(write), STORE);
+            uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
+            //if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
+
         }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
@@ -337,6 +367,8 @@ class SpikeSimif : public simif_t
             return -3;
         if (!compare_state())
             return -4;
+        if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
+            return -5;
         return 0;
     }
 
@@ -435,6 +467,8 @@ class SpikeSimif : public simif_t
     }
 };
 
+SpikeSimif simif;
+
 template <std::size_t N> uint32_t ExtractField(VlWide<N> wide, uint32_t startBit, uint32_t len)
 {
     uint32_t wlen = (sizeof(EData) * 8);
@@ -464,19 +498,6 @@ template <std::size_t N> uint32_t ExtractField(VlWide<N> wide, uint32_t startBit
     }
 }
 
-struct
-{
-    uint32_t lastComSqN;
-    uint32_t id = 0;
-    uint32_t nextSqN;
-
-    uint64_t committed = 0;
-    Inst pd[4];
-    Inst de[4];
-    Inst insts[128];
-} state;
-
-std::array<uint8_t, 32> regTagOverride;
 uint32_t ReadRegister(uint32_t rid)
 {
     auto core = top->Top->soc->core;
@@ -490,8 +511,6 @@ uint32_t ReadRegister(uint32_t rid)
     else
         return core->rf->mem[comTag];
 }
-
-SpikeSimif simif;
 
 // ONLY use this for initialization!
 // If there is a previously allocated
@@ -576,11 +595,15 @@ void LogCommit(Inst& inst)
     if (inst.interrupt == Inst::IR_SQUASH)
     {
 #ifdef COSIM
+        // printf("INTERRUPT %.8x\n", inst.pc);
         simif.take_trap(true, inst.interruptCause, inst.pc, inst.interruptDelegate);
 #endif
     }
     else
     {
+        if (inst.incMinstret)
+            curCycInstRet++;
+
         if (inst.rd != 0 && inst.flags < 6)
             regTagOverride[inst.rd] = inst.tag;
 
@@ -671,6 +694,7 @@ void LogIssue(Inst& inst)
 
 void LogCycle()
 {
+    curCycInstRet = 0;
     memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
 #ifdef KONATA
     fprintf(konataFile, "C\t1\n");
@@ -767,6 +791,7 @@ void LogInstructions()
                     state.insts[sqn].interrupt = Inst::IR_KEEP;
                 state.insts[sqn].interruptCause = (core->CSR_trapControl[0] >> 1) & 15;
                 state.insts[sqn].interruptDelegate = core->CSR_trapControl[0] & 1;
+                state.insts[sqn].incMinstret = (core->ROB_validRetire & (1 << i));
 
                 state.lastComSqN = curComSqN;
                 LogCommit(state.insts[sqn]);
@@ -855,6 +880,19 @@ void LogInstructions()
                 else
                     state.pd[i].valid = false;
         }
+
+        if (core->__PVT__ifetch__DOT__en1)
+        {
+            int fetchID = core->__PVT__ifetch__DOT__fetchID;
+            state.fetches[fetchID] = state.fetch0;
+        }
+        
+        // Fetch 0
+        if (core->__PVT__ifetch__DOT__ifetchEn)
+        {
+            for (size_t i = 0; i < 4; i++)
+                state.fetch0.returnAddr[i] = core->__PVT__ifetch__DOT__bp__DOT__retStack__DOT__rstack[i];
+        } 
     }
     LogCycle();
 }
@@ -909,22 +947,27 @@ struct Args
     std::string memDumpFile;
     bool restoreSave = 0;
     uint32_t deviceTreeAddr = 0;
+    bool logPerformance = 0;
 };
 
 static void ParseArgs(int argc, char** argv, Args& args)
 {
-    static struct option long_options[] = {{"device-tree", required_argument, 0, 'd'},
-                                           {"backup-file", required_argument, 0, 'b'},
-                                           {"dump-mem", required_argument, 0, 'o'}};
+    static struct option long_options[] = {
+        {"device-tree", required_argument, 0, 'd'},
+        {"backup-file", required_argument, 0, 'b'},
+        {"dump-mem", required_argument, 0, 'o'},
+        {"perfc", no_argument, 0, 'p'},
+    };
     int idx;
     int c;
-    while ((c = getopt_long(argc, argv, "d:b:o:", long_options, &idx)) != -1)
+    while ((c = getopt_long(argc, argv, "d:b:o:p", long_options, &idx)) != -1)
     {
         switch (c)
         {
             case 'd': args.deviceTreeFile = std::string(optarg); break;
             case 'b': args.backupFile = std::string(optarg); break;
             case 'o': args.memDumpFile = std::string(optarg); break;
+            case 'p': args.logPerformance = 1; break;
             default: break;
         }
     }
@@ -934,13 +977,13 @@ static void ParseArgs(int argc, char** argv, Args& args)
 
     if (args.progFile.empty())
     {
-        // clang-format off
         fprintf(stderr,
                 "usage: %s [options] <ELF BINARY>.elf|<BACKUP FILE>.backup|<ASSEMBLY FILE>\n"
                 "Options:\n"
                 "\t" "--device-tree, -d: Load device tree binary, store address in a1 at boot.\n"
                 "\t" "--backup-file, -b: Periodically save state in specified file. Reload by specifying backup file as program.\n"
                 "\t" "--dump-mem, -o:    Dump memory into output file after loading binary.\n"
+                "\t" "--perfc, p:        Periodically dump performance counter stats.\n"
                 , argv[0]);
         // clang-format on
         exit(-1);
@@ -1069,7 +1112,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (args.deviceTreeAddr != 0 && !args.restoreSave)
+    if (args.deviceTreeAddr != 0)
         WriteRegister(11, args.deviceTreeAddr);
 
     uint64_t lastMInstret = core->csr->minstret;
@@ -1088,7 +1131,8 @@ int main(int argc, char** argv)
         top->eval(); // Evaluate model
 
 #ifdef TRACE
-        tfp->dump(main_time);
+        if (main_time > DEBUG_TIME)
+            tfp->dump(main_time);
 #endif
 
         if (top->clk == 1)
@@ -1099,7 +1143,7 @@ int main(int argc, char** argv)
             HandleInput();
 
         // Hang Detection
-        if ((main_time & (0xfff)) == 0 && !args.restoreSave)
+        if ((main_time & (0x3fff)) == 0 && !args.restoreSave)
         {
             uint64_t minstret = core->csr->minstret;
             if (minstret == lastMInstret)
@@ -1114,8 +1158,23 @@ int main(int argc, char** argv)
         }
         if ((main_time & 0xffffff) == 0)
         {
+            if (args.logPerformance)
+            {
+                double ipc = (double)core->csr->minstret / core->csr->mcycle;
+                double mpki = (double)core->csr->mhpmcounter5 / (core->csr->minstret / 1000.0);
+                double bmrate = ((double)core->csr->mhpmcounter4 / core->csr->mhpmcounter3) * 100.0;
+
+                fprintf(stderr, "main_time:          %lu\n", main_time);
+                fprintf(stderr, "mcycle:             %lu\n", core->csr->mcycle);
+                fprintf(stderr, "minstret:           %lu # %f IPC \n", core->csr->minstret, ipc);
+                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", core->csr->mhpmcounter5, mpki);
+                fprintf(stderr, "branches:           %lu\n", core->csr->mhpmcounter3);
+                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", core->csr->mhpmcounter4, bmrate);
+            }
+
             if (!args.backupFile.empty())
                 save_model(args.backupFile);
+
         }
         args.restoreSave = 0;
         main_time++;
