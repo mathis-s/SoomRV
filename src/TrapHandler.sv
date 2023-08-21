@@ -79,7 +79,7 @@ always_ff@(posedge clk) begin
             if (IN_trapInstr.flags == FLAGS_FENCE || 
                 IN_trapInstr.flags == FLAGS_ORDERING || 
                 IN_trapInstr.flags == FLAGS_XRET ||
-                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_SFENCE_VMA)) 
+                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_SFENCE_VMA)) 
             ) begin
                 
                 case (IN_trapInstr.flags)
@@ -132,14 +132,14 @@ always_ff@(posedge clk) begin
                 
                 reg[3:0] trapCause;
                 reg delegate;
-                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.name == 5'(TRAP_V_INTERRUPT);
+                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT);
                         
                 if (isInterrupt) begin
                     trapCause = IN_trapControl.interruptCause;
                 end
                 else begin
                     case (IN_trapInstr.flags)
-                        FLAGS_TRAP: trapCause = IN_trapInstr.name[3:0];
+                        FLAGS_TRAP: trapCause = IN_trapInstr.rd[3:0];
                         FLAGS_LD_MA: trapCause = RVP_TRAP_LD_MA;
                         FLAGS_LD_AF: trapCause = RVP_TRAP_LD_AF;
                         FLAGS_LD_PF: trapCause = RVP_TRAP_LD_PF;

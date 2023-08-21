@@ -28,7 +28,7 @@ typedef struct packed
     logic high;
     
     Tag tagDst;
-    RegNm nmDst;
+    RegNm rd;
     SqN sqN;
     logic valid;
 } MulPS;

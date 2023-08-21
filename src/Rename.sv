@@ -106,8 +106,8 @@ always_comb begin
     // Issue/Lookup
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
     
-        RAT_lookupIDs[2*i+0] = IN_uop[i].rs0;
-        RAT_lookupIDs[2*i+1] = IN_uop[i].rs1;
+        RAT_lookupIDs[2*i+0] = IN_uop[i].rs1;
+        RAT_lookupIDs[2*i+1] = IN_uop[i].rs2;
         
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
@@ -146,11 +146,11 @@ always_comb begin
     
     // Commit
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
-        RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].nmDst != 0));
+        RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].rd != 0));
             //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         TB_commitValid[i] = IN_comUOp[i].valid;
         
-        RAT_commitIDs[i] = IN_comUOp[i].nmDst;
+        RAT_commitIDs[i] = IN_comUOp[i].rd;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
         RAT_commitAvail[i] = IN_comUOp[i].compressed;
@@ -229,12 +229,12 @@ reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
         
-        // When nmDst == 0, the register is (also) discarded immediately instead of being committed.
+        // When rd == 0, the register is (also) discarded immediately instead of being committed.
         // This is currently only used for rmw atomics with rd=x0.
-        isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].nmDst != 0;
+        isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].rd != 0;
         if (IN_comUOp[i].valid)
             for (integer j = i + 1; j < WIDTH_COMMIT; j=j+1)
-                if (IN_comUOp[j].valid && (IN_comUOp[j].nmDst == IN_comUOp[i].nmDst))
+                if (IN_comUOp[j].valid && (IN_comUOp[j].rd == IN_comUOp[i].rd))
                     isNewestCommit[i] = 0;
     end
 end
@@ -282,9 +282,9 @@ always_ff@(posedge clk) begin
             // in rd. This saves encoding space, as these instructions
             // have no result anyways.
             if (IN_uop[i].fu == FU_TRAP)
-                OUT_uop[i].nmDst <= IN_uop[i].opcode[4:0];
+                OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
             else
-                OUT_uop[i].nmDst <= IN_uop[i].rd;
+                OUT_uop[i].rd <= IN_uop[i].rd;
                 
             // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
             if (isSc[i] && !scSuccessful[i])

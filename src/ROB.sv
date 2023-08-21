@@ -4,7 +4,7 @@ typedef struct packed
     Flags flags;
     Tag tag;
     logic sqN_msb;
-    RegNm name; // also used to differentiate between decode-time exceptions (these have no dst anyways)
+    RegNm rd; // also used to differentiate between decode-time exceptions (these have no dst anyways)
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
     logic isFP;
@@ -177,7 +177,7 @@ always_ff@(posedge clk) begin
                         assert(deqEntries[i].valid);
                         OUT_comUOp[i].valid <= 1;
                         OUT_comUOp[i].sqN <= 'x;//{deqEntries[i].sqN_msb, id[5:0]};
-                        OUT_comUOp[i].nmDst <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].name;
+                        OUT_comUOp[i].rd <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
                         for (integer j = 0; j < WIDTH_WB; j=j+1)
@@ -203,7 +203,7 @@ always_ff@(posedge clk) begin
                 
                 if (!temp && deqEntries[i].valid && deqEntries[i].flags != FLAGS_NX && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
                 
-                    OUT_comUOp[i].nmDst <= deqEntries[i].name;
+                    OUT_comUOp[i].rd <= deqEntries[i].rd;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id};
                     OUT_comUOp[i].isBranch <= deqEntries[i].flags == FLAGS_BRANCH || 
@@ -217,7 +217,7 @@ always_ff@(posedge clk) begin
                         (deqEntries[i].flags <= FLAGS_ORDERING) || 
                         (deqEntries[i].flags == FLAGS_XRET) ||
                         (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR) ||
-                        (deqEntries[i].flags == FLAGS_TRAP && deqEntries[i].name == RegNm'(TRAP_V_SFENCE_VMA));
+                        (deqEntries[i].flags == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
                     
@@ -228,7 +228,7 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.flags <= deqEntries[i].flags;
                         OUT_trapUOp.tag <= deqEntries[i].tag;
                         OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id};
-                        OUT_trapUOp.name <= deqEntries[i].name;
+                        OUT_trapUOp.rd <= deqEntries[i].rd;
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
@@ -243,7 +243,7 @@ always_ff@(posedge clk) begin
                             // so changing these is fine (does not leave us with inconsistent RAT/TB)
                             if ((deqEntries[i].flags >= FLAGS_ILLEGAL_INSTR &&
                                 deqEntries[i].flags <= FLAGS_ST_PF)) begin
-                                OUT_comUOp[i].nmDst <= 0;
+                                OUT_comUOp[i].rd <= 0;
                                 OUT_comUOp[i].tagDst <= 7'h40;
                             end
                             
@@ -279,7 +279,7 @@ always_ff@(posedge clk) begin
                 
                 entries[id].valid <= 1;
                 entries[id].tag <= rnUOpSorted[i].tagDst;
-                entries[id].name <= rnUOpSorted[i].nmDst;
+                entries[id].rd <= rnUOpSorted[i].rd;
                 entries[id].sqN_msb <= rnUOpSorted[i].sqN[ID_LEN];
                 entries[id].compressed <= rnUOpSorted[i].compressed;
                 entries[id].fetchID <= rnUOpSorted[i].fetchID;

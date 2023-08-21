@@ -28,8 +28,8 @@
 typedef struct packed
 {
     logic[6:0] funct7; 
+    logic[4:0] rs2;
     logic[4:0] rs1;
-    logic[4:0] rs0;
     logic[2:0] funct3;
     logic[4:0] rd;
     logic[6:0] opcode;
@@ -299,19 +299,19 @@ always_comb begin
                     `OPC_ENV: begin
                         case (instr.funct3)
                             0: begin
-                                if ((uop.imm == 0 || uop.imm == 1) && instr.rs0 == 0 && instr.rd == 0) begin
+                                if ((uop.imm == 0 || uop.imm == 1) && instr.rs1 == 0 && instr.rd == 0) begin
                                     case (uop.imm)
                                         0: uop.opcode = TRAP_ECALL_M;
                                         1: uop.opcode = TRAP_BREAK;
                                     endcase
                                     uop.fu = FU_TRAP;
-                                    uop.rs0 = 0;
                                     uop.rs1 = 0;
+                                    uop.rs2 = 0;
                                     uop.rd = 0;
                                     uop.immB = 1;
                                     invalidEnc = 0;
                                 end
-                                else if (instr.rs1 == 5'b00010 && instr.rs0 == 0 && instr.rd == 0) begin
+                                else if (instr.rs2 == 5'b00010 && instr.rs1 == 0 && instr.rd == 0) begin
                                     if (instr.funct7 == 7'b0001000) begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_SRET;
@@ -323,7 +323,7 @@ always_comb begin
                                         invalidEnc = 0;
                                     end
                                 end
-                                else if (instr.funct7 == 7'b0001000 && instr.rs1 == 5'b00101 && instr.rs0 == 0 && instr.rd == 0) begin
+                                else if (instr.funct7 == 7'b0001000 && instr.rs2 == 5'b00101 && instr.rs1 == 0 && instr.rd == 0) begin
                                     
                                     // WFI (currently nop)
                                     uop.fu = FU_RN;
@@ -336,15 +336,15 @@ always_comb begin
                                 end
                                 else if (instr.funct7 == 7'b0001011 && instr.rd == 0) begin
                                     // sinval.vma
-                                    uop.rs0 = instr.rs0;
                                     uop.rs1 = instr.rs1;
+                                    uop.rs2 = instr.rs2;
                                     //invalidEnc = 0;
                                 end
-                                else if (instr.funct7 == 7'b0001100 && instr.rs1 == 0 && instr.rs0 == 0 && instr.rd == 0) begin
+                                else if (instr.funct7 == 7'b0001100 && instr.rs2 == 0 && instr.rs1 == 0 && instr.rd == 0) begin
                                     // sfence.w.inval
                                     //invalidEnc = 0;
                                 end
-                                else if (instr.funct7 == 7'b0001100 && instr.rs1 == 5'b1 && instr.rs0 == 0 && instr.rd == 0) begin
+                                else if (instr.funct7 == 7'b0001100 && instr.rs2 == 5'b1 && instr.rs1 == 0 && instr.rd == 0) begin
                                     // sfence.inval.ir
                                     //invalidEnc = 0;
                                 end
@@ -352,7 +352,7 @@ always_comb begin
                             
                             1: begin // csrrw
                                 uop.fu = FU_CSR;
-                                uop.rs0 = instr.rs0;
+                                uop.rs1 = instr.rs1;
                                 uop.rd = instr.rd;
                                 uop.opcode = CSR_RW;
                                 uop.imm = {20'bx, instr[31:20]};
@@ -361,18 +361,18 @@ always_comb begin
                             
                             2: begin // csrrs
                                 uop.fu = FU_CSR;
-                                uop.rs0 = instr.rs0;
+                                uop.rs1 = instr.rs1;
                                 uop.rd = instr.rd;
-                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RS;
+                                uop.opcode = (instr.rs1 == 0) ? CSR_R : CSR_RS;
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             3: begin // csrrc
                                 uop.fu = FU_CSR;
-                                uop.rs0 = instr.rs0;
+                                uop.rs1 = instr.rs1;
                                 uop.rd = instr.rd;
-                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RC;
+                                uop.opcode = (instr.rs1 == 0) ? CSR_R : CSR_RC;
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
@@ -381,23 +381,23 @@ always_comb begin
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
                                 uop.opcode = CSR_RW_I;
-                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             6: begin // csrrsi
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
-                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RS_I;
-                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                uop.opcode = (instr.rs1 == 0) ? CSR_R : CSR_RS_I;
+                                uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
                             
                             7: begin // csrrci
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
-                                uop.opcode = (instr.rs0 == 0) ? CSR_R : CSR_RC_I;
-                                uop.imm = {15'bx, instr.rs0, instr[31:20]};
+                                uop.opcode = (instr.rs1 == 0) ? CSR_R : CSR_RC_I;
+                                uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
                         
@@ -405,8 +405,8 @@ always_comb begin
                     end
                     `OPC_LUI: begin
                         uop.fu = FU_INT;
-                        uop.rs0 = 0;
                         uop.rs1 = 0;
+                        uop.rs2 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
                         uop.opcode = INT_LUI;
@@ -414,16 +414,16 @@ always_comb begin
                     end
                     `OPC_AUIPC: begin
                         uop.fu = FU_INT;
-                        uop.rs0 = 0;
                         uop.rs1 = 0;
+                        uop.rs2 = 0;
                         uop.rd = instr.rd;
                         uop.opcode = INT_AUIPC;
                         invalidEnc = 0;
                     end
                     `OPC_JAL: begin
                         uop.fu = FU_INT;
-                        uop.rs0 = 0;
                         uop.rs1 = 0;
+                        uop.rs2 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
                         uop.opcode = INT_JAL;
@@ -442,17 +442,17 @@ always_comb begin
                     `OPC_JALR: begin
 
                         reg rdIsLink = (instr.rd == 1 || instr.rd == 5);
-                        reg rs1IsLink = (instr.rs0 == 1 || instr.rs0 == 5);
+                        reg rs1IsLink = (instr.rs1 == 1 || instr.rs1 == 5);
                         
                         uop.fu = FU_INT;
-                        uop.rs0 = instr.rs0;
+                        uop.rs1 = instr.rs1;
                         uop.immB = 1;
                         uop.rd = instr.rd;
                         // actual RISC-V instr immediate is encoded in imm12
                         uop.imm12 = instr[31:20];
 
                         isIndirBranch = 1;
-                        isReturn = (uop.rs0 == 1 && uop.imm12 == 0);
+                        isReturn = (uop.rs1 == 1 && uop.imm12 == 0);
                         isCall = rdIsLink;
                         uop.opcode = isReturn ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
                         
@@ -468,8 +468,8 @@ always_comb begin
                         invalidEnc = 0;
                     end
                     `OPC_LOAD: begin
-                        uop.rs0 = instr.rs0;
-                        uop.rs1 = 0;
+                        uop.rs1 = instr.rs1;
+                        uop.rs2 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
 
@@ -487,8 +487,8 @@ always_comb begin
                             instr.funct3 != 5;
                     end
                     `OPC_STORE: begin
-                        uop.rs0 = instr.rs0;
                         uop.rs1 = instr.rs1;
+                        uop.rs2 = instr.rs2;
                         uop.immB = 0;
                         uop.rd = 0;
 
@@ -509,7 +509,7 @@ always_comb begin
                             endcase
                             
                             if (instr.funct3[2])
-                                uop.rd = uop.rs0;
+                                uop.rd = uop.rs1;
                         end
                         else begin
                             case (instr.funct3)
@@ -523,8 +523,8 @@ always_comb begin
                         end
                     end
                     `OPC_BRANCH: begin
-                        uop.rs0 = instr.rs0;
                         uop.rs1 = instr.rs1;
+                        uop.rs2 = instr.rs2;
                         uop.immB = 0;
                         uop.rd = 0;
                         uop.fu = FU_INT;
@@ -538,7 +538,7 @@ always_comb begin
                         /* verilator lint_off ALWCOMBORDER */
                         /*if (!invalidEnc && DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0 && uopsComb[i-1].imm != 0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0 && uopsComb[i-1].imm != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
@@ -584,26 +584,26 @@ always_comb begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_INVAL;
                             uop.fu = FU_ST;
-                            uop.rs0 = instr.rs0;
+                            uop.rs1 = instr.rs1;
                         end
                         // cbo.clean -> runs as store op
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_CLEAN;
                             uop.fu = FU_ST;
-                            uop.rs0 = instr.rs0;
+                            uop.rs1 = instr.rs1;
                         end
                         // cbo.flush -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_FLUSH;
                             uop.fu = FU_ST;
-                            uop.rs0 = instr.rs0;
+                            uop.rs1 = instr.rs1;
                         end
                     end
                     `OPC_REG_IMM: begin
-                        uop.rs0 = instr.rs0;
-                        uop.rs1 = 0;
+                        uop.rs1 = instr.rs1;
+                        uop.rs2 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
                         uop.fu = FU_INT;
@@ -623,7 +623,7 @@ always_comb begin
                             
                             if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
                                 uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
-                                uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs0) begin
+                                uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs1) begin
                                 
                                 uopsComb[i-1].imm[11:0] = uop.imm[11:0];
                                 if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
@@ -634,27 +634,27 @@ always_comb begin
                         end
                         else if (instr.funct7 == 7'b0110000) begin
                             if (instr.funct3 == 3'b001) begin
-                                if (instr.rs1 == 5'b00000) begin
+                                if (instr.rs2 == 5'b00000) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_CLZ;
                                 end
-                                else if (instr.rs1 == 5'b00001) begin
+                                else if (instr.rs2 == 5'b00001) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_CTZ;
                                 end
-                                else if (instr.rs1 == 5'b00010) begin
+                                else if (instr.rs2 == 5'b00010) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_CPOP;
                                 end
-                                else if (instr.rs1 == 5'b00100) begin
+                                else if (instr.rs2 == 5'b00100) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_SE_B;
                                 end
-                                else if (instr.rs1 == 5'b00101) begin
+                                else if (instr.rs2 == 5'b00101) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_SE_H;
                                 end
-                                else if (instr.rs1 == 5'b00101) begin
+                                else if (instr.rs2 == 5'b00101) begin
                                     invalidEnc = 0;
                                     uop.opcode = INT_ZE_H;
                                 end
@@ -662,7 +662,7 @@ always_comb begin
                             else if (instr.funct3 == 3'b101) begin
                                 invalidEnc = 0;
                                 uop.opcode = INT_ROR;
-                                uop.imm = {27'b0, instr.rs1};
+                                uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr[31:20] == 12'b001010000111 && instr.funct3 == 3'b101) begin
@@ -677,31 +677,31 @@ always_comb begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
                                 uop.opcode = INT_BCLR;
-                                uop.imm = {27'b0, instr.rs1};
+                                uop.imm = {27'b0, instr.rs2};
                             end
                             else if (instr.funct3 == 3'b101) begin
                                 //invalidEnc = 0;
                                 uop.opcode = INT_BEXT;
-                                uop.imm = {27'b0, instr.rs1};
+                                uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr.funct7 == 7'b0110100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
                                 uop.opcode = INT_BINV;
-                                uop.imm = {27'b0, instr.rs1};
+                                uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr.funct7 == 7'b0010100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
                                 uop.opcode = INT_BSET;
-                                uop.imm = {27'b0, instr.rs1};
+                                uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         
                         // li rd, 0 is eliminated during rename
-                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs0 == 0 && 
+                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs1 == 0 && 
                             uop.imm[11] == uop.imm[10] &&
                             uop.imm[11] == uop.imm[9] &&
                             uop.imm[11] == uop.imm[8] &&
@@ -712,8 +712,8 @@ always_comb begin
                         end
                     end
                     `OPC_REG_REG: begin
-                        uop.rs0 = instr.rs0;
                         uop.rs1 = instr.rs1;
+                        uop.rs2 = instr.rs2;
                         uop.immB = 0;
                         uop.rd = instr.rd;
                         uop.fu = FU_INT;
@@ -813,10 +813,10 @@ always_comb begin
                                 uop.fu = FU_INT;
                             end
                         end
-                        else if (instr.funct7 == 7'b0000100 && instr.rs1 == 0 && instr.funct3 == 3'b100) begin
+                        else if (instr.funct7 == 7'b0000100 && instr.rs2 == 0 && instr.funct3 == 3'b100) begin
                             // NOTE: differenct encoding in rv64!
                             invalidEnc = 0;
-                            uop.rs1 = 0;
+                            uop.rs2 = 0;
                             uop.opcode = INT_ZE_H;
                         end
                         else if (instr.funct7 == 7'b0110000) begin
@@ -878,7 +878,7 @@ always_comb begin
                         if (i32.flw.width == 3'b010) begin
                             uop.fu = FU_LD;
                             uop.opcode = LSU_FLW;
-                            uop.rs0 = i32.flw.rs1;
+                            uop.rs1 = i32.flw.rs1;
                             uop.rd = i32.flw.rd;
                             uop.rd_fp = 1;
                             uop.imm = {{20{i32.flw.offset[11]}}, i32.flw.offset[11:0]};
@@ -889,8 +889,8 @@ always_comb begin
                         if (i32.fsw.width == 3'b010) begin
                             uop.fu = FU_ST;
                             uop.opcode = LSU_FSW;
-                            uop.rs0 = i32.fsw.rs1;
-                            uop.rs1 = i32.fsw.rs2;
+                            uop.rs1 = i32.fsw.rs1;
+                            uop.rs2 = i32.fsw.rs2;
                             uop.rs1_fp = 1;
                             uop.imm = {{20{i32.fsw.offset2[6]}}, i32.fsw.offset2[6:0], i32.fsw.offset[4:0]};
                             invalidEnc = 0;
@@ -901,9 +901,9 @@ always_comb begin
                         if (i32.fma.fmt == 2'b00) begin
                             uop.fu = FU_FPU;
                             uop.opcode = FPU_FMADD_S;
-                            uop.rs0 = i32.fma.rs1;
+                            uop.rs1 = i32.fma.rs1;
                             uop.rs0_fp = 1;
-                            uop.rs1 = i32.fma.rs2;
+                            uop.rs2 = i32.fma.rs2;
                             uop.rs1_fp = 1;
                             uop.rs2 = i32.fma.rs3;
                             uop.rd = i32.fma.rd;
@@ -916,9 +916,9 @@ always_comb begin
                         if (i32.fma.fmt == 2'b00) begin
                             uop.fu = FU_FPU;
                             uop.opcode = FPU_FMSUB_S;
-                            uop.rs0 = i32.fma.rs1;
+                            uop.rs1 = i32.fma.rs1;
                             uop.rs0_fp = 1;
-                            uop.rs1 = i32.fma.rs2;
+                            uop.rs2 = i32.fma.rs2;
                             uop.rs1_fp = 1;
                             uop.rs2 = i32.fma.rs3;
                             uop.rd = i32.fma.rd;
@@ -931,9 +931,9 @@ always_comb begin
                         if (i32.fma.fmt == 2'b00) begin
                             uop.fu = FU_FPU;
                             uop.opcode = FPU_FNMSUB_S;
-                            uop.rs0 = i32.fma.rs1;
+                            uop.rs1 = i32.fma.rs1;
                             uop.rs0_fp = 1;
-                            uop.rs1 = i32.fma.rs2;
+                            uop.rs2 = i32.fma.rs2;
                             uop.rs1_fp = 1;
                             uop.rs2 = i32.fma.rs3;
                             uop.rd = i32.fma.rd;
@@ -946,9 +946,9 @@ always_comb begin
                         if (i32.fma.fmt == 2'b00) begin
                             uop.fu = FU_FPU;
                             uop.opcode = FPU_FNMADD_S;
-                            uop.rs0 = i32.fma.rs1;
+                            uop.rs1 = i32.fma.rs1;
                             uop.rs0_fp = 1;
-                            uop.rs1 = i32.fma.rs2;
+                            uop.rs2 = i32.fma.rs2;
                             uop.rs1_fp = 1;
                             uop.rs2 = i32.fma.rs3;
                             uop.rd = i32.fma.rd;
@@ -961,9 +961,9 @@ always_comb begin
                         if (i32.fp.fmt == 2'b00) begin
                             
                             uop.fu = FU_FPU;
-                            uop.rs0 = i32.fp.rs1;
+                            uop.rs1 = i32.fp.rs1;
                             //uop.rs0_fp = 1;
-                            uop.rs1 = i32.fp.rs2;
+                            uop.rs2 = i32.fp.rs2;
                             //uop.rs1_fp = 1;
                             uop.rd = i32.fp.rd;
                             // uop.rd_fp = 1;
@@ -992,7 +992,7 @@ always_comb begin
                                 5'b01011: begin
                                     uop.opcode = {i32.fp.rm, FDIV_FSQRT_S};
                                     invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
-                                    uop.rs1 = 0;
+                                    uop.rs2 = 0;
                                     uop.fu = FU_FDIV;
                                     if (i32.fp.rs2 != 0) invalidEnc = 1;
                                 end
@@ -1015,7 +1015,7 @@ always_comb begin
                                     else invalidEnc = 1;
                                 end
                                 5'b11000: begin
-                                    uop.rs1 = 0;
+                                    uop.rs2 = 0;
                                     if (i32.fp.rs2 == 5'b00000) begin
                                         uop.opcode = {i32.fp.rm, FPU_FCVTWS};
                                         invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
@@ -1074,13 +1074,13 @@ always_comb begin
                         if (instr.funct3 == 3'b010) begin
                             
                             uop.rd = instr.rd;
-                            uop.rs0 = instr.rs0;
                             uop.rs1 = instr.rs1;
+                            uop.rs2 = instr.rs2;
                             uop.fu = FU_ATOMIC;
                             
                             case (instr.funct7[6:2])
                                 5'b00010: begin // lr.w
-                                    if (instr.rs1 == 5'b0) begin
+                                    if (instr.rs2 == 5'b0) begin
                                         uop.opcode = LSU_LR_W;
                                         uop.fu = FU_LD;
                                         invalidEnc = 0;
@@ -1145,7 +1145,7 @@ always_comb begin
                         uop.opcode = LSU_LW;
                         uop.fu = FU_LD;
                         uop.imm = {25'b0, i16.cl.imm[0], i16.cl.imm2, i16.cl.imm[1], 2'b00};
-                        uop.rs0 = {2'b01, i16.cl.rs1};
+                        uop.rs1 = {2'b01, i16.cl.rs1};
                         uop.rd = {2'b01, i16.cl.rd};
                         invalidEnc = 0;
                     end
@@ -1154,12 +1154,12 @@ always_comb begin
                         uop.opcode = LSU_SW;
                         uop.fu = FU_ST;
                         uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
-                        uop.rs0 = {2'b01, i16.cs.rd_rs1};
-                        uop.rs1 = {2'b01, i16.cs.rs2};
+                        uop.rs1 = {2'b01, i16.cs.rd_rs1};
+                        uop.rs2 = {2'b01, i16.cs.rs2};
                         
                         /*if (FUSE_STORE_DATA && i != 0 && uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT &&
                             uopsComb[i-1].rs0 == uopsComb[i-1].rd && uopsComb[i-1].immB &&
-                            uopsComb[i-1].rs0 == uop.rs1 &&
+                            uopsComb[i-1].rs0 == uop.rs2 &&
                             uopsComb[i-1].opcode == INT_ADD) begin
                             
                             uop.opcode = LSU_F_ADDI_SW;
@@ -1175,7 +1175,7 @@ always_comb begin
                         uop.opcode = INT_ADD;
                         uop.fu = FU_INT;
                         uop.imm = {22'b0, i16.ciw.imm[5:2], i16.ciw.imm[7:6], i16.ciw.imm[0], i16.ciw.imm[1], 2'b00};
-                        uop.rs0 = 2;
+                        uop.rs1 = 2;
                         uop.immB = 1;
                         uop.rd = {2'b01, i16.ciw.rd};
                         invalidEnc = 0;
@@ -1221,14 +1221,14 @@ always_comb begin
                         uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3], 
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
-                        uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        uop.rs1 = {2'b01, i16.cb.rd_rs1};
                         
                         isBranch = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         /*if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
@@ -1245,14 +1245,14 @@ always_comb begin
                         uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3], 
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
                         
-                        uop.rs0 = {2'b01, i16.cb.rd_rs1};
+                        uop.rs1 = {2'b01, i16.cb.rd_rs1};
                         
                         isBranch = 1;
                         branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         
                         /*if (DO_FUSE && i != 0 && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs0 && uop.rs0 != 0) begin
+                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0) begin
                             
                             uop.rd = uopsComb[i-1].rd;
                             uop.imm[31:20] = uopsComb[i-1].imm[11:0];
@@ -1275,7 +1275,7 @@ always_comb begin
                         
                         if (i16.ci.rd_rs1 == 2) begin
                             uop.opcode = INT_ADD;
-                            uop.rs0 = 2;
+                            uop.rs1 = 2;
                             uop.imm = {{22{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm[2:1], 
                                 i16.ci.imm[3], i16.ci.imm[0], i16.ci.imm[4], 4'b0};
                         end
@@ -1294,12 +1294,12 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.imm = {{26{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm};
                         uop.immB = 1;
-                        uop.rs0 = i16.ci.rd_rs1;
+                        uop.rs1 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
                         
                         if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
                             uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
-                            uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs0) begin
+                            uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs1) begin
                             
                             uopsComb[i-1].imm[11:0] = uop.imm[11:0];
                             if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
@@ -1314,7 +1314,7 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.imm = {27'b0, i16.cb2.imm[4:0]};
                         uop.immB = 1;
-                        uop.rs0 = {2'b01, i16.cb2.rd_rs1};
+                        uop.rs1 = {2'b01, i16.cb2.rd_rs1};
                         uop.rd = {2'b01, i16.cb2.rd_rs1};
                         invalidEnc = 0;
                     end
@@ -1324,7 +1324,7 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.imm = {27'b0, i16.cb2.imm[4:0]};
                         uop.immB = 1;
-                        uop.rs0 = {2'b01, i16.cb2.rd_rs1};
+                        uop.rs1 = {2'b01, i16.cb2.rd_rs1};
                         uop.rd = {2'b01, i16.cb2.rd_rs1};
                         invalidEnc = 0;
                     end
@@ -1334,7 +1334,7 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.imm = {{26{i16.cb2.imm2}}, i16.cb2.imm2, i16.cb2.imm[4:0]};
                         uop.immB = 1;
-                        uop.rs0 = {2'b01, i16.cb2.rd_rs1};
+                        uop.rs1 = {2'b01, i16.cb2.rd_rs1};
                         uop.rd = {2'b01, i16.cb2.rd_rs1};
                         invalidEnc = 0;
                     end
@@ -1347,8 +1347,8 @@ always_comb begin
                             2'b00: uop.opcode = INT_SUB;
                         endcase
                         uop.fu = FU_INT;
-                        uop.rs0 = {2'b01, i16.ca.rd_rs1};
-                        uop.rs1 = {2'b01, i16.ca.rs2};
+                        uop.rs1 = {2'b01, i16.ca.rd_rs1};
+                        uop.rs2 = {2'b01, i16.ca.rs2};
                         uop.rd = {2'b01, i16.ca.rd_rs1};
                         invalidEnc = 0;
                     end
@@ -1364,7 +1364,7 @@ always_comb begin
                         uop.opcode = LSU_LW;
                         uop.fu = FU_LD;
                         uop.imm = {24'b0, i16.ci.imm[1:0], i16.ci.imm2, i16.ci.imm[4:2], 2'b00};
-                        uop.rs0 = 2; // sp
+                        uop.rs1 = 2; // sp
                         uop.rd = i16.ci.rd_rs1;
                         invalidEnc = 0;
                     end
@@ -1373,14 +1373,14 @@ always_comb begin
                         uop.opcode = LSU_SW;
                         uop.fu = FU_ST;
                         uop.imm = {24'b0, i16.css.imm[1:0], i16.css.imm[5:2], 2'b00};
-                        uop.rs0 = 2; // sp
-                        uop.rs1 = i16.css.rs2;
+                        uop.rs1 = 2; // sp
+                        uop.rs2 = i16.css.rs2;
                         invalidEnc = 0;
                     end
                     // c.jr
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
                         uop.fu = FU_INT;
-                        uop.rs0 = i16.cr.rd_rs1;
+                        uop.rs1 = i16.cr.rd_rs1;
                         
                         isIndirBranch = 1;
                         isReturn = (i16.cr.rd_rs1 == 1);
@@ -1400,7 +1400,7 @@ always_comb begin
                     // c.jalr
                     else if (i16.cr.funct4 == 4'b1001 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
                         uop.fu = FU_INT;
-                        uop.rs0 = i16.cr.rd_rs1;
+                        uop.rs1 = i16.cr.rd_rs1;
                         uop.rd = 1;
                         
                         isIndirBranch = 1;
@@ -1422,7 +1422,7 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.imm = {27'b0, i16.ci.imm[4:0]};
                         uop.immB = 1;
-                        uop.rs0 = i16.ci.rd_rs1;
+                        uop.rs1 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
                         invalidEnc = 0;
                     end
@@ -1430,7 +1430,7 @@ always_comb begin
                     else if (i16.cr.funct4 == 4'b1000 && i16.cr.rd_rs1 != 0 && i16.cr.rs2 != 0) begin
                         uop.opcode = INT_ADD;
                         uop.fu = FU_INT;
-                        uop.rs1 = i16.cr.rs2;
+                        uop.rs2 = i16.cr.rs2;
                         uop.rd = i16.cr.rd_rs1;
                         invalidEnc = 0;
                     end
@@ -1438,8 +1438,8 @@ always_comb begin
                     else if (i16.cr.funct4 == 4'b1001 && i16.cr.rd_rs1 != 0 && i16.cr.rs2 != 0) begin
                         uop.opcode = INT_ADD;
                         uop.fu = FU_INT;
-                        uop.rs0 = i16.cr.rd_rs1;
-                        uop.rs1 = i16.cr.rs2;
+                        uop.rs1 = i16.cr.rd_rs1;
+                        uop.rs2 = i16.cr.rs2;
                         uop.rd = i16.cr.rd_rs1;
                         invalidEnc = 0;
                     end

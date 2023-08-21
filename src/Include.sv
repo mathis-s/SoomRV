@@ -444,8 +444,8 @@ typedef struct packed
 {
     logic[31:0] imm;
     logic[11:0] imm12; // only used for jalr
-    logic[4:0] rs0;
     logic[4:0] rs1;
+    logic[4:0] rs2;
     logic immB;
     logic[4:0] rd;
     logic[5:0] opcode;
@@ -468,7 +468,7 @@ typedef struct packed
     Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
-    RegNm nmDst;
+    RegNm rd;
     logic[5:0] opcode;
     FetchID_t fetchID;
     FetchOff_t fetchOffs;
@@ -616,7 +616,7 @@ typedef struct packed
     Tag tagDst;
     SqN sqN;
     logic doNotCommit;
-    logic external; // not part of normal execution, ignore sqn, tagDst and nmDst, don't commit
+    logic external; // not part of normal execution, ignore sqn, tagDst and rd, don't commit
     AGU_Exception exception;
     logic isMMIO;
     logic valid;
@@ -647,7 +647,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    RegNm nmDst;
+    RegNm rd;
     Tag tagDst;
     SqN sqN;
     logic isBranch;
@@ -661,7 +661,7 @@ typedef struct packed
     Flags flags;
     Tag tag;
     SqN sqN;
-    RegNm name;
+    RegNm rd;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
     logic compressed;
