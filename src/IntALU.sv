@@ -102,12 +102,6 @@ always_comb begin
         INT_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
         INT_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
         INT_FSGNJX_S: resC = {srcA[31] ^ srcB[31], srcA[30:0]};
-        //INT_F_ADDI_BEQ,
-        //INT_F_ADDI_BNE,
-        //INT_F_ADDI_BLT,
-        //INT_F_ADDI_BGE,
-        //INT_F_ADDI_BLTU,
-        //INT_F_ADDI_BGEU: resC = srcA + {{20{imm[31]}}, imm[31:20]};
         default: resC = 32'bx;
     endcase
     
@@ -130,12 +124,6 @@ always_comb begin
         INT_BGE: branchTaken = !lessThan;
         INT_BLTU: branchTaken = lessThanU;
         INT_BGEU: branchTaken = !lessThanU;
-        //INT_F_ADDI_BEQ:  branchTaken = (resC == srcB); 
-        //INT_F_ADDI_BNE:  branchTaken = (resC != srcB); 
-        //INT_F_ADDI_BLT:  branchTaken = $signed(resC < srcB); 
-        //INT_F_ADDI_BGE:  branchTaken = !($signed(resC < srcB)); 
-        //INT_F_ADDI_BLTU: branchTaken = (resC < srcB); 
-        //INT_F_ADDI_BGEU: branchTaken = !(resC < srcB); 
         default: branchTaken = 0;
     endcase
     
@@ -146,14 +134,7 @@ always_comb begin
         IN_uop.opcode == INT_BLT ||
         IN_uop.opcode == INT_BGE ||
         IN_uop.opcode == INT_BLTU ||
-        IN_uop.opcode == INT_BGEU);// ||
-        //IN_uop.opcode == INT_F_ADDI_BEQ ||
-        //IN_uop.opcode == INT_F_ADDI_BNE ||
-        //IN_uop.opcode == INT_F_ADDI_BLT ||
-        //IN_uop.opcode == INT_F_ADDI_BGE ||
-        //IN_uop.opcode == INT_F_ADDI_BLTU ||
-        //IN_uop.opcode == INT_F_ADDI_BGEU);
-        
+        IN_uop.opcode == INT_BGEU);
 end
 
 reg indBranchCorrect;

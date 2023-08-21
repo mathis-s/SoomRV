@@ -27,6 +27,7 @@ typedef struct packed
     logic valid;
     logic[30:0] dst;
     logic[`BTB_TAG_SIZE-1:0] src;
+    FetchOff_t offs;
 } BTBEntry;
 
 localparam LENGTH = `BTB_ENTRIES / `BTB_ASSOC;
@@ -36,7 +37,6 @@ BTBEntry[`BTB_ASSOC-1:0] entries[LENGTH-1:0];
 reg[$clog2(`BTB_ASSOC)-1:0] usedID;
 
 always_comb begin
-    
     BTBEntry[`BTB_ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+2:3]];
     
     OUT_branchFound = 0;
@@ -49,11 +49,12 @@ always_comb begin
     usedID = 0;
     
     if (IN_pcValid) begin
-        
         for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-            
-            if (fetched[i].valid && fetched[i].src[`BTB_TAG_SIZE-1:3] == IN_pc[`BTB_TAG_SIZE-1:3] && fetched[i].src[2:0] >= IN_pc[2:0] &&
-                (!OUT_branchFound || fetched[i].src[2:0] < OUT_branchSrcOffs)) begin
+            if (fetched[i].valid &
+                fetched[i].src == IN_pc[$clog2(LENGTH)+3 +: `BTB_TAG_SIZE] &&
+                fetched[i].offs >= IN_pc[2:0] &&
+                (!OUT_branchFound || fetched[i].offs < OUT_branchSrcOffs)
+            ) begin
                 
                 if (OUT_branchFound)
                     OUT_multipleBranches = 1;
@@ -61,7 +62,7 @@ always_comb begin
                 OUT_branchIsJump = fetched[i].isJump;
                 OUT_branchIsCall = fetched[i].isCall;
                 OUT_branchDst = fetched[i].dst;
-                OUT_branchSrcOffs = fetched[i].src[$bits(FetchOff_t)-1:0];
+                OUT_branchSrcOffs = fetched[i].offs;
                 OUT_branchCompr = fetched[i].compr;
                 usedID = i[$clog2(`BTB_ASSOC)-1:0];
             end
@@ -69,66 +70,79 @@ always_comb begin
     end
 end
 
+// Shift the index at which we begin searching for unused
+// entries in a line for improved distribution of entries
+reg[$clog2(`BTB_ASSOC)-1:0] searchIdx;
+always_ff@(posedge clk) begin
+    searchIdx <= searchIdx + 1;
+end
+
+reg[$clog2(`BTB_ASSOC)-1:0] insertAssocIdx;
+reg insertAssocIdxValid;
+always_comb begin
+    insertAssocIdxValid = 0;
+    insertAssocIdx = 'x;
+
+    for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
+        reg[$clog2(`BTB_ASSOC)-1:0] assocIdx = searchIdx + i[$clog2(`BTB_ASSOC)-1:0];
+        if (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][assocIdx].used) begin
+            insertAssocIdx = assocIdx;
+            insertAssocIdxValid = 1;
+        end
+    end
+
+    for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
+        
+        reg[$clog2(`BTB_ASSOC)-1:0] assocIdx = searchIdx + i[$clog2(`BTB_ASSOC)-1:0];
+        reg[$clog2(LENGTH)-1:0] idx = IN_btUpdate.src[$clog2(LENGTH)+3:4];
+
+        if (entries[idx][assocIdx].src == IN_btUpdate.src[$clog2(LENGTH)+4 +: `BTB_TAG_SIZE] &&
+            entries[idx][assocIdx].offs == IN_btUpdate.src[1 +: $bits(FetchOff_t)]
+        ) begin
+            insertAssocIdx = assocIdx;
+            insertAssocIdxValid = 1;
+        end
+    end
+end
+
 always_ff@(posedge clk) begin
     
     if (rst) begin
+        `ifdef SYNC_RESET
         for (integer i = 0; i < LENGTH; i=i+1)
-            for (integer j = 0; j < `BTB_ASSOC; j=j+1)
+            for (integer j = 0; j < `BTB_ASSOC; j=j+1) begin
                 entries[i][j].valid <= 0;
+                entries[i][j].used <= 0;
+            end
+        `endif
     end
     else begin
-    
         if (IN_btUpdate.valid) begin
-            
-            reg inserted = 0;
-            
+            reg[$clog2(LENGTH)-1:0] idx = IN_btUpdate.src[$clog2(LENGTH)+3:4];
             if (!IN_btUpdate.clean) begin
-                // Try to find invalid fields
-                for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-                    if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid)) begin
-                        
-                        inserted = 1;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 1;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isCall <= IN_btUpdate.isCall;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
-                    end
-                    else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
+                if (insertAssocIdxValid) begin
+                    entries[idx][insertAssocIdx].valid <= 1;
+                    entries[idx][insertAssocIdx].used <= 0;
+                    entries[idx][insertAssocIdx].compr <= IN_btUpdate.compressed;
+                    entries[idx][insertAssocIdx].isJump <= IN_btUpdate.isJump;
+                    entries[idx][insertAssocIdx].isCall <= IN_btUpdate.isCall;
+                    entries[idx][insertAssocIdx].dst <= IN_btUpdate.dst[31:1];
+                    entries[idx][insertAssocIdx].src <= IN_btUpdate.src[$clog2(LENGTH)+4 +: `BTB_TAG_SIZE];
+                    entries[idx][insertAssocIdx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
                 end
-                
-                // Try to find unused fields
-                for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-                    if (!inserted && (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used)) begin
-                        
-                        inserted = 1;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 1;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].compr <= IN_btUpdate.compressed;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isJump <= IN_btUpdate.isJump;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].isCall <= IN_btUpdate.isCall;
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].dst <= IN_btUpdate.dst[31:1];
-                        entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].src <= IN_btUpdate.src[`BTB_TAG_SIZE:1];
-                    end
-                    else if (!inserted) entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].used <= 0;
+                else begin
+                    for (integer i = 0; i < `BTB_ASSOC; i=i+1)
+                        entries[idx][i].used <= 0;
                 end
             end
             else begin
-                // Delete all entries in block on branch target mispredict for now.
-                for (integer i = 0; i < `BTB_ASSOC; i=i+1)
-                    entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][i].valid <= 0;
+                entries[idx][insertAssocIdx].valid <= 0;
+                entries[idx][insertAssocIdx].used <= 0;
             end
         end
-        
-        // maybe else if (for port sharing?)
-        if (IN_pcValid && OUT_branchFound && (IN_BPT_branchTaken || OUT_branchIsJump)) begin
+        else if (IN_pcValid && OUT_branchFound && (IN_BPT_branchTaken || OUT_branchIsJump)) begin
             entries[IN_pc[$clog2(LENGTH)+2:3]][usedID].used <= 1;
         end
     end
-
 end
-
-
 endmodule
