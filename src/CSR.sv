@@ -859,10 +859,12 @@ always_ff@(posedge clk) begin
                             
                             CSR_mcounteren: mcounteren[5:0] <= wdata[5:0];
                             CSR_mcountinhibit: begin
+                                // do not allow disabling counters in verilator
+                                // simulation for performance measurement.
+                                `ifndef VERILATOR
                                 mcountinhibit[0] <= wdata[0];
-                                // We monitor minstret in the simulator to detect stalls.
-                                //mcountinhibit[5:2] <= wdata[5:2];
-                                mcountinhibit[5:3] <= wdata[5:3];
+                                mcountinhibit[5:2] <= wdata[5:2];
+                                `endif
                             end
                             
                             CSR_mtvec: begin

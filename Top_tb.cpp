@@ -1136,6 +1136,7 @@ int main(int argc, char** argv)
 
     top->final(); // Done simulating
 #ifdef TRACE
+    tfp->flush();
     tfp->close();
     delete tfp;
 #endif
