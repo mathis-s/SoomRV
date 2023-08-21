@@ -95,18 +95,6 @@ IFetch ifetch
     .IN_memc(IN_memc)
 );
 
-IndirBranchInfo IBP_updates[1:0];
-wire[30:0] IBP_predDst;
-IndirectBranchPredictor ibp
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_clearICache(TH_clearICache),
-    
-    .IN_ibUpdates(IBP_updates),
-    .OUT_predDst(IBP_predDst)
-);
-
 SqN RN_nextSqN;
 SqN ROB_curSqN /*verilator public*/;
 
@@ -385,7 +373,6 @@ IntALU ialu
     
     .OUT_branch(branchProvs[0]),
     .OUT_btUpdate(BP_btUpdates[0]),
-    .OUT_ibInfo(IBP_updates[0]),
     
     .OUT_zcFwd(LD_zcFwd[0]),
     
@@ -687,7 +674,6 @@ IntALU ialu1
 
     .OUT_branch(branchProvs[1]),
     .OUT_btUpdate(BP_btUpdates[1]),
-    .OUT_ibInfo(IBP_updates[1]),
     
     .OUT_zcFwd(LD_zcFwd[1]),
     

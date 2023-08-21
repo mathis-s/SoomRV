@@ -23,7 +23,6 @@ SRC_FILES = \
 	src/ROB.sv \
 	src/AGU.sv \
 	src/BranchPredictor.sv \
-	src/IndirectBranchPredictor.sv \
 	src/LoadBuffer.sv \
 	src/StoreQueue.sv \
 	src/Multiply.sv \

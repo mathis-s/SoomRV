@@ -13,7 +13,6 @@ module IntALU
 
     output BranchProv OUT_branch,
     output BTUpdate OUT_btUpdate,
-    output IndirBranchInfo OUT_ibInfo,
     
     output ZCForward OUT_zcFwd,
 
@@ -160,11 +159,9 @@ always_ff@(posedge clk) begin
     OUT_uop <= 'x;
     OUT_branch <= 'x;
     OUT_btUpdate <= 'x;
-    OUT_ibInfo <= 'x;
     OUT_uop.valid <= 0;
     OUT_branch.taken <= 0;
     OUT_btUpdate.valid <= 0;
-    OUT_ibInfo.valid <= 0;
 
     if (!rst) begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
@@ -175,8 +172,7 @@ always_ff@(posedge clk) begin
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
             OUT_branch.flush <= 0;
-            OUT_ibInfo.valid <= 0;
-            
+
             if (isBranch)
                 OUT_branch.history <= {IN_uop.history[$bits(BHist_t)-2:0], branchTaken};
             else
