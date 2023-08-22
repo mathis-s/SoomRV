@@ -726,9 +726,8 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 226 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 226 - 32 - 32, 32);
-            state.insts[sqn].srcC = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 226 - 32 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32, 32);
             state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(state.insts[sqn]);
         }
@@ -739,8 +738,8 @@ void LogInstructions()
         if (uop[0] & 1)
         {
             uint32_t sqn = ExtractField(uop, 156 - 32 * 2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
-            state.insts[sqn].memAddr = ExtractField(uop, 156 - 32, 32);
-            state.insts[sqn].memData = ExtractField(uop, 156 - 32 * 2, 32);
+            state.insts[sqn].memAddr = ExtractField(uop, 156 - 32 - 32, 32);
+            state.insts[sqn].memData = 0;//ExtractField(uop, 156 - 32 * 2, 32);
         }
 
     // Result

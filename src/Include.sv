@@ -465,7 +465,6 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
-    Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
     RegNm rd;
@@ -488,7 +487,6 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
-    Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
     logic[5:0] opcode;
@@ -506,7 +504,6 @@ typedef struct packed
 {
     logic[31:0] srcA;
     logic[31:0] srcB;
-    logic[31:0] srcC; // only used in store port (for atomics), optimized out otherwise
     logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;
@@ -543,7 +540,6 @@ typedef enum logic[1:0]
 typedef struct packed
 {
     logic[31:0] addr;
-    logic[31:0] data;
     // could union some of these fields
     logic[3:0] wmask;
     logic signExtend;
@@ -615,6 +611,7 @@ typedef struct packed
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;
+    SqN loadSqN;
     Tag tagDst;
     SqN sqN;
     logic doNotCommit;
@@ -632,6 +629,13 @@ typedef struct packed
 
 typedef struct packed
 {
+    SqN loadSqN;
+    logic fail;
+    logic valid;
+} LD_Ack;
+
+typedef struct packed
+{
     logic[31:0] addr;
     logic[31:0] data;
     logic[3:0] wmask;
@@ -646,6 +650,12 @@ typedef struct packed
     logic fail;
     logic valid;
 } ST_Ack;
+
+typedef struct packed
+{
+    SqN maxComSqN;
+    logic valid;
+} SQ_ComInfo;
 
 typedef struct packed
 {
@@ -828,6 +838,7 @@ typedef struct packed
 {
     logic[31:0] data;
     logic[3:0] mask;
+    logic conflict;
     logic valid;
 } StFwdResult;
 

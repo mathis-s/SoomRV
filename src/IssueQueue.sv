@@ -194,15 +194,6 @@ always_ff@(posedge clk) begin
                         end
                         else
                             OUT_uop.tagB <= 7'h40;
-                    
-                        
-                        if (NUM_OPERANDS >= 3) begin
-                            // verilator lint_off SELRANGE
-                            OUT_uop.tagC <= queue[i].tags[2];
-                            // verilator lint_on SELRANGE
-                        end
-                        else
-                            OUT_uop.tagC <= 7'h40;
                         
                         
                         OUT_uop.immB <= queue[i].immB;
@@ -280,20 +271,6 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
-                    // Special handling for multi-uop instructions
-                    if (FU0 == FU_ST) begin
-                        // verilator lint_off SELRANGE
-                        if (IN_uop[i].fu == FU_ATOMIC) begin
-                            // Second uop goes into store FU
-                            // Data operand is result of op
-                            temp.tags[2] = IN_uop[i].tagDst;
-                            temp.avail[2] = 0;
-                            // Result was already written
-                            temp.tagDst = 7'h40;
-                        end
-                        else temp.avail[2] = 1;
-                        // verilator lint_on SELRANGE
-                    end
                     if (FU0 == FU_ST || FU0 == FU_LD)
                         if (temp.fu == FU_ATOMIC) begin
                             temp.fu = FuncUnit'(FU0);

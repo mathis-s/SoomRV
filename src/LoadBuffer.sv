@@ -13,7 +13,8 @@ module LoadBuffer
     input AGU_UOp IN_uopLd,
     input AGU_UOp IN_uopSt,
     output wire OUT_isDelayLoad,
-
+    
+    input LD_Ack IN_ldAck,
     input wire IN_SQ_done,
 
     output LD_UOp OUT_uopAGULd,
@@ -36,6 +37,7 @@ typedef struct packed
     logic[31:0] addr;
     logic signExtend;
     logic doNotCommit; // could encode doNotCommit as size == 3
+    logic nonSpec;
     logic issued;
     logic valid;
 } LBEntry;
@@ -49,6 +51,7 @@ wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 LBEntry lateLoadUOp;
 reg issueLateLoad;
 reg delayLoad;
+reg nonSpeculative;
 assign OUT_isDelayLoad = delayLoad;
 always_comb begin
     OUT_uopAGULd = 'x;
@@ -57,12 +60,24 @@ always_comb begin
     OUT_uopLd.valid = 0;
     
     issueLateLoad = 0;
-    delayLoad = IN_uopLd.valid && `IS_MMIO_PMA(IN_uopLd.addr) && IN_uopLd.exception == AGU_NO_EXCEPTION;
+    nonSpeculative = IN_uopLd.valid && `IS_MMIO_PMA(IN_uopLd.addr) && IN_uopLd.exception == AGU_NO_EXCEPTION;
+    delayLoad = nonSpeculative;
+    
+    // If it needs forwarding from current cycle's store, we also delay the load.
+    if (IN_uopLd.valid && !IN_stall &&
+        $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
+        IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
+            (IN_uopSt.size == 2 ||
+            (IN_uopSt.size == 1 && (IN_uopLd.size > 1 || IN_uopLd.addr[1] == IN_uopSt.addr[1])) ||
+            (IN_uopSt.size == 0 && (IN_uopLd.size > 0 || IN_uopLd.addr[1:0] == IN_uopSt.addr[1:0])))
+        )
+        delayLoad = 1;
     
     if (!delayLoad) begin
         OUT_uopAGULd.addr = IN_uopLd.addr; 
         OUT_uopAGULd.signExtend = IN_uopLd.signExtend; 
         OUT_uopAGULd.size = IN_uopLd.size; 
+        OUT_uopAGULd.loadSqN = IN_uopLd.loadSqN; 
         OUT_uopAGULd.tagDst = IN_uopLd.tagDst; 
         OUT_uopAGULd.sqN = IN_uopLd.sqN; 
         OUT_uopAGULd.doNotCommit = IN_uopLd.doNotCommit; 
@@ -75,7 +90,8 @@ always_comb begin
     OUT_uopLd.addr = lateLoadUOp.addr; 
     OUT_uopLd.signExtend = lateLoadUOp.signExtend; 
     OUT_uopLd.size = lateLoadUOp.size; 
-    OUT_uopLd.tagDst = lateLoadUOp.tagDst; 
+    OUT_uopLd.loadSqN = {lateLoadUOp.highLdSqN, deqIndex};
+    OUT_uopLd.tagDst = lateLoadUOp.tagDst;
     OUT_uopLd.sqN = lateLoadUOp.sqN; 
     OUT_uopLd.doNotCommit = lateLoadUOp.doNotCommit; 
     OUT_uopLd.external = 0;
@@ -100,15 +116,6 @@ always_comb begin
             storeIsCollision = 1;
         end
     end
-    
-    if (IN_uopLd.valid && !IN_stall && !delayLoad &&
-        $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
-        IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
-            (IN_uopSt.size == 2 ||
-            (IN_uopSt.size == 1 && (IN_uopLd.size > 1 || IN_uopLd.addr[1] == IN_uopSt.addr[1])) ||
-            (IN_uopSt.size == 0 && (IN_uopLd.size > 0 || IN_uopLd.addr[1:0] == IN_uopSt.addr[1:0])))
-        )
-        storeIsCollision = 1;
 end
 
 always_ff@(posedge clk) begin
@@ -129,6 +136,11 @@ always_ff@(posedge clk) begin
         if (!IN_stall) begin
             lateLoadUOp <= 'x;
             lateLoadUOp.valid <= 0;
+        end
+
+        if (IN_ldAck.valid && IN_ldAck.fail) begin
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck.loadSqN[$clog2(NUM_ENTRIES)-1:0];
+            entries[index].issued <= 0;
         end
 
         if (IN_branch.taken) begin
@@ -152,8 +164,8 @@ always_ff@(posedge clk) begin
             // We do not have the same problem as below with multiple commits here, 
             // as the ROB can't commit beyond the load we issue with this,
             // and will need more than a cycle after this runs to commit anything again.
-            if (entries[deqIndex].valid && !entries[deqIndex].issued && 
-                commitSqN == entries[deqIndex].sqN && !lateLoadUOp.valid && IN_SQ_done
+            if (entries[deqIndex].valid && !entries[deqIndex].issued && !lateLoadUOp.valid &&
+                (!entries[deqIndex].nonSpec || (commitSqN == entries[deqIndex].sqN && IN_SQ_done))
             ) begin
                 lateLoadUOp <= entries[deqIndex];
                 entries[deqIndex].issued <= 1;
@@ -187,6 +199,7 @@ always_ff@(posedge clk) begin
             entries[index].doNotCommit <= IN_uopLd.doNotCommit;
             entries[index].highLdSqN <= IN_uopLd.loadSqN[$bits(SqN)-1:$clog2(NUM_ENTRIES)];
             entries[index].issued <= !delayLoad;
+            entries[index].nonSpec <= nonSpeculative;
             entries[index].valid <= 1;
         end
         

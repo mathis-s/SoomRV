@@ -26,6 +26,7 @@ module LoadStoreUnit
 
     input LD_UOp IN_uopLd, // special loads (page walk, non-speculative)
     output LD_UOp OUT_uopLdSq,
+    output LD_Ack OUT_ldAck,
 
     input ST_UOp IN_uopSt,
 
@@ -248,7 +249,7 @@ reg[$clog2(`CASSOC)-1:0] assocCnt;
 
 typedef enum logic[2:0]
 {
-    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT
+    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT, SQ_CONFLICT
 } MissType;
 
 typedef struct packed
@@ -263,6 +264,7 @@ typedef struct packed
 CacheMiss miss[1:0];
 
 // Load Result Output
+LD_UOp curLd;
 always_comb begin
     // Load output is combination of ldOps[1] (the op that accessed cache 2 cycles ago)
     // and the loaded result (or an internal/external MMIO load).
@@ -270,6 +272,8 @@ always_comb begin
     reg isExtMMIO = !ldOps[1].valid;
     reg isIntMMIO = ldOps[1].valid && ldOps[1].isMMIO;
     reg noEvict = !IF_ct.rdata[0][assocCnt].valid;
+
+    curLd = ld;
     
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
@@ -305,9 +309,16 @@ always_comb begin
                 cacheHit = 0;
                 readData = 'x;
             end
+            
+            // don't care if cache is hit if this is a complete forward
+            if (!(isExtMMIO || isIntMMIO) && IN_stFwd.mask == 4'b1111)
+                cacheHit = 1;
         end
 
-        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && (!loadWasExtIOBusy || isExtMMIO)) begin
+        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && 
+            (!loadWasExtIOBusy || isExtMMIO) &&
+            (ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || !IN_stFwd.conflict)
+        ) begin
             // Use forwarded store data if available
             if (!(isExtMMIO || isIntMMIO)) begin
                 for (integer i = 0; i < `CASSOC; i=i+1) begin
@@ -343,7 +354,9 @@ always_comb begin
         end
         else begin
             miss[0].valid = 1;
-            if (loadWasExtIOBusy)
+            if (IN_stFwd.conflict)
+                miss[0].mtype = SQ_CONFLICT;
+            else if (loadWasExtIOBusy)
                 miss[0].mtype = IO_BUSY;
             else
                 miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
@@ -519,11 +532,20 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .IN_cacheLoadAddr(cacheLoadAddr),
 
     .IN_ld(ldOps[1]),
-    .IN_enqueue(miss[0].valid),
+    .IN_enqueue(miss[0].valid && miss[0].mtype != SQ_CONFLICT),
 
     .OUT_ld(LMQ_ld),
     .IN_dequeue(LMQ_dequeue)
 );
+
+always_comb begin
+    OUT_ldAck = 'x;
+    OUT_ldAck.valid = miss[0].valid && miss[0].mtype == SQ_CONFLICT;
+    if (OUT_ldAck.valid) begin
+        OUT_ldAck.fail = 1;
+        OUT_ldAck.loadSqN = curLd.loadSqN;
+    end
+end
 
 wire redoStore = stOps[1].valid &&
     (miss[1].valid ?
@@ -546,7 +568,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT) begin
+            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -640,7 +662,7 @@ always_ff@(posedge clk) begin
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT) begin
+                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;

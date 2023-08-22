@@ -136,7 +136,8 @@ InstrDecoder idec
 );
 
 wire frontendEn /*verilator public*/ = 
-    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) && 
+    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) &&
+    ($signed((RN_nextStoreSqN) - SQ_maxStoreSqN) <= -(`DEC_WIDTH - 1)) &&
     !branch.taken &&
     en &&
     !SQ_flush;
@@ -274,7 +275,7 @@ IssueQueue#(`IQ_2_SIZE,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
     .OUT_full(IQ2_full)
 );
 wire IQ3_full;
-IssueQueue#(`IQ_3_SIZE,3,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(`IQ_3_SIZE,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),
@@ -323,7 +324,7 @@ RF rf
     .raddr4(RF_readAddress[4]), .rdata4(RF_readData[4]),
     .raddr5(RF_readAddress[5]), .rdata5(RF_readData[5]),
     .raddr6(RF_readAddress[6]), .rdata6(RF_readData[6]),
-    .raddr7(RF_readAddress[7]), .rdata7(RF_readData[7])
+    .raddr7(SQ_RF_raddr), .rdata7(RF_SQ_rdata)
 );
 
 EX_UOp LD_uop[3:0] /*verilator public*/;
@@ -557,6 +558,7 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd;
 LD_UOp LB_aguUOpLd;
+
 wire LB_isDelayLoad;
 LoadBuffer lb
 (
@@ -568,7 +570,8 @@ LoadBuffer lb
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
     .OUT_isDelayLoad(LB_isDelayLoad),
-
+    
+    .IN_ldAck(LSU_ldAck),
     .IN_SQ_done(SQ_done),
     
     .OUT_uopAGULd(LB_aguUOpLd),
@@ -589,6 +592,11 @@ ST_UOp SQ_uop;
 StFwdResult SQ_fwd;
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
+SQ_ComInfo SQ_info;
+
+wire[$bits(Tag)-2:0] SQ_RF_raddr;
+wire[31:0] RF_SQ_rdata;
+
 StoreQueue sq
 (
     .clk(clk),
@@ -601,6 +609,11 @@ StoreQueue sq
     .IN_uopSt(AGU_ST_uop),
     .IN_uopLd(CC_SQ_uopLd),
     
+    .IN_rnUOp(RN_uop),
+    .IN_resultUOp(wbUOp[2:0]),
+    .OUT_RF_raddr(SQ_RF_raddr),
+    .IN_RF_rdata(RF_SQ_rdata),
+    
     .IN_curSqN(ROB_curSqN),
     
     .IN_branch(branch),
@@ -611,7 +624,8 @@ StoreQueue sq
     .IN_stAck(LSU_stAck),
     
     .OUT_flush(SQ_flush),
-    .OUT_maxStoreSqN(SQ_maxStoreSqN)
+    .OUT_maxStoreSqN(SQ_maxStoreSqN),
+    .OUT_sqInfo(SQ_info)
 );
 
 wire LSU_loadFwdValid = 0;
@@ -620,6 +634,7 @@ wire CC_loadStall;
 wire CC_storeStall;
 wire LSU_ldAGUStall;
 LD_UOp CC_SQ_uopLd;
+LD_Ack LSU_ldAck;
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
@@ -643,6 +658,8 @@ LoadStoreUnit lsu
 
     .IN_uopLd(LS_uopLd),
     .OUT_uopLdSq(CC_SQ_uopLd),
+    .OUT_ldAck(LSU_ldAck),
+
     .IN_uopSt(SQ_uop),
     
     .IF_cache(IF_cache),
@@ -745,6 +762,7 @@ ROB rob
     .IN_interruptPending(CSR_trapControl.interruptPending),
 
     .IN_branch(branch),
+    .IN_sqInfo(SQ_info),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),

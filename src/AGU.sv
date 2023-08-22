@@ -322,19 +322,15 @@ always_ff@(posedge clk) begin
                         case (phyAddr[1:0]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0001;
-                                OUT_aguOp.data <= IN_uop.srcB;
                             end
                             1: begin 
                                 OUT_aguOp.wmask <= 4'b0010;
-                                OUT_aguOp.data <= IN_uop.srcB << 8;
                             end
                             2: begin
                                 OUT_aguOp.wmask <= 4'b0100;
-                                OUT_aguOp.data <= IN_uop.srcB << 16;
                             end 
                             3: begin
                                 OUT_aguOp.wmask <= 4'b1000;
-                                OUT_aguOp.data <= IN_uop.srcB << 24;
                             end 
                         endcase
                     end
@@ -344,23 +340,19 @@ always_ff@(posedge clk) begin
                         case (phyAddr[1]) 
                             0: begin
                                 OUT_aguOp.wmask <= 4'b0011;
-                                OUT_aguOp.data <= IN_uop.srcB;
                             end
                             1: begin 
                                 OUT_aguOp.wmask <= 4'b1100;
-                                OUT_aguOp.data <= IN_uop.srcB << 16;
                             end
                         endcase
                     end
                     
                     LSU_SC_W, LSU_SW, LSU_SW_I: begin
                         OUT_aguOp.wmask <= 4'b1111;
-                        OUT_aguOp.data <= IN_uop.srcB;
                     end
                     
                     LSU_CBO_CLEAN: begin
                         OUT_aguOp.wmask <= 0;
-                        OUT_aguOp.data <= {30'bx, 2'd0};
 
                         if (!IN_vmem.cbcfe) begin
                             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
@@ -370,8 +362,6 @@ always_ff@(posedge clk) begin
                     
                     LSU_CBO_INVAL: begin
                         OUT_aguOp.wmask <= 0;
-
-                        OUT_aguOp.data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
 
                         if (exceptFlags == FLAGS_NONE)
                             OUT_uop.flags <= FLAGS_ORDERING;
@@ -384,7 +374,6 @@ always_ff@(posedge clk) begin
                     
                     LSU_CBO_FLUSH: begin
                         OUT_aguOp.wmask <= 0;
-                        OUT_aguOp.data <= {30'bx, 2'd2};
                         if (exceptFlags == FLAGS_NONE)
                             OUT_uop.flags <= FLAGS_ORDERING;
 
@@ -394,15 +383,16 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
-                    ATOMIC_AMOSWAP_W: OUT_aguOp.data <= IN_uop.srcB;
-                    ATOMIC_AMOADD_W:  OUT_aguOp.data <= IN_uop.srcB + IN_uop.srcC;
-                    ATOMIC_AMOXOR_W:  OUT_aguOp.data <= IN_uop.srcB ^ IN_uop.srcC;
-                    ATOMIC_AMOAND_W:  OUT_aguOp.data <= IN_uop.srcB & IN_uop.srcC;
-                    ATOMIC_AMOOR_W:   OUT_aguOp.data <= IN_uop.srcB | IN_uop.srcC;
-                    ATOMIC_AMOMIN_W:  OUT_aguOp.data <= ($signed(IN_uop.srcB) < $signed(IN_uop.srcC)) ? IN_uop.srcB : IN_uop.srcC;
-                    ATOMIC_AMOMAX_W:  OUT_aguOp.data <= !($signed(IN_uop.srcB) < $signed(IN_uop.srcC)) ? IN_uop.srcB : IN_uop.srcC;
-                    ATOMIC_AMOMINU_W: OUT_aguOp.data <= (IN_uop.srcB < IN_uop.srcC) ? IN_uop.srcB : IN_uop.srcC;
-                    ATOMIC_AMOMAXU_W: OUT_aguOp.data <= !(IN_uop.srcB < IN_uop.srcC) ? IN_uop.srcB : IN_uop.srcC;
+                    ATOMIC_AMOSWAP_W,
+                    ATOMIC_AMOADD_W,
+                    ATOMIC_AMOXOR_W,
+                    ATOMIC_AMOAND_W,
+                    ATOMIC_AMOOR_W,
+                    ATOMIC_AMOMIN_W,
+                    ATOMIC_AMOMAX_W,
+                    ATOMIC_AMOMINU_W,
+                    ATOMIC_AMOMAXU_W:;
+
                     default: assert(0);
                 endcase
             end

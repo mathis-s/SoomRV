@@ -35,6 +35,7 @@ module ROB
     output reg[WIDTH-1:0] OUT_PERFC_retireBranch,
     
     input BranchProv IN_branch,
+    input SQ_ComInfo IN_sqInfo,
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
@@ -200,7 +201,12 @@ always_ff@(posedge clk) begin
             
                 reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
-                if (!temp && deqEntries[i].valid && deqEntries[i].flags != FLAGS_NX && (!pred || (deqEntries[i].flags == FLAGS_NONE))) begin
+                if (!temp && 
+                    deqEntries[i].valid &&
+                    deqEntries[i].flags != FLAGS_NX &&
+                    (!pred || (deqEntries[i].flags == FLAGS_NONE)) &&
+                    (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0)
+                ) begin
                 
                     OUT_comUOp[i].rd <= deqEntries[i].rd;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
