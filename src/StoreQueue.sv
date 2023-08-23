@@ -66,7 +66,8 @@ reg[$clog2(NUM_ENTRIES):0] loadBaseIndex;
 
 always_comb begin
     OUT_sqInfo = 'x;
-    OUT_sqInfo.valid = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].valid;
+    OUT_sqInfo.valid =
+        entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].valid;
     if (OUT_sqInfo.valid)
         OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
 end
@@ -136,26 +137,27 @@ always_comb begin
     end
 
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (entries[i].valid && entries[i].addrAvail &&
-            entries[i].addr == IN_uopLd.addr[31:2] && 
-            ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready) &&
-            !`IS_MMIO_PMA_W(entries[i].addr)
+        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
+        if (entries[idx].valid && entries[idx].addrAvail &&
+            entries[idx].addr == IN_uopLd.addr[31:2] && 
+            ($signed(entries[idx].sqN - IN_uopLd.sqN) < 0 || entries[idx].ready) &&
+            !`IS_MMIO_PMA_W(entries[idx].addr)
         ) begin
             
-            if (entries[i].loaded) begin
+            if (entries[idx].loaded) begin
                 // this is pretty neat!
-                if (entries[i].wmask[0])
-                    lookupData[7:0] = entries[i].data[7:0];
-                if (entries[i].wmask[1])
-                    lookupData[15:8] = entries[i].data[15:8];
-                if (entries[i].wmask[2])
-                    lookupData[23:16] = entries[i].data[23:16];
-                if (entries[i].wmask[3])
-                    lookupData[31:24] = entries[i].data[31:24];
+                if (entries[idx].wmask[0])
+                    lookupData[7:0] = entries[idx].data[7:0];
+                if (entries[idx].wmask[1])
+                    lookupData[15:8] = entries[idx].data[15:8];
+                if (entries[idx].wmask[2])
+                    lookupData[23:16] = entries[idx].data[23:16];
+                if (entries[idx].wmask[3])
+                    lookupData[31:24] = entries[idx].data[31:24];
                     
-                lookupMask = lookupMask | entries[i].wmask;
+                lookupMask = lookupMask | entries[idx].wmask;
             end
-            else if ((entries[i].wmask & readMask) != 0) lookupConflict = 1;
+            else if ((entries[idx].wmask & readMask) != 0) lookupConflict = 1;
         end
     end
 end
@@ -337,46 +339,31 @@ always_ff@(posedge clk) begin
         
         // Dequeue
         if (!IN_stallSt) begin
+            reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
             // Try storing new op
-            if (entries[0].valid && !IN_branch.taken && 
-                entries[0].ready && nextEvictedIn < NUM_EVICTED &&
-                entries[0].loaded && allowDequeue &&
-                entries[0].addrAvail
+            if (entries[idx].valid && !IN_branch.taken && 
+                entries[idx].ready && nextEvictedIn < NUM_EVICTED &&
+                entries[idx].loaded && allowDequeue &&
+                entries[idx].addrAvail
             ) begin
                 assert(evictedNextIdValid);
                 doingDequeue = 1;
 
-                entries[NUM_ENTRIES-1].valid <= 0;
-            
-                if (!flushing)
-                    baseIndex = baseIndex + 1;
-                
+                entries[idx].valid <= 0;        
                 OUT_uopSt.valid <= 1;
                 OUT_uopSt.id <= evictedNextId;
-                OUT_uopSt.addr <= {entries[0].addr, 2'b0};
-                OUT_uopSt.data <= entries[0].data;
-                OUT_uopSt.wmask <= entries[0].wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[0].addr);
+                OUT_uopSt.addr <= {entries[idx].addr, 2'b0};
+                OUT_uopSt.data <= entries[idx].data;
+                OUT_uopSt.wmask <= entries[idx].wmask;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[idx].addr);
                 
-                for (integer i = 1; i < NUM_ENTRIES; i=i+1) begin
-                    entries[i-1] <= entries[i];
-                    if ($signed(IN_curSqN - entries[i].sqN) > 0)
-                        entries[i-1].ready <= 1;
-                    if (dataAvail[i])
-                        entries[i-1].avail <= 1;
-                end
-                
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[0];
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[idx];
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= evictedNextId;
                 nextEvictedIn = nextEvictedIn + 1;
                     
                 evictedUsedIds[evictedNextId] <= 1;
-
-                // FIXME: Either allow incrementing by more than one,
-                // or ignore already loaded ops (or combination)
-                if (loadBaseIndex != 0)
-                    nextloadBaseIndex = nextloadBaseIndex - 1;
+                baseIndex = baseIndex + 1;
             end
 
             // Re-issue op that previously missed cache
@@ -392,27 +379,28 @@ always_ff@(posedge clk) begin
         end
         
         // Set Availability
-        if (!doingDequeue) begin
-            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if (entries[i].valid && dataAvail[i])
-                    entries[i].avail <= 1;
-            end
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+            if (entries[i].valid && dataAvail[i])
+                entries[i].avail <= 1;
         end
 
         // Write Loaded Data
         if (loadValid) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] idx = doingDequeue ? (loadIndex - 1) : loadIndex;
+            reg[$clog2(NUM_ENTRIES)-1:0] idx = loadIndex;
             entries[idx].avail <= 1;
             entries[idx].loaded <= 1;
             entries[idx].data <= loadData;
             
-            if (!loadBaseIndex[$clog2(NUM_ENTRIES)] && loadBaseIndex[$clog2(NUM_ENTRIES)-1:0] == loadIndex)
+            if (nextloadBaseIndex[$clog2(NUM_ENTRIES)-1:0] == loadIndex)
                 nextloadBaseIndex = nextloadBaseIndex + 1;
         end
+        else if (entries[loadIndex].valid && entries[loadIndex].loaded)
+            nextloadBaseIndex = nextloadBaseIndex + 1;
 
         // Invalidate
         if (IN_branch.taken) begin
             reg[$clog2(NUM_ENTRIES):0] highestValidIdx = 0;
+
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ($signed(entries[i].sqN - IN_branch.sqN) > 0 && !entries[i].ready) begin
                     entries[i] <= 'x;
@@ -420,19 +408,18 @@ always_ff@(posedge clk) begin
                 end
                 else if (entries[i].valid) highestValidIdx = i[$clog2(NUM_ENTRIES):0];
             end
-
-            if (nextloadBaseIndex > highestValidIdx)
-                    nextloadBaseIndex = highestValidIdx;
             
             if (IN_branch.flush)
                 baseIndex = IN_branch.storeSqN + 1;
-                
+            
+            // TODO: set this to last known valid index instead of base index
+            nextloadBaseIndex = baseIndex[$clog2(NUM_ENTRIES):0];
             flushing <= IN_branch.flush;
         end
     
         // Enqueue
         if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
             assert(entries[index].valid);
             entries[index].addr <= IN_uopSt.addr[31:2];
@@ -454,7 +441,7 @@ always_ff@(posedge clk) begin
             if (IN_rnUOp[i].valid && (!IN_branch.taken || $signed(IN_rnUOp[i].sqN - IN_branch.sqN) <= 0) &&
                 (IN_rnUOp[i].fu == FU_ST || IN_rnUOp[i].fu == FU_ATOMIC)) begin
                 
-                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_rnUOp[i].storeSqN[$clog2(NUM_ENTRIES)-1:0] - baseIndex[$clog2(NUM_ENTRIES)-1:0];
+                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_rnUOp[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];
                 assert(IN_rnUOp[i].storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 
                 entries[index].data <= 'x;

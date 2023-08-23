@@ -16,7 +16,6 @@
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
-#include "VTop_RenameTable.h"
 #include "VTop_RenameTable__N8.h"
 #include "VTop_SoC.h"
 #include "VTop_TagBuffer.h"
