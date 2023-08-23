@@ -17,3 +17,5 @@
 !Top_tb.cpp
 !linker.ld
 !view.gtkw
+!docs
+!docs/*
