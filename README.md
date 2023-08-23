@@ -41,6 +41,9 @@ This is on by default for `make linux`. To restart a crashed or closed Linux boo
 at the last checkpoint, use e.g. `./obj_dir/VTop soomrv.backup --backup-file=soomrv2.backup`.
 (There seem to be some spurious segfaults in the Verilator-generated code.)
 
+## Documentation
+For a general overview of the implementation, see [Overview](docs/Overview.md).
+
 ## License
 SoomRV is released under the MIT License. Use of this source code is governed by a MIT-style license that can be found in the `LICENSE` file.
 
