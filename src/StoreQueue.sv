@@ -100,18 +100,20 @@ end
 
 reg[$clog2(NUM_EVICTED):0] evictedIn;
 
-reg[3:0] lookupMask;
-reg[31:0] lookupData;
-reg lookupConflict;
+reg[3:0] readMask;
 always_comb begin
-    // Store queue lookup
-    reg[3:0] readMask;
     case (IN_uopLd.size)
         0: readMask = (4'b1 << IN_uopLd.addr[1:0]);
         1: readMask = ((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
         default: readMask = 4'b1111;
     endcase
-    
+end
+
+reg[3:0] lookupMask;
+reg[31:0] lookupData;
+reg lookupConflict;
+// Store queue lookup
+always_comb begin
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
     lookupMask = ~readMask;
@@ -123,44 +125,65 @@ always_comb begin
             evicted[i].s.addr == IN_uopLd.addr[31:2] && 
             !`IS_MMIO_PMA_W(evicted[i].s.addr)
         ) begin
-            if (evicted[i].s.wmask[0])
-                lookupData[7:0] = evicted[i].s.data[7:0];
-            if (evicted[i].s.wmask[1])
-                lookupData[15:8] = evicted[i].s.data[15:8];
-            if (evicted[i].s.wmask[2])
-                lookupData[23:16] = evicted[i].s.data[23:16];
-            if (evicted[i].s.wmask[3])
-                lookupData[31:24] = evicted[i].s.data[31:24];
-                
+            for (integer j = 0; j < 4; j=j+1)
+                if (evicted[i].s.wmask[j])
+                    lookupData[j*8 +: 8] = evicted[i].s.data[j*8 +: 8];
             lookupMask = lookupMask | evicted[i].s.wmask;
         end
     end
 
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (entries[idx].valid && entries[idx].addrAvail &&
-            entries[idx].addr == IN_uopLd.addr[31:2] && 
-            ($signed(entries[idx].sqN - IN_uopLd.sqN) < 0 || entries[idx].ready) &&
-            !`IS_MMIO_PMA_W(entries[idx].addr)
-        ) begin
+    for (integer i = 0; i < 4; i=i+1)
+        if (lookupMaskIter[outputIdx][i])
+            lookupData[i*8 +: 8] = lookupDataIter[outputIdx][i*8 +: 8];
+
+    lookupMask = lookupMask | lookupMaskIter[outputIdx];    
+    lookupConflict = |lookupConflictList;
+end
+
+// This generates circular logic to iterate through the StoreQueue for forwarding data to loads.
+// Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
+// If tooling does not support this, it might be necessary to make the SQ a shift register again
+// or chose one of the less efficient methods of iteration.
+logic[31:0] lookupDataIter[NUM_ENTRIES-1:0];
+logic[3:0]  lookupMaskIter[NUM_ENTRIES-1:0];
+logic[NUM_ENTRIES-1:0] lookupConflictList;
+wire[$clog2(NUM_ENTRIES)-1:0] outputIdx = baseIndex[$clog2(NUM_ENTRIES)-1:0] - 1;
+generate
+for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
+always_comb begin
+    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
+    // break in circular feedback
+    if (i == baseIndex[$clog2(NUM_ENTRIES)-1:0]) begin
+        lookupMaskIter[i] = 0;
+        lookupDataIter[i] = 'x;
+    end
+    // continue circular feedback
+    else begin
+        lookupMaskIter[i] = lookupMaskIter[prev];
+        lookupDataIter[i] = lookupDataIter[prev];
+    end
+
+    // actual forwarding
+    lookupConflictList[i] = 0;
+    if (entries[i].valid && entries[i].addrAvail &&
+        entries[i].addr == IN_uopLd.addr[31:2] && 
+        ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready) &&
+        !`IS_MMIO_PMA_W(entries[i].addr)
+    ) begin
+        
+        if (entries[i].loaded) begin
             
-            if (entries[idx].loaded) begin
-                // this is pretty neat!
-                if (entries[idx].wmask[0])
-                    lookupData[7:0] = entries[idx].data[7:0];
-                if (entries[idx].wmask[1])
-                    lookupData[15:8] = entries[idx].data[15:8];
-                if (entries[idx].wmask[2])
-                    lookupData[23:16] = entries[idx].data[23:16];
-                if (entries[idx].wmask[3])
-                    lookupData[31:24] = entries[idx].data[31:24];
-                    
-                lookupMask = lookupMask | entries[idx].wmask;
-            end
-            else if ((entries[idx].wmask & readMask) != 0) lookupConflict = 1;
+            for (integer j = 0; j < 4; j=j+1)
+                if (entries[i].wmask[j])
+                    lookupDataIter[i][j*8 +: 8] = entries[i].data[j*8 +: 8];
+                
+            lookupMaskIter[i] = lookupMaskIter[i] | entries[i].wmask;
         end
+        else if ((entries[i].wmask & readMask) != 0) lookupConflictList[i] = 1;
     end
 end
+endgenerate
+
 
 assign OUT_done = 
     (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && 
