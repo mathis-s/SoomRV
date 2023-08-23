@@ -1,13 +1,13 @@
 # General
 SoomRV is a tag-based OoO architecture. During rename, every instruction that writes to an architectural (i.e. virtual) register is given a tag. This tag is used both as the destination register
-for the instruction itself, and as a source register for all instructions depending on the computed value. A tag is freed again only once a new instruction writes to the same virtual register. Then, a new tag is allocated to store the new value. The current speculative as well as committed mappings from virtual to physical registers are stored in the [RenameTable](../src/RenameTable.sv).
+for the instruction itself, and as a source register for all instructions depending on the computed value. A tag is freed again only once a new instruction writing to the same virtual register commits. The current speculative as well as committed mappings from virtual to physical registers are stored in the [RenameTable](../src/RenameTable.sv).
 
 After instructions are renamed, they await their execution in various issue queues. Within issue queues, availability of instruction operands is tracked using the operands' tags. Once all operands are available, the instruction is issued, even if older instructions are still waiting.
-The actual value of operands is not kept yet within IQs (except immediates). Operand registers are only loaded in the following "Load" pipeline stage after the instruction is issued.
+The actual value of operands is not kept within IQs yet (except immediates). Operand registers are only loaded in the following "Load" pipeline stage after the instruction is issued.
 
 Instructions are executed speculatively and out of order. As such, a recovery mechanism is required in case a misspeculation is made. SoomRV uses a reorder buffer to track all post-rename instructions. If a misspeculation occurs, a global `branch` signal fires. This signal invalidates all post-misspeculation in-flight instructions at every stage in the pipeline and in the ROB. To check whether a given instruction came before or after the misspeculation, every instruction carries a sequence number.
 
-Additionally, after misspeculation, recovery of rename state is necessary. In SoomRV, rename state is reset to committed state when a misspeculation fires. Then, not-yet-committed instructions are "re-played" from the ROB to recover rename state. (Another possible approach would be snapshotting rename state in every cycle.)
+Additionally, after misspeculation, recovery of rename state is necessary. In SoomRV, rename state is reset to committed state when a misspeculation fires. Then, not-yet-committed instructions are "re-played" from the ROB to recover the last correct rename state. (Another possible approach would be snapshotting rename state in every cycle.)
 
 # UOps
 Most of SoomRV is built around different Modules passing various `UOp` or other structs between them.
@@ -65,7 +65,7 @@ The fetch ID is similar to sequence numbers, though it is assigned during fetch;
 Fetch IDs are used to access the fetch state backup stored in the PCFile for every fetch bundle.
 
 Specifically, we access the fetch state backup when we want to know the program counter
-or branch prediction information for an instruction, since these are only stored in the PCFile.
+or branch prediction information for an instruction. These are only stored in the PCFile, thus saving area.
 In the case of `EX_UOp`, this access has already been performed by the immediately preceding pipeline stage (Load) for us to use during execution.
 
 In addition, the ROB will access PCFile using an instructions's `fetchID` if the instruction is an exception or a predicted branch. In both cases, we need access to the original program counter after commit.
@@ -73,7 +73,7 @@ In addition, the ROB will access PCFile using an instructions's `fetchID` if the
 
 # Modules
 What follows are short descriptions of some important modules in SoomRV.
-Most of the following modules are themselves instantiated in the [Core](../src/Core.sv) module.
+Most of the following modules are themselves instantiated within the [Core](../src/Core.sv) module.
 
 ### [IFetch](../src/IFetch.sv)
 IFetch is a large module which handles the first few pipeline stages, all related to instruction fetching. It also includes all branch prediction modules.
