@@ -64,7 +64,7 @@ always_comb begin
     delayLoad = nonSpeculative;
     
     // If it needs forwarding from current cycle's store, we also delay the load.
-    if (IN_uopLd.valid && !IN_stall &&
+    if (IN_uopLd.valid &&
         $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
             (IN_uopSt.size == 2 ||

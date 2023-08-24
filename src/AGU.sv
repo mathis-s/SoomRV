@@ -36,9 +36,8 @@ function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user);
     return r;
 endfunction
 
-// delayed loads stay in the LoadBuffer anyways,
-// so we can ignore the LSU's stall signal
-wire inStallMasked = IN_stall && !IN_isDelayLoad;
+// possibly do not respect if page fault?
+wire inStallMasked = IN_stall;
 
 reg pageWalkActive;
 reg pageWalkAccepted;
@@ -397,8 +396,7 @@ always_ff@(posedge clk) begin
                 endcase
             end
         end
-        else if ((!inStallMasked && !eldIsPageWalkOp) || (OUT_aguOp.valid && IN_branch.taken && $signed(OUT_aguOp.sqN - IN_branch.sqN) > 0))
-            OUT_aguOp.valid <= 0;
+        else OUT_aguOp.valid <= 0;
     end
 end
 

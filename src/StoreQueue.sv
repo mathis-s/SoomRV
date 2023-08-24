@@ -62,12 +62,10 @@ typedef struct packed
 
 SQEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
-reg[$clog2(NUM_ENTRIES):0] loadBaseIndex;
 
 always_comb begin
     OUT_sqInfo = 'x;
-    OUT_sqInfo.valid =
-        entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].valid;
+    OUT_sqInfo.valid = loadBaseIndexValid;
     if (OUT_sqInfo.valid)
         OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
 end
@@ -249,7 +247,6 @@ end
 
 // Track Store Data Availability
 logic[NUM_ENTRIES-1:0] dataAvail;
-
 always_comb begin
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         dataAvail[i] = 0;
@@ -266,24 +263,69 @@ always_comb begin
     end
 end
 
-// Register File Read
+// Select entry for which to read store data from RF
 reg[$clog2(NUM_ENTRIES)-1:0] loadIndex;
 reg loadValid;
 always_comb begin
-    loadIndex = loadBaseIndex[$clog2(NUM_ENTRIES)-1:0];
-    OUT_RF_raddr = '0;
-    loadValid = 0;
+    // Find candidates
+    reg[NUM_ENTRIES-1:0] isLoadCandidate;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        isLoadCandidate[i] =
+            entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail;
+    end
 
-    if (entries[loadIndex].valid && !entries[loadIndex].loaded && entries[loadIndex].avail && entries[loadIndex].addrAvail) begin
+    // Priority encode beginning at base index
+    loadValid = 0;
+    loadIndex = 'x;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
+        if (!loadValid && 
+            isLoadCandidate[idx]
+        ) begin
+            loadValid = 1;
+            loadIndex = idx;
+        end
+    end
+
+    OUT_RF_raddr = '0;
+    if (loadValid && !entries[loadIndex].data.m.tag[$bits(Tag)-1]) begin
         OUT_RF_raddr = entries[loadIndex].data.m.tag[$bits(Tag)-2:0];
-        loadValid = 1;
     end
 end
+
+// Find oldest not-yet-loaded entry 
+reg loadBaseIndexValid;
+reg[$clog2(NUM_ENTRIES)-1:0] loadBaseIndex;
+always_comb begin
+    reg[NUM_ENTRIES-1:0] isNotLoaded;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        isNotLoaded[i] =
+            entries[i].valid && !entries[i].loaded;
+    end
+
+    // Priority encode beginning at base index
+    loadBaseIndexValid = 0;
+    loadBaseIndex = 'x;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
+        if (!loadBaseIndexValid && 
+            isNotLoaded[idx]
+        ) begin
+            loadBaseIndexValid = 1;
+            loadBaseIndex = idx;
+        end
+    end
+end
+
+// Preprocess store data
 reg[31:0] loadData;
 always_comb begin
     reg[31:0] rawLoadData = 'x;
     loadData = 'x;
-    rawLoadData = IN_RF_rdata;
+    if (entries[loadIndex].data.m.tag[$bits(Tag)-1])
+        rawLoadData = {{26{entries[loadIndex].data.m.tag[5]}}, entries[loadIndex].data.m.tag[5:0]};
+    else
+        rawLoadData = IN_RF_rdata;
     // since we're deconstructing it anyways,
     // we may want to store offset + size instead of wmask
 
@@ -323,14 +365,12 @@ always_ff@(posedge clk) begin
         OUT_uopSt.valid <= 0;
         flushing <= 0;
         evictedUsedIds <= 0;
-        loadBaseIndex <= 0;
     end
     
     else begin
         reg doingEnqueue = 0;
         reg doingDequeue = 0;
         reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
-        reg[$clog2(NUM_ENTRIES):0] nextloadBaseIndex = loadBaseIndex;
 
         if (!IN_stallSt)
             OUT_uopSt.valid <= 0;
@@ -409,16 +449,10 @@ always_ff@(posedge clk) begin
 
         // Write Loaded Data
         if (loadValid) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] idx = loadIndex;
-            entries[idx].avail <= 1;
-            entries[idx].loaded <= 1;
-            entries[idx].data <= loadData;
-            
-            if (nextloadBaseIndex[$clog2(NUM_ENTRIES)-1:0] == loadIndex)
-                nextloadBaseIndex = nextloadBaseIndex + 1;
+            entries[loadIndex].avail <= 1;
+            entries[loadIndex].loaded <= 1;
+            entries[loadIndex].data <= loadData;
         end
-        else if (entries[loadIndex].valid && entries[loadIndex].loaded)
-            nextloadBaseIndex = nextloadBaseIndex + 1;
 
         // Invalidate
         if (IN_branch.taken) begin
@@ -435,12 +469,10 @@ always_ff@(posedge clk) begin
             if (IN_branch.flush)
                 baseIndex = IN_branch.storeSqN + 1;
             
-            // TODO: set this to last known valid index instead of base index
-            nextloadBaseIndex = baseIndex[$clog2(NUM_ENTRIES):0];
             flushing <= IN_branch.flush;
         end
     
-        // Enqueue
+        // Set Address
         if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
@@ -484,8 +516,12 @@ always_ff@(posedge clk) begin
 
                 entries[index].data.m.tag <= IN_rnUOp[i].tagB;
                 entries[index].sqN <= IN_rnUOp[i].sqN;
-
-                if (IN_rnUOp[i].tagB[6]) begin
+                
+                // If this is a sw storing an eliminated immediate load,
+                // we can fill the data field right away. This is not possible
+                // for sb and sh, as the offset is unknown until the address is known.
+                // (This might not be worth it, without this we wouldn't need to write to all of data.)
+                if (IN_rnUOp[i].tagB[6] && IN_rnUOp[i].opcode == LSU_SW && 0) begin
                     entries[index].loaded <= 1;
                     entries[index].avail <= 1;
                     entries[index].data <= {{26{IN_rnUOp[i].tagB[5]}}, IN_rnUOp[i].tagB[5:0]};
@@ -505,7 +541,6 @@ always_ff@(posedge clk) begin
         end
 
         evictedIn <= nextEvictedIn;
-        loadBaseIndex <= nextloadBaseIndex;
     end
 end
 endmodule
