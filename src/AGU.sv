@@ -261,7 +261,7 @@ always_ff@(posedge clk) begin
             
             if (LOAD_AGU) begin
                 OUT_aguOp.isLoad <= 1;
-                OUT_aguOp.doNotCommit <= IN_uop.opcode >= ATOMIC_AMOSWAP_W;
+                OUT_aguOp.doNotCommit <= 0;
                 
                 OUT_uop <= 'x;
                 OUT_uop.valid <= 0;
@@ -298,6 +298,7 @@ always_ff@(posedge clk) begin
                 OUT_aguOp.isLoad <= 0;
                 OUT_aguOp.doNotCommit <= 0;
                 
+                OUT_uop.storeSqN <= IN_uop.storeSqN;
                 OUT_uop.tagDst <= IN_uop.tagDst;
                 OUT_uop.sqN <= IN_uop.sqN;
                 OUT_uop.result <= phyAddr;
@@ -390,7 +391,10 @@ always_ff@(posedge clk) begin
                     ATOMIC_AMOMIN_W,
                     ATOMIC_AMOMAX_W,
                     ATOMIC_AMOMINU_W,
-                    ATOMIC_AMOMAXU_W:;
+                    ATOMIC_AMOMAXU_W: begin
+                        OUT_uop.doNotCommit <= 1;
+                        OUT_aguOp.doNotCommit <= 1;
+                    end
 
                     default: assert(0);
                 endcase

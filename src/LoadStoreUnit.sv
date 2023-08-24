@@ -327,6 +327,7 @@ always_comb begin
             end
             
             OUT_uopLd.valid = 1;
+            OUT_uopLd.storeSqN = 'x;
             OUT_uopLd.tagDst = ld.tagDst;
             OUT_uopLd.sqN = ld.sqN;
             OUT_uopLd.doNotCommit = ld.doNotCommit;

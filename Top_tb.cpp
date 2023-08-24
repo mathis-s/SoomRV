@@ -744,11 +744,12 @@ void LogInstructions()
     // Result
     for (size_t i = 0; i < 4; i++)
     {
+        uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
+        bool isAtomic = state.insts[sqn].fu == 9;
         // WB valid
-        if ((core->wbUOp[i] & 1) && !(core->wbUOp[i] & 2))
+        if ((core->wbUOp[i] & 1) && (isAtomic ? (i == 2) : !(core->wbUOp[i] & 2)))
         {
-            uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
-            uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7)) & 0xffff'ffff;
+            uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7 + 7)) & 0xffff'ffff;
             state.insts[sqn].result = result;
             state.insts[sqn].flags = (core->wbUOp[i] >> 2) & 0xF;
 

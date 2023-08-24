@@ -55,7 +55,6 @@ typedef enum logic[5:0]
     INT_BEXT,
     INT_BINV,
     INT_BSET,
-    //INT_MV,
     INT_FSGNJ_S,
     INT_FSGNJN_S,
     INT_FSGNJX_S,
@@ -164,8 +163,8 @@ typedef enum logic[2:0]
 
 typedef enum logic[5:0]
 {
-    ATOMIC_AMOSWAP_W=32,
-    ATOMIC_AMOADD_W,
+    ATOMIC_AMOSWAP_W=55,
+    ATOMIC_AMOADD_W=56,
     ATOMIC_AMOXOR_W,
     ATOMIC_AMOAND_W,
     ATOMIC_AMOOR_W,
@@ -522,6 +521,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] result;
+    SqN storeSqN; // this is only used for atomics, may be 'x otherwise
     Tag tagDst;
     SqN sqN;
     Flags flags;

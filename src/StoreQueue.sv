@@ -3,7 +3,8 @@ module StoreQueue
     parameter NUM_ENTRIES=`SQ_SIZE,
     parameter NUM_EVICTED=4,
     parameter RESULT_BUS_COUNT=3,
-    parameter WIDTH_RN = `DEC_WIDTH
+    parameter WIDTH_RN = `DEC_WIDTH,
+    parameter AMO_RES_PORT=0
 )
 (
     input wire clk,
@@ -53,6 +54,7 @@ typedef struct packed
     
     SqN sqN;
     
+    logic atomic;
     logic addrAvail;
     logic ready;
     logic loaded;
@@ -266,12 +268,14 @@ end
 // Select entry for which to read store data from RF
 reg[$clog2(NUM_ENTRIES)-1:0] loadIndex;
 reg loadValid;
+reg loadIsAtomic;
+reg[31:0] atomicLoadData;
 always_comb begin
     // Find candidates
     reg[NUM_ENTRIES-1:0] isLoadCandidate;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         isLoadCandidate[i] =
-            entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail;
+            entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomic;
     end
 
     // Priority encode beginning at base index
@@ -285,6 +289,16 @@ always_comb begin
             loadValid = 1;
             loadIndex = idx;
         end
+    end
+
+    // If an atomic op result is incoming, load that instead
+    loadIsAtomic = 0;
+    atomicLoadData = 'x;
+    if (IN_resultUOp[AMO_RES_PORT].valid && IN_resultUOp[AMO_RES_PORT].doNotCommit) begin
+        loadIsAtomic = 1;
+        loadValid = 1;
+        loadIndex = IN_resultUOp[AMO_RES_PORT].storeSqN[$clog2(NUM_ENTRIES)-1:0];
+        atomicLoadData = IN_resultUOp[AMO_RES_PORT].result;
     end
 
     OUT_RF_raddr = '0;
@@ -322,7 +336,10 @@ reg[31:0] loadData;
 always_comb begin
     reg[31:0] rawLoadData = 'x;
     loadData = 'x;
-    if (entries[loadIndex].data.m.tag[$bits(Tag)-1])
+
+    if (loadIsAtomic)
+        rawLoadData = atomicLoadData;
+    else if (entries[loadIndex].data.m.tag[$bits(Tag)-1])
         rawLoadData = {{26{entries[loadIndex].data.m.tag[5]}}, entries[loadIndex].data.m.tag[5:0]};
     else
         rawLoadData = IN_RF_rdata;
@@ -330,14 +347,13 @@ always_comb begin
     // we may want to store offset + size instead of wmask
 
     case (entries[loadIndex].wmask)
-        4'b1111: loadData = rawLoadData;
+        default: loadData = rawLoadData;
         4'b0001: loadData[7:0] = rawLoadData[7:0];
         4'b0010: loadData[15:8] = rawLoadData[7:0];
         4'b0100: loadData[23:16] = rawLoadData[7:0];
         4'b1000: loadData[31:24] = rawLoadData[7:0];
         4'b0011: loadData[15:0] = rawLoadData[15:0];
         4'b1100: loadData[31:16] = rawLoadData[15:0];
-        default: ;
     endcase
 end
 
@@ -500,31 +516,29 @@ always_ff@(posedge clk) begin
                 assert(IN_rnUOp[i].storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 
                 entries[index].data <= 'x;
-                entries[index].wmask <= 'x;
-                entries[index].addr <= 0;
+                entries[index].addr <= 'x;
+                entries[index].wmask <= 0;
 
                 entries[index].valid <= 1;
+                entries[index].atomic <= 0;
                 entries[index].ready <= 0;
                 entries[index].loaded <= 0;
+                entries[index].sqN <= IN_rnUOp[i].sqN;
+                entries[index].addrAvail <= 0;
                 entries[index].avail <= IN_rnUOp[i].availB;
+                entries[index].data.m.tag <= IN_rnUOp[i].tagB;
 
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1)
                     if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && IN_rnUOp[i].tagB == IN_resultUOp[j].tagDst)
                         entries[index].avail <= 1;
 
-                entries[index].addrAvail <= 0;
-
-                entries[index].data.m.tag <= IN_rnUOp[i].tagB;
-                entries[index].sqN <= IN_rnUOp[i].sqN;
-                
-                // If this is a sw storing an eliminated immediate load,
-                // we can fill the data field right away. This is not possible
-                // for sb and sh, as the offset is unknown until the address is known.
-                // (This might not be worth it, without this we wouldn't need to write to all of data.)
-                if (IN_rnUOp[i].tagB[6] && IN_rnUOp[i].opcode == LSU_SW && 0) begin
-                    entries[index].loaded <= 1;
-                    entries[index].avail <= 1;
-                    entries[index].data <= {{26{IN_rnUOp[i].tagB[5]}}, IN_rnUOp[i].tagB[5:0]};
+                if (IN_rnUOp[i].fu == FU_ATOMIC) begin
+                    if (IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
+                        entries[index].data.m.tag <= 'x;
+                        entries[index].atomic <= 1;
+                        // operand cannot be available yet
+                        entries[index].avail <= 0;
+                    end
                 end
                 doingEnqueue = 1;
             end

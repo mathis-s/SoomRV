@@ -58,13 +58,16 @@ wire[31:0] pcPlus2 = IN_uop.pc + 2;
 wire[31:0] pcPlus4 = IN_uop.pc + 4;
 
 always_comb begin
-    // optimize this depending on how good of a job synthesis does
     case (IN_uop.opcode)
         INT_AUIPC: resC = IN_uop.pc + imm;
-        INT_ADD: resC = srcA + srcB;
-        INT_XOR: resC = srcA ^ srcB;
-        INT_OR: resC = srcA | srcB;
-        INT_AND: resC = srcA & srcB;
+        ATOMIC_AMOADD_W, INT_ADD: resC = srcA + srcB;
+        ATOMIC_AMOXOR_W, INT_XOR: resC = srcA ^ srcB;
+        ATOMIC_AMOOR_W, INT_OR: resC = srcA | srcB;
+        ATOMIC_AMOAND_W, INT_AND: resC = srcA & srcB;
+        ATOMIC_AMOMAX_W, INT_MAX: resC = lessThan ? srcB : srcA;
+        ATOMIC_AMOMAXU_W, INT_MAXU: resC = lessThanU ? srcB : srcA;
+        ATOMIC_AMOMIN_W, INT_MIN: resC = lessThan ? srcA : srcB;
+        ATOMIC_AMOMINU_W, INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_SLL: resC = srcA << srcB[4:0];
         INT_SRL: resC = srcA >> srcB[4:0];
         INT_SLT: resC = {31'b0, lessThan};
@@ -90,10 +93,6 @@ always_comb begin
         INT_CTZ: resC = {26'b0, resLzTz};
         INT_CPOP: resC = {26'b0, resPopCnt};
         INT_ORC_B: resC = {{{4'd8}{|srcA[31:24]}}, {{4'd8}{|srcA[23:16]}}, {{4'd8}{|srcA[15:8]}}, {{4'd8}{|srcA[7:0]}}};
-        INT_MAX: resC = lessThan ? srcB : srcA;
-        INT_MAXU: resC = lessThanU ? srcB : srcA;
-        INT_MIN: resC = lessThan ? srcA : srcB;
-        INT_MINU: resC = lessThanU ? srcA : srcB;
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
         INT_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
         INT_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
@@ -123,7 +122,6 @@ always_comb begin
         default: branchTaken = 0;
     endcase
     
-    // TODO: Optimize order of these in OPCode_INT enum for easy decoding.
     isBranch =
         (IN_uop.opcode == INT_BEQ ||
         IN_uop.opcode == INT_BNE ||
@@ -232,10 +230,12 @@ always_ff@(posedge clk) begin
                 end
             end
 
-            OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.result <= resC;
+            OUT_uop.storeSqN <= IN_uop.storeSqN;
+            OUT_uop.tagDst <= IN_uop.tagDst;
             OUT_uop.sqN <= IN_uop.sqN;
-            OUT_uop.doNotCommit <= 0;
+            // atomics are committed by the store port, not the int port
+            OUT_uop.doNotCommit <= (IN_uop.opcode >= ATOMIC_AMOADD_W);
             
             if (isBranch && IN_uop.bpi.predicted)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;

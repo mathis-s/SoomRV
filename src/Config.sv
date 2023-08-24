@@ -17,7 +17,7 @@
 `define IQ_3_SIZE 10
 
 // Memory
-`define SQ_SIZE 16
+`define SQ_SIZE 32
 `define LB_SIZE 16
 
 // ROB Size
