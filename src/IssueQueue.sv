@@ -113,13 +113,21 @@ always_comb begin
     end
 end
 
+reg[NUM_UOPS-1:0] acceptIncoming;
 always_comb begin
     reg[$clog2(SIZE):0] count = 0;
+    acceptIncoming = 0;
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        if (IN_uop[i].valid && 
+        if (IN_uop[i].valid &&
+            
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
+                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
+                    (PORT_IDX == 0 && IN_uop[i].fu == FU_ATOMIC)) &&
+            // Edge Case: INT port does not enqueue AMOSWAP (no int uop needed)
+            (PORT_IDX != 0 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
+        ) begin
             count = count + 1;
+            acceptIncoming[i] = 1;
         end
     end
     OUT_full = insertIndex > (SIZE[$clog2(SIZE):0] - count);
@@ -233,13 +241,7 @@ always_ff@(posedge clk) begin
         // Enqueue
         if (frontEn && !IN_branch.taken) begin
             for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                if (IN_uop[i].valid && 
-                    ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                        IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
-                            (PORT_IDX == 0 && IN_uop[i].fu == FU_ATOMIC))
-                    ) begin
-                    
-                    reg doNotAccept = 0;
+                if (acceptIncoming[i]) begin
                     R_ST_UOp temp;
                     
                     temp.imm = 0;
@@ -285,8 +287,6 @@ always_ff@(posedge clk) begin
                                 temp.tags[0] = temp.tagDst;
                                 temp.avail[0] = 0;
                                 temp.tagDst = 7'h40;
-                                if (temp.opcode == ATOMIC_AMOSWAP_W)
-                                    doNotAccept = 1;
                             end
 
                             // STORE port
@@ -311,10 +311,8 @@ always_ff@(posedge clk) begin
                     end
                     // verilator lint_on SELRANGE
                     
-                    if (!doNotAccept) begin
-                        queue[insertIndex[ID_LEN-1:0]] <= temp;
-                        insertIndex = insertIndex + 1;
-                    end
+                    queue[insertIndex[ID_LEN-1:0]] <= temp;
+                    insertIndex = insertIndex + 1;
                 end
             end
         end
