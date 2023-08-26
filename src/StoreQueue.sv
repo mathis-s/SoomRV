@@ -184,9 +184,10 @@ always_comb begin
 end
 endgenerate
 
+wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
 assign OUT_done = 
-    (!entries[0].valid || (!entries[0].ready && !($signed(IN_curSqN - entries[0].sqN) > 0))) && 
+    (!entries[baseIndexI].valid || (!entries[baseIndexI].ready && !($signed(IN_curSqN - entries[baseIndexI].sqN) > 0))) && 
     evictedIn == 0 &&
     !IN_stallSt;
 
@@ -206,7 +207,8 @@ always_comb begin
                 (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
                 (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
 
-            ((evicted[i].s.addr == entries[0].addr) || (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[0].addr))))
+            ((evicted[i].s.addr == entries[baseIndexI].addr) || 
+                (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr))))
             allowDequeue = 0;
     end
 end
@@ -475,21 +477,18 @@ always_ff@(posedge clk) begin
             reg[$clog2(NUM_ENTRIES):0] highestValidIdx = 0;
 
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ($signed(entries[i].sqN - IN_branch.sqN) > 0 && !entries[i].ready) begin
+                if ((IN_branch.flush || $signed(entries[i].sqN - IN_branch.sqN) > 0) && !entries[i].ready) begin
                     entries[i] <= 'x;
                     entries[i].valid <= 0;
                 end
                 else if (entries[i].valid) highestValidIdx = i[$clog2(NUM_ENTRIES):0];
             end
             
-            if (IN_branch.flush)
-                baseIndex = IN_branch.storeSqN + 1;
-            
             flushing <= IN_branch.flush;
         end
     
         // Set Address
-        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
+        if (IN_uopSt.valid && (!IN_branch.taken || ($signed(IN_uopSt.sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
             assert(entries[index].valid);
@@ -509,7 +508,7 @@ always_ff@(posedge clk) begin
 
         // Enqueue
         for (integer i = 0; i < WIDTH_RN; i=i+1)
-            if (IN_rnUOp[i].valid && (!IN_branch.taken || $signed(IN_rnUOp[i].sqN - IN_branch.sqN) <= 0) &&
+            if (IN_rnUOp[i].valid && (!IN_branch.taken || ($signed(IN_rnUOp[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush)) &&
                 (IN_rnUOp[i].fu == FU_ST || IN_rnUOp[i].fu == FU_ATOMIC)) begin
                 
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_rnUOp[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];
@@ -544,7 +543,11 @@ always_ff@(posedge clk) begin
             end
 
         OUT_empty <= empty && !doingEnqueue;
-        if (OUT_empty) flushing <= 0;
+        if (OUT_empty && flushing) begin
+            flushing <= 0;
+            if (flushing)
+                baseIndex = 1;
+        end
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
         if (IN_uopLd.valid) begin
