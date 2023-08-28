@@ -1159,16 +1159,30 @@ int main(int argc, char** argv)
         {
             if (args.logPerformance)
             {
-                double ipc = (double)core->csr->minstret / core->csr->mcycle;
-                double mpki = (double)core->csr->mhpmcounter5 / (core->csr->minstret / 1000.0);
-                double bmrate = ((double)core->csr->mhpmcounter4 / core->csr->mhpmcounter3) * 100.0;
+                std::array<uint64_t, 5> counters = {
+                    core->csr->mcycle,
+                    core->csr->minstret,
+                    core->csr->mhpmcounter3,
+                    core->csr->mhpmcounter4,
+                    core->csr->mhpmcounter5,
+                };
+                static std::array<uint64_t, 5> lastCounters;
 
-                fprintf(stderr, "main_time:          %lu\n", main_time);
-                fprintf(stderr, "mcycle:             %lu\n", core->csr->mcycle);
-                fprintf(stderr, "minstret:           %lu # %f IPC \n", core->csr->minstret, ipc);
-                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", core->csr->mhpmcounter5, mpki);
-                fprintf(stderr, "branches:           %lu\n", core->csr->mhpmcounter3);
-                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", core->csr->mhpmcounter4, bmrate);
+                std::array<uint64_t, 5> current;
+                for (size_t i = 0; i < counters.size(); i++)
+                    current[i] = counters[i] - lastCounters[i];
+
+                double ipc = (double)current[1] / current[0];
+                double mpki = (double)current[4] / (current[1] / 1000.0);
+                double bmrate = ((double)current[3] / current[2]) * 100.0;
+
+                fprintf(stderr, "cycles:             %lu\n", current[0]);
+                fprintf(stderr, "instret:            %lu # %f IPC \n", current[1], ipc);
+                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
+                fprintf(stderr, "branches:           %lu\n", current[2]);
+                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
+
+                lastCounters = counters;
             }
 
             if (!args.backupFile.empty())

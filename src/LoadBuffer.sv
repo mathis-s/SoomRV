@@ -64,8 +64,9 @@ always_comb begin
     delayLoad = nonSpeculative;
     
     // If it needs forwarding from current cycle's store, we also delay the load.
-    if (IN_uopLd.valid &&
-        $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
+    if (IN_uopLd.valid && $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
+        IN_uopSt.valid &&
+        IN_uopLd.exception == AGU_NO_EXCEPTION &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
             (IN_uopSt.size == 2 ||
             (IN_uopSt.size == 1 && (IN_uopLd.size > 1 || IN_uopLd.addr[1] == IN_uopSt.addr[1])) ||
@@ -145,7 +146,7 @@ always_ff@(posedge clk) begin
 
         if (IN_branch.taken) begin
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ($signed(entries[i].sqN - IN_branch.sqN) >= 0) begin
+                if ($signed(entries[i].sqN - IN_branch.sqN) > 0) begin
                     entries[i] <= 'x;
                     entries[i].valid <= 0;
                 end
@@ -154,7 +155,7 @@ always_ff@(posedge clk) begin
             if (IN_branch.flush)
                 baseIndex = IN_branch.loadSqN;
 
-            if ($signed(lateLoadUOp.sqN - IN_branch.sqN) >= 0) begin
+            if ($signed(lateLoadUOp.sqN - IN_branch.sqN) > 0) begin
                 lateLoadUOp <= 'x;
                 lateLoadUOp.valid <= 0;
             end
@@ -188,7 +189,7 @@ always_ff@(posedge clk) begin
             end
         end
         // Insert new entries, check stores
-        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) < 0)) begin
+        if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopLd.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].sqN <= IN_uopLd.sqN;
@@ -203,7 +204,7 @@ always_ff@(posedge clk) begin
             entries[index].valid <= 1;
         end
         
-        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) < 0)) begin
+        if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
             if (storeIsCollision) begin
                 // We reset back to the op after the store when a load collision occurs, even though you only need to
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
@@ -211,7 +212,8 @@ always_ff@(posedge clk) begin
                 OUT_branch.taken <= 1;
                 OUT_branch.dstPC <= IN_uopSt.pc + (IN_uopSt.compressed ? 2 : 4);
                 OUT_branch.sqN <= IN_uopSt.sqN;
-                OUT_branch.loadSqN <= IN_uopSt.loadSqN;
+                // TODO: dedicated field for atomic
+                OUT_branch.loadSqN <= IN_uopSt.loadSqN + (IN_uopSt.doNotCommit ? 1 : 0);
                 OUT_branch.storeSqN <= IN_uopSt.storeSqN;
                 OUT_branch.fetchID <= IN_uopSt.fetchID;
                 OUT_branch.history <= IN_uopSt.history;

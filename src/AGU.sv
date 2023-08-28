@@ -36,12 +36,12 @@ function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user);
     return r;
 endfunction
 
-wire inStallMasked = IN_stall || TMQ_stall;
+wire inStallMasked = IN_stall;
 
 reg pageWalkActive;
 reg pageWalkAccepted;
 reg eldIsPageWalkOp;
-assign OUT_stall = inStallMasked;
+assign OUT_stall = inStallMasked || TMQ_stall;
 
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
@@ -248,7 +248,7 @@ always_comb begin
 
     TMQ_dequeue = 0;
     
-    if (IN_uop.valid && en) begin
+    if (aguUOp_c.valid && en && !TMQ_stall) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end
@@ -307,9 +307,9 @@ always_comb begin
 
     // Misalign has higher priority than access fault
     if (LOAD_AGU) begin
-        case (IN_uop.opcode)
-            LSU_LB, LSU_LBU: begin end
-            LSU_LH, LSU_LHU: begin
+        case (issUOp_c.size)
+            0: ;
+            1: begin
                 if (phyAddr[0])
                     except = AGU_ADDR_MISALIGN;
             end
@@ -320,9 +320,9 @@ always_comb begin
         endcase
     end
     else begin
-        case (IN_uop.opcode)
-            LSU_SB_I, LSU_SB: begin end
-            LSU_SH_I, LSU_SH: begin
+        case (issUOp_c.size)
+            0: ;
+            1: begin
                 if (phyAddr[0]) begin
                     except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_ST_MA;
@@ -345,7 +345,7 @@ always_comb begin
     TMQ_enqueue = 0;
     TMQ_uopReady = 'x;
 
-    if (!rst && issUOp_c.valid &&
+    if (!rst && issUOp_c.valid && !IN_stall &&
         (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0) &&
         (IN_vmem.sv32en && except == AGU_NO_EXCEPTION && !IN_tlb.hit)
     ) begin
