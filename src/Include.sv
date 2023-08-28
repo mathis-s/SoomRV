@@ -593,7 +593,8 @@ typedef struct packed
 typedef struct packed
 {
     logic[19:0] ppn;
-    logic fault;
+    logic pageFault;
+    logic accessFault;
     logic[2:0] rwx;
     logic isSuper;
     logic user;

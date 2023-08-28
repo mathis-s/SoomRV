@@ -225,6 +225,7 @@ TLBMissQueue tmq
     .IN_branch(IN_branch),
     .IN_vmem(IN_vmem),
     .IN_pw(IN_pw),
+    .IN_pwActive(pageWalkActive),
 
     .OUT_stall(TMQ_stall),
     .IN_enqueue(TMQ_enqueue),
@@ -294,12 +295,12 @@ always_comb begin
     exceptFlags = FLAGS_NONE;
     
     if (IN_vmem.sv32en && IN_tlb.hit && 
-        (IN_tlb.fault || IsPermFault(IN_tlb.rwx, IN_tlb.user))
+        (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user))
     ) begin
         except = AGU_PAGE_FAULT;
         if (STORE_AGU) exceptFlags = FLAGS_ST_PF;
     end
-    else if (!`IS_LEGAL_ADDR(phyAddr) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
+    else if ((!`IS_LEGAL_ADDR(phyAddr) || IN_tlb.accessFault) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
         except = AGU_ACCESS_FAULT;
         if (STORE_AGU) exceptFlags = FLAGS_ST_AF;
     end
@@ -350,10 +351,7 @@ always_comb begin
     ) begin
         tlbMiss = 1;
         TMQ_enqueue = 1;
-        
-        // do not attempt to wait for the result of page walk if
-        // address is wrong. Instead re-issue early to start new page walk.
-        TMQ_uopReady = pageWalkActive && pageWalkAddr[31:12] != issUOp_c.addr[31:12];
+        TMQ_uopReady = 0;
     end
 end
 

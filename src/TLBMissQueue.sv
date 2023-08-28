@@ -6,6 +6,7 @@ module TLBMissQueue#(parameter SIZE=4)
     input BranchProv IN_branch,
     input VirtMemState IN_vmem,
     input PageWalk_Res IN_pw,
+    input wire IN_pwActive,
     
     output wire OUT_stall,
     input wire IN_enqueue,
@@ -42,7 +43,9 @@ always_comb begin
     idxOutValid = 0;
     idxOut = 'x;
     for (integer i = 0; i < SIZE; i=i+1) begin
-        if (queue[i].valid && ready[i]) begin
+        // When page walker is not busy, we also issue non-ready
+        // ops that will miss TLB and start a new page walk.
+        if (queue[i].valid && (ready[i] || !IN_pwActive)) begin
             idxOut = i[ID_LEN-1:0];
             idxOutValid = 1;
         end
