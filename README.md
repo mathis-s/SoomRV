@@ -1,7 +1,6 @@
 # SoomRV
 ## Description
-SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execute up to 4 instructions per cycle completely out of order, and also supports speculative execution and precise exceptions.
-
+SoomRV is a simple superscalar out-of-order RISC-V core. It can execute up to 4 instructions per cycle and is able to boot Linux.
 ## Basic Architecture
 <img src="https://user-images.githubusercontent.com/39701487/218574949-e18bcb51-5050-4f99-82a6-c8ea58c11a93.png" width="600" />
 
@@ -11,11 +10,10 @@ SoomRV is a simple superscalar Out-of-Order RISC-V microprocessor. It can execut
 ## Features
 - RV32IMACZicsrZifenceiZbaZbbZicbomZfinx Instruction Set
 - 4-wide superscalar OoO Execution (tag-indexed register file, load after issue)
-- Fully Out-of-Order Load/Store
-- TAGE Branch Predictor
-- Supports Instruction and Data Cache
 - Implements RISC-V Privileged Spec (M/S/U mode, virtual memory, boots Linux)
-- Currently scores 10.256 DMIPS/MHz at 2.721 IPC (`-march=rv32imac_zicsr_zba_zbb -O3 -finline-limit=128`, using `strcmp` implemented in `test_programs/entry.s`)
+- IFetch: 16 byte fetch, TAGE direction predictor, recovering return stack
+- Memory: VIPT cache, late store data gathering, through-memory dependency tracking
+- Currently scores 10.309 DMIPS/MHz at 2.729 IPC (default configuration, `-march=rv32imac_zicsr_zba_zbb -O3 -finline-limit=128`, using `strcmp` implemented in `test_programs/entry.s`)
 
 ## Simulating
 1. Install the [RV32 Linux Toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator (at least version 5.0).
