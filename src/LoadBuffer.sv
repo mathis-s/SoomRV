@@ -36,6 +36,7 @@ typedef struct packed
     logic[31:0] addr;
     logic signExtend;
     logic doNotCommit; // could encode doNotCommit as size == 3
+    
     logic nonSpec;
     logic issued;
     logic valid;
@@ -47,7 +48,7 @@ SqN baseIndex;
 SqN indexIn;
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
-LBEntry lateLoadUOp;
+LD_UOp lateLoadUOp;
 reg issueLateLoad;
 reg delayLoad;
 reg nonSpeculative;
@@ -86,22 +87,14 @@ always_comb begin
         OUT_uopAGULd.valid = IN_uopLd.valid; 
     end
     
-    OUT_uopLd.addr = lateLoadUOp.addr; 
-    OUT_uopLd.signExtend = lateLoadUOp.signExtend; 
-    OUT_uopLd.size = lateLoadUOp.size; 
-    OUT_uopLd.loadSqN = {lateLoadUOp.highLdSqN, deqIndex};
-    OUT_uopLd.tagDst = lateLoadUOp.tagDst;
-    OUT_uopLd.sqN = lateLoadUOp.sqN; 
-    OUT_uopLd.doNotCommit = lateLoadUOp.doNotCommit; 
-    OUT_uopLd.external = 0;
-    OUT_uopLd.exception = AGU_NO_EXCEPTION;
-    OUT_uopLd.isMMIO = `IS_MMIO_PMA(lateLoadUOp.addr); 
-    OUT_uopLd.valid = lateLoadUOp.valid; 
+    OUT_uopLd = lateLoadUOp;
 end
 
-logic storeIsCollision;
+// For every store, check if we previously speculatively loaded from the address written to
+// (if so, flush pipeline)
+logic storeIsConflict;
 always_comb begin
-    storeIsCollision = 0;
+    storeIsConflict = 0;
     
     // The order we check loads here does not matter, as we reset all the way back to the store on collision.
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -112,8 +105,39 @@ always_comb begin
                 (IN_uopSt.size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uopSt.addr[1])) ||
                 (IN_uopSt.size == 0 && (entries[i].size > 0 || entries[i].addr[1:0] == IN_uopSt.addr[1:0])))
             ) begin
-            storeIsCollision = 1;
+            storeIsConflict = 1;
         end
+    end
+end
+
+// Select late load to issue
+logic[$clog2(NUM_ENTRIES)-1:0] issueIdx;
+logic issueIdxValid;
+always_comb begin
+    logic[NUM_ENTRIES-1:0] issueCandidates = 0;
+    issueIdx = 'x;
+    issueIdxValid = 0;
+    
+    // Out-of-order late issue (regular loads)
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        issueCandidates[i] =
+            entries[i].valid && !entries[i].issued && !entries[i].nonSpec;
+    end
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
+        if (issueCandidates[idx] && !issueIdxValid) begin
+            issueIdxValid = 1;
+            issueIdx = idx[$clog2(NUM_ENTRIES)-1:0];
+        end
+    end
+
+    // In-order late issue (MMIO)
+    if (entries[deqIndex].valid && !entries[deqIndex].issued &&
+        (!entries[deqIndex].nonSpec || (commitSqN == entries[deqIndex].sqN && IN_SQ_done))
+    ) begin
+        // Overwrite. This load is in-order, so it always has top priority.
+        issueIdxValid = 1;
+        issueIdx = deqIndex;
     end
 end
 
@@ -136,11 +160,13 @@ always_ff@(posedge clk) begin
             lateLoadUOp <= 'x;
             lateLoadUOp.valid <= 0;
         end
-
+        
+        // Process negative load acks
         if (IN_ldAck.valid && IN_ldAck.fail) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].issued <= 0;
         end
+        
 
         if (IN_branch.taken) begin
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -163,11 +189,20 @@ always_ff@(posedge clk) begin
             // We do not have the same problem as below with multiple commits here, 
             // as the ROB can't commit beyond the load we issue with this,
             // and will need more than a cycle after this runs to commit anything again.
-            if (entries[deqIndex].valid && !entries[deqIndex].issued && !lateLoadUOp.valid &&
-                (!entries[deqIndex].nonSpec || (commitSqN == entries[deqIndex].sqN && IN_SQ_done))
-            ) begin
-                lateLoadUOp <= entries[deqIndex];
-                entries[deqIndex].issued <= 1;
+            if (!lateLoadUOp.valid && issueIdxValid) begin
+                entries[issueIdx].issued <= 1;
+
+                lateLoadUOp.addr <= entries[issueIdx].addr;
+                lateLoadUOp.signExtend <= entries[issueIdx].signExtend;
+                lateLoadUOp.size <= entries[issueIdx].size;
+                lateLoadUOp.loadSqN <= {entries[issueIdx].highLdSqN, issueIdx};
+                lateLoadUOp.tagDst <= entries[issueIdx].tagDst;
+                lateLoadUOp.sqN <= entries[issueIdx].sqN;
+                lateLoadUOp.doNotCommit <= entries[issueIdx].doNotCommit;
+                lateLoadUOp.external <= 0;
+                lateLoadUOp.exception <= AGU_NO_EXCEPTION;
+                lateLoadUOp.isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
+                lateLoadUOp.valid <= 1;
             end
             
             // Delete entries that have been committed. To keep pace with ROB commit speed, 
@@ -186,6 +221,7 @@ always_ff@(posedge clk) begin
                 end
             end
         end
+
         // Insert new entries, check stores
         if (IN_uopLd.valid && (!IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)) begin
             
@@ -203,7 +239,7 @@ always_ff@(posedge clk) begin
         end
         
         if (IN_uopSt.valid && (!IN_branch.taken || $signed(IN_uopSt.sqN - IN_branch.sqN) <= 0)) begin
-            if (storeIsCollision) begin
+            if (storeIsConflict) begin
                 // We reset back to the op after the store when a load collision occurs, even though you only need to
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
                 // in the buffer, we just use the store's snapshot.
