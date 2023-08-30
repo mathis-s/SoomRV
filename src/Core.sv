@@ -613,6 +613,7 @@ StoreQueue sq
     .IN_resultUOp(wbUOp[2:0]),
     .OUT_RF_raddr(SQ_RF_raddr),
     .IN_RF_rdata(RF_SQ_rdata),
+    .IN_vmem(CSR_vmem),
     
     .IN_curSqN(ROB_curSqN),
     

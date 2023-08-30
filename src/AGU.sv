@@ -163,34 +163,23 @@ always_comb begin
             
             LSU_CBO_CLEAN: begin
                 aguUOp_c.wmask = 0;
-
-                //if (!IN_vmem.cbcfe) begin
-                //    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
-                //    aguUOp_c.valid = 0;
-                //end
+                if (!IN_vmem.cbcfe) begin
+                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                end
             end
             
             LSU_CBO_INVAL: begin
                 aguUOp_c.wmask = 0;
-
-                //if (exceptFlags == FLAGS_NONE)
-                //    resUOp_c.flags = FLAGS_ORDERING;
-
-                //if (IN_vmem.cbie == 2'b00) begin
-                //    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
-                //    aguUOp_c.valid = 0;
-                //end
+                if (IN_vmem.cbie == 2'b00) begin
+                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                end
             end
             
             LSU_CBO_FLUSH: begin
                 aguUOp_c.wmask = 0;
-                //if (exceptFlags == FLAGS_NONE)
-                //    resUOp_c.flags = FLAGS_ORDERING;
-                //
-                //if (!IN_vmem.cbcfe) begin
-                //    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
-                //    aguUOp_c.valid = 0;
-                //end
+                if (!IN_vmem.cbcfe) begin
+                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                end
             end
             
             ATOMIC_AMOSWAP_W,
@@ -248,7 +237,8 @@ always_comb begin
 
     TMQ_dequeue = 0;
     
-    if (aguUOp_c.valid && en && !TMQ_stall) begin
+    // illegal instruction exceptions always pass through
+    if (aguUOp_c.valid && en && (!TMQ_stall || resUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end
@@ -294,6 +284,12 @@ always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
     
+    // Cache Management Ops are encoded with wmask 0 and
+    // are ordering
+    if (STORE_AGU && issUOp_c.wmask == 0)
+        exceptFlags = FLAGS_ORDERING;
+    
+    //
     if (IN_vmem.sv32en && IN_tlb.hit && 
         (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user))
     ) begin
@@ -397,31 +393,35 @@ always_ff@(posedge clk) begin
             ) begin
                 
                 reg doIssue = 1;
-
-                if (tlbMiss) begin
-                    if (!pageWalkActive) begin
-                        pageWalkActive <= 1;
-                        pageWalkAccepted <= 0;
-                        pageWalkAddr <= issUOp_c.addr;
+                if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+                    if (tlbMiss) begin
+                        if (!pageWalkActive) begin
+                            pageWalkActive <= 1;
+                            pageWalkAccepted <= 0;
+                            pageWalkAddr <= issUOp_c.addr;
+                        end
+                        doIssue = 0;
                     end
-                    doIssue = 0;
-                end
 
-                if (except != AGU_NO_EXCEPTION) begin
-                    OUT_tvalProv.valid <= 1;
-                    OUT_tvalProv.sqN <= issUOp_c.sqN;
-                    OUT_tvalProv.tval <= issUOp_c.addr;
+                    if (except != AGU_NO_EXCEPTION) begin
+                        OUT_tvalProv.valid <= 1;
+                        OUT_tvalProv.sqN <= issUOp_c.sqN;
+                        OUT_tvalProv.tval <= issUOp_c.addr;
+                    end
                 end
 
                 if (doIssue) begin
-                    OUT_aguOp <= issUOp_c;
-                    OUT_uop <= issResUOp_c;
                     
-                    OUT_aguOp.exception <= except;
-                    OUT_uop.flags <= exceptFlags;
+                    OUT_uop <= issResUOp_c;
+                    if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+                        OUT_aguOp <= issUOp_c;
+                        
+                        OUT_aguOp.exception <= except;
+                        OUT_uop.flags <= exceptFlags;
 
-                    if (IN_vmem.sv32en) begin
-                        OUT_aguOp.addr <= phyAddr;
+                        if (IN_vmem.sv32en) begin
+                            OUT_aguOp.addr <= phyAddr;
+                        end
                     end
                 end
             end

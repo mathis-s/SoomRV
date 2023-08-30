@@ -21,6 +21,7 @@ module StoreQueue
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
     output reg[$bits(Tag)-2:0] OUT_RF_raddr,
     input wire[31:0] IN_RF_rdata,
+    input VirtMemState IN_vmem,
     
     input SqN IN_curSqN,
     
@@ -488,20 +489,20 @@ always_ff@(posedge clk) begin
         end
     
         // Set Address
-        if (IN_uopSt.valid && (!IN_branch.taken || ($signed(IN_uopSt.sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))) begin
+        if (IN_uopSt.valid && 
+            (!IN_branch.taken || ($signed(IN_uopSt.sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
+        ) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
             assert(entries[index].valid);
-            entries[index].addr <= IN_uopSt.addr[31:2];
-            entries[index].wmask <= IN_uopSt.wmask;
-            entries[index].addrAvail <= 1;
-
-            if (IN_uopSt.exception != AGU_NO_EXCEPTION)
-                entries[index].wmask <= 0;
-
-            if (IN_uopSt.wmask == 0) begin
-                entries[index].loaded <= 1;
-                entries[index].avail <= 1;
+            if (IN_uopSt.exception == AGU_NO_EXCEPTION) begin
+                entries[index].addr <= IN_uopSt.addr[31:2];
+                entries[index].wmask <= IN_uopSt.wmask;
+                entries[index].addrAvail <= 1;
+            end
+            else begin
+                entries[index] <= 'x;
+                entries[index].avail <= 0;
             end
             doingEnqueue = 1;
         end
@@ -531,14 +532,33 @@ always_ff@(posedge clk) begin
                     if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && IN_rnUOp[i].tagB == IN_resultUOp[j].tagDst)
                         entries[index].avail <= 1;
 
-                if (IN_rnUOp[i].fu == FU_ATOMIC) begin
-                    if (IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
-                        entries[index].data.m.tag <= 'x;
-                        entries[index].atomic <= 1;
-                        // operand cannot be available yet
-                        entries[index].avail <= 0;
-                    end
+                // Atomic Ops special handling
+                if (IN_rnUOp[i].fu == FU_ATOMIC && IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
+                    entries[index].data.m.tag <= 'x;
+                    entries[index].atomic <= 1;
+                    // operand cannot be available yet
+                    entries[index].avail <= 0;
                 end
+                
+                // Cache Block Ops special handling
+                if (IN_rnUOp[i].fu == FU_ST) begin
+                    case (IN_rnUOp[i].opcode)
+                        LSU_CBO_CLEAN: begin
+                            entries[index].data <= {30'bx, 2'd0};
+                            entries[index].loaded <= 1;
+                        end
+                        LSU_CBO_INVAL: begin
+                            entries[index].data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
+                            entries[index].loaded <= 1;
+                        end
+                        LSU_CBO_FLUSH: begin
+                            entries[index].data <= {30'bx, 2'd2};
+                            entries[index].loaded <= 1;
+                        end
+                        default: ;
+                    endcase
+                end
+
                 doingEnqueue = 1;
             end
 

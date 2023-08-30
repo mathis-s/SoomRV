@@ -461,6 +461,7 @@ class SpikeSimif : public simif_t
         processor->put_csr(CSR_STVEC, csr->__PVT__stvec);
         processor->put_csr(CSR_SATP, csr->__PVT__satp);
         processor->put_csr(CSR_SENVCFG, csr->__PVT__senvcfg);
+        processor->put_csr(CSR_SCAUSE, csr->__PVT__scause);
 
         processor->set_privilege(csr->__PVT__priv, false);
     }
