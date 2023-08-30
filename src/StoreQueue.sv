@@ -495,6 +495,7 @@ always_ff@(posedge clk) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
             assert(IN_uopSt.storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
             assert(entries[index].valid);
+            assert(!entries[index].addrAvail);
             if (IN_uopSt.exception == AGU_NO_EXCEPTION) begin
                 entries[index].addr <= IN_uopSt.addr[31:2];
                 entries[index].wmask <= IN_uopSt.wmask;
@@ -502,7 +503,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 entries[index] <= 'x;
-                entries[index].avail <= 0;
+                entries[index].valid <= 0;
             end
             doingEnqueue = 1;
         end

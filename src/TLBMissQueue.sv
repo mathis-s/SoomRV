@@ -60,6 +60,8 @@ always_ff@(posedge clk) begin
             queue[i] <= 'x;
             queue[i].valid <= 0;
         end
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
 `endif
     end
     else begin
