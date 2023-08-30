@@ -21,8 +21,7 @@ module AGU
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
     output ELD_UOp OUT_eldOp,
-    output RES_UOp OUT_uop,
-    input wire IN_isDelayLoad
+    output RES_UOp OUT_uop
 );
 
 localparam STORE_AGU = !LOAD_AGU;

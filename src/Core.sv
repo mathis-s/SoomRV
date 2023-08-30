@@ -523,8 +523,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .IN_uop(LD_uop[2]),
     .OUT_aguOp(AGU_LD_uop),
     .OUT_eldOp(AGU_eLdUOp),
-    .OUT_uop(),
-    .IN_isDelayLoad(LB_isDelayLoad)
+    .OUT_uop()
 );
 
 AGU_UOp AGU_ST_uop /* verilator public */;
@@ -550,8 +549,7 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
     .IN_uop(LD_uop[3]),
     .OUT_aguOp(AGU_ST_uop),
     .OUT_eldOp(),
-    .OUT_uop(wbUOp[3]),
-    .IN_isDelayLoad(1'bx)
+    .OUT_uop(wbUOp[3])
 );
 
 
@@ -559,7 +557,6 @@ SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd;
 LD_UOp LB_aguUOpLd;
 
-wire LB_isDelayLoad;
 LoadBuffer lb
 (
     .clk(clk),
@@ -569,7 +566,6 @@ LoadBuffer lb
     .IN_stall(LS_AGULD_uopStall),
     .IN_uopLd(AGU_LD_uop),
     .IN_uopSt(AGU_ST_uop),
-    .OUT_isDelayLoad(LB_isDelayLoad),
     
     .IN_ldAck(LSU_ldAck),
     .IN_SQ_done(SQ_done),

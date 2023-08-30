@@ -12,7 +12,6 @@ module LoadBuffer
     input wire IN_stall,
     input AGU_UOp IN_uopLd,
     input AGU_UOp IN_uopSt,
-    output wire OUT_isDelayLoad,
     
     input LD_Ack IN_ldAck,
     input wire IN_SQ_done,
@@ -52,7 +51,6 @@ LBEntry lateLoadUOp;
 reg issueLateLoad;
 reg delayLoad;
 reg nonSpeculative;
-assign OUT_isDelayLoad = delayLoad;
 always_comb begin
     OUT_uopAGULd = 'x;
     OUT_uopAGULd.valid = 0;
