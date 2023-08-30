@@ -44,8 +44,9 @@ always_comb begin
         OUT_pcReadAddr[i] = IN_uop[i].fetchID;
     end
     
-    // Second AGU_LD read port is used as third AGU_ST read port (for atomics)
-    OUT_rfReadAddr[2+NUM_UOPS] = IN_uop[3].tagC[5:0];
+    // LD/ST only use one register read port
+    OUT_rfReadAddr[2+NUM_UOPS] = 'x;
+    OUT_rfReadAddr[3+NUM_UOPS] = 'x;
 end
 
 FuncUnit outFU[NUM_UOPS-1:0];
@@ -132,7 +133,7 @@ always_ff@(posedge clk) begin
                     end
                 end
                 
-                if (IN_uop[i].immB || i == 2) begin
+                if (IN_uop[i].immB || i == 2 || i == 3) begin
                     OUT_uop[i].srcB <= IN_uop[i].imm;
                 end
                 else if (IN_uop[i].tagB[6]) begin
@@ -160,31 +161,6 @@ always_ff@(posedge clk) begin
                         OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                     end
                 end
-                
-                // Store Pipeline has a third read port for atomics
-                if (i == 3) begin
-                    reg found = 0;
-                    // Try to forward from wbs
-                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: one-hot
-                        if (IN_wbHasResult[j] && IN_uop[i].tagC == IN_wbUOp[j].tagDst) begin
-                            OUT_uop[i].srcC <= IN_wbUOp[j].result;
-                            found = 1;
-                        end
-                    end
-                    
-                    // ZC is impossible as the atomic memory operand always comes from load port
-                    /*for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagC) begin
-                            OUT_uop[i].srcC <= IN_zcFwd[j].result;
-                            found = 1;
-                        end
-                    end*/
-                    
-                    if (!found)
-                        OUT_uop[i].srcC <= IN_rfReadData[2 + NUM_UOPS];
-                end
-                
             end
             else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
                 OUT_uop[i] <= 'x;

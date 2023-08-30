@@ -55,7 +55,6 @@ typedef enum logic[5:0]
     INT_BEXT,
     INT_BINV,
     INT_BSET,
-    //INT_MV,
     INT_FSGNJ_S,
     INT_FSGNJN_S,
     INT_FSGNJX_S,
@@ -164,8 +163,8 @@ typedef enum logic[2:0]
 
 typedef enum logic[5:0]
 {
-    ATOMIC_AMOSWAP_W=32,
-    ATOMIC_AMOADD_W,
+    ATOMIC_AMOSWAP_W=55,
+    ATOMIC_AMOADD_W=56,
     ATOMIC_AMOXOR_W,
     ATOMIC_AMOAND_W,
     ATOMIC_AMOOR_W,
@@ -465,7 +464,6 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
-    Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
     RegNm rd;
@@ -488,7 +486,6 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
-    Tag tagC; // only used in store port (for atomics), optimized out otherwise
     SqN sqN;
     Tag tagDst;
     logic[5:0] opcode;
@@ -506,7 +503,6 @@ typedef struct packed
 {
     logic[31:0] srcA;
     logic[31:0] srcB;
-    logic[31:0] srcC; // only used in store port (for atomics), optimized out otherwise
     logic[31:0] pc;
     logic[31:0] imm;
     logic[5:0] opcode;
@@ -525,6 +521,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] result;
+    SqN storeSqN; // this is only used for atomics, may be 'x otherwise
     Tag tagDst;
     SqN sqN;
     Flags flags;
@@ -543,7 +540,6 @@ typedef enum logic[1:0]
 typedef struct packed
 {
     logic[31:0] addr;
-    logic[31:0] data;
     // could union some of these fields
     logic[3:0] wmask;
     logic signExtend;
@@ -597,7 +593,8 @@ typedef struct packed
 typedef struct packed
 {
     logic[19:0] ppn;
-    logic fault;
+    logic pageFault;
+    logic accessFault;
     logic[2:0] rwx;
     logic isSuper;
     logic user;
@@ -615,6 +612,7 @@ typedef struct packed
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;
+    SqN loadSqN;
     Tag tagDst;
     SqN sqN;
     logic doNotCommit;
@@ -632,6 +630,13 @@ typedef struct packed
 
 typedef struct packed
 {
+    SqN loadSqN;
+    logic fail;
+    logic valid;
+} LD_Ack;
+
+typedef struct packed
+{
     logic[31:0] addr;
     logic[31:0] data;
     logic[3:0] wmask;
@@ -646,6 +651,12 @@ typedef struct packed
     logic fail;
     logic valid;
 } ST_Ack;
+
+typedef struct packed
+{
+    SqN maxComSqN;
+    logic valid;
+} SQ_ComInfo;
 
 typedef struct packed
 {
@@ -828,6 +839,7 @@ typedef struct packed
 {
     logic[31:0] data;
     logic[3:0] mask;
+    logic conflict;
     logic valid;
 } StFwdResult;
 

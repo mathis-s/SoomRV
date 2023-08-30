@@ -324,7 +324,7 @@ always_ff@(posedge clk) begin
             // Check if TLB hit
             if (TLB_res.hit) begin
                 pcPPN <= TLB_res.isSuper ? {TLB_res.ppn[19:10], 10'b0} : TLB_res.ppn;
-                pcPPNfault <= (TLB_res.fault || !TLB_res.rwx[0]) ? IF_PAGE_FAULT : IF_FAULT_NONE;
+                pcPPNfault <= (TLB_res.pageFault || !TLB_res.rwx[0]) ? IF_PAGE_FAULT : (TLB_res.accessFault ? IF_ACCESS_FAULT : IF_FAULT_NONE);
                 pcPPNsuperpage <= TLB_res.isSuper;
                 pcPPNuser <= TLB_res.user;
                 lastVPN <= pcVPN;

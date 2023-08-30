@@ -14,10 +14,10 @@
 `define IQ_0_SIZE 8
 `define IQ_1_SIZE 8
 `define IQ_2_SIZE 8
-`define IQ_3_SIZE 10
+`define IQ_3_SIZE 8
 
 // Memory
-`define SQ_SIZE 24
+`define SQ_SIZE 32
 `define LB_SIZE 16
 
 // ROB Size

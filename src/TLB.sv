@@ -18,7 +18,10 @@ typedef struct packed
     logic isSuper;
     logic user;
     logic globl;
-    logic[2:0] rwx; // 0 is invalid
+    logic[2:0] rwx;
+    logic accessFault;
+    logic pageFault;
+    logic valid;
 } TLBEntry;
 
 TLBEntry tlb[LEN-1:0][ASSOC-1:0];
@@ -29,17 +32,19 @@ always_comb begin
     inc = '0;
     for (integer i = 0; i < NUM_RQ; i=i+1) begin
         reg[$clog2(LEN)-1:0] idx = IN_rqs[i].vpn[$clog2(LEN)-1:0];
-        OUT_res[i].fault = 0;
+        OUT_res[i].pageFault = 0;
+        OUT_res[i].accessFault = 0;
         OUT_res[i].hit = 0;
         
         if (IN_rqs[i].valid)
             for (integer j = 0; j < ASSOC; j=j+1)
-                if (tlb[idx][j].rwx != 0 && 
+                if (tlb[idx][j].valid && 
                     (tlb[idx][j].isSuper ? 
                         tlb[idx][j].vpn[19-$clog2(LEN):10-$clog2(LEN)] == IN_rqs[i].vpn[19:10] :
                         tlb[idx][j].vpn == IN_rqs[i].vpn[19:$clog2(LEN)])
                 ) begin
-                    OUT_res[i].fault = 0;
+                    OUT_res[i].accessFault = tlb[idx][j].accessFault;
+                    OUT_res[i].pageFault = tlb[idx][j].pageFault;
                     OUT_res[i].rwx = tlb[idx][j].rwx;
                     OUT_res[i].user = tlb[idx][j].user;
                     OUT_res[i].isSuper = tlb[idx][j].isSuper;
@@ -57,7 +62,7 @@ always_ff@(posedge clk) begin
     if (rst || clear) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
-                tlb[i][j].rwx <= 0;
+                tlb[i][j].valid <= 0;
         
         // When an sfence.vma commits, the translation in progress
         // is also stale.
@@ -71,9 +76,7 @@ always_ff@(posedge clk) begin
             ignoreCur <= 0;
 
         // FIXME: Currently, we might double insert if both AGUs tlb miss on the same address.
-        if (IN_pw.valid && !IN_pw.pageFault && IN_pw.ppn[21:20] == 0 && !ignoreCur &&
-            // only cache useful translations
-            (IS_IFETCH ? (IN_pw.rwx[0] != 0) : (IN_pw.rwx[2:1] != 0)) &&
+        if (IN_pw.valid && !ignoreCur &&
             // disambiguate between ifetch and regular ld/st
             (IS_IFETCH ? IN_pw.rqID == 0 : IN_pw.rqID != 0)
         ) begin
@@ -89,6 +92,11 @@ always_ff@(posedge clk) begin
 
             tlb[idx][assocIdx].globl <= IN_pw.globl;
             tlb[idx][assocIdx].user <= IN_pw.user;
+
+            tlb[idx][assocIdx].pageFault <= IN_pw.pageFault;
+            tlb[idx][assocIdx].accessFault <= IN_pw.ppn[21:20] != 0;
+
+            tlb[idx][assocIdx].valid <= 1;
         end
 
         for (integer i = 0; i < LEN; i=i+1)

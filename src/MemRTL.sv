@@ -54,8 +54,8 @@ always@(posedge clk) begin
                 if (wm_reg[i])
                     mem[addr_reg][(WRITE_SIZE*i)+:WRITE_SIZE] <= data_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
             end
-            // $display("[%d] %m: write %x to %x (%b)", $time(), data_reg, addr_reg, wm_reg);
-            // OUT_data <= 0;
+            //if (addr_reg == {32'h0A0}[$clog2(NUM_WORDS)-1:0] && WORD_SIZE == 128)
+            //    $display("[%d] %m: write %x to %x (%b)", $time(), data_reg, addr_reg, wm_reg);
         end
         else begin
             OUT_data <= mem[addr_reg];
@@ -64,6 +64,8 @@ always@(posedge clk) begin
     
     if (!ce1_reg) begin
         OUT_data1 <= mem[addr1_reg];
+        //if (addr1_reg == {32'h0A0}[$clog2(NUM_WORDS)-1:0] && WORD_SIZE == 128)
+        //    $display("[%d] %m: read %x from %x", $time(), mem[addr1_reg], addr1_reg);
     end
     
     if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg && 0) begin

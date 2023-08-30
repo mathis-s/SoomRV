@@ -82,6 +82,7 @@ always_ff@(posedge clk) begin
                 
                 running <= 0;
                 
+                OUT_uop.storeSqN <= uop.storeSqN;
                 OUT_uop.sqN <= uop.sqN;
                 OUT_uop.tagDst <= uop.tagDst;
                 OUT_uop.doNotCommit <= 0;

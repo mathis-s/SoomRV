@@ -1,6 +1,7 @@
 module IssueQueue
 #(
     parameter SIZE = 8,
+    parameter PORT_IDX=0,
     parameter NUM_OPERANDS = 2,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
@@ -112,13 +113,21 @@ always_comb begin
     end
 end
 
+reg[NUM_UOPS-1:0] acceptIncoming;
 always_comb begin
     reg[$clog2(SIZE):0] count = 0;
+    acceptIncoming = 0;
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        if (IN_uop[i].valid && 
+        if (IN_uop[i].valid &&
+            
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
+                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
+                    (PORT_IDX == 0 && IN_uop[i].fu == FU_ATOMIC)) &&
+            // Edge Case: INT port does not enqueue AMOSWAP (no int uop needed)
+            (PORT_IDX != 0 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
+        ) begin
             count = count + 1;
+            acceptIncoming[i] = 1;
         end
     end
     OUT_full = insertIndex > (SIZE[$clog2(SIZE):0] - count);
@@ -194,15 +203,6 @@ always_ff@(posedge clk) begin
                         end
                         else
                             OUT_uop.tagB <= 7'h40;
-                    
-                        
-                        if (NUM_OPERANDS >= 3) begin
-                            // verilator lint_off SELRANGE
-                            OUT_uop.tagC <= queue[i].tags[2];
-                            // verilator lint_on SELRANGE
-                        end
-                        else
-                            OUT_uop.tagC <= 7'h40;
                         
                         
                         OUT_uop.immB <= queue[i].immB;
@@ -241,10 +241,7 @@ always_ff@(posedge clk) begin
         // Enqueue
         if (frontEn && !IN_branch.taken) begin
             for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                if (IN_uop[i].valid && 
-                    ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
-                        IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3)) begin
-                    
+                if (acceptIncoming[i]) begin
                     R_ST_UOp temp;
                     
                     temp.imm = 0;
@@ -280,29 +277,27 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
-                    // Special handling for multi-uop instructions
-                    if (FU0 == FU_ST) begin
-                        // verilator lint_off SELRANGE
-                        if (IN_uop[i].fu == FU_ATOMIC) begin
-                            // Second uop goes into store FU
-                            // Data operand is result of op
-                            temp.tags[2] = IN_uop[i].tagDst;
-                            temp.avail[2] = 0;
-                            // Result was already written
-                            temp.tagDst = 7'h40;
-                        end
-                        else temp.avail[2] = 1;
-                        // verilator lint_on SELRANGE
-                    end
-                    if (FU0 == FU_ST || FU0 == FU_LD)
+                    // verilator lint_off SELRANGE
+                    // Ports 0, 2, 3 are used for atomics
+                    if (PORT_IDX == 0 || PORT_IDX == 2 || PORT_IDX == 3)
                         if (temp.fu == FU_ATOMIC) begin
                             temp.fu = FuncUnit'(FU0);
+                            // INT port
+                            if (PORT_IDX == 0) begin
+                                temp.tags[0] = temp.tagDst;
+                                temp.avail[0] = 0;
+                                temp.tagDst = 7'h40;
+                            end
+
+                            // STORE port
+                            if (PORT_IDX == 3) begin
+                                temp.tagDst = 7'h40;
+                            end
                         end
                     
                     // Special handling for jalr
                     if (IN_uop[i].fu == FU_INT && (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)) begin
                         assert(IMM_BITS == 36);
-                        // verilator lint_off SELRANGE
                         
                         // Use {imm[0], tags[1]} to encode 8 bits of imm12
                         temp.tags[1] = IN_uop[i].imm12[6:0];
@@ -313,9 +308,9 @@ always_ff@(posedge clk) begin
 
                         // tags[1] is not used for register encoding, thus is always valid
                         temp.avail[1] = 1;
-                        // verilator lint_on SELRANGE
                     end
-
+                    // verilator lint_on SELRANGE
+                    
                     queue[insertIndex[ID_LEN-1:0]] <= temp;
                     insertIndex = insertIndex + 1;
                 end

@@ -16,7 +16,6 @@
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
-#include "VTop_RenameTable.h"
 #include "VTop_RenameTable__N8.h"
 #include "VTop_SoC.h"
 #include "VTop_TagBuffer.h"
@@ -462,6 +461,7 @@ class SpikeSimif : public simif_t
         processor->put_csr(CSR_STVEC, csr->__PVT__stvec);
         processor->put_csr(CSR_SATP, csr->__PVT__satp);
         processor->put_csr(CSR_SENVCFG, csr->__PVT__senvcfg);
+        processor->put_csr(CSR_SCAUSE, csr->__PVT__scause);
 
         processor->set_privilege(csr->__PVT__priv, false);
     }
@@ -726,9 +726,8 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 226 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 226 - 32 - 32, 32);
-            state.insts[sqn].srcC = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 226 - 32 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32, 32);
             state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(state.insts[sqn]);
         }
@@ -739,18 +738,19 @@ void LogInstructions()
         if (uop[0] & 1)
         {
             uint32_t sqn = ExtractField(uop, 156 - 32 * 2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
-            state.insts[sqn].memAddr = ExtractField(uop, 156 - 32, 32);
-            state.insts[sqn].memData = ExtractField(uop, 156 - 32 * 2, 32);
+            state.insts[sqn].memAddr = ExtractField(uop, 156 - 32 - 32, 32);
+            state.insts[sqn].memData = 0;//ExtractField(uop, 156 - 32 * 2, 32);
         }
 
     // Result
     for (size_t i = 0; i < 4; i++)
     {
+        uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
+        bool isAtomic = state.insts[sqn].fu == 9;
         // WB valid
-        if ((core->wbUOp[i] & 1) && !(core->wbUOp[i] & 2))
+        if ((core->wbUOp[i] & 1) && (isAtomic ? (i == 2) : !(core->wbUOp[i] & 2)))
         {
-            uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
-            uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7)) & 0xffff'ffff;
+            uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7 + 7)) & 0xffff'ffff;
             state.insts[sqn].result = result;
             state.insts[sqn].flags = (core->wbUOp[i] >> 2) & 0xF;
 
@@ -1160,16 +1160,30 @@ int main(int argc, char** argv)
         {
             if (args.logPerformance)
             {
-                double ipc = (double)core->csr->minstret / core->csr->mcycle;
-                double mpki = (double)core->csr->mhpmcounter5 / (core->csr->minstret / 1000.0);
-                double bmrate = ((double)core->csr->mhpmcounter4 / core->csr->mhpmcounter3) * 100.0;
+                std::array<uint64_t, 5> counters = {
+                    core->csr->mcycle,
+                    core->csr->minstret,
+                    core->csr->mhpmcounter3,
+                    core->csr->mhpmcounter4,
+                    core->csr->mhpmcounter5,
+                };
+                static std::array<uint64_t, 5> lastCounters;
 
-                fprintf(stderr, "main_time:          %lu\n", main_time);
-                fprintf(stderr, "mcycle:             %lu\n", core->csr->mcycle);
-                fprintf(stderr, "minstret:           %lu # %f IPC \n", core->csr->minstret, ipc);
-                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", core->csr->mhpmcounter5, mpki);
-                fprintf(stderr, "branches:           %lu\n", core->csr->mhpmcounter3);
-                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", core->csr->mhpmcounter4, bmrate);
+                std::array<uint64_t, 5> current;
+                for (size_t i = 0; i < counters.size(); i++)
+                    current[i] = counters[i] - lastCounters[i];
+
+                double ipc = (double)current[1] / current[0];
+                double mpki = (double)current[4] / (current[1] / 1000.0);
+                double bmrate = ((double)current[3] / current[2]) * 100.0;
+
+                fprintf(stderr, "cycles:             %lu\n", current[0]);
+                fprintf(stderr, "instret:            %lu # %f IPC \n", current[1], ipc);
+                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
+                fprintf(stderr, "branches:           %lu\n", current[2]);
+                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
+
+                lastCounters = counters;
             }
 
             if (!args.backupFile.empty())
