@@ -300,7 +300,7 @@ always_comb begin
             end
             
             if (cacheTransfer && cacheLoadAddr == ld.addr[31:`CLSIZE_E]) begin
-                cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2]});
+                cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, {ld.addr[`CLSIZE_E-1:2] - cacheLoadBase}[`CLSIZE_E-3:0]});
                 readData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
             end
             
@@ -433,7 +433,7 @@ always_comb begin
         
         // do allow access to regions of memory that have been loaded already in the current transfer
         if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
-            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2]});
+            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, {st.addr[`CLSIZE_E-1:2] - cacheLoadBase}[`CLSIZE_E-3:0]});
             cacheHitAssoc = cacheLoadAssoc;
         end
         
@@ -509,7 +509,10 @@ enum logic[3:0]
 reg cacheTransfer;
 wire[$clog2(SIZE)-1:0] cacheTransferIdx = {curCacheMiss.assoc, curCacheMiss.missAddr[11:`CLSIZE_E]};
 wire cacheLoadActive = (state == LOAD_ACTIVE);
+
+wire[`CLSIZE_E-3:0] cacheLoadBase = curCacheMiss.missAddr[`CLSIZE_E-1:2];
 wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
+
 wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
 wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
 wire[9:0] cacheLoadCurAddr = {curCacheMiss.missAddr[11:`CLSIZE_E], cacheLoadProgress[`CLSIZE_E-3:0]};
@@ -529,6 +532,7 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .OUT_full(LMQ_full),
 
     .IN_cacheLoadActive(cacheLoadActive),
+    .IN_cacheLoadBase(cacheLoadBase),
     .IN_cacheLoadProgress(cacheLoadProgress),
     .IN_cacheLoadAddr(cacheLoadAddr),
 
@@ -680,8 +684,8 @@ always_ff@(posedge clk) begin
                             REGULAR: begin
                                 state <= REPLACE_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -690,8 +694,8 @@ always_ff@(posedge clk) begin
                             REGULAR_NO_EVICT: begin
                                 state <= LOAD_RQ;
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -701,8 +705,8 @@ always_ff@(posedge clk) begin
                             MGMT_FLUSH: begin
                                 state <= EVICT_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                                 cacheLoadAssoc <= miss[i].assoc;
@@ -759,7 +763,7 @@ always_ff@(posedge clk) begin
                     state <= LOAD_RQ;
                     // sramAddr stays the same
                     LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    LSU_memc.extAddr <= {curCacheMiss.missAddr[31:`CLSIZE_E], {(`CLSIZE_E-2){1'b0}}};
+                    LSU_memc.extAddr <= {curCacheMiss.missAddr[31:2]};
                     LSU_memc.cacheID <= 0;
                     LSU_memc.rqID <= 0;
                 end

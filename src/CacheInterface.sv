@@ -117,7 +117,7 @@ always_ff@(posedge clk) begin
         else if (active) begin
             if (isWrite && progress) begin
                 if (lenCnt == 1) active <= 0;
-                addrCnt <= addrCnt + 1;
+                addrCnt[`CLSIZE_E-3:0] <= addrCnt[`CLSIZE_E-3:0] + 1;
                 lenCnt <= lenCnt - 1;
                 
                 readBufferInsertIdx = 0;
@@ -148,7 +148,7 @@ always_ff@(posedge clk) begin
                 if (readToBuffer) begin
                     readRequests <= {readRequests[0], 1'b1};
                     
-                    addrCnt <= addrCnt + 1;
+                    addrCnt[`CLSIZE_E-3:0] <= addrCnt[`CLSIZE_E-3:0] + 1;
                     lenCnt <= lenCnt - 1;
                 end
             end

@@ -99,7 +99,7 @@ always_ff@(posedge clk) begin
                 end
                 else begin
                     mem[addr[$clog2(SIZE)-1:0]] <= inBus;
-                    addr[28:0] <= addr[28:0] + 1;
+                    addr[`CLSIZE_E-3:0] <= addr[`CLSIZE_E-3:0] + 1;
                 end
             end
             else state <= 0;
@@ -109,7 +109,7 @@ always_ff@(posedge clk) begin
         3: begin
             if (en) begin
                 outBus <= mem[addr[$clog2(SIZE)-1:0]];
-                addr[28:0] <= addr[28:0] + 1;
+                addr[`CLSIZE_E-3:0] <= addr[`CLSIZE_E-3:0] + 1;
                 oen <= 1;
             end
             else begin 
