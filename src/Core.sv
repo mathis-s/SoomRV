@@ -470,6 +470,7 @@ PageWalker pageWalker
 
     .IN_ldStall(CC_PW_LD_stall),
     .OUT_ldUOp(PW_LD_uop),
+    .IN_ldAck(LSU_ldAck),
     .IN_ldResUOp(wbUOp[2])
 );
 

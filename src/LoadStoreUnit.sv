@@ -142,14 +142,14 @@ always_comb begin
         uopLd = LMQ_ld;
         LMQ_dequeue = 1;
     end
-    else if (IN_uopLd.valid && !LMQ_full &&
+    else if (IN_uopLd.valid &&
         (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) &&
         !(cacheTransfer && cacheLoadCurAddr == IN_uopLd.addr[11:2])
     ) begin
         uopLd = IN_uopLd;
         OUT_ldStall = 0;
     end
-    else if (IN_uopELd.valid && !LMQ_full &&
+    else if (IN_uopELd.valid &&
         !(cacheTransfer && cacheLoadCurAddr == IN_uopELd.addr[11:2])
     ) begin
         uopLd.valid = 1;
@@ -371,21 +371,30 @@ end
 // Store Pipeline
 reg[1:0] stConflictMiss;
 reg[1:0] stConflictMiss_c;
+reg stallStConflict;
 always_ff@(posedge clk) begin
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
             stOps[i].valid <= 0;
+        stallStConflict <= 0;
     end
     else begin
+        reg uopStStall = (isCacheBypassStUOp ? BLSU_stStall : stall[1]);
+
         stOps[0] <= 'x;
         stOps[0].valid <= 0;
         stOps[1] <= 'x;
         stOps[1].valid <= 0;
         
+        // While a store is stalled, accumulate occurring conflicts
+        if (uopSt.valid && uopStStall)
+            stallStConflict <= stallStConflict | stConflictMiss_c[0];
+        else stallStConflict <= 0;
+        
         // Progress the delay line
-        if (uopSt.valid && (isCacheBypassStUOp ? !BLSU_stStall : !stall[1])) begin
+        if (uopSt.valid && !uopStStall) begin
             stOps[0] <= uopSt;
-            stConflictMiss[0] <= stConflictMiss_c[0];
+            stConflictMiss[0] <= stConflictMiss_c[0] || stallStConflict;
         end
         
         if (stOps[0].valid) begin
@@ -520,6 +529,7 @@ wire[9:0] cacheLoadCurAddr = {curCacheMiss.missAddr[11:`CLSIZE_E], cacheLoadProg
 reg[$clog2(ASSOC)-1:0] cacheLoadAssoc;
 reg LMQ_dequeue;
 
+wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
 LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
 (
@@ -536,8 +546,8 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
     .IN_cacheLoadProgress(cacheLoadProgress),
     .IN_cacheLoadAddr(cacheLoadAddr),
 
-    .IN_ld(ldOps[1]),
-    .IN_enqueue(miss[0].valid && miss[0].mtype != SQ_CONFLICT),
+    .IN_ld(curLd),
+    .IN_enqueue(loadIsRegularMiss),
 
     .OUT_ld(LMQ_ld),
     .IN_dequeue(LMQ_dequeue)
@@ -545,9 +555,18 @@ LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
 
 always_comb begin
     OUT_ldAck = 'x;
-    OUT_ldAck.valid = miss[0].valid && miss[0].mtype == SQ_CONFLICT;
-    if (OUT_ldAck.valid) begin
+    // We have to decide whether to place a missing load into the quick-to-react
+    // load miss queue or back in the (slow) load buffer. If the LMQ is full, LB
+    // is always chosen as fallback. Otherwise, regular misses are placed
+    // in the LMQ.
+    if (miss[0].valid &&
+        (miss[0].mtype == SQ_CONFLICT ||
+        miss[0].mtype == IO_BUSY ||
+        (loadIsRegularMiss && LMQ_full))
+    ) begin
+        OUT_ldAck.valid = 1;
         OUT_ldAck.fail = 1;
+        OUT_ldAck.external = curLd.external;
         OUT_ldAck.loadSqN = curLd.loadSqN;
     end
 end
@@ -621,7 +640,7 @@ end
 reg[SIZE-1:0] dirty;
 
 reg flushQueued;
-wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || ldOps[1].valid || stOps[0].valid || stOps[1].valid);
+wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || curLd.valid || stOps[0].valid || stOps[1].valid);
 wire flushReady = IN_SQ_empty && !busy;
 wire flushActive = (
     state == FLUSH || state == FLUSH_RQ || state == FLUSH_ACTIVE || 

@@ -1,4 +1,4 @@
-module LoadMissQueue#(parameter SIZE=2, parameter CLSIZE_E=7)
+module LoadMissQueue#(parameter SIZE=4, parameter CLSIZE_E=7)
 (
     input wire clk,
     input wire rst,
@@ -35,7 +35,7 @@ always_comb begin
         if (queue[i].ld.valid)
             free = free - 1;
     end
-    OUT_full = !(free > 3);
+    OUT_full = free == 0;
 end
 
 always_ff@(posedge clk) begin
@@ -63,7 +63,7 @@ always_ff@(posedge clk) begin
         end
 
         // Enqueue
-        if (IN_ld.valid && IN_enqueue && 
+        if (IN_ld.valid && IN_enqueue && !OUT_full &&
             (IN_ld.external || !IN_branch.taken || $signed(IN_ld.sqN - IN_branch.sqN) <= 0)) begin
             reg enq = 0;
             for (integer i = 0; i < SIZE; i=i+1) begin

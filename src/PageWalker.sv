@@ -8,6 +8,7 @@ module PageWalker#(parameter NUM_RQS=3)
     
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
+    input LD_Ack IN_ldAck,
     input RES_UOp IN_ldResUOp
 );
 
@@ -104,7 +105,6 @@ always_ff@(posedge clk) begin
                 end
                 else if (ldResValid) begin
                     // Pointer to next page
-                    
                     if (IN_ldResUOp.result[3:0] == 4'b0001 && IN_ldResUOp.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
                         
                         OUT_ldUOp.valid <= 1;
@@ -127,6 +127,12 @@ always_ff@(posedge clk) begin
                         OUT_res.user <= dagu_c[0];
                         state <= IDLE;
                     end
+                end
+                else if (IN_ldAck.valid && IN_ldAck.external && IN_ldAck.fail) begin
+                    // If a lot of misses are coming in, the LSU might not have capacity to
+                    // buffer our op. Page walk loads cannot use the LB as fallback buffering,
+                    // so we just re-issue on NACK.
+                    OUT_ldUOp.valid <= 1;
                 end
             end
         endcase

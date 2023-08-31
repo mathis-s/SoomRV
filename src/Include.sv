@@ -632,6 +632,7 @@ typedef struct packed
 {
     SqN loadSqN;
     logic fail;
+    logic external;
     logic valid;
 } LD_Ack;
 

@@ -162,7 +162,7 @@ always_ff@(posedge clk) begin
         end
         
         // Process negative load acks
-        if (IN_ldAck.valid && IN_ldAck.fail) begin
+        if (IN_ldAck.valid && IN_ldAck.fail && !IN_ldAck.external) begin
             reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck.loadSqN[$clog2(NUM_ENTRIES)-1:0];
             entries[index].issued <= 0;
         end
