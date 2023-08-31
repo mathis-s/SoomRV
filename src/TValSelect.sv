@@ -53,7 +53,10 @@ always_ff@(posedge clk) begin
         
         // Do not overwrite yet if invalidateCurTVal(_c). In that case, the trap op has just committed.
         // The trap then needs a few (2) cycles to fire, at which point everything will be flushed.
-        if (earliest.valid && (!curTVal.live || $signed(curTVal.sqN - earliest.sqN) >= 0)) begin
+        if (earliest.valid &&
+            (!IN_branch.taken || $signed(earliest.sqN - IN_branch.sqN) < 0) &&
+            (!curTVal.live || $signed(curTVal.sqN - earliest.sqN) >= 0)
+        ) begin
             curTVal.tval <= earliest.tval;
             curTVal.sqN <= earliest.sqN;
             curTVal.live <= 1;
