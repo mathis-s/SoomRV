@@ -200,12 +200,9 @@ always_ff@(posedge clk) begin
                         OUT_stat.resultValid <= 1;
                     end
                 end
-                
             end
         endcase
-    
     end
-
 end
 
 endmodule

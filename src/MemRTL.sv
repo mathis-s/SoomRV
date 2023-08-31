@@ -68,22 +68,11 @@ always@(posedge clk) begin
         //    $display("[%d] %m: read %x from %x", $time(), mem[addr1_reg], addr1_reg);
     end
     
-    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg && 0) begin
-        $display("Warning: Multiple %m accesses at same address %x, we=%b", addr_reg, we_reg);
-        dbgMultiple <= 1;
-        OUT_data1 <= 'x;
-        
-        /*if (!we_reg) begin
-            for (integer i = 0; i < WORD_SIZE/8; i=i+1) begin
-                if (wm_reg[i])
-                    mem[addr_reg][(8*i)+:8] <= 'x;
-            end
+    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg) begin
+        for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
+            if (wm_reg[i])
+                OUT_data1[(WRITE_SIZE*i)+:WRITE_SIZE] <= data_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
         end
-        else begin
-            OUT_data <= 'x;
-        end
-        
-        assert(0);*/
     end
 end
 

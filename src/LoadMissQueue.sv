@@ -10,6 +10,7 @@ module LoadMissQueue#(parameter SIZE=2, parameter CLSIZE_E=7)
     output reg OUT_full,
 
     input wire IN_cacheLoadActive,
+    input wire[CLSIZE_E-3:0] IN_cacheLoadBase,
     input wire[CLSIZE_E-2:0] IN_cacheLoadProgress,
     input wire[31-CLSIZE_E:0] IN_cacheLoadAddr,
 
@@ -56,7 +57,8 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < SIZE; i=i+1) begin
             if (IN_cacheLoadActive && queue[i].ld.valid &&
                 queue[i].ld.addr[31:CLSIZE_E] == IN_cacheLoadAddr &&
-                {1'b0, queue[i].ld.addr[CLSIZE_E-1:2]} < IN_cacheLoadProgress)
+                {1'b0, queue[i].ld.addr[CLSIZE_E-1:2] - IN_cacheLoadBase} < IN_cacheLoadProgress
+            )
                 queue[i].ready <= 1;
         end
 

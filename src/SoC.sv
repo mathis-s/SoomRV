@@ -163,19 +163,19 @@ assign IF_cache.rdata = dcache_out1;
 assign IF_cache.rbusy = 1'b0;
 assign IF_cache.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
 
-MemRTL#(64, (1 << (`CACHE_SIZE_E - 3))) icache
+MemRTL#(128, (1 << (`CACHE_SIZE_E - 4)), 32) icache
 (
     .clk(clk),
-    .IN_nce(MC_DC_used[1] ? MC_DC_if[1].ce : CORE_instrReadEnable),
-    .IN_nwe(MC_DC_used[1] ? MC_DC_if[1].we : 1'b1),
-    .IN_addr(MC_DC_used[1] ? MC_DC_if[1].addr[(`CACHE_SIZE_E-3):1] : {CORE_instrReadAddress[(`CACHE_SIZE_E-5):0], 1'b1}),
-    .IN_data({MC_DC_if[1].data, MC_DC_if[1].data}),
-    .IN_wm({{4{MC_DC_if[1].addr[0]}}, {4{~MC_DC_if[1].addr[0]}}}),
-    .OUT_data(CORE_instrReadData[127:64]),
+    .IN_nce(MC_DC_if[1].ce),
+    .IN_nwe(MC_DC_if[1].we),
+    .IN_addr(MC_DC_if[1].addr[(`CACHE_SIZE_E-3):2]),
+    .IN_data({4{MC_DC_if[1].data}}),
+    .IN_wm(4'b1 << MC_DC_if[1].addr[1:0]),
+    .OUT_data(),
     
     .IN_nce1(CORE_instrReadEnable),
-    .IN_addr1({CORE_instrReadAddress[(`CACHE_SIZE_E-5):0], 1'b0}),
-    .OUT_data1(CORE_instrReadData[63:0])
+    .IN_addr1(CORE_instrReadAddress[(`CACHE_SIZE_E-5):0]),
+    .OUT_data1(CORE_instrReadData[127:0])
 );
 
 MMIO mmio
