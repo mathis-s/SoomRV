@@ -316,6 +316,7 @@ always_ff@(posedge clk) begin
                         FU_ATOMIC: begin
                             counterStoreSqN = counterStoreSqN + 1;
                             counterLoadSqN = counterLoadSqN + 1;
+                            intOrder = 1;
                         end
                         default: begin end
                     endcase
