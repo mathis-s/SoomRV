@@ -1,7 +1,5 @@
 module LoadStoreUnit
 #(
-    parameter ASSOC=4,
-    parameter CLSIZE_E=7,
     parameter SIZE=(1<<(`CACHE_SIZE_E - `CLSIZE_E)),
     localparam TOTAL_UOPS = 2
 )
@@ -498,11 +496,11 @@ end
 // Store Conflict Misses
 always_comb begin
     stConflictMiss_c[0] = (redoStore &&
-        (stOps[1].addr[31:CLSIZE_E] == uopSt.addr[31:CLSIZE_E] ||
+        (stOps[1].addr[31:`CLSIZE_E] == uopSt.addr[31:`CLSIZE_E] ||
             stOps[1].isMMIO && uopSt.isMMIO));
 
     stConflictMiss_c[1] = (redoStore &&
-        (stOps[1].addr[31:CLSIZE_E] == stOps[0].addr[31:CLSIZE_E] ||
+        (stOps[1].addr[31:`CLSIZE_E] == stOps[0].addr[31:`CLSIZE_E] ||
             (stOps[1].isMMIO && stOps[0].isMMIO))) || 
         stConflictMiss[0];
 end
@@ -526,12 +524,12 @@ wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
 wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
 wire[9:0] cacheLoadCurAddr = {curCacheMiss.missAddr[11:`CLSIZE_E], cacheLoadProgress[`CLSIZE_E-3:0]};
 
-reg[$clog2(ASSOC)-1:0] cacheLoadAssoc;
+reg[$clog2(`CASSOC)-1:0] cacheLoadAssoc;
 reg LMQ_dequeue;
 
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
-LoadMissQueue#(4, `CLSIZE_E) loadMissQueue
+LoadMissQueue#(4) loadMissQueue
 (
     .clk(clk),
     .rst(rst),

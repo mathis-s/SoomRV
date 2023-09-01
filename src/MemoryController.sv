@@ -53,7 +53,7 @@ always_comb begin
             enableCache = 1;
             enableExt = 1;
             extAddr = IN_ctrl.extAddr;
-            accessLength = IN_ctrl.cacheID ? 32 : 32;
+            accessLength = 1 << (`CLSIZE_E - 2);
         end
         else if (IN_ctrl.cmd == MEMC_READ_SINGLE || IN_ctrl.cmd == MEMC_WRITE_SINGLE) begin
             enableExt = 1;

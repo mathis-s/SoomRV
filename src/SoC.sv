@@ -101,7 +101,7 @@ reg[1:0][$clog2(`CASSOC)-1:0] MEMC_readAssoc;
 always_ff@(posedge clk) begin
     dcache_readSelect0 <= {dcache_readSelect0[0], MC_DC_if[0].addr[0]};
     dcache_readSelect1 <= {dcache_readSelect1[0], CORE_raddr[0]};
-    MEMC_readAssoc <= {MEMC_readAssoc[0], MC_DC_if[0].addr[11:10]};
+    MEMC_readAssoc <= {MEMC_readAssoc[0], MC_DC_if[0].addr[10+:$clog2(`CASSOC)]};
 end
 
 wire[`CASSOC-1:0][31:0] dcache_out0 = dcache_readSelect0[1] ? dcache1_out0 : dcache0_out0;
@@ -115,8 +115,8 @@ MemRTL#(32 * `CASSOC, (1 << (`CACHE_SIZE_E - 3 - $clog2(`CASSOC)))) dcache0
     .IN_nce(!(!DC_if0.ce && DC_if0.addr[0] == 1'b0)),
     .IN_nwe(DC_if0.we),
     .IN_addr(DC_if0.addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
-    .IN_data({4{DC_if0.data}}),
-    .IN_wm({12'b0, DC_if0.wm} << (DC_if0.addr[11:10] * 4)),
+    .IN_data({`CASSOC{DC_if0.data}}),
+    .IN_wm({{(`CASSOC-1){4'b0}}, DC_if0.wm} << (DC_if0.addr[10+:$clog2(`CASSOC)] * 4)),
     .OUT_data(dcache0_out0),
     
     .IN_nce1(!(!IF_cache.re && CORE_raddr[0] == 0)),
@@ -132,8 +132,8 @@ MemRTL#(32 * `CASSOC, (1 << (`CACHE_SIZE_E - 3 - $clog2(`CASSOC)))) dcache1
     .IN_nce(!(!DC_if1.ce && DC_if1.addr[0] == 1'b1)),
     .IN_nwe(DC_if1.we),
     .IN_addr(DC_if1.addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):1]),
-    .IN_data({4{DC_if1.data}}),
-    .IN_wm({12'b0, DC_if1.wm} << (DC_if1.addr[11:10] * 4)),
+    .IN_data({`CASSOC{DC_if1.data}}),
+    .IN_wm({{(`CASSOC-1){4'b0}}, DC_if1.wm} << (DC_if1.addr[10+:$clog2(`CASSOC)] * 4)),
     .OUT_data(dcache1_out0),
     
     .IN_nce1(!(!IF_cache.re && CORE_raddr[0] == 1)),
@@ -147,7 +147,7 @@ MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASS
     .IN_nce(!(IF_ct.re[1] || IF_ct.we)),
     .IN_nwe(!IF_ct.we),
     .IN_addr({IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1]}[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
-    .IN_data({4{IF_ct.wdata}}),
+    .IN_data({`CASSOC{IF_ct.wdata}}),
     .IN_wm(1 << IF_ct.wassoc),
     .OUT_data(IF_ct.rdata[1]),
     
