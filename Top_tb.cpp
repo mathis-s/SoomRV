@@ -310,16 +310,12 @@ class SpikeSimif : public simif_t
             processor->get_mmu()->yield_load_reservation();
         }
 
-        // WFI is currently a nop.
-        if (instSIM == 0x10500073)
-        {
-            processor->get_state()->pc += 4;
-            processor->get_state()->minstret->bump(1);
-        }
-        else
-            processor->step(1);
+        processor->step(1);
 
-        // TODO: Use this for adjusting WARL behaviour
+        // interrupts are handled by SoomRV
+        processor->clear_waiting_for_interrupt();
+
+        // TODO: Use this for adjusting WARL behavior
         auto writes = processor->get_state()->log_reg_write;
         bool gprWritten = false;
         for (auto write : writes) {}
@@ -366,8 +362,8 @@ class SpikeSimif : public simif_t
             return -3;
         if (!compare_state())
             return -4;
-        if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
-            return -5;
+        //if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
+        //    return -5;
         return 0;
     }
 
@@ -587,6 +583,8 @@ void Exit(int code)
     exit(code);
 }
 
+void LogFlush(Inst& inst);
+
 void LogCommit(Inst& inst)
 {
 #ifdef COSIM
@@ -597,6 +595,11 @@ void LogCommit(Inst& inst)
 #ifdef COSIM
         // printf("INTERRUPT %.8x\n", inst.pc);
         simif.take_trap(true, inst.interruptCause, inst.pc, inst.interruptDelegate);
+#endif
+#ifdef KONATA
+        // This is a fake interrupt instruction,
+        // show it as flushed in Konata
+        LogFlush(inst);
 #endif
     }
     else

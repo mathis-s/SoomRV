@@ -209,7 +209,8 @@ always_comb begin
                 (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
 
             ((evicted[i].s.addr == entries[baseIndexI].addr) || 
-                (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr))))
+                (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
+                (evicted[i].s.wmask == 0)))
             allowDequeue = 0;
     end
 end

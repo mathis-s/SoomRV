@@ -121,8 +121,10 @@ InstrDecoder idec
 (
     .clk(clk),
     .rst(rst),
-    .IN_invalidate(branch.taken),
     .en(!RN_stall && frontendEn),
+    .IN_invalidate(branch.taken),
+
+    .IN_dec(CSR_dec),
     .IN_instrs(PD_instrs),
     .IN_lateRetAddr(BP_lateRetAddr),
     
@@ -427,6 +429,7 @@ TValSelect tvalSelect
 RES_UOp CSR_uop;
 TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
+DecodeState CSR_dec;
 VirtMemState CSR_vmem;
 CSR csr
 (
@@ -450,6 +453,7 @@ CSR csr
     .OUT_trapControl(CSR_trapControl),
     .OUT_fRoundMode(CSR_fRoundMode),
     
+    .OUT_dec(CSR_dec),
     .OUT_vmem(CSR_vmem),
     
     .OUT_uop(CSR_uop)

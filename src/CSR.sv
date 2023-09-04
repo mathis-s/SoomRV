@@ -23,6 +23,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     output TrapControlState OUT_trapControl,
     output wire[2:0] OUT_fRoundMode,
     
+    output DecodeState OUT_dec,
     output VirtMemState OUT_vmem,
     
     output RES_UOp OUT_uop
@@ -401,6 +402,8 @@ assign OUT_trapControl.interruptCause = interruptCause;
 assign OUT_trapControl.interruptDelegate = interruptDelegate;
 
 assign OUT_fRoundMode = frm;
+
+assign OUT_dec.allowWFI = (priv == PRIV_MACHINE) || (priv == PRIV_SUPERVISOR && !mstatus.tw);
 
 always_comb begin
 

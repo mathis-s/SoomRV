@@ -210,7 +210,7 @@ typedef enum logic[3:0]
 } RVPTrapCause;
 
 // For decode-time traps, we use FLAGS_TRAP/FU_TRAP as an,
-// escape flag. The (unused) rd field then stores on of these fields
+// escape flag. The (unused) rd field then stores one of these fields
 // to specify the decode-time exception encountered.
 
 // All other exceptions are passed as result flags from
@@ -395,6 +395,7 @@ typedef struct packed
     logic[4:0] fetchID;
     BHist_t history;
     RetStackIdx_t rIdx;
+    logic wfi;
     logic taken;
 } DecodeBranchProv;
 
@@ -749,6 +750,11 @@ typedef struct packed
     logic cbcfe;
     PrivLevel priv;
 } VirtMemState;
+
+typedef struct packed
+{
+    logic allowWFI;
+} DecodeState;
 
 typedef struct packed
 {

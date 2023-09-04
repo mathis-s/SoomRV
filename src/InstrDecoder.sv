@@ -200,6 +200,8 @@ module InstrDecoder
     input wire rst,
     input wire en,
     input wire IN_invalidate,
+
+    input DecodeState IN_dec,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
     input wire[30:0] IN_lateRetAddr,
     
@@ -234,7 +236,9 @@ always_comb begin
     retUpd_c.valid = 0;
     
     OUT_decBranch = 'x;
+    OUT_decBranch.wfi = 0;
     OUT_decBranch.taken = 0;
+
     validMask = 4'b1111;
     
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
@@ -271,6 +275,7 @@ always_comb begin
             reg isReturn = 0;
             reg isCall = 0;
             reg isJump = 0;
+            reg isWFI = 0;
             reg[30:0] branchTarget = 'x;
             
             reg[30:0] lateReturnAddr = IN_instrs[i].targetIsRetAddr ? IN_instrs[i].predTarget : IN_lateRetAddr;
@@ -309,6 +314,7 @@ always_comb begin
                                     uop.rs2 = 0;
                                     uop.rd = 0;
                                     uop.immB = 1;
+                                    isWFI = 1;
                                     invalidEnc = 0;
                                 end
                                 else if (instr.rs2 == 5'b00010 && instr.rs1 == 0 && instr.rd == 0) begin
@@ -316,18 +322,22 @@ always_comb begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_SRET;
                                         invalidEnc = 0;
+                                        isWFI = 1;
                                     end
                                     else if (instr.funct7 == 7'b0011000) begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_MRET;
                                         invalidEnc = 0;
+                                        isWFI = 1;
                                     end
                                 end
                                 else if (instr.funct7 == 7'b0001000 && instr.rs2 == 5'b00101 && instr.rs1 == 0 && instr.rd == 0) begin
-                                    
-                                    // WFI (currently nop)
-                                    uop.fu = FU_RN;
-                                    invalidEnc = 0;
+                                    if (IN_dec.allowWFI) begin
+                                        // WFI
+                                        uop.fu = FU_RN;
+                                        invalidEnc = 0;
+                                        isWFI = 1;
+                                    end
                                 end
                                 else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
                                     uop.fu = FU_TRAP;
@@ -1557,6 +1567,17 @@ always_comb begin
                     OUT_decBranch.rIdx = IN_instrs[i].rIdx - 1;
                     OUT_decBranch.dst = lateReturnAddr;
                 end
+            end
+            
+            // Wait For Interrupt jumps to the instruction after itself
+            // and disables the frontend until interrupt.
+            if (isWFI) begin
+                OUT_decBranch.taken = 1;
+                OUT_decBranch.wfi = 1;
+                OUT_decBranch.history = IN_instrs[i].history;
+                OUT_decBranch.fetchID = IN_instrs[i].fetchID;
+                OUT_decBranch.rIdx = IN_instrs[i].rIdx;
+                OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
             end
         end
         

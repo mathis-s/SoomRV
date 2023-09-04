@@ -156,7 +156,7 @@ always_comb begin
     fetchIsFault = fault_c != IF_FAULT_NONE;
 end
 
-wire baseEn = IN_en && !BP_stall &&
+wire baseEn = IN_en && !waitForInterrupt && !BP_stall &&
     (IN_ROB_curFetchID != fetchID);
 
 wire tryReadICache = 
@@ -257,6 +257,8 @@ reg pageWalkAccepted;
 reg waitForPWComplete;
 reg[19:0] pageWalkVPN;
 
+reg waitForInterrupt;
+
 reg en1;
 always_ff@(posedge clk) begin
     OUT_pw.valid <= 0;
@@ -272,6 +274,7 @@ always_ff@(posedge clk) begin
         fault <= IF_FAULT_NONE;
         pcPPNfault <= IF_FAULT_NONE;
         waitForPWComplete <= 0;
+        waitForInterrupt <= 0;
     end
     else begin
         
@@ -279,6 +282,9 @@ always_ff@(posedge clk) begin
             outInstrs_r <= 'x;
             outInstrs_r.valid <= 0;
         end
+
+        if (IN_interruptPending)
+            waitForInterrupt <= 0;
         
         // TLB Flush
         if (IN_clearICache || IN_flushTLB) begin
@@ -342,10 +348,14 @@ always_ff@(posedge clk) begin
             if (OUT_branch.taken) begin
                 pc <= OUT_branch.dstPC[31:1];
                 fetchID <= OUT_branch.fetchID + 1;
+                waitForInterrupt <= 0;
             end
             else if (IN_decBranch.taken) begin
                 pc <= IN_decBranch.dst;
                 fetchID <= IN_decBranch.fetchID + 1;
+                // We also use WFI to temporarily disable the frontend
+                // for ops that always flush the pipeline
+                waitForInterrupt <= IN_decBranch.wfi;
             end
             fault <= IF_FAULT_NONE;
             en1 <= 0;

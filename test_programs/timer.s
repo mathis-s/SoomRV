@@ -31,7 +31,7 @@ main:
 
     la a0, user
     csrrw x0, mepc, a0
-    li a0, 0x00000000
+    li a0, 0x00000000 | (0<<21) | (1<<11) # TW=0, MPP=S
     csrrw x0, mstatus, a0
     mret
 
@@ -73,9 +73,9 @@ machine_trap:
     sw x30, 116(a0)
     sw x31, 120(a0)
     
-    #call printdecu
+    call printdecu
     csrr a0, mepc
-    call printhex
+    #call printhex
 
     csrr a0, mcause
     bltz a0, .continue
@@ -89,7 +89,7 @@ machine_trap:
     
     # schedule timer interrupt in 1000 cycles
     li a1, 0x1100bff8
-    li a2, 100
+    li a2, 1000
     lw a0, 0(a1)
     add a0, a0, a2
     li a1, 0x11004000
@@ -138,18 +138,11 @@ machine_trap:
     
 user:
     li a0, 0
-
-    #.loop:
-    #    j .loop
-    #nop
-    #nop
-    #nop
-    #ebreak
-    
     .loop:
         addi a0, a0, 1
         mv s0, a0
         call printdecu
         mv a0, s0
+        wfi
         j .loop
     
