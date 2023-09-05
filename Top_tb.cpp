@@ -1146,7 +1146,7 @@ int main(int argc, char** argv)
             HandleInput();
 
         // Hang Detection
-        if ((main_time & (0x3fff)) == 0 && !args.restoreSave)
+        if ((main_time & (0x3fff)) == 0 && !args.restoreSave && !core->__PVT__ifetch__DOT__waitForInterrupt)
         {
             uint64_t minstret = core->csr->minstret;
             if (minstret == lastMInstret)

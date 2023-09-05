@@ -55,6 +55,7 @@ typedef struct packed
     
     SqN sqN;
     
+    logic atomicLd;
     logic atomic;
     logic addrAvail;
     logic ready;
@@ -69,8 +70,17 @@ SqN baseIndex;
 always_comb begin
     OUT_sqInfo = 'x;
     OUT_sqInfo.valid = loadBaseIndexValid;
-    if (OUT_sqInfo.valid)
-        OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
+    if (OUT_sqInfo.valid) begin
+        if (entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].atomic &&
+            !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded
+        ) begin
+            // For atomics, do not allow commit until other UOps are done and store
+            // data is known
+            OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN - 1;
+        end
+        else
+            OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
+    end
 end
 
 reg empty;
@@ -279,7 +289,7 @@ always_comb begin
     reg[NUM_ENTRIES-1:0] isLoadCandidate;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         isLoadCandidate[i] =
-            entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomic;
+            entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
     end
 
     // Priority encode beginning at base index
@@ -522,6 +532,7 @@ always_ff@(posedge clk) begin
                 entries[index].wmask <= 0;
 
                 entries[index].valid <= 1;
+                entries[index].atomicLd <= 0;
                 entries[index].atomic <= 0;
                 entries[index].ready <= 0;
                 entries[index].loaded <= 0;
@@ -535,11 +546,15 @@ always_ff@(posedge clk) begin
                         entries[index].avail <= 1;
 
                 // Atomic Ops special handling
-                if (IN_rnUOp[i].fu == FU_ATOMIC && IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
-                    entries[index].data.m.tag <= 'x;
+                if (IN_rnUOp[i].fu == FU_ATOMIC) begin
                     entries[index].atomic <= 1;
-                    // operand cannot be available yet
-                    entries[index].avail <= 0;
+                    if (IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
+                        
+                        entries[index].atomicLd <= 1;
+                        entries[index].data.m.tag <= 'x;
+                        // operand cannot be available yet
+                        entries[index].avail <= 0;
+                    end
                 end
                 
                 // Cache Block Ops special handling
