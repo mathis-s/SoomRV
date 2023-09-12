@@ -55,6 +55,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         activeLd.valid <= 0;
+        OUT_memc <= '0;
         OUT_memc.cmd <= MEMC_NONE;
         state <= IDLE;
     end

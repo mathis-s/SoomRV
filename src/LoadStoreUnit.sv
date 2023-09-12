@@ -36,6 +36,7 @@ module LoadStoreUnit
     output ST_Ack OUT_stAck,
 
     output MemController_Req OUT_memc,
+    output MemController_Req OUT_BLSU_memc,
     input MemController_Res IN_memc,
 
     output RES_UOp OUT_uopLd
@@ -43,7 +44,8 @@ module LoadStoreUnit
 
 MemController_Req BLSU_memc;
 MemController_Req LSU_memc;
-assign OUT_memc = (LSU_memc.cmd != MEMC_NONE) ? LSU_memc : BLSU_memc;
+assign OUT_memc = LSU_memc;
+assign OUT_BLSU_memc = BLSU_memc;
 
 wire isCacheBypassLdUOp = 
     `ENABLE_EXT_MMIO && uopLd_0.valid && uopLd_0.isMMIO && uopLd_0.exception == AGU_NO_EXCEPTION &&

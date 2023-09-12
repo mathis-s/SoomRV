@@ -26,8 +26,8 @@ typedef struct packed
 ICacheTableEntry icacheTable[LEN-1:0][ASSOC-1:0];
 reg[$clog2(ASSOC)-1:0] counters[LEN-1:0];
 
+reg doCacheLoad;
 reg cacheEntryFound;
-
 reg[$clog2(LEN)-1:0] cacheIndex;
 reg[$clog2(ASSOC)-1:0] cacheAssocIndex;
 always_comb begin
@@ -35,6 +35,7 @@ always_comb begin
     cacheEntryFound = 0;
     cacheAssocIndex = 0;
     OUT_lookupAddress = 0;
+    doCacheLoad = 1;
 
     for (integer i = 0; i < ASSOC; i=i+1) begin
         if (icacheTable[cacheIndex][i].valid && 
@@ -43,47 +44,52 @@ always_comb begin
             OUT_lookupAddress[`CLSIZE_E+$clog2(NUM_ICACHE_LINES)-5:0] = 
                 {i[$clog2(ASSOC)-1:0], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4]};
             cacheEntryFound = 1;
+            doCacheLoad = 0;
             cacheAssocIndex = i[$clog2(ASSOC)-1:0];
         end
     end
 
-    if (state == LOAD_ACTIVE && 
-        IN_lookupPC[31:`CLSIZE_E] == cacheMissPC[31:`CLSIZE_E] &&
-        (IN_memc.progress[`CLSIZE_E-2:2] > (IN_lookupPC[4 +: `CLSIZE_E-4] - cacheMissPC[4 +: `CLSIZE_E-4]))
-    ) begin
-        cacheEntryFound = 1;
-        cacheAssocIndex = loadAssocIdx;
-        OUT_lookupAddress[`CLSIZE_E+$clog2(NUM_ICACHE_LINES)-5:0] = 
-            {loadAssocIdx, loadIdx, IN_lookupPC[`CLSIZE_E-1:4]};
+    for (integer i = 0; i < 4; i=i+1) begin
+        if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 1 &&
+            IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].newAddr[31:`CLSIZE_E]
+        ) begin
+            cacheEntryFound = 0;
+            doCacheLoad = 0;
+        end
+    end
+
+    if (OUT_memc.cmd != MEMC_NONE && IN_lookupPC[31:`CLSIZE_E] == OUT_memc.extAddr[31-2:`CLSIZE_E-2]) begin
+        cacheEntryFound = 0;
+        doCacheLoad = 0;
     end
 end
 
-assign OUT_stall = (!cacheEntryFound || (state != IDLE && state != LOAD_ACTIVE)) && IN_lookupValid;
+assign OUT_stall = (!cacheEntryFound || (state != IDLE)) && IN_lookupValid;
 
 reg[$clog2(ASSOC)-1:0] loadAssocIdx;
 reg[$clog2(LEN)-1:0] loadIdx;
 reg[$clog2(LEN)-1:0] cleanIdx;
-reg[31:0] cacheMissPC;
 
 enum logic[2:0]
 {
     IDLE,
-    LOAD_RQ,
-    LOAD_ACTIVE,
-    FLUSH_WAIT,
     CLEAN
 } state;
 
 always_ff@(posedge clk) begin
-    OUT_memc.data <= 'x;
+    
+    if (!(OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0])) begin
+        OUT_memc <= '0;
+        OUT_memc.cmd <= MEMC_NONE;
+    end
+
     if (rst) begin
         state <= CLEAN;
-        OUT_memc.cmd <= MEMC_NONE;
 `ifdef SYNC_RESET
     for (integer i = 0; i < LEN; i=i+1)
         for (integer j = 0; j < ASSOC; j=j+1)
             icacheTable[i][j].valid <= 0;
-    state <= FLUSH_WAIT;
+    state <= IDLE;
 `endif
     end
     else begin
@@ -100,31 +106,15 @@ always_ff@(posedge clk) begin
                     icacheTable[cleanIdx][i].valid <= 0;
                 end
                 if (cleanIdx == LEN - 1) begin
-                    state <= FLUSH_WAIT;
+                    state <= IDLE;
                     cleanIdx <= 'x;
                 end
                 else cleanIdx <= cleanIdx + 1;
             end
 `endif
-            FLUSH_WAIT: begin
-                if (!IN_memc.busy || IN_memc.rqID != 1)
-                    state <= IDLE;
-            end
-            LOAD_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == 1) begin
-                    OUT_memc.cmd <= MEMC_NONE;
-                    state <= LOAD_ACTIVE;
-                end
-            end
-            LOAD_ACTIVE: begin
-                if (!IN_memc.busy) begin
-                    state <= IDLE;
-                    icacheTable[loadIdx][loadAssocIdx].valid <= 1;
-                end
-            end
             default: begin
                 state <= IDLE;
-                if (!cacheEntryFound) begin
+                if (doCacheLoad && OUT_memc.cmd == MEMC_NONE) begin
                     OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                     OUT_memc.sramAddr <= {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
                     OUT_memc.extAddr <= {IN_lookupPC[31:4], 2'b0};
@@ -135,10 +125,7 @@ always_ff@(posedge clk) begin
                     loadAssocIdx <= counters[cacheIndex];
 
                     icacheTable[cacheIndex][counters[cacheIndex]].addr <= IN_lookupPC[31:`CLSIZE_E+$clog2(LEN)];
-                    icacheTable[cacheIndex][counters[cacheIndex]].valid <= 0;
-                    
-                    cacheMissPC <= IN_lookupPC;
-                    state <= LOAD_RQ;
+                    icacheTable[cacheIndex][counters[cacheIndex]].valid <= 1;
                 end
             end
         endcase

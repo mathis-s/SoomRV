@@ -12,7 +12,7 @@
 #include "VTop.h"
 #include "VTop_CSR.h"
 #include "VTop_Core.h"
-#include "VTop_ExternalMemorySim.h"
+#include "VTop_ExternalAXISim.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
@@ -546,12 +546,12 @@ static bool kbhit()
 
 static void HandleInput()
 {
-    auto emem = top->Top->extMem;
+    /*auto emem = top->Top->extMem;
     if (!emem->inputAvail && kbhit())
     {
         emem->inputAvail = 1;
         emem->inputByte = getchar();
-    }
+    }*/
 }
 
 void DumpState(FILE* stream, uint32_t pc, uint32_t inst)
@@ -1099,7 +1099,7 @@ int main(int argc, char** argv)
     else
     {
         for (size_t i = 0; i < (1 << 24); i++)
-            top->Top->extMem->mem[i] = pram[i];
+            top->Top->extMem->mem[i >> 2][i & 3] = pram[i];
 
         // Reset
         top->rst = 1;

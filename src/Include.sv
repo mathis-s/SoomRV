@@ -300,12 +300,21 @@ typedef enum logic[1:0]
 typedef enum logic[2:0]
 {
     MEMC_NONE,
+    MEMC_REPLACE,
     MEMC_CP_CACHE_TO_EXT,
     MEMC_CP_EXT_TO_CACHE,
-    MEMC_PAGE_WALK,
     MEMC_READ_SINGLE,
     MEMC_WRITE_SINGLE
 } MemC_Cmd;
+
+typedef struct packed
+{
+    logic[31:0] oldAddr;
+    logic[31:0] newAddr;
+    logic[`CLSIZE_E-2:0] progress;
+    logic[0:0] cacheID;
+    logic valid;
+} MemController_Transf;
 
 typedef struct packed
 {
@@ -313,18 +322,22 @@ typedef struct packed
     logic[31:0] data;
     logic[`CACHE_SIZE_E-3:0] sramAddr;
     logic[29:0] extAddr;
+    logic[29:0] oldAddr;
     logic[0:0] cacheID;
     logic[2:0] rqID;
 } MemController_Req;
 
 typedef struct packed
 {
+    MemController_Transf[3:0] transfers;
+
     logic[9:0] progress;
     
     logic[31:0] result;
     logic resultValid;
     
     logic[2:0] rqID;
+    logic[2:0] stall;
     logic busy;
 } MemController_Res;
 

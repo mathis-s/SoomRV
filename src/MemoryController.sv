@@ -1,207 +1,293 @@
-module MemoryController#(parameter NUM_CACHES=2)
+module MemoryController
+#(parameter NUM_CACHES=2, parameter NUM_TFS=4, parameter NUM_TFS_IN=3, parameter ID_LEN=2, parameter ADDR_LEN=32, parameter WIDTH=128)
 (
     input wire clk,
     input wire rst,
     
-    input MemController_Req IN_ctrl,
+    input MemController_Req IN_ctrl[NUM_TFS_IN-1:0],
     output MemController_Res OUT_stat,
     
-    //output reg[NUM_CACHES-1:0] OUT_CACHE_used,
     output reg OUT_CACHE_we[NUM_CACHES-1:0],
     output reg OUT_CACHE_ce[NUM_CACHES-1:0],
-    output reg[3:0] OUT_CACHE_wm[NUM_CACHES-1:0],
+    output reg[(WIDTH/8)-1:0] OUT_CACHE_wm[NUM_CACHES-1:0],
     output reg[`CACHE_SIZE_E-3:0] OUT_CACHE_addr[NUM_CACHES-1:0],
-    output reg[31:0] OUT_CACHE_data[NUM_CACHES-1:0],
-    input wire[31:0] IN_CACHE_data[NUM_CACHES-1:0],
+    output reg[WIDTH-1:0] OUT_CACHE_data[NUM_CACHES-1:0],
+    input wire[WIDTH-1:0] IN_CACHE_data[NUM_CACHES-1:0],
+
+    output[ID_LEN-1:0]  s_axi_awid, // write req id
+    output[ADDR_LEN-1:0] s_axi_awaddr, // write addr
+    output[7:0] s_axi_awlen, // write len
+    //output[2:0] s_axi_awsize, // word size
+    output[1:0] s_axi_awburst, // FIXED, INCR, WRAP, RESERVED
+    output[0:0] s_axi_awlock, // exclusive access
+    output[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
+    output s_axi_awvalid,
+    input s_axi_awready,
     
-    output wire OUT_EXT_oen,
-    output wire OUT_EXT_en,
-    output wire[31:0] OUT_EXT_bus,
-    input wire IN_EXT_stall,
-    input wire[31:0] IN_EXT_bus
+    // write stream
+    output[WIDTH-1:0] s_axi_wdata,
+    output[(WIDTH/8)-1:0] s_axi_wstrb,
+    output s_axi_wlast,
+    output s_axi_wvalid,
+    input s_axi_wready,
     
+    // write response
+    output s_axi_bready,
+    input[ID_LEN-1:0] s_axi_bid,
+    //input[1:0] s_axi_bresp,
+    input s_axi_bvalid,
+    
+    // read request
+    output[ID_LEN-1:0] s_axi_arid,
+    output[ADDR_LEN-1:0] s_axi_araddr,
+    output[7:0] s_axi_arlen,
+    //output[2:0] s_axi_arsize,
+    output[1:0] s_axi_arburst,
+    output[0:0] s_axi_arlock,
+    output[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
+    output s_axi_arvalid,
+    input s_axi_arready,
+    
+    // read stream
+    output s_axi_rready,
+    input[ID_LEN-1:0] s_axi_rid,
+    input[WIDTH-1:0] s_axi_rdata,
+    //input logic[1:0] s_axi_rresp,
+    input s_axi_rlast,
+    input s_axi_rvalid
 );
 
-
-reg[2:0] state;
-reg[2:0] returnState;
-
-assign OUT_CACHE_wm[0] = 4'b1111;
-assign OUT_CACHE_wm[1] = 4'b1111;
-
-wire[31:0] outDataCacheIF;
-wire[0:0] idCacheIF;
-
-// Generate control signals for cache and external memory interfaces
-reg[7:0] accessLength;
-reg enableCache;
-reg enableExt;
-reg[29:0] extAddr;
-reg extIsWrite;
-
 always_comb begin
-    
-    enableCache = 0;
-    enableExt = 0;
-    accessLength = 'x;
-    extAddr = 'x;
-    extIsWrite = 'x;
-    
-    if (!rst && state == 0) begin
-        extIsWrite = IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_WRITE_SINGLE;
-        if (IN_ctrl.cmd == MEMC_CP_CACHE_TO_EXT || IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE) begin
-            enableCache = 1;
-            enableExt = 1;
-            extAddr = IN_ctrl.extAddr;
-            accessLength = 1 << (`CLSIZE_E - 2);
-        end
-        else if (IN_ctrl.cmd == MEMC_READ_SINGLE || IN_ctrl.cmd == MEMC_WRITE_SINGLE) begin
-            enableExt = 1;
-            extAddr = IN_ctrl.extAddr;
-            accessLength = 1;
+    s_axi_awid = '0;
+    s_axi_awaddr = '0;
+    s_axi_awlen = '0;
+    s_axi_awburst = '0;
+    s_axi_awlock = '0;
+    s_axi_awcache = '0;
+    s_axi_awvalid = '0;
+    s_axi_wdata = '0;
+    s_axi_wstrb = '0;
+    s_axi_wlast = '0;
+    s_axi_wlast = '0;
+    s_axi_wvalid = '0;
+    s_axi_bready = '0;
+end
+
+typedef enum logic[1:0]
+{
+    FIXED, INCR, WRAP
+} BurstType;
+
+typedef struct packed
+{
+    logic[`CLSIZE_E-2:0] progress;
+    logic[`CACHE_SIZE_E-3:0] cacheAddr;
+    logic[31:0] newAddr;
+    logic[31:0] oldAddr;
+    // r/w from AXI perspective
+    logic needReadRq;
+    logic needWriteRq;
+    logic[0:0] cacheID;
+    MemC_Cmd cmd;
+    logic valid;
+} Transfer;
+
+Transfer transfers[NUM_TFS-1:0];
+
+// Find enqueue index
+logic[$clog2(NUM_TFS)-1:0] enqIdx;
+logic enqIdxValid;
+always_comb begin
+    enqIdx = 'x;
+    enqIdxValid = 0;
+    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+        if (!enqIdxValid && transfers[i].cmd == MEMC_NONE) begin
+            enqIdx = i[$clog2(NUM_TFS)-1:0];
+            enqIdxValid = 1;
         end
     end
 end
 
-wire CACHEIF_busy;
-
-wire CACHEIF_ce;
-wire CACHEIF_we;
-wire[`CACHE_SIZE_E-3:0] CACHEIF_addr;
-wire[31:0] CACHEIF_data;
+// Select Incoming Transfer
+MemController_Req selReq;
 always_comb begin
-    for (integer i = 0; i < 2; i=i+1) begin
-        OUT_CACHE_ce[i] = 1;
-        OUT_CACHE_we[i] = 1;
-        OUT_CACHE_addr[i] = CACHEIF_addr;
-        OUT_CACHE_data[i] = CACHEIF_data;
+    OUT_stat.stall = '1;
+    selReq = 'x;
+    selReq.cmd = MEMC_NONE;
+
+    if (enqIdxValid) begin
+        for (integer i = 0; i < NUM_TFS_IN; i=i+1) begin
+            if (selReq.cmd == MEMC_NONE && IN_ctrl[i].cmd != MEMC_NONE) begin
+                selReq = IN_ctrl[i];
+                OUT_stat.stall[i] = 1'b0;
+            end
+        end
     end
-    OUT_CACHE_ce[idCacheIF] = CACHEIF_ce;
-    OUT_CACHE_we[idCacheIF] = CACHEIF_we;
 end
-CacheInterface#(.ADDR_BITS(`CACHE_SIZE_E-2)) cacheIF
+
+// AXI read control signals
+reg[$clog2(NUM_TFS)-1:0] arIdx;
+reg arIdxValid;
+wire readReqSuccess = arIdxValid && s_axi_arready;
+always_comb begin
+    
+    // Default AXI read rq bus state
+    s_axi_arid = '0;
+    s_axi_araddr = '0;
+    s_axi_arlen = '0;
+    s_axi_arburst = '0;
+    s_axi_arlock = '0;
+    s_axi_arcache = '0;
+    s_axi_arvalid = '0;
+    
+    // Find Op that requires read request
+    arIdx = 'x;
+    arIdxValid = 0;
+    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+        if (!arIdxValid && transfers[i].valid && transfers[i].needReadRq) begin
+            arIdx = i[$clog2(NUM_TFS)-1:0];
+            arIdxValid = 1;
+        end
+    end
+
+    // Reads only have to be requested on AXI. The MemoryWriteInterface
+    // handles data as it comes in, no setup required.
+    if (arIdxValid) begin
+        s_axi_arvalid = 1;
+        s_axi_arburst = WRAP;
+        s_axi_arlen = (1 << (`CLSIZE_E - 4)) - 1;
+        s_axi_araddr = transfers[arIdx].newAddr;
+        s_axi_arid = arIdx;
+    end
+end
+
+// Output status to clients
+always_comb begin
+    OUT_stat = '0;
+    OUT_stat.busy = 1; // make old clients stall
+
+    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+        OUT_stat.transfers[i] = 'x;
+        OUT_stat.transfers[i].valid = 0;
+        
+        if (transfers[i].valid) begin
+            OUT_stat.transfers[i].valid = 1;
+            OUT_stat.transfers[i].cacheID = transfers[i].cacheID;
+            OUT_stat.transfers[i].progress = transfers[i].progress[`CLSIZE_E-2:0];
+            OUT_stat.transfers[i].oldAddr = transfers[i].oldAddr;
+            OUT_stat.transfers[i].newAddr = transfers[i].newAddr;
+        end
+    end
+end
+
+logic ICW_ready;
+logic ICW_valid;
+logic[`CACHE_SIZE_E-3:0] ICW_addr;
+logic[127:0] ICW_data;
+
+CacheWriteInterface#(`CACHE_SIZE_E-2, 8, 128, 128) icacheWriteIF
 (
     .clk(clk),
     .rst(rst),
-    
-    .IN_en(state == 0 && enableCache),
-    .IN_write(IN_ctrl.cmd == MEMC_CP_EXT_TO_CACHE),
-    .IN_cacheID(IN_ctrl.cacheID),
-    .IN_len(accessLength),
-    .IN_addr(IN_ctrl.sramAddr),
-    .OUT_busy(CACHEIF_busy),
-    
-    .IN_valid(MEM_IF_advance),
-    .IN_data(memoryIFdata),
-    .OUT_valid(),
-    .OUT_data(outDataCacheIF),
-    
-    .OUT_CACHE_id(idCacheIF),
-    .OUT_CACHE_ce(CACHEIF_ce),
-    .OUT_CACHE_we(CACHEIF_we),
-    .OUT_CACHE_addr(CACHEIF_addr),
-    .OUT_CACHE_data(CACHEIF_data),
-    .IN_CACHE_data(IN_CACHE_data[idCacheIF])
+
+    .OUT_ready(ICW_ready),
+    .IN_valid(ICW_valid),
+    .IN_addr(ICW_addr),
+    .IN_data(ICW_data),
+
+    .IN_CACHE_ready(1'b1),
+    .OUT_CACHE_ce(OUT_CACHE_ce[1]),
+    .OUT_CACHE_we(OUT_CACHE_we[1]),
+    .OUT_CACHE_addr(OUT_CACHE_addr[1]),
+    .OUT_CACHE_data(OUT_CACHE_data[1])
 );
 
-wire MEM_IF_advance;
-wire[31:0] memoryIFdata;
-wire MEMIF_busy;
-reg[31:0] writeData;
-MemoryInterface memoryIF
-(
-    .clk(clk),
-    .rst(rst),
-    
-    .IN_en(state == 0 && IN_ctrl.cmd != MEMC_NONE),
-    .IN_write(extIsWrite),
-    .IN_len(accessLength),
-    .IN_addr(extAddr),
-    .OUT_busy(MEMIF_busy),
-    
-    .OUT_advance(MEM_IF_advance),
-    .IN_data(useWriteData ? writeData : outDataCacheIF),
-    .OUT_data(memoryIFdata),
-    
-    .OUT_EXT_oen(OUT_EXT_oen),
-    .OUT_EXT_en(OUT_EXT_en),
-    .OUT_EXT_bus(OUT_EXT_bus),
-    .IN_EXT_stall(IN_EXT_stall),
-    .IN_EXT_bus(IN_EXT_bus)
-);
+// temp
+always_comb begin
+    OUT_CACHE_ce[0] = 1;
+    OUT_CACHE_we[0] = 1;
+    OUT_CACHE_addr[0] = 'x;
+    OUT_CACHE_data[0] = 'x;
+    OUT_CACHE_wm[0] = '0;
+    OUT_CACHE_wm[1] = '1;
+end
 
-reg[3:0] lastProgress;
-reg outputResult;
-reg useWriteData;
+function logic[`CACHE_SIZE_E-3:0] GetCacheRdAddr(Transfer t);
+    case (t.cmd)
+    MEMC_REPLACE, MEMC_CP_EXT_TO_CACHE:
+        return {t.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2], (t.cacheAddr[`CLSIZE_E-3:0] + t.progress[`CLSIZE_E-3:0])};
+    default:
+        return t.cacheAddr;
+    endcase
+endfunction
 
+// Forward AXI read data to cache
+always_comb begin
+    // Defaults
+    s_axi_rready = 0;
+    ICW_valid = 0;
+    ICW_addr = 'x;
+    ICW_data = 'x;
+
+
+    if (s_axi_rvalid) begin
+        reg[0:0] cID = transfers[s_axi_rid].cacheID;
+
+        case (cID)
+        0: ;
+
+        1: if (ICW_ready) begin // icache
+            s_axi_rready = 1;
+            ICW_valid = 1;
+            ICW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
+            ICW_data = s_axi_rdata;
+        end
+        endcase
+
+    end
+end
+
+
+// Input Transfers
 always_ff@(posedge clk) begin
-    
-    OUT_stat.resultValid <= 0;
-    
     if (rst) begin
-        state <= 0;
-        OUT_stat.busy <= 0;
-        OUT_stat.progress <= 0;
+        for (integer i = 0; i < NUM_TFS; i=i+1) begin
+            transfers[i] <= 'x;
+            transfers[i].valid <= 0;
+        end
     end
     else begin
         
-        case(state)
-            // Idle
-            0: begin
-                if (IN_ctrl.cmd != MEMC_NONE) begin
-                    
-                    // Interface
-                    case (IN_ctrl.cmd)
-                        
-                        MEMC_CP_CACHE_TO_EXT,
-                        MEMC_CP_EXT_TO_CACHE: begin
-                            state <= 1;
-                            outputResult <= 0;
-                            useWriteData <= 0;
-                        end
-                        MEMC_WRITE_SINGLE: begin
-                            state <= 1;
-                            outputResult <= 0;
-                            useWriteData <= 1;
-                            writeData <= IN_ctrl.data;
-                        end
-                        MEMC_READ_SINGLE: begin
-                            state <= 1;
-                            outputResult <= 1;
-                            useWriteData <= 0;
-                        end
-                        
-                        default: assert(0);
-                    endcase
-                    OUT_stat.rqID <= IN_ctrl.rqID;
-                    OUT_stat.busy <= 1;
-                    OUT_stat.progress <= 0;
-                    lastProgress <= 0;
-                end
-                else begin
-                    OUT_stat.busy <= 0;
-                end
-            end
-            
-            
-            // Wait until transaction is done
-            1: begin
-                if (!MEMIF_busy && !CACHEIF_busy) begin
-                    state <= 0;
-                    OUT_stat.result <= 'x;
-                    OUT_stat.progress <= 0;
-                    OUT_stat.busy <= 0;
-                end
+        // Enqueue
+        if (selReq.cmd != MEMC_NONE) begin
+            assert(enqIdxValid);
+            transfers[enqIdx].valid <= 1;
+            transfers[enqIdx].cmd <= selReq.cmd;
+            transfers[enqIdx].needReadRq <= 0;
+            transfers[enqIdx].needWriteRq <= 0;
+            transfers[enqIdx].oldAddr <= {selReq.oldAddr, 2'b0};
+            transfers[enqIdx].newAddr <= {selReq.extAddr, 2'b0};
+            transfers[enqIdx].cacheAddr <= selReq.sramAddr;
+            transfers[enqIdx].progress <= 0;
+            transfers[enqIdx].cacheID <= selReq.cacheID;
 
-                if (MEM_IF_advance) begin
-                    OUT_stat.progress <= OUT_stat.progress + 1;
-                    if (outputResult) begin
-                        OUT_stat.result <= memoryIFdata;
-                        OUT_stat.resultValid <= 1;
-                    end
-                end
+            if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_EXT_TO_CACHE)
+                transfers[enqIdx].needReadRq <= 1;
+        end
+
+        // Read Request
+        if (readReqSuccess) begin
+            transfers[arIdx].needReadRq <= 0;
+        end
+
+        // Read Data
+        if (s_axi_rvalid && s_axi_rready) begin
+            transfers[s_axi_rid].progress <= transfers[s_axi_rid].progress + 4;
+            if ((transfers[s_axi_rid].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
+                transfers[s_axi_rid] <= 'x;
+                transfers[s_axi_rid].valid <= 0;
             end
-        endcase
+        end
     end
 end
 

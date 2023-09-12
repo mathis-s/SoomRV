@@ -35,7 +35,6 @@ SRC_FILES = \
 	src/MemRTL.sv \
 	src/Top.sv \
 	src/MemoryController.sv \
-	src/ExternalMemorySim.sv \
 	src/RenameTable.sv \
 	src/TagBuffer.sv \
 	src/FPU.sv \
@@ -62,6 +61,8 @@ SRC_FILES = \
 	src/TValSelect.sv \
 	src/SoC.sv \
 	src/TLBMissQueue.sv \
+	src/ExternalAXISim.sv \
+	src/CacheWriteInterface.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
