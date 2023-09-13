@@ -136,21 +136,18 @@ always_comb begin
         // do not issue load
     end
     else if (LMQ_ld.valid && 
-        (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0) &&
-        !(cacheTransfer && cacheLoadCurAddr == LMQ_ld.addr[11:2])
+        (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0)
     ) begin
         uopLd = LMQ_ld;
         LMQ_dequeue = 1;
     end
     else if (IN_uopLd.valid &&
-        (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) &&
-        !(cacheTransfer && cacheLoadCurAddr == IN_uopLd.addr[11:2])
+        (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
     ) begin
         uopLd = IN_uopLd;
         OUT_ldStall = 0;
     end
-    else if (IN_uopELd.valid &&
-        !(cacheTransfer && cacheLoadCurAddr == IN_uopELd.addr[11:2])
+    else if (IN_uopELd.valid
     ) begin
         uopLd.valid = 1;
         uopLd.external = 0;
@@ -247,9 +244,9 @@ end
 
 reg[$clog2(`CASSOC)-1:0] assocCnt;
 
-typedef enum logic[2:0]
+typedef enum logic[3:0]
 {
-    REGULAR, REGULAR_NO_EVICT, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT, SQ_CONFLICT
+    REGULAR, REGULAR_NO_EVICT, TRANS_IN_PROG, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT, SQ_CONFLICT
 } MissType;
 
 typedef struct packed
@@ -272,6 +269,7 @@ always_comb begin
     reg isExtMMIO = !ldOps[1].valid;
     reg isIntMMIO = ldOps[1].valid && ldOps[1].isMMIO;
     reg noEvict = !IF_ct.rdata[0][assocCnt].valid;
+    reg doCacheLoad = 1;
 
     curLd = ld;
     
@@ -295,24 +293,32 @@ always_comb begin
                 if (IF_ct.rdata[0][i].valid && IF_ct.rdata[0][i].addr == ld.addr[31:12]) begin
                     assert(!cacheHit); // multiple hits are invalid
                     cacheHit = 1;
+                    doCacheLoad = 0;
                     readData = IF_cache.rdata[i];
                 end
             end
             
-            if (cacheTransfer && cacheLoadAddr == ld.addr[31:`CLSIZE_E]) begin
-                cacheHit = cacheLoadActive && (lastCacheLoadProgress > {1'b0, ld.addr[`CLSIZE_E-1:2] - cacheLoadBase});
-                readData = cacheHit ? IF_cache.rdata[cacheLoadAssoc] : 'x;
+            // check if cache line is currently being transferred
+            for (integer i = 0; i < 4; i=i+1) begin
+                if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
+                    IN_memc.transfers[i].newAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
+                ) begin
+                    doCacheLoad = 0;
+                    cacheHit = 0;
+                end
             end
-            
-            // trying to access an address that is being evicted
-            if (cacheTransfer && cacheEvictAddr == ld.addr[31:`CLSIZE_E]) begin
+            if (LSU_memc.cmd != MEMC_NONE && 
+                LSU_memc.extAddr[31-2:`CLSIZE_E-2] == ld.addr[31:`CLSIZE_E]
+            ) begin
+                doCacheLoad = 0;
                 cacheHit = 0;
-                readData = 'x;
             end
             
             // don't care if cache is hit if this is a complete forward
-            if (!(isExtMMIO || isIntMMIO) && IN_stFwd.mask == 4'b1111)
+            if (!(isExtMMIO || isIntMMIO) && IN_stFwd.mask == 4'b1111) begin
                 cacheHit = 1;
+                doCacheLoad = 0;
+            end
         end
 
         if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && 
@@ -359,8 +365,10 @@ always_comb begin
                 miss[0].mtype = SQ_CONFLICT;
             else if (loadWasExtIOBusy)
                 miss[0].mtype = IO_BUSY;
-            else
+            else if (doCacheLoad)
                 miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
+            else
+                miss[0].mtype = TRANS_IN_PROG;
             miss[0].oldAddr = {IF_ct.rdata[0][assocCnt].addr, 12'b0};
             miss[0].missAddr = ld.addr;
             miss[0].assoc = assocCnt;
@@ -410,6 +418,7 @@ reg[$clog2(SIZE)-1:0] setDirtyIdx;
 always_comb begin
     ST_UOp st = stOps[1];
     reg cacheHit = 0;
+    reg doCacheLoad = 1;
     reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
     reg noEvict = !IF_ct.rdata[1][assocCnt].valid;
 
@@ -424,28 +433,35 @@ always_comb begin
     setDirty = 0;
     setDirtyIdx = 'x;
 
-    if (stOps[1].valid && !rst) begin
+    if (st.valid && !rst) begin
         
+        // check for hit in cache table
         for (integer i = 0; i < `CASSOC; i=i+1) begin
-            if (IF_ct.rdata[1][i].valid && IF_ct.rdata[1][i].addr == stOps[1].addr[31:12]) begin
+            if (IF_ct.rdata[1][i].valid && IF_ct.rdata[1][i].addr == st.addr[31:12]) begin
                 assert(!cacheHit); // multiple hits are invalid
+                doCacheLoad = 0;
                 cacheHit = 1;
                 cacheHitAssoc = i[$clog2(`CASSOC)-1:0];
             end
         end
 
-        // trying to access an address that is being evicted or loaded
-        if (cacheHit && cacheTransfer && cacheTransferIdx == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}) begin
+        // check if cache line is currently being transferred
+        for (integer i = 0; i < 4; i=i+1) begin
+            if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
+                IN_memc.transfers[i].newAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
+            ) begin
+                doCacheLoad = 0;
             cacheHit = 0;
             cacheHitAssoc = 'x;
         end
-        
-        // do allow access to regions of memory that have been loaded already in the current transfer
-        if (cacheTransfer && cacheLoadAddr == st.addr[31:`CLSIZE_E]) begin
-            cacheHit = cacheLoadActive && (cacheLoadProgress > {1'b0, st.addr[`CLSIZE_E-1:2] - cacheLoadBase});
-            cacheHitAssoc = cacheLoadAssoc;
         end
-        
+        if (LSU_memc.cmd != MEMC_NONE && 
+            LSU_memc.extAddr[31-2:`CLSIZE_E-2] == st.addr[31:`CLSIZE_E]
+        ) begin
+            doCacheLoad = 0;
+            cacheHit = 0;
+            cacheHitAssoc = 'x;
+        end
         
         if (stConflictMiss[1]) begin
             miss[1].valid = 1;
@@ -477,18 +493,18 @@ always_comb begin
             // now that we're sure they hit cache.
             if (cacheHit) begin
                 IF_cache.we = 0;
-                IF_cache.waddr = stOps[1].addr[11:0];
+                IF_cache.waddr = st.addr[11:0];
                 IF_cache.wassoc = cacheHitAssoc;
-                IF_cache.wdata = stOps[1].data;
-                IF_cache.wmask = stOps[1].wmask;
+                IF_cache.wdata = st.data;
+                IF_cache.wmask = st.wmask;
                 setDirty = 1;
-                setDirtyIdx = {cacheHitAssoc, stOps[1].addr[11:`CLSIZE_E]};
+                setDirtyIdx = {cacheHitAssoc, st.addr[11:`CLSIZE_E]};
             end
             else begin
                 miss[1].valid = 1;
-                miss[1].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
+                miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
                 miss[1].oldAddr = {IF_ct.rdata[1][assocCnt].addr, 12'b0};
-                miss[1].missAddr = stOps[1].addr;
+                miss[1].missAddr = st.addr;
                 miss[1].assoc = assocCnt;
             end
         end
@@ -515,18 +531,6 @@ enum logic[3:0]
     FLUSH, FLUSH_RQ, FLUSH_ACTIVE, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
 } state;
 
-reg cacheTransfer;
-wire[$clog2(SIZE)-1:0] cacheTransferIdx = {curCacheMiss.assoc, curCacheMiss.missAddr[11:`CLSIZE_E]};
-wire cacheLoadActive = (state == LOAD_ACTIVE);
-
-wire[`CLSIZE_E-3:0] cacheLoadBase = curCacheMiss.missAddr[`CLSIZE_E-1:2];
-wire[`CLSIZE_E-2:0] cacheLoadProgress = IN_memc.progress[`CLSIZE_E-2:0];
-
-wire[31-`CLSIZE_E:0] cacheLoadAddr = curCacheMiss.missAddr[31:`CLSIZE_E];
-wire[31-`CLSIZE_E:0] cacheEvictAddr = curCacheMiss.oldAddr[31:`CLSIZE_E];
-wire[9:0] cacheLoadCurAddr = {curCacheMiss.missAddr[11:`CLSIZE_E], cacheLoadProgress[`CLSIZE_E-3:0]};
-
-reg[$clog2(`CASSOC)-1:0] cacheLoadAssoc;
 reg LMQ_dequeue;
 
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
@@ -541,10 +545,7 @@ LoadMissQueue#(4) loadMissQueue
     
     .OUT_full(LMQ_full),
 
-    .IN_cacheLoadActive(cacheLoadActive),
-    .IN_cacheLoadBase(cacheLoadBase),
-    .IN_cacheLoadProgress(cacheLoadProgress),
-    .IN_cacheLoadAddr(cacheLoadAddr),
+    .IN_memc(IN_memc),
 
     .IN_ld(curLd),
     .IN_enqueue(loadIsRegularMiss),
@@ -573,7 +574,7 @@ end
 
 wire redoStore = stOps[1].valid &&
     (miss[1].valid ?
-        (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT) : 
+        (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT || miss[1].mtype == TRANS_IN_PROG) : 
         (!stOps[1].isMMIO && IF_cache.wbusy));
 
 assign OUT_stAck.id = stOps[1].id;
@@ -592,7 +593,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT) begin
+            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -643,7 +644,7 @@ reg flushQueued;
 wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || curLd.valid || stOps[0].valid || stOps[1].valid);
 wire flushReady = IN_SQ_empty && !busy;
 wire flushActive = (
-    state == FLUSH || state == FLUSH_RQ || state == FLUSH_ACTIVE || 
+    state == FLUSH || 
     state == FLUSH_READ0 || state == FLUSH_READ1);
 assign OUT_busy = busy || flushQueued || flushActive;
 
@@ -651,36 +652,30 @@ reg flushDone;
 reg[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushIdx;
 reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 
-
-reg[`CLSIZE_E-2:0] lastCacheLoadProgress;
-
 // Cache<->Memory Transfer State Machine
 CacheMiss curCacheMiss;
 reg[$clog2(`CASSOC)-1:0] replaceAssoc;
 always_ff@(posedge clk) begin
+    
+    // For now, we ignore MemC stalls and assume the command
+    // was accepted. If not, both loads and stores are eventually
+    // re-run. This is just problematic for MMIO and management ops.
+    LSU_memc <= 'x;
+    LSU_memc.cmd <= MEMC_NONE;
 
     if (rst) begin
         state <= IDLE;
         replaceAssoc <= 0;
-        LSU_memc <= 'x;
-        LSU_memc.cmd <= MEMC_NONE;
-        cacheTransfer <= 0;
-        cacheLoadAssoc <= 0;
         flushQueued <= 0;
-        lastCacheLoadProgress <= 0;
     end
     else begin
 
         if (IN_flush) flushQueued <= 1;
         if (setDirty) dirty[setDirtyIdx] <= 1;
 
-        lastCacheLoadProgress <= cacheLoadProgress;
-
         case (state)
             IDLE: begin
                 reg temp = 0;
-                cacheTransfer <= 0;
-                lastCacheLoadProgress <= 0;
                 for (integer i = 0; i < 2; i=i+1) begin
 
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
@@ -690,7 +685,6 @@ always_ff@(posedge clk) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
-                        cacheTransfer <= 1;
                         
                         // if not dirty, do not copy back to main memory
                         if (missType == REGULAR && !dirty[missIdx] && (!setDirty || setDirtyIdx != missIdx))
@@ -701,34 +695,28 @@ always_ff@(posedge clk) begin
                         
                         case (missType)
                             REGULAR: begin
-                                state <= REPLACE_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
                                 LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
-                                cacheLoadAssoc <= miss[i].assoc;
                             end
 
                             REGULAR_NO_EVICT: begin
-                                state <= LOAD_RQ;
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
                                 LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
-                                cacheLoadAssoc <= miss[i].assoc;
                             end
 
                             MGMT_CLEAN,
                             MGMT_FLUSH: begin
-                                state <= EVICT_RQ;
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
                                 LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
-                                cacheLoadAssoc <= miss[i].assoc;
                             end
                             
                             default: ; // MGMT_INVAL does not evict the cache line
@@ -743,50 +731,10 @@ always_ff@(posedge clk) begin
                         flushIdx <= 0;
                         flushAssocIdx <= 0;
                         flushDone <= 0;
-                        cacheTransfer <= 1;
                     end
                 end
             end
-            LOAD_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == 0) begin
-                    LSU_memc.cmd <= MEMC_NONE;
-                    state <= LOAD_ACTIVE;
-                end
-            end
-            LOAD_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
-                    state <= IDLE;
-                    cacheTransfer <= 0;
-                end
-            end
-            FLUSH_RQ, EVICT_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == 0) begin
-                    LSU_memc.cmd <= MEMC_NONE;
-                    state <= (state == EVICT_RQ) ? EVICT_ACTIVE : FLUSH_ACTIVE;
-                end
-            end
-            FLUSH_ACTIVE, EVICT_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
-                    state <= (state == EVICT_ACTIVE) ? IDLE : FLUSH;
-                    if (state == EVICT_ACTIVE) cacheTransfer <= 0;
-                end
-            end
-            REPLACE_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == 0) begin
-                    LSU_memc.cmd <= MEMC_NONE;
-                    state <= REPLACE_ACTIVE;
-                end
-            end
-            REPLACE_ACTIVE: begin
-                if (!IN_memc.busy || IN_memc.progress == (1 << (`CLSIZE_E - 2))) begin
-                    state <= LOAD_RQ;
-                    // sramAddr stays the same
-                    LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    LSU_memc.extAddr <= {curCacheMiss.missAddr[31:2]};
-                    LSU_memc.cacheID <= 0;
-                    LSU_memc.rqID <= 0;
-                end
-            end
+
             FLUSH_READ0, FLUSH_READ1: begin
                 // wait two cycles to read from cache table...
                 state <= (state == FLUSH_READ0) ? FLUSH : FLUSH_READ0;
@@ -794,20 +742,19 @@ always_ff@(posedge clk) begin
             FLUSH: begin
                 if (flushDone) begin
                     state <= IDLE;
-                    cacheTransfer <= 0;
                 end
                 else begin
+                    
                     CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
                     if (entry.valid && dirty[{flushAssocIdx, flushIdx}]) begin
-                        state <= FLUSH_RQ;
                         LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         LSU_memc.sramAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
                         LSU_memc.extAddr <= {entry.addr, flushIdx, {(`CLSIZE_E-2){1'b0}}};
                         LSU_memc.cacheID <= 0;
                         LSU_memc.rqID <= 0;
-                        cacheLoadAssoc <= flushAssocIdx;
                     end
                     else if (&flushAssocIdx) state <= FLUSH_READ1;
+
                     {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
                 end
             end

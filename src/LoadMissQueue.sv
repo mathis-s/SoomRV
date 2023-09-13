@@ -9,10 +9,7 @@ module LoadMissQueue#(parameter SIZE=4)
 
     output reg OUT_full,
 
-    input wire IN_cacheLoadActive,
-    input wire[`CLSIZE_E-3:0] IN_cacheLoadBase,
-    input wire[`CLSIZE_E-2:0] IN_cacheLoadProgress,
-    input wire[31-`CLSIZE_E:0] IN_cacheLoadAddr,
+    input MemController_Res IN_memc,
 
     input LD_UOp IN_ld,
     input wire IN_enqueue,
@@ -54,13 +51,13 @@ always_ff@(posedge clk) begin
         end
 
         // Set Ready
-        for (integer i = 0; i < SIZE; i=i+1) begin
-            if (IN_cacheLoadActive && queue[i].ld.valid &&
-                queue[i].ld.addr[31:`CLSIZE_E] == IN_cacheLoadAddr &&
-                {1'b0, queue[i].ld.addr[`CLSIZE_E-1:2] - IN_cacheLoadBase} < IN_cacheLoadProgress
-            )
-                queue[i].ready <= 1;
-        end
+        //for (integer i = 0; i < SIZE; i=i+1) begin
+        //    if (IN_cacheLoadActive && queue[i].ld.valid &&
+        //        queue[i].ld.addr[31:`CLSIZE_E] == IN_cacheLoadAddr &&
+        //        {1'b0, queue[i].ld.addr[`CLSIZE_E-1:2] - IN_cacheLoadBase} < IN_cacheLoadProgress
+        //    )
+        //        queue[i].ready <= 1;
+        //end
 
         // Enqueue
         if (IN_ld.valid && IN_enqueue && !OUT_full &&

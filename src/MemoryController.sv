@@ -184,7 +184,6 @@ logic ICW_ready;
 logic ICW_valid;
 logic[`CACHE_SIZE_E-3:0] ICW_addr;
 logic[127:0] ICW_data;
-
 CacheWriteInterface#(`CACHE_SIZE_E-2, 8, 128, 128) icacheWriteIF
 (
     .clk(clk),
@@ -202,13 +201,30 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, 128, 128) icacheWriteIF
     .OUT_CACHE_data(OUT_CACHE_data[1])
 );
 
+logic DCW_ready;
+logic DCW_valid;
+logic[`CACHE_SIZE_E-3:0] DCW_addr;
+logic[127:0] DCW_data;
+CacheWriteInterface#(`CACHE_SIZE_E-2, 8, 128, 32) dcacheWriteIF
+(
+    .clk(clk),
+    .rst(rst),
+
+    .OUT_ready(DCW_ready),
+    .IN_valid(DCW_valid),
+    .IN_addr(DCW_addr),
+    .IN_data(DCW_data),
+
+    .IN_CACHE_ready(1'b1),
+    .OUT_CACHE_ce(OUT_CACHE_ce[0]),
+    .OUT_CACHE_we(OUT_CACHE_we[0]),
+    .OUT_CACHE_addr(OUT_CACHE_addr[0]),
+    .OUT_CACHE_data(OUT_CACHE_data[0][31:0])
+);
+
 // temp
 always_comb begin
-    OUT_CACHE_ce[0] = 1;
-    OUT_CACHE_we[0] = 1;
-    OUT_CACHE_addr[0] = 'x;
-    OUT_CACHE_data[0] = 'x;
-    OUT_CACHE_wm[0] = '0;
+    OUT_CACHE_wm[0] = '1;
     OUT_CACHE_wm[1] = '1;
 end
 
@@ -228,13 +244,20 @@ always_comb begin
     ICW_valid = 0;
     ICW_addr = 'x;
     ICW_data = 'x;
-
+    DCW_valid = 0;
+    DCW_addr = 'x;
+    DCW_data = 'x;
 
     if (s_axi_rvalid) begin
         reg[0:0] cID = transfers[s_axi_rid].cacheID;
 
         case (cID)
-        0: ;
+        0: if (DCW_ready) begin // dcache
+            s_axi_rready = 1;
+            DCW_valid = 1;
+            DCW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
+            DCW_data = s_axi_rdata;
+        end
 
         1: if (ICW_ready) begin // icache
             s_axi_rready = 1;
@@ -243,7 +266,6 @@ always_comb begin
             ICW_data = s_axi_rdata;
         end
         endcase
-
     end
 end
 
@@ -265,9 +287,9 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].cmd <= selReq.cmd;
             transfers[enqIdx].needReadRq <= 0;
             transfers[enqIdx].needWriteRq <= 0;
-            transfers[enqIdx].oldAddr <= {selReq.oldAddr, 2'b0};
-            transfers[enqIdx].newAddr <= {selReq.extAddr, 2'b0};
-            transfers[enqIdx].cacheAddr <= selReq.sramAddr;
+            transfers[enqIdx].oldAddr <= {selReq.oldAddr, 2'b0} & ~(WIDTH/8 - 1);
+            transfers[enqIdx].newAddr <= {selReq.extAddr, 2'b0} & ~(WIDTH/8 - 1);
+            transfers[enqIdx].cacheAddr <= selReq.sramAddr & ~((WIDTH/8 - 1) >> 2);
             transfers[enqIdx].progress <= 0;
             transfers[enqIdx].cacheID <= selReq.cacheID;
 

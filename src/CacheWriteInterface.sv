@@ -30,7 +30,7 @@ typedef struct packed
 
 Transfer cur;
 
-assign OUT_ready = !cur.valid || (writeValid && cur.idx == 1'((IWIDTH/CWIDTH) - 1));
+assign OUT_ready = !cur.valid || (writeValid && cur.idx == ($bits(cur.idx))'((IWIDTH/CWIDTH) - 1));
 
 wire writeValid = !OUT_CACHE_ce && IN_CACHE_ready;
 always_comb begin
@@ -44,7 +44,7 @@ always_comb begin
     if (cur.valid) begin
         OUT_CACHE_ce = 0;
         OUT_CACHE_we = 0;
-        OUT_CACHE_addr = cur.addr + {{`CACHE_SIZE_E-3{1'b0}}, cur.idx};
+        OUT_CACHE_addr = cur.addr + $bits(cur.addr)'(cur.idx);
         OUT_CACHE_data = cur.data[cur.idx * CWIDTH +: CWIDTH];
     end
 end
