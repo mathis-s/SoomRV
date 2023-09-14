@@ -637,7 +637,7 @@ always_comb begin
 end
 
 // keep track of dirtyness here 
-// (otherwise1 we would need a separate write port to cache table)
+// (otherwise we would need a separate write port to cache table)
 reg[SIZE-1:0] dirty;
 
 reg flushQueued;
@@ -695,9 +695,10 @@ always_ff@(posedge clk) begin
                         
                         case (missType)
                             REGULAR: begin
-                                LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                                LSU_memc.cmd <= MEMC_REPLACE;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
+                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
+                                LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                             end
@@ -705,6 +706,7 @@ always_ff@(posedge clk) begin
                             REGULAR_NO_EVICT: begin
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.oldAddr <= 'x;
                                 LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
@@ -714,7 +716,8 @@ always_ff@(posedge clk) begin
                             MGMT_FLUSH: begin
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.extAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
+                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
+                                LSU_memc.extAddr <= 'x;
                                 LSU_memc.cacheID <= 0;
                                 LSU_memc.rqID <= 0;
                             end

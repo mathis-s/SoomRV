@@ -197,20 +197,18 @@ end
 
 // Requests
 always_comb begin
-    s_axi_awready = 0;
-    s_axi_arready = 0;
-    s_axi_arready = s_axi_arvalid && !tfs[0][s_axi_arid].valid;
-    s_axi_awready = s_axi_awvalid && !tfs[1][s_axi_awid].valid;
+    s_axi_arready = !tfs[0][s_axi_arid].valid;
+    s_axi_awready = !tfs[1][s_axi_awid].valid;
 end
 always_ff@(posedge clk) begin
-    if (s_axi_arready) begin
+    if (s_axi_arready && s_axi_arvalid) begin
         tfs[0][s_axi_arid].valid <= 1;
         tfs[0][s_axi_arid].addr <= s_axi_araddr;
         tfs[0][s_axi_arid].btype <= BurstType'(s_axi_arburst);
         tfs[0][s_axi_arid].len <= s_axi_arlen;
         tfs[0][s_axi_arid].cur <= 0;
     end
-    if (s_axi_awready) begin
+    if (s_axi_awready && s_axi_awvalid) begin
         tfs[1][s_axi_awid].valid <= 1;
         tfs[1][s_axi_awid].addr <= s_axi_awaddr;
         tfs[1][s_axi_awid].btype <= BurstType'(s_axi_awburst);

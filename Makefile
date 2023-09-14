@@ -63,6 +63,8 @@ SRC_FILES = \
 	src/TLBMissQueue.sv \
 	src/ExternalAXISim.sv \
 	src/CacheWriteInterface.sv \
+	src/CacheReadInterface.sv \
+	src/FIFO.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

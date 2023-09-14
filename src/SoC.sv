@@ -219,7 +219,7 @@ assign DC_dataOut = {96'bx, dcache_out0[MEMC_readAssoc[1]]};
 assign IF_cache.rdata = dcache_out1;
 
 assign IF_cache.rbusy = 1'b0;
-assign IF_cache.wbusy = 1'b1;//MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
+assign IF_cache.wbusy = MC_DC_used[0] && MC_DC_if[0].addr[0] == CORE_DC_if.addr[0];
 
 MemRTL#(128, (1 << (`CACHE_SIZE_E - 4)), 32) icache
 (
