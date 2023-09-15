@@ -82,6 +82,7 @@ always_comb begin
             FIFO_valid = 1;
             FIFO_data = acc;
             FIFO_data[(WNUM-1) * CWIDTH +: CWIDTH] = IN_CACHE_data;
+            FIFO_id = readIdSR[1];
             FIFO_last = readLastSR[1];
             accIdx_c = 0;
         end

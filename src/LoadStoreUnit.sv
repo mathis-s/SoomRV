@@ -593,7 +593,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
+            if (forwardMiss && miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -655,18 +655,22 @@ reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 // Cache<->Memory Transfer State Machine
 CacheMiss curCacheMiss;
 reg[$clog2(`CASSOC)-1:0] replaceAssoc;
+
+
+wire forwardMiss = LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1];
 always_ff@(posedge clk) begin
     
-    // For now, we ignore MemC stalls and assume the command
-    // was accepted. If not, both loads and stores are eventually
-    // re-run. This is just problematic for MMIO and management ops.
-    LSU_memc <= 'x;
-    LSU_memc.cmd <= MEMC_NONE;
+    if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
+        LSU_memc <= 'x;
+        LSU_memc.cmd <= MEMC_NONE;
+    end
 
     if (rst) begin
         state <= IDLE;
         replaceAssoc <= 0;
         flushQueued <= 0;
+        LSU_memc <= 'x;
+        LSU_memc.cmd <= MEMC_NONE;
     end
     else begin
 
@@ -681,7 +685,7 @@ always_ff@(posedge clk) begin
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT) begin
+                    if (forwardMiss && miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
