@@ -15,6 +15,7 @@ assign OUT_halt = SOC_poweroff || SOC_reboot;
 logic[ID_LEN-1:0]  s_axi_awid;
 logic[ADDR_LEN-1:0] s_axi_awaddr;
 logic[7:0] s_axi_awlen;
+logic[2:0] s_axi_awsize;
 logic[1:0] s_axi_awburst;
 logic[0:0] s_axi_awlock;
 logic[3:0] s_axi_awcache;
@@ -31,6 +32,7 @@ logic s_axi_bvalid;
 logic[ID_LEN-1:0] s_axi_arid;
 logic[ADDR_LEN-1:0] s_axi_araddr;
 logic[7:0] s_axi_arlen;
+logic[2:0] s_axi_arsize;
 logic[1:0] s_axi_arburst;
 logic[0:0] s_axi_arlock;
 logic[3:0] s_axi_arcache;
@@ -49,6 +51,7 @@ ExternalAXISim extMem
     .s_axi_awid(s_axi_awid),
     .s_axi_awaddr(s_axi_awaddr),
     .s_axi_awlen(s_axi_awlen),
+    .s_axi_awsize(s_axi_awsize),
     .s_axi_awburst(s_axi_awburst),
     .s_axi_awlock(s_axi_awlock),
     .s_axi_awcache(s_axi_awcache),
@@ -65,6 +68,7 @@ ExternalAXISim extMem
     .s_axi_arid(s_axi_arid),
     .s_axi_araddr(s_axi_araddr),
     .s_axi_arlen(s_axi_arlen),
+    .s_axi_arsize(s_axi_arsize),
     .s_axi_arburst(s_axi_arburst),
     .s_axi_arlock(s_axi_arlock),
     .s_axi_arcache(s_axi_arcache),
@@ -89,6 +93,7 @@ SoC soc
     .s_axi_awid(s_axi_awid),
     .s_axi_awaddr(s_axi_awaddr),
     .s_axi_awlen(s_axi_awlen),
+    .s_axi_awsize(s_axi_awsize),
     .s_axi_awburst(s_axi_awburst),
     .s_axi_awlock(s_axi_awlock),
     .s_axi_awcache(s_axi_awcache),
@@ -105,6 +110,7 @@ SoC soc
     .s_axi_arid(s_axi_arid),
     .s_axi_araddr(s_axi_araddr),
     .s_axi_arlen(s_axi_arlen),
+    .s_axi_arsize(s_axi_arsize),
     .s_axi_arburst(s_axi_arburst),
     .s_axi_arlock(s_axi_arlock),
     .s_axi_arcache(s_axi_arcache),

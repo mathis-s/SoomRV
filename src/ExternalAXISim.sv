@@ -7,7 +7,7 @@ module ExternalAXISim
     input[ID_LEN-1:0]  s_axi_awid, // write req id
     input[ADDR_LEN-1:0] s_axi_awaddr, // write addr
     input[7:0] s_axi_awlen, // write len
-    //input[2:0] s_axi_awsize, // word size
+    input[2:0] s_axi_awsize, // word size
     input[1:0] s_axi_awburst, // FIXED, INCR, WRAP, RESERVED
     input[0:0] s_axi_awlock, // exclusive access
     input[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
@@ -31,7 +31,7 @@ module ExternalAXISim
     input[ID_LEN-1:0] s_axi_arid,
     input[ADDR_LEN-1:0] s_axi_araddr,
     input[7:0] s_axi_arlen,
-    //input[2:0] s_axi_arsize,
+    input[2:0] s_axi_arsize,
     input[1:0] s_axi_arburst,
     input[0:0] s_axi_arlock,
     input[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}

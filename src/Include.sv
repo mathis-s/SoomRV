@@ -8,6 +8,7 @@ typedef logic[11:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
+typedef logic[0:0] CacheID_t;
 
 typedef enum logic[5:0]
 {
@@ -297,46 +298,62 @@ typedef enum logic[1:0]
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
-typedef enum logic[2:0]
+typedef enum logic[3:0]
 {
     MEMC_NONE,
+
+    // cache line operations
     MEMC_REPLACE,
     MEMC_CP_CACHE_TO_EXT,
     MEMC_CP_EXT_TO_CACHE,
-    MEMC_READ_SINGLE,
-    MEMC_WRITE_SINGLE
+
+    // single access
+    MEMC_READ_BYTE,
+    MEMC_READ_HALF,
+    MEMC_READ_WORD,
+    MEMC_WRITE_BYTE,
+    MEMC_WRITE_HALF,
+    MEMC_WRITE_WORD
 } MemC_Cmd;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic[`CACHE_SIZE_E-3:0] id;
+    logic valid;
+} MemController_SglLdRes;
+
+typedef struct packed
+{
+    logic[`CACHE_SIZE_E-3:0] id;
+    logic valid;
+} MemController_SglStRes;
 
 typedef struct packed
 {
     logic[31:0] oldAddr;
     logic[31:0] newAddr;
     logic[`CLSIZE_E-2:0] progress;
-    logic[0:0] cacheID;
+    CacheID_t cacheID;
     logic valid;
 } MemController_Transf;
 
 typedef struct packed
 {
     MemC_Cmd cmd;
-    logic[31:0] data;
-    logic[`CACHE_SIZE_E-3:0] sramAddr;
-    logic[29:0] extAddr;
-    logic[29:0] oldAddr;
-    logic[0:0] cacheID;
-    logic[2:0] rqID;
+    logic[31:0] data; // only used for MMIO stores
+    logic[`CACHE_SIZE_E-3:0] sramAddr; // instead used as ID for MMIO 
+    logic[31:0] extAddr;
+    logic[31:0] oldAddr;
+    CacheID_t cacheID;
 } MemController_Req;
 
 typedef struct packed
 {
     MemController_Transf[3:0] transfers;
-
-    logic[9:0] progress;
+    MemController_SglLdRes sglLdRes;
+    MemController_SglStRes sglStRes;
     
-    logic[31:0] result;
-    logic resultValid;
-    
-    logic[2:0] rqID;
     logic[2:0] stall;
     logic busy;
 } MemController_Res;

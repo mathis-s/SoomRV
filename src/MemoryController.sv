@@ -17,7 +17,7 @@ module MemoryController
     output[ID_LEN-1:0]  s_axi_awid, // write req id
     output[ADDR_LEN-1:0] s_axi_awaddr, // write addr
     output[7:0] s_axi_awlen, // write len
-    //output[2:0] s_axi_awsize, // word size
+    output[2:0] s_axi_awsize, // word size
     output[1:0] s_axi_awburst, // FIXED, INCR, WRAP, RESERVED
     output[0:0] s_axi_awlock, // exclusive access
     output[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
@@ -41,7 +41,7 @@ module MemoryController
     output[ID_LEN-1:0] s_axi_arid,
     output[ADDR_LEN-1:0] s_axi_araddr,
     output[7:0] s_axi_arlen,
-    //output[2:0] s_axi_arsize,
+    output[2:0] s_axi_arsize,
     output[1:0] s_axi_arburst,
     output[0:0] s_axi_arlock,
     output[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
@@ -56,10 +56,6 @@ module MemoryController
     input s_axi_rlast,
     input s_axi_rvalid
 );
-
-always_comb begin
-    s_axi_bready = '1;
-end
 
 always_comb begin
     OUT_CACHE_we[0] = 1;
@@ -100,12 +96,28 @@ typedef struct packed
     logic needReadRq;
     logic[1:0] needWriteRq; // 0: cache, 1: AXI
     
-    logic[0:0] cacheID;
+    CacheID_t cacheID;
     MemC_Cmd cmd;
     logic valid;
 } Transfer;
 
 Transfer transfers[NUM_TFS-1:0];
+
+logic[3:0] isMMIO;
+always_comb begin
+    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+        case(transfers[i].cmd)
+            MEMC_READ_BYTE, MEMC_READ_HALF, MEMC_READ_WORD,
+            MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD:
+                isMMIO[i] = transfers[i].valid;
+            default:
+                isMMIO[i] = 0;
+        endcase
+    end
+end
+
+MemController_SglLdRes sglLdRes;
+MemController_SglStRes sglStRes;
 
 // Find enqueue index
 logic[$clog2(NUM_TFS)-1:0] enqIdx;
@@ -152,6 +164,7 @@ always_comb begin
     s_axi_arlock = '0;
     s_axi_arcache = '0;
     s_axi_arvalid = '0;
+    s_axi_arsize = '0;
     
     // Find Op that requires read request
     arIdx = 'x;
@@ -168,9 +181,16 @@ always_comb begin
     if (arIdxValid) begin
         s_axi_arvalid = 1;
         s_axi_arburst = WRAP;
-        s_axi_arlen = (1 << (`CLSIZE_E - 4)) - 1;
+        s_axi_arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
         s_axi_araddr = transfers[arIdx].newAddr;
         s_axi_arid = arIdx;
+
+        case (transfers[arIdx].cmd)
+            MEMC_WRITE_BYTE: s_axi_arsize = 0;
+            MEMC_WRITE_HALF: s_axi_arsize = 1;
+            MEMC_WRITE_WORD: s_axi_arsize = 2;
+            default: s_axi_arsize = 3'($clog2(WIDTH/8));
+        endcase
     end
 end
 
@@ -178,12 +198,13 @@ end
 always_comb begin
     OUT_stat = '0;
     OUT_stat.busy = 1; // make old clients stall
-
+    
+    // Cache Line Transfer Status
     for (integer i = 0; i < NUM_TFS; i=i+1) begin
         OUT_stat.transfers[i] = 'x;
         OUT_stat.transfers[i].valid = 0;
         
-        if (transfers[i].valid) begin
+        if (transfers[i].valid && !isMMIO[i]) begin
             OUT_stat.transfers[i].valid = 1;
             OUT_stat.transfers[i].cacheID = transfers[i].cacheID;
             OUT_stat.transfers[i].progress = transfers[i].progress[`CLSIZE_E-2:0];
@@ -191,6 +212,10 @@ always_comb begin
             OUT_stat.transfers[i].newAddr = transfers[i].newAddr;
         end
     end
+    
+    // MMIO
+    OUT_stat.sglLdRes = sglLdRes;
+    OUT_stat.sglStRes = sglStRes;
 end
 
 logic ICW_ready;
@@ -268,23 +293,27 @@ always_comb begin
     
     // todo: add fifo to remove comb path from valid to ready
     if (s_axi_rvalid) begin
-        reg[0:0] cID = transfers[s_axi_rid].cacheID;
-
-        case (cID)
-        0: if (DCW_ready && transfers[s_axi_rid].evictProgress > transfers[s_axi_rid].progress) begin // dcache
+        if (isMMIO[s_axi_rid]) begin
             s_axi_rready = 1;
-            DCW_valid = 1;
-            DCW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
-            DCW_data = s_axi_rdata;
         end
+        else begin
+            CacheID_t cID = transfers[s_axi_rid].cacheID;
+            case (cID)
+            0: if (DCW_ready && transfers[s_axi_rid].evictProgress > transfers[s_axi_rid].progress) begin // dcache
+                s_axi_rready = 1;
+                DCW_valid = 1;
+                DCW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
+                DCW_data = s_axi_rdata;
+            end
 
-        1: if (ICW_ready) begin // icache
-            s_axi_rready = 1;
-            ICW_valid = 1;
-            ICW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
-            ICW_data = s_axi_rdata;
+            1: if (ICW_ready) begin // icache
+                s_axi_rready = 1;
+                ICW_valid = 1;
+                ICW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
+                ICW_data = s_axi_rdata;
+            end
+            endcase
         end
-        endcase
     end
 end
 
@@ -338,6 +367,7 @@ always_comb begin
     // Default AXI write rq bus state
     s_axi_awaddr = '0;
     s_axi_awlen = '0;
+    s_axi_awsize = '0;
     s_axi_awburst = '0;
     s_axi_awlock = '0;
     s_axi_awcache = '0;
@@ -369,9 +399,16 @@ always_comb begin
     if (awIdxValid && transfers[awIdx].needWriteRq[1]) begin
         s_axi_awvalid = 1;
         s_axi_awburst = WRAP;
-        s_axi_awlen = (1 << (`CLSIZE_E - 4)) - 1;
+        s_axi_awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
         s_axi_awaddr = transfers[awIdx].oldAddr;
         s_axi_awid = awIdx;
+        
+        case (transfers[awIdx].cmd)
+            MEMC_WRITE_BYTE: s_axi_awsize = 0;
+            MEMC_WRITE_HALF: s_axi_awsize = 1;
+            MEMC_WRITE_WORD: s_axi_awsize = 2;
+            default: s_axi_awsize = 3'($clog2(WIDTH/8));
+        endcase
     end
     
     // Request to dcache read interface
@@ -403,9 +440,14 @@ always_comb begin
 end
 assign DCR_dataReady = s_axi_wready;
 
+assign s_axi_bready = 1;
 
 // Input Transfers
 always_ff@(posedge clk) begin
+    
+    sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
+    sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};
+
     if (rst) begin
         for (integer i = 0; i < NUM_TFS; i=i+1) begin
             transfers[i] <= 'x;
@@ -421,20 +463,34 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].cmd <= selReq.cmd;
             transfers[enqIdx].needReadRq <= '0;
             transfers[enqIdx].needWriteRq <= '0;
-            transfers[enqIdx].oldAddr <= {selReq.oldAddr, 2'b0} & ~(WIDTH/8 - 1);
-            transfers[enqIdx].newAddr <= {selReq.extAddr, 2'b0} & ~(WIDTH/8 - 1);
+            transfers[enqIdx].oldAddr <= selReq.oldAddr & ~(WIDTH/8 - 1);
+            transfers[enqIdx].newAddr <= selReq.extAddr & ~(WIDTH/8 - 1);
             transfers[enqIdx].cacheAddr <= selReq.sramAddr & ~((WIDTH/8 - 1) >> 2);
             transfers[enqIdx].progress <= 0;
-            transfers[enqIdx].evictProgress <= '1;
+            transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
             transfers[enqIdx].cacheID <= selReq.cacheID;
 
-            if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_EXT_TO_CACHE)
-                transfers[enqIdx].needReadRq <= '1;
-
-            if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_CACHE_TO_EXT) begin
-                transfers[enqIdx].needWriteRq <= '1;
-                transfers[enqIdx].evictProgress <= 0;
-            end
+            case (selReq.cmd)
+                MEMC_REPLACE: begin
+                    transfers[enqIdx].needReadRq <= '1;
+                    transfers[enqIdx].needWriteRq <= '1;
+                    transfers[enqIdx].evictProgress <= 0;
+                end
+                MEMC_CP_EXT_TO_CACHE: begin
+                    transfers[enqIdx].needReadRq <= '1;
+                end
+                MEMC_CP_CACHE_TO_EXT: begin
+                    transfers[enqIdx].needWriteRq <= '1;
+                    transfers[enqIdx].evictProgress <= 0;
+                end
+                MEMC_READ_BYTE, MEMC_READ_HALF, MEMC_READ_WORD: begin
+                    transfers[enqIdx].needReadRq <= '1;
+                end
+                MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
+                    transfers[enqIdx].needWriteRq <= 2'b10;
+                end
+                default: assert(0);
+            endcase
         end
 
         // Read Request
@@ -444,10 +500,20 @@ always_ff@(posedge clk) begin
 
         // Read Data
         if (s_axi_rvalid && s_axi_rready) begin
+
             transfers[s_axi_rid].progress <= transfers[s_axi_rid].progress + 4;
             if ((transfers[s_axi_rid].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
                 transfers[s_axi_rid] <= 'x;
                 transfers[s_axi_rid].valid <= 0;
+            end
+            
+            if (isMMIO[s_axi_rid]) begin
+                transfers[s_axi_rid] <= 'x;
+                transfers[s_axi_rid].valid <= 0;
+                
+                sglLdRes.valid <= 1;
+                sglLdRes.id <= transfers[s_axi_rid].cacheAddr;
+                sglLdRes.data <= s_axi_rdata[31:0];
             end
         end
 
@@ -460,6 +526,12 @@ always_ff@(posedge clk) begin
         // Write Data
         if (DCR_dataValid && s_axi_wready) begin
             transfers[DCR_dataTId].evictProgress <= transfers[DCR_dataTId].evictProgress + 4;
+        end
+
+        // Write ACK (only relevant for MMIO)
+        if (s_axi_bvalid && isMMIO[s_axi_bid]) begin
+            sglStRes.valid <= 1;
+            sglStRes.id <= transfers[s_axi_bid].cacheAddr;
         end
     end
 end

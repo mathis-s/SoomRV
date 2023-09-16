@@ -308,7 +308,7 @@ always_comb begin
                 end
             end
             if (LSU_memc.cmd != MEMC_NONE && 
-                LSU_memc.extAddr[31-2:`CLSIZE_E-2] == ld.addr[31:`CLSIZE_E]
+                LSU_memc.extAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
             ) begin
                 doCacheLoad = 0;
                 cacheHit = 0;
@@ -456,7 +456,7 @@ always_comb begin
         end
         end
         if (LSU_memc.cmd != MEMC_NONE && 
-            LSU_memc.extAddr[31-2:`CLSIZE_E-2] == st.addr[31:`CLSIZE_E]
+            LSU_memc.extAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
         ) begin
             doCacheLoad = 0;
             cacheHit = 0;
@@ -701,29 +701,26 @@ always_ff@(posedge clk) begin
                             REGULAR: begin
                                 LSU_memc.cmd <= MEMC_REPLACE;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
+                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2], 2'b0};
+                                LSU_memc.extAddr <= {miss[i].missAddr[31:2], 2'b0};
                                 LSU_memc.cacheID <= 0;
-                                LSU_memc.rqID <= 0;
                             end
 
                             REGULAR_NO_EVICT: begin
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
                                 LSU_memc.oldAddr <= 'x;
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:2]};
+                                LSU_memc.extAddr <= {miss[i].missAddr[31:2], 2'b0};
                                 LSU_memc.cacheID <= 0;
-                                LSU_memc.rqID <= 0;
                             end
 
                             MGMT_CLEAN,
                             MGMT_FLUSH: begin
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                                 LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2]};
+                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2], 2'b0};
                                 LSU_memc.extAddr <= 'x;
                                 LSU_memc.cacheID <= 0;
-                                LSU_memc.rqID <= 0;
                             end
                             
                             default: ; // MGMT_INVAL does not evict the cache line
@@ -756,9 +753,8 @@ always_ff@(posedge clk) begin
                     if (entry.valid && dirty[{flushAssocIdx, flushIdx}]) begin
                         LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         LSU_memc.sramAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
-                        LSU_memc.extAddr <= {entry.addr, flushIdx, {(`CLSIZE_E-2){1'b0}}};
+                        LSU_memc.extAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
                         LSU_memc.cacheID <= 0;
-                        LSU_memc.rqID <= 0;
                     end
                     else if (&flushAssocIdx) state <= FLUSH_READ1;
 

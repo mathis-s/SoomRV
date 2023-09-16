@@ -58,7 +58,7 @@ always_comb begin
         end
     end
 
-    if (OUT_memc.cmd != MEMC_NONE && IN_lookupPC[31:`CLSIZE_E] == OUT_memc.extAddr[31-2:`CLSIZE_E-2]) begin
+    if (OUT_memc.cmd != MEMC_NONE && IN_lookupPC[31:`CLSIZE_E] == OUT_memc.extAddr[31:`CLSIZE_E]) begin
         cacheEntryFound = 0;
         doCacheLoad = 0;
     end
@@ -117,9 +117,8 @@ always_ff@(posedge clk) begin
                 if (doCacheLoad && OUT_memc.cmd == MEMC_NONE) begin
                     OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                     OUT_memc.sramAddr <= {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
-                    OUT_memc.extAddr <= {IN_lookupPC[31:4], 2'b0};
+                    OUT_memc.extAddr <= {IN_lookupPC[31:4], 4'b0};
                     OUT_memc.cacheID <= 1;
-                    OUT_memc.rqID <= 1;
 
                     loadIdx <= cacheIndex;
                     loadAssocIdx <= counters[cacheIndex];
