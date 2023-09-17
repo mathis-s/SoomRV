@@ -168,9 +168,11 @@ always_comb begin
 end
 
 // Write Data Input
+// TODO: buffer input before processing
+// in case write transfer does not exist yet
 reg[NUM_TFS-1:0] writeDone;
 always_comb begin
-    s_axi_wready = 1;
+    s_axi_wready = fifoAWValid[0];
 end
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
@@ -215,6 +217,11 @@ end
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
 
+    if (s_axi_awready && s_axi_awvalid) begin
+        fifoAWValid[fifoAWInsIdx] <= 1;
+        fifoAW[fifoAWInsIdx] <= s_axi_awid;
+    end
+
     if (!(s_axi_bvalid && !s_axi_bready)) begin
         s_axi_bid <= 'x;
         s_axi_bvalid <= 0;
@@ -229,6 +236,11 @@ always_ff@(posedge clk) begin
             end
             fifoAW[NUM_TFS-1] <= 'x;
             fifoAWValid[NUM_TFS-1] <= 0;
+
+            if (s_axi_awready && s_axi_awvalid) begin
+                fifoAWValid[fifoAWInsIdx-1] <= 1;
+                fifoAW[fifoAWInsIdx-1] <= s_axi_awid;
+            end
 
             tfs[1][idx] <= 'x;
             tfs[1][idx].valid <= 0;
@@ -256,9 +268,6 @@ always_ff@(posedge clk) begin
         tfs[1][s_axi_awid].len <= s_axi_awlen;
         tfs[1][s_axi_awid].cur <= 0;
         writeDone[s_axi_awid] <= 0;
-
-        fifoAWValid[fifoAWInsIdx] <= 1;
-        fifoAW[fifoAWInsIdx] <= s_axi_awid;
     end
 end
 endmodule

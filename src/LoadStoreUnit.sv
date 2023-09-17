@@ -581,6 +581,28 @@ assign OUT_stAck.id = stOps[1].id;
 assign OUT_stAck.valid = stOps[1].valid;
 assign OUT_stAck.fail = redoStore;
 
+
+// Check for read after write conflicts
+logic[1:0] missEvictConflict;
+always_comb begin
+    for (integer i = 0; i < 2; i=i+1) begin
+        missEvictConflict[i] = 0;
+        
+        for (integer j = 0; j < 4; j=j+1) begin
+            if (miss[i].valid &&
+                IN_memc.transfers[j].valid &&
+                IN_memc.transfers[j].writeAddr[31:`CLSIZE_E] == miss[i].missAddr[31:`CLSIZE_E]
+            ) begin
+                missEvictConflict[i] = 1;
+            end
+        end
+
+        if ((LSU_memc.cmd == MEMC_REPLACE || LSU_memc.cmd == MEMC_CP_CACHE_TO_EXT) &&
+            miss[i].valid && LSU_memc.writeAddr[31:`CLSIZE_E] == miss[i].writeAddr[31:`CLSIZE_E])
+            missEvictConflict[i] = 1;
+    end
+end
+
 // Cache Table Writes
 reg cacheTableWrite;
 always_comb begin
@@ -593,7 +615,8 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
-            if (forwardMiss && miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
+            if (forwardMiss && !missEvictConflict[i] && miss[i].valid && !temp &&
+                miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                 temp = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -685,7 +708,8 @@ always_ff@(posedge clk) begin
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[11:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (forwardMiss && miss[i].valid && !temp && miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
+                    if (forwardMiss && !missEvictConflict[i] && miss[i].valid && !temp &&
+                        miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                         temp = 1;
                         curCacheMiss <= miss[i];
                         assocCnt <= assocCnt + 1;
