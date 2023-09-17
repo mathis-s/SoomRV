@@ -331,8 +331,8 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[31:0] oldAddr;
-    logic[31:0] newAddr;
+    logic[31:0] writeAddr;
+    logic[31:0] readAddr;
     logic[`CLSIZE_E-2:0] progress;
     CacheID_t cacheID;
     logic valid;
@@ -342,9 +342,9 @@ typedef struct packed
 {
     MemC_Cmd cmd;
     logic[31:0] data; // only used for MMIO stores
-    logic[`CACHE_SIZE_E-3:0] sramAddr; // instead used as ID for MMIO 
-    logic[31:0] extAddr;
-    logic[31:0] oldAddr;
+    logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
+    logic[31:0] readAddr;
+    logic[31:0] writeAddr;
     CacheID_t cacheID;
 } MemController_Req;
 

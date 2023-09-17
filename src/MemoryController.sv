@@ -89,8 +89,8 @@ typedef struct packed
     logic[`CLSIZE_E-2:0] evictProgress;
     logic[`CLSIZE_E-2:0] progress;
     logic[`CACHE_SIZE_E-3:0] cacheAddr;
-    logic[31:0] newAddr;
-    logic[31:0] oldAddr;
+    logic[31:0] readAddr;
+    logic[31:0] writeAddr;
 
     // r/w from AXI perspective
     logic needReadRq;
@@ -182,7 +182,7 @@ always_comb begin
         s_axi_arvalid = 1;
         s_axi_arburst = WRAP;
         s_axi_arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
-        s_axi_araddr = transfers[arIdx].newAddr;
+        s_axi_araddr = transfers[arIdx].readAddr;
         s_axi_arid = arIdx;
 
         case (transfers[arIdx].cmd)
@@ -208,8 +208,8 @@ always_comb begin
             OUT_stat.transfers[i].valid = 1;
             OUT_stat.transfers[i].cacheID = transfers[i].cacheID;
             OUT_stat.transfers[i].progress = transfers[i].progress[`CLSIZE_E-2:0];
-            OUT_stat.transfers[i].oldAddr = transfers[i].oldAddr;
-            OUT_stat.transfers[i].newAddr = transfers[i].newAddr;
+            OUT_stat.transfers[i].writeAddr = transfers[i].writeAddr;
+            OUT_stat.transfers[i].readAddr = transfers[i].readAddr;
         end
     end
     
@@ -323,6 +323,8 @@ logic DCR_reqValid;
 logic[ID_LEN-1:0] DCR_reqTId;
 logic[7:0] DCR_reqLen;
 logic[`CACHE_SIZE_E-3:0] DCR_reqAddr;
+logic DCR_reqMMIO;
+logic[31:0] DCR_reqMMIOData;
 
 logic DCR_dataReady;
 logic DCR_dataValid;
@@ -344,6 +346,8 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, 32, 4) dcacheReadIF
     .IN_id(DCR_reqTId),
     .IN_len(DCR_reqLen),
     .IN_addr(DCR_reqAddr),
+    .IN_mmio(DCR_reqMMIO),
+    .IN_mmioData(DCR_reqMMIOData),
 
     .IN_ready(DCR_dataReady),
     .OUT_valid(DCR_dataValid),
@@ -377,6 +381,8 @@ always_comb begin
     DCR_reqAddr = 'x;
     DCR_reqLen = 'x;
     DCR_reqTId = 'x;
+    DCR_reqMMIOData = 'x;
+    DCR_reqMMIO = 0;
     DCR_reqValid = 0;
     
     // Find Op that requires write request
@@ -400,7 +406,7 @@ always_comb begin
         s_axi_awvalid = 1;
         s_axi_awburst = WRAP;
         s_axi_awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
-        s_axi_awaddr = transfers[awIdx].oldAddr;
+        s_axi_awaddr = transfers[awIdx].writeAddr;
         s_axi_awid = awIdx;
         
         case (transfers[awIdx].cmd)
@@ -415,8 +421,10 @@ always_comb begin
     if (awIdxValid && transfers[awIdx].needWriteRq[0]) begin
         DCR_reqValid = 1;
         DCR_reqTId = awIdx;
-        DCR_reqLen = (1 << (`CLSIZE_E - 2)) - 1;
-        DCR_reqAddr = transfers[awIdx].cacheAddr;
+        DCR_reqLen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 2)) - 1);
+        DCR_reqAddr = isMMIO[awIdx] ? 'x : transfers[awIdx].cacheAddr;
+        DCR_reqMMIO = isMMIO[awIdx];
+        DCR_reqMMIOData = isMMIO[awIdx] ? transfers[awIdx].readAddr : 'x;
     end
 end
 
@@ -463,9 +471,9 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].cmd <= selReq.cmd;
             transfers[enqIdx].needReadRq <= '0;
             transfers[enqIdx].needWriteRq <= '0;
-            transfers[enqIdx].oldAddr <= selReq.oldAddr & ~(WIDTH/8 - 1);
-            transfers[enqIdx].newAddr <= selReq.extAddr & ~(WIDTH/8 - 1);
-            transfers[enqIdx].cacheAddr <= selReq.sramAddr & ~((WIDTH/8 - 1) >> 2);
+            transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
+            transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
+            transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
             transfers[enqIdx].progress <= 0;
             transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
             transfers[enqIdx].cacheID <= selReq.cacheID;
@@ -487,7 +495,9 @@ always_ff@(posedge clk) begin
                     transfers[enqIdx].needReadRq <= '1;
                 end
                 MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
-                    transfers[enqIdx].needWriteRq <= 2'b10;
+                    transfers[enqIdx].needWriteRq <= '1;
+                    // readAddr field is used to store data to write
+                    transfers[enqIdx].readAddr <= selReq.data;
                 end
                 default: assert(0);
             endcase
@@ -532,6 +542,8 @@ always_ff@(posedge clk) begin
         if (s_axi_bvalid && isMMIO[s_axi_bid]) begin
             sglStRes.valid <= 1;
             sglStRes.id <= transfers[s_axi_bid].cacheAddr;
+            transfers[s_axi_bid] <= 'x;
+            transfers[s_axi_bid].valid <= 0;
         end
     end
 end

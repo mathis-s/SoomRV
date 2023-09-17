@@ -251,7 +251,7 @@ typedef enum logic[3:0]
 
 typedef struct packed
 {
-    logic[31:0] oldAddr;
+    logic[31:0] writeAddr;
     logic[31:0] missAddr;
     logic[$clog2(`CASSOC)-1:0] assoc;
     MissType mtype;
@@ -301,14 +301,14 @@ always_comb begin
             // check if cache line is currently being transferred
             for (integer i = 0; i < 4; i=i+1) begin
                 if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
-                    IN_memc.transfers[i].newAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
+                    IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
                 ) begin
                     doCacheLoad = 0;
                     cacheHit = 0;
                 end
             end
             if (LSU_memc.cmd != MEMC_NONE && 
-                LSU_memc.extAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
+                LSU_memc.readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
             ) begin
                 doCacheLoad = 0;
                 cacheHit = 0;
@@ -369,7 +369,7 @@ always_comb begin
                 miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
             else
                 miss[0].mtype = TRANS_IN_PROG;
-            miss[0].oldAddr = {IF_ct.rdata[0][assocCnt].addr, 12'b0};
+            miss[0].writeAddr = {IF_ct.rdata[0][assocCnt].addr, 12'b0};
             miss[0].missAddr = ld.addr;
             miss[0].assoc = assocCnt;
         end
@@ -448,7 +448,7 @@ always_comb begin
         // check if cache line is currently being transferred
         for (integer i = 0; i < 4; i=i+1) begin
             if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
-                IN_memc.transfers[i].newAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
+                IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
             ) begin
                 doCacheLoad = 0;
             cacheHit = 0;
@@ -456,7 +456,7 @@ always_comb begin
         end
         end
         if (LSU_memc.cmd != MEMC_NONE && 
-            LSU_memc.extAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
+            LSU_memc.readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
         ) begin
             doCacheLoad = 0;
             cacheHit = 0;
@@ -465,7 +465,7 @@ always_comb begin
         
         if (stConflictMiss[1]) begin
             miss[1].valid = 1;
-            miss[1].oldAddr = 'x;
+            miss[1].writeAddr = 'x;
             miss[1].missAddr = 'x;
             miss[1].assoc = 'x;
             miss[1].mtype = CONFLICT;
@@ -477,7 +477,7 @@ always_comb begin
             // Management Ops
             if (cacheHit) begin
                 miss[1].valid = 1;
-                miss[1].oldAddr = st.addr;
+                miss[1].writeAddr = st.addr;
                 miss[1].missAddr = st.addr;
                 miss[1].assoc = cacheHitAssoc;
                 case (st.data[1:0])
@@ -503,7 +503,7 @@ always_comb begin
             else begin
                 miss[1].valid = 1;
                 miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                miss[1].oldAddr = {IF_ct.rdata[1][assocCnt].addr, 12'b0};
+                miss[1].writeAddr = {IF_ct.rdata[1][assocCnt].addr, 12'b0};
                 miss[1].missAddr = st.addr;
                 miss[1].assoc = assocCnt;
             end
@@ -700,26 +700,26 @@ always_ff@(posedge clk) begin
                         case (missType)
                             REGULAR: begin
                                 LSU_memc.cmd <= MEMC_REPLACE;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2], 2'b0};
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:2], 2'b0};
+                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.writeAddr <= {miss[i].writeAddr[31:12], miss[i].missAddr[11:2], 2'b0};
+                                LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
                                 LSU_memc.cacheID <= 0;
                             end
 
                             REGULAR_NO_EVICT: begin
                                 LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.oldAddr <= 'x;
-                                LSU_memc.extAddr <= {miss[i].missAddr[31:2], 2'b0};
+                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.writeAddr <= 'x;
+                                LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
                                 LSU_memc.cacheID <= 0;
                             end
 
                             MGMT_CLEAN,
                             MGMT_FLUSH: begin
                                 LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.sramAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
-                                LSU_memc.oldAddr <= {miss[i].oldAddr[31:12], miss[i].missAddr[11:2], 2'b0};
-                                LSU_memc.extAddr <= 'x;
+                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[11:2]};
+                                LSU_memc.writeAddr <= {miss[i].writeAddr[31:12], miss[i].missAddr[11:2], 2'b0};
+                                LSU_memc.readAddr <= 'x;
                                 LSU_memc.cacheID <= 0;
                             end
                             
@@ -752,8 +752,8 @@ always_ff@(posedge clk) begin
                     CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
                     if (entry.valid && dirty[{flushAssocIdx, flushIdx}]) begin
                         LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                        LSU_memc.sramAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
-                        LSU_memc.extAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
+                        LSU_memc.cacheAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
+                        LSU_memc.readAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
                         LSU_memc.cacheID <= 0;
                     end
                     else if (&flushAssocIdx) state <= FLUSH_READ1;

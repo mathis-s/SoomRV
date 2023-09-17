@@ -51,14 +51,14 @@ always_comb begin
 
     for (integer i = 0; i < 4; i=i+1) begin
         if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 1 &&
-            IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].newAddr[31:`CLSIZE_E]
+            IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E]
         ) begin
             cacheEntryFound = 0;
             doCacheLoad = 0;
         end
     end
 
-    if (OUT_memc.cmd != MEMC_NONE && IN_lookupPC[31:`CLSIZE_E] == OUT_memc.extAddr[31:`CLSIZE_E]) begin
+    if (OUT_memc.cmd != MEMC_NONE && IN_lookupPC[31:`CLSIZE_E] == OUT_memc.readAddr[31:`CLSIZE_E]) begin
         cacheEntryFound = 0;
         doCacheLoad = 0;
     end
@@ -116,8 +116,8 @@ always_ff@(posedge clk) begin
                 state <= IDLE;
                 if (doCacheLoad && OUT_memc.cmd == MEMC_NONE) begin
                     OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    OUT_memc.sramAddr <= {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
-                    OUT_memc.extAddr <= {IN_lookupPC[31:4], 4'b0};
+                    OUT_memc.cacheAddr <= {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
+                    OUT_memc.readAddr <= {IN_lookupPC[31:4], 4'b0};
                     OUT_memc.cacheID <= 1;
 
                     loadIdx <= cacheIndex;

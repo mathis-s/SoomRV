@@ -1,3 +1,8 @@
+
+// Address for the simulated 8250 UART stub
+// This must be between EXT_MMIO_START_ADDR and EXT_MMIO_END_ADDR!
+`define SERIAL_ADDR 32'h1000_0000
+
 module ExternalAXISim
 #(parameter ID_LEN=2, parameter WIDTH=128, parameter ADDR_LEN=32)
 (
@@ -83,6 +88,10 @@ Transfer[NUM_TFS-1:0] tfs[1:0];
 wire Transfer[NUM_TFS-1:0] reads = tfs[0];
 wire Transfer[NUM_TFS-1:0] writes = tfs[1];
 
+// RTL sim input
+logic inputAvail /*verilator public*/ = 0;
+logic[7:0] inputByte /*verilator public*/;
+
 // Read Data Output
 logic readDataIdxValid;
 logic[ID_LEN-1:0] readDataIdx;
@@ -107,12 +116,30 @@ always_ff@(posedge clk) begin
         if (readDataIdxValid) begin
             reg last = (reads[readDataIdx].cur) == (reads[readDataIdx].len);
             reg[ADDR_LEN-1:0] addr = GetCurAddr(reads[readDataIdx]);
-            assert((addr & ($clog2(BWIDTH) - 1)) == 0);
 
             s_axi_rid <= readDataIdx;
-            s_axi_rdata <= mem[addr[$clog2(BWIDTH) +: MADDR_LEN]];
             s_axi_rlast <= last;
             s_axi_rvalid <= 1;
+
+            if (addr[31]) begin
+                // Memory
+                assert((addr & ($clog2(BWIDTH) - 1)) == 0);
+                s_axi_rdata <= mem[addr[$clog2(BWIDTH) +: MADDR_LEN]];
+            end
+            else begin
+                // MMIO
+                case (addr)
+                    `SERIAL_ADDR: begin
+                        s_axi_rdata <= 'x;
+                        s_axi_rdata[7:0] <= inputByte;
+                        inputAvail <= 0;
+                    end
+                    `SERIAL_ADDR + 5: begin
+                        s_axi_rdata <= 'x;
+                        s_axi_rdata[7:0] <= 8'h60 | (inputAvail ? 1 : 0);
+                    end
+                endcase
+            end
 
             tfs[0][readDataIdx].cur <= reads[readDataIdx].cur + 1;
             if (last) begin
@@ -154,12 +181,26 @@ always_ff@(posedge clk) begin
         reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
         assert(fifoAWValid[0]);
         assert(w.valid);
-        assert((addr & ($clog2(BWIDTH) - 1)) == 0);
         assert(s_axi_wlast == last);
 
-        for (integer i = 0; i < BWIDTH; i=i+1) begin
-            if (s_axi_wstrb[i])
-                mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= s_axi_wdata[8*i +: 8];
+        if (addr[31]) begin
+            // Memory
+            assert((addr & ($clog2(BWIDTH) - 1)) == 0);
+            for (integer i = 0; i < BWIDTH; i=i+1) begin
+                if (s_axi_wstrb[i])
+                    mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= s_axi_wdata[8*i +: 8];
+            end
+        end
+        else begin
+            // MMIO
+            case (addr)
+                `SERIAL_ADDR: begin
+                    if (s_axi_wstrb[0]) begin
+                        $write("%c", s_axi_wdata[7:0] & 8'd127);
+                        $fflush(32'h80000001);
+                    end
+                end
+            endcase
         end
 
         tfs[1][idx].cur <= w.cur + 1;

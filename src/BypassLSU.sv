@@ -27,9 +27,11 @@ LD_UOp activeLd;
 
 wire invalidateActiveLd = !(activeLd.external || !IN_branch.taken || $signed(activeLd.sqN - IN_branch.sqN) <= 0);
 
-enum logic[1:0]
+enum logic[2:0]
 {
     IDLE,
+    RQ_LD,
+    RQ_ST,
     WAIT_LD,
     WAIT_ST
 } state;
@@ -83,12 +85,12 @@ always_ff@(posedge clk) begin
                         default: assert(0);
                     endcase
 
-                    OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= {IN_uopSt.addr[31:2], addrLow};
+                    OUT_memc.cacheAddr <= 'x;
+                    OUT_memc.writeAddr <= {IN_uopSt.addr[31:2], addrLow};
                     OUT_memc.cacheID <= 'x;
                     OUT_memc.data <= IN_uopSt.data;
 
-                    state <= WAIT_LD;
+                    state <= RQ_ST;
                 end
                 else if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall && 
                     (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
@@ -101,12 +103,18 @@ always_ff@(posedge clk) begin
                         default: assert(0);
                     endcase
 
-                    OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= IN_uopLd.addr[31:0];
+                    OUT_memc.cacheAddr <= 'x;
+                    OUT_memc.readAddr <= IN_uopLd.addr[31:0];
                     OUT_memc.cacheID <= 'x;
 
-                    state <= WAIT_ST;
+                    state <= RQ_LD;
                     activeLd <= IN_uopLd;
+                end
+            end
+            RQ_LD, RQ_ST: begin
+                if (!IN_memc.stall[2]) begin
+                    OUT_memc <= MemController_Req'{default: 'x, cmd: MEMC_NONE};
+                    state <= state == RQ_LD ? WAIT_LD : WAIT_ST;
                 end
             end
             WAIT_LD: begin

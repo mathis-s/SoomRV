@@ -10,6 +10,8 @@ module CacheReadInterface
     input wire[ID_LEN-1:0] IN_id,
     input wire[LEN_BITS-1:0] IN_len,
     input wire[ADDR_BITS-1:0] IN_addr,
+    input wire IN_mmio,
+    input wire[31:0] IN_mmioData,
 
     // Streaming
     input wire IN_ready,
@@ -53,9 +55,13 @@ FIFO#(IWIDTH + ID_LEN + 1, BUF_LEN) fifo
 
 typedef struct packed
 {
+    logic[31:0] mmioData;
+    logic mmio;
+
     logic[LEN_BITS-1:0] progress;
     logic[LEN_BITS-1:0] len;
     logic[ADDR_BITS-1:0] addr;
+
     logic[ID_LEN-1:0] id;
     logic valid;
 } Transfer;
@@ -76,14 +82,24 @@ always_comb begin
     FIFO_last = 'x;
     doAcc = 0;
 
-    if (readSuccSR[1]) begin
+    if (readMetaSR[1].valid) begin
         accIdx_c = accIdx_c + 1;
-        if (accIdx_c[$clog2(WNUM)]) begin
+
+        if (readMetaSR[1].mmio) begin
+            FIFO_valid = 1;
+            FIFO_data = '0;
+            FIFO_data[31:0] = readMetaSR[1].mmioData;
+            FIFO_id = readMetaSR[1].id;
+            FIFO_last = readMetaSR[1].last;
+            assert(accIdx_c == 1);
+            accIdx_c = 0;
+        end
+        else if (accIdx_c[$clog2(WNUM)]) begin
             FIFO_valid = 1;
             FIFO_data = acc;
             FIFO_data[(WNUM-1) * CWIDTH +: CWIDTH] = IN_CACHE_data;
-            FIFO_id = readIdSR[1];
-            FIFO_last = readLastSR[1];
+            FIFO_id = readMetaSR[1].id;
+            FIFO_last = readMetaSR[1].last;
             accIdx_c = 0;
         end
         else doAcc = 1;
@@ -97,49 +113,54 @@ always_ff@(posedge clk) begin
         accIdx_r <= accIdx_c;
         if (doAcc) begin
             acc[accIdx_r * CWIDTH +: CWIDTH] <= IN_CACHE_data;
-            assert(!readLastSR[1]);
+            assert(!readMetaSR[1].last);
         end
     end
 end
 
 logic allowNewRead;
 always_comb begin
-    logic[$clog2(BUF_LEN):0] inFlight = $clog2(BUF_LEN)'(readSuccSR[1]) + $clog2(BUF_LEN)'(readSuccSR[0]);
+    logic[$clog2(BUF_LEN):0] inFlight = $clog2(BUF_LEN)'(readMetaSR[1].valid) + $clog2(BUF_LEN)'(readMetaSR[1].valid);
     allowNewRead = ((FIFO_free * WNUM) > inFlight);
 end
 
+typedef struct packed
+{
+    logic[31:0] mmioData;
+    logic[ID_LEN-1:0] id;
+    logic mmio;
+    logic last;
+    logic valid;
+} ReadMeta;
 
 // Issue new read
-logic readValid;
-logic readLast;
-logic[ID_LEN-1:0] readId;
+ReadMeta readMeta;
 always_comb begin
     OUT_CACHE_ce = 1;
     OUT_CACHE_we = 1;
     OUT_CACHE_addr = 'x;
-    
-    readId = 'x;
-    readLast = 'x;
-    readValid = 0;
+
+    readMeta = ReadMeta'{default: 'x, valid: 0};
 
     if (cur.valid && allowNewRead) begin
+
         OUT_CACHE_ce = 0;
         OUT_CACHE_we = 1;
         OUT_CACHE_addr = {cur.addr[ADDR_BITS-1:`CLSIZE_E-2], cur.addr[`CLSIZE_E-3:0] + cur.progress[`CLSIZE_E-3:0]};
-        readId = cur.id;
-        readValid = 1;
-        readLast = (cur.progress == cur.len);
+        
+        readMeta.valid = 1;
+        readMeta.id = cur.id;
+        readMeta.last = (cur.progress == cur.len) || cur.mmio;
+        readMeta.mmio = cur.mmio;
+        readMeta.mmioData = cur.mmioData;
     end
 end
 
-wire readSucc = readValid && IN_CACHE_ready;
+wire readSucc = readMeta.valid && (IN_CACHE_ready || readMeta.mmio);
 
-logic[1:0] readSuccSR;
-logic[1:0] readLastSR;
-logic[1:0][ID_LEN-1:0] readIdSR;
+assign OUT_ready = !next.valid || (readSucc && readMeta.last);
 
-assign OUT_ready = !next.valid || (readSucc && readLast);
-
+ReadMeta[1:0] readMetaSR;
 always_ff@(posedge clk) begin
     
     if (rst) begin
@@ -147,9 +168,7 @@ always_ff@(posedge clk) begin
         cur.valid <= 0;
         next <= 'x;
         next.valid <= 0;
-        readSuccSR <= 0;
-        readLastSR <= 'x;
-        readIdSR <= 'x;
+        readMetaSR <= '0;
     end
     else begin
         Transfer incoming = Transfer'{default: 'x, valid: 0};
@@ -160,14 +179,15 @@ always_ff@(posedge clk) begin
             incoming.addr = IN_addr;
             incoming.progress = 0;
             incoming.len = IN_len;
+            
+            incoming.mmio = IN_mmio;
+            incoming.mmioData = IN_mmioData;
         end
-
-        readSuccSR <= {readSuccSR[0], readSucc};
-        readLastSR <= {readLastSR[0], readLast};
-        readIdSR <= {readIdSR[0], readId};
+        
+        readMetaSR <= {readMetaSR[0], readSucc ? readMeta : '0};
         
         if (readSucc) begin
-            if (readLast) begin
+            if (readMeta.last) begin
                 if (next.valid) begin
                     cur <= next;
                     next <= Transfer'{default: 'x, valid: 0};
