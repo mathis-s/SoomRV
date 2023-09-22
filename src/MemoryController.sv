@@ -88,6 +88,7 @@ typedef struct packed
 {
     logic[`CLSIZE_E-2:0] evictProgress;
     logic[`CLSIZE_E-2:0] progress;
+    logic[`CLSIZE_E-2:0] addrCounter;
     logic[`CACHE_SIZE_E-3:0] cacheAddr;
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
@@ -222,6 +223,11 @@ logic ICW_ready;
 logic ICW_valid;
 logic[`CACHE_SIZE_E-3:0] ICW_addr;
 logic[127:0] ICW_data;
+logic[ID_LEN-1:0] ICW_id;
+
+logic ICW_ackValid;
+logic[ID_LEN-1:0] ICW_ackId;
+
 CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 128) icacheWriteIF
 (
     .clk(clk),
@@ -231,6 +237,10 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 128) icacheWriteIF
     .IN_valid(ICW_valid),
     .IN_addr(ICW_addr),
     .IN_data(ICW_data),
+    .IN_id(ICW_id),
+
+    .OUT_ackValid(ICW_ackValid),
+    .OUT_ackId(ICW_ackId),
 
     .IN_CACHE_ready(1'b1),
     .OUT_CACHE_ce(OUT_CACHE_ce[1]),
@@ -243,6 +253,11 @@ logic DCW_ready;
 logic DCW_valid;
 logic[`CACHE_SIZE_E-3:0] DCW_addr;
 logic[127:0] DCW_data;
+logic[ID_LEN-1:0] DCW_id;
+
+logic DCW_ackValid;
+logic[ID_LEN-1:0] DCW_ackId;
+
 
 logic DCW_CACHE_ready;
 logic DCW_CACHE_ce;
@@ -257,6 +272,10 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 32) dcacheWriteIF
     .IN_valid(DCW_valid),
     .IN_addr(DCW_addr),
     .IN_data(DCW_data),
+    .IN_id(DCW_id),
+
+    .OUT_ackValid(DCW_ackValid),
+    .OUT_ackId(DCW_ackId),
 
     .IN_CACHE_ready(DCW_CACHE_ready),
     .OUT_CACHE_ce(DCW_CACHE_ce),
@@ -274,7 +293,7 @@ end
 function logic[`CACHE_SIZE_E-3:0] GetCacheRdAddr(Transfer t);
     case (t.cmd)
     MEMC_REPLACE, MEMC_CP_EXT_TO_CACHE:
-        return {t.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2], (t.cacheAddr[`CLSIZE_E-3:0] + t.progress[`CLSIZE_E-3:0])};
+        return {t.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2], (t.cacheAddr[`CLSIZE_E-3:0] + t.addrCounter[`CLSIZE_E-3:0])};
     default:
         return t.cacheAddr;
     endcase
@@ -284,12 +303,16 @@ endfunction
 always_comb begin
     // Defaults
     s_axi_rready = 0;
+
     ICW_valid = 0;
     ICW_addr = 'x;
     ICW_data = 'x;
+    ICW_id = 'x;
+    
     DCW_valid = 0;
     DCW_addr = 'x;
     DCW_data = 'x;
+    DCW_id = 'x;
     
     // todo: add fifo to remove comb path from valid to ready
     if (s_axi_rvalid) begin
@@ -299,11 +322,12 @@ always_comb begin
         else begin
             CacheID_t cID = transfers[s_axi_rid].cacheID;
             case (cID)
-            0: if (DCW_ready && transfers[s_axi_rid].evictProgress > transfers[s_axi_rid].progress) begin // dcache
+            0: if (DCW_ready && transfers[s_axi_rid].evictProgress > transfers[s_axi_rid].addrCounter) begin // dcache
                 s_axi_rready = 1;
                 DCW_valid = 1;
                 DCW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
                 DCW_data = s_axi_rdata;
+                DCW_id = s_axi_rid;
             end
 
             1: if (ICW_ready) begin // icache
@@ -311,6 +335,7 @@ always_comb begin
                 ICW_valid = 1;
                 ICW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
                 ICW_data = s_axi_rdata;
+                ICW_id = s_axi_rid;
             end
             endcase
         end
@@ -475,6 +500,7 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
             transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
             transfers[enqIdx].progress <= 0;
+            transfers[enqIdx].addrCounter <= 0;
             transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
             transfers[enqIdx].cacheID <= selReq.cacheID;
 
@@ -511,11 +537,7 @@ always_ff@(posedge clk) begin
         // Read Data
         if (s_axi_rvalid && s_axi_rready) begin
 
-            transfers[s_axi_rid].progress <= transfers[s_axi_rid].progress + 4;
-            if ((transfers[s_axi_rid].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
-                transfers[s_axi_rid] <= 'x;
-                transfers[s_axi_rid].valid <= 0;
-            end
+            transfers[s_axi_rid].addrCounter <= transfers[s_axi_rid].addrCounter + 4;
             
             if (isMMIO[s_axi_rid]) begin
                 transfers[s_axi_rid] <= 'x;
@@ -524,6 +546,22 @@ always_ff@(posedge clk) begin
                 sglLdRes.valid <= 1;
                 sglLdRes.id <= transfers[s_axi_rid].cacheAddr;
                 sglLdRes.data <= s_axi_rdata[31:0];
+            end
+        end
+
+        // Read ACK
+        if (DCW_ackValid) begin
+            transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + 4;
+            if ((transfers[DCW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
+                transfers[DCW_ackId] <= 'x;
+                transfers[DCW_ackId].valid <= 0;
+            end
+        end
+        if (ICW_ackValid) begin
+            transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + 4;
+            if ((transfers[ICW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
+                transfers[ICW_ackId] <= 'x;
+                transfers[ICW_ackId].valid <= 0;
             end
         end
 

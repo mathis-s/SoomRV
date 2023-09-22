@@ -1,14 +1,17 @@
 module CacheWriteInterface
-#(parameter ADDR_BITS=10, parameter LEN_BITS=8, parameter IWIDTH=128, parameter CWIDTH=128)
+#(parameter ADDR_BITS=10, parameter LEN_BITS=8, parameter IWIDTH=128, parameter CWIDTH=128, parameter ID_LEN=2)
 (
     input wire clk,
     input wire rst,
     
     output wire OUT_ready,
-    // Set at start of transaction
     input wire IN_valid,
     input wire[ADDR_BITS-1:0] IN_addr,
     input wire[IWIDTH-1:0] IN_data,
+    input wire[ID_LEN-1:0] IN_id,
+
+    output reg OUT_ackValid,
+    output reg[ID_LEN-1:0] OUT_ackId, 
 
     // Cache Interface
     input wire IN_CACHE_ready,
@@ -22,10 +25,11 @@ localparam WNUM = IWIDTH / CWIDTH;
 
 typedef struct packed
 {
-    reg[IWIDTH-1:0] data;
-    reg[ADDR_BITS-1:0] addr;
-    reg[$clog2(IWIDTH/CWIDTH):0] idx;
-    reg valid;
+    logic[IWIDTH-1:0] data;
+    logic[ADDR_BITS-1:0] addr;
+    logic[$clog2(IWIDTH/CWIDTH):0] idx;
+    logic[ID_LEN-1:0] id;
+    logic valid;
 } Transfer;
 
 Transfer cur;
@@ -50,6 +54,10 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
+    
+    OUT_ackValid <= 0;
+    OUT_ackId <= 'x;
+
     if (rst) begin
         cur <= 'x;
         cur.valid <= 0;
@@ -63,6 +71,10 @@ always_ff@(posedge clk) begin
         
         cur.idx <= nextIdx;
         if (nextIdx[$clog2(IWIDTH/CWIDTH)]) begin
+            
+            OUT_ackValid <= 1;
+            OUT_ackId <= cur.id;
+
             cur <= 'x;
             cur.valid <= 0;
         end
@@ -71,6 +83,7 @@ always_ff@(posedge clk) begin
             cur.valid <= 1;
             cur.addr <= IN_addr;
             cur.data <= IN_data;
+            cur.id <= IN_id;
             cur.idx <= 0;
         end
     end
