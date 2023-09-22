@@ -46,7 +46,12 @@ always_comb begin
 
     if (state == WAIT_LD && !invalidateActiveLd && IN_memc.sglLdRes.valid) begin
         OUT_uopLd = activeLd;
-        OUT_ldData = IN_memc.sglLdRes.data;
+        case (activeLd.size)
+            0: OUT_ldData = {4{IN_memc.sglLdRes.data[7:0]}}; 
+            1: OUT_ldData = {2{IN_memc.sglLdRes.data[15:0]}}; 
+            default: OUT_ldData = IN_memc.sglLdRes.data;
+        endcase
+        
     end
 end
 

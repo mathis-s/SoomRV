@@ -496,13 +496,22 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].cmd <= selReq.cmd;
             transfers[enqIdx].needReadRq <= '0;
             transfers[enqIdx].needWriteRq <= '0;
-            transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
-            transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
-            transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
             transfers[enqIdx].progress <= 0;
             transfers[enqIdx].addrCounter <= 0;
             transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
             transfers[enqIdx].cacheID <= selReq.cacheID;
+
+            if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_CACHE_TO_EXT || selReq.cmd == MEMC_CP_EXT_TO_CACHE) begin
+                // cache-line oriented ops use aligned addresses
+                transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
+                transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
+                transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
+            end
+            else begin
+                transfers[enqIdx].writeAddr <= selReq.writeAddr;
+                transfers[enqIdx].readAddr <= selReq.readAddr;
+                transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
+            end
 
             case (selReq.cmd)
                 MEMC_REPLACE: begin
