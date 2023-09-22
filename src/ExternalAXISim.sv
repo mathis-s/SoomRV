@@ -171,17 +171,29 @@ end
 // TODO: buffer input before processing
 // in case write transfer does not exist yet
 reg[NUM_TFS-1:0] writeDone;
+
+reg[ID_LEN-1:0] writeIdx;
+reg writeIdxValid;
 always_comb begin
-    s_axi_wready = fifoAWValid[0];
+    writeIdx = 'x;
+    writeIdxValid = 0;
+
+    for (integer i = NUM_TFS-1; i >= 0; i=i-1) begin
+        if (fifoAWValid[i] && !writeDone[fifoAW[i[ID_LEN-1:0]]]) begin
+            writeIdxValid = 1;
+            writeIdx = fifoAW[i[ID_LEN-1:0]];
+        end
+    end
 end
+assign s_axi_wready = writeIdxValid;
 always_ff@(posedge clk) begin
-    reg[ID_LEN-1:0] idx = fifoAW[0];
+    reg[ID_LEN-1:0] idx = writeIdx;
 
     if (s_axi_wready && s_axi_wvalid) begin
         Transfer w = writes[idx];
         reg last = w.cur == w.len;
         reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
-        assert(fifoAWValid[0]);
+        assert(writeIdxValid);
         assert(w.valid);
         assert(s_axi_wlast == last);
 
