@@ -304,9 +304,13 @@ always_comb begin
                     IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
                 ) begin
                     doCacheLoad = 0;
-                    cacheHit = 0;
+                    //cacheHit = 0;
+                    cacheHit = 
+                        (IN_memc.transfers[i].progress) >
+                        ({1'b0, ld.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]});
                 end
             end
+            
             if (LSU_memc.cmd != MEMC_NONE && 
                 LSU_memc.readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
             ) begin
@@ -369,7 +373,7 @@ always_comb begin
                 miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
             else
                 miss[0].mtype = TRANS_IN_PROG;
-            miss[0].writeAddr = {IF_ct.rdata[0][assocCnt].addr, 12'b0};
+            miss[0].writeAddr = {IF_ct.rdata[0][assocCnt].addr, ld.addr[11:0]};
             miss[0].missAddr = ld.addr;
             miss[0].assoc = assocCnt;
         end
@@ -451,9 +455,16 @@ always_comb begin
                 IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
             ) begin
                 doCacheLoad = 0;
-            cacheHit = 0;
-            cacheHitAssoc = 'x;
-        end
+                if ((IN_memc.transfers[i].progress) >
+                    ({1'b0, st.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]})
+                ) begin
+                    assert(cacheHit);
+                end
+                else begin
+                    cacheHitAssoc = 'x;
+                    cacheHit = 0;
+                end
+            end
         end
         if (LSU_memc.cmd != MEMC_NONE && 
             LSU_memc.readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
@@ -503,7 +514,7 @@ always_comb begin
             else begin
                 miss[1].valid = 1;
                 miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                miss[1].writeAddr = {IF_ct.rdata[1][assocCnt].addr, 12'b0};
+                miss[1].writeAddr = {IF_ct.rdata[1][assocCnt].addr, st.addr[11:0]};
                 miss[1].missAddr = st.addr;
                 miss[1].assoc = assocCnt;
             end
@@ -535,12 +546,21 @@ reg LMQ_dequeue;
 
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
+reg LMQ_allowNewMisses;
+always_comb begin
+    LMQ_allowNewMisses = 0;
+    for (integer i = 0; i < 4; i=i+1)
+        if (!IN_memc.transfers[i].valid)
+            LMQ_allowNewMisses = 1;
+    if (LSU_memc.cmd != MEMC_NONE)
+        LMQ_allowNewMisses = 0;
+end
 LoadMissQueue#(4) loadMissQueue
 (
     .clk(clk),
     .rst(rst),
     
-    .IN_ready(state == IDLE),
+    .IN_ready(LMQ_allowNewMisses),
     .IN_branch(IN_branch),
     
     .OUT_full(LMQ_full),
@@ -582,12 +602,13 @@ assign OUT_stAck.valid = stOps[1].valid;
 assign OUT_stAck.fail = redoStore;
 
 
-// Check for read after write conflicts
+// Check for conflicts
 logic[1:0] missEvictConflict;
 always_comb begin
     for (integer i = 0; i < 2; i=i+1) begin
         missEvictConflict[i] = 0;
         
+        // read after write
         for (integer j = 0; j < 4; j=j+1) begin
             if (miss[i].valid &&
                 IN_memc.transfers[j].valid &&
@@ -596,10 +617,23 @@ always_comb begin
                 missEvictConflict[i] = 1;
             end
         end
-
         if ((LSU_memc.cmd == MEMC_REPLACE || LSU_memc.cmd == MEMC_CP_CACHE_TO_EXT) &&
-            miss[i].valid && LSU_memc.writeAddr[31:`CLSIZE_E] == miss[i].writeAddr[31:`CLSIZE_E])
+            miss[i].valid && LSU_memc.writeAddr[31:`CLSIZE_E] == miss[i].missAddr[31:`CLSIZE_E])
             missEvictConflict[i] = 1;
+        
+        // write after read
+        for (integer j = 0; j < 4; j=j+1) begin
+            if (miss[i].valid &&
+                IN_memc.transfers[j].valid &&
+                IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == miss[i].writeAddr[31:`CLSIZE_E]
+            ) begin
+                missEvictConflict[i] = 1;
+            end
+        end
+        if ((LSU_memc.cmd == MEMC_REPLACE || LSU_memc.cmd == MEMC_CP_EXT_TO_CACHE) &&
+            miss[i].valid && LSU_memc.readAddr[31:`CLSIZE_E] == miss[i].writeAddr[31:`CLSIZE_E])
+            missEvictConflict[i] = 1;
+
     end
 end
 

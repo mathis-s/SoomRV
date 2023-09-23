@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Sun Sep 17 16:31:04 2023
+[*] GTKWave Analyzer v3.3.117 (w)1999-2023 BSI
+[*] Sat Sep 23 19:27:16 2023
 [*]
 [dumpfile] "Top_tb.vcd"
-[dumpfile_mtime] "Sun Sep 17 16:29:01 2023"
-[dumpfile_size] 2437335437
+[dumpfile_mtime] "Sat Sep 23 19:25:54 2023"
+[dumpfile_size] 19082634
 [savefile] "view.gtkw"
-[timestart] 116
-[size] 3840 2118
+[timestart] 11958
+[size] 3840 2113
 [pos] -1 -1
-*-4.030970 154 123848 123790 123838 123858 134008 982664 986572 986578 12557784 12557810 12557826 12437634 19900674 1085186725 1085186731 7142594 7142588 44529178 44529162 838053308 838054064 838054042 2380 4938 7634 7594
+*-4.330970 12141 287432 268618 268636 268642 16354 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.extMem.
@@ -108,6 +108,7 @@
 [treeopen] TOP.Top.soc.core.lsu.IF_ct.wdata.
 [treeopen] TOP.Top.soc.core.lsu.IN_aguLd.
 [treeopen] TOP.Top.soc.core.lsu.IN_branch.
+[treeopen] TOP.Top.soc.core.lsu.IN_memc.
 [treeopen] TOP.Top.soc.core.lsu.IN_stFwd.
 [treeopen] TOP.Top.soc.core.lsu.IN_uopELd.
 [treeopen] TOP.Top.soc.core.lsu.IN_uopLd.
@@ -153,6 +154,7 @@
 [treeopen] TOP.Top.soc.core.rob.entries[6].
 [treeopen] TOP.Top.soc.core.rob.IN_uop[0].
 [treeopen] TOP.Top.soc.core.rob.IN_wbUOps[2].
+[treeopen] TOP.Top.soc.core.sq.
 [treeopen] TOP.Top.soc.core.sq.entries[0].data.m.
 [treeopen] TOP.Top.soc.core.sq.entries[14].
 [treeopen] TOP.Top.soc.core.sq.entries[15].
@@ -200,7 +202,7 @@
 [sst_width] 315
 [signals_width] 596
 [sst_expanded] 1
-[sst_vpaned_height] 1536
+[sst_vpaned_height] 1511
 @28
 TOP.Top.soc.clk
 TOP.Top.soc.en
@@ -315,6 +317,7 @@ TOP.Top.extMem.s_axi_araddr[31:0]
 @22
 TOP.Top.extMem.s_axi_rdata[127:0]
 @28
+TOP.Top.extMem.s_axi_rid[1:0]
 TOP.Top.extMem.s_axi_rvalid
 TOP.Top.extMem.s_axi_rready
 @200
@@ -407,7 +410,6 @@ TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
 TOP.Top.soc.memc.isMMIO[3:0]
 @28
 TOP.Top.soc.memc.OUT_stat.sglLdRes.valid
-@29
 TOP.Top.soc.memc.OUT_stat.sglStRes.valid
 @200
 -
@@ -1180,10 +1182,15 @@ TOP.Top.soc.core.lsu.curLd.valid
 @22
 TOP.Top.soc.core.lsu.curLd.sqN[6:0]
 TOP.Top.soc.core.lsu.curLd.addr[31:0]
+@29
+TOP.Top.soc.core.lsu.miss[0].valid
 @200
 -
+@22
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].readAddr[31:0]
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].progress[5:0]
 @28
-TOP.Top.soc.core.lsu.miss[0].valid
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].valid
 @200
 -
 @28
@@ -1288,8 +1295,6 @@ TOP.Top.soc.core.lsu.IF_ct.waddr[11:0]
 TOP.Top.soc.core.lsu.IF_ct.wassoc[1:0]
 @200
 -
-@22
-TOP.Top.soc.core.lsu.state[3:0]
 @28
 TOP.Top.soc.core.lsu.curCacheMiss.valid
 @22
@@ -1306,59 +1311,10 @@ TOP.Top.soc.core.lsu.curCacheMiss.assoc[1:0]
 @200
 -
 @28
-TOP.Top.soc.core.lsu.IN_memc.stall[2:0]
-@22
-TOP.Top.soc.core.lsu.OUT_memc.cacheAddr[11:0]
-@200
--
-@28
 TOP.Top.soc.core.lsu.IN_stFwd.valid
 @22
 TOP.Top.soc.core.lsu.IN_stFwd.mask[3:0]
 TOP.Top.soc.core.lsu.IN_stFwd.data[31:0]
-@200
--
-@28
-TOP.Top.soc.core.lsu.IN_stFwd.valid
-@c00022
-TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-@28
-(0)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(1)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(2)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(3)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(4)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(5)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(6)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(7)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(8)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(9)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(10)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(11)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(12)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(13)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(14)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(15)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(16)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(17)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(18)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(19)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(20)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(21)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(22)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(23)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(24)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(25)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(26)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(27)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(28)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(29)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(30)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(31)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-@1401200
--group_end
-@22
-TOP.Top.soc.core.lsu.IN_stFwd.mask[3:0]
 @200
 -
 @28
