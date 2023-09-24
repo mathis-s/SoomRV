@@ -33,7 +33,8 @@ enum logic[2:0]
     RQ_LD,
     RQ_ST,
     WAIT_LD,
-    WAIT_ST
+    WAIT_ST,
+    DONE_LD
 } state;
 
 always_comb begin
@@ -42,16 +43,9 @@ always_comb begin
 
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
-    OUT_ldData = 'x;
 
-    if (state == WAIT_LD && !invalidateActiveLd && IN_memc.sglLdRes.valid) begin
+    if (state == DONE_LD && !invalidateActiveLd) begin
         OUT_uopLd = activeLd;
-        case (activeLd.size)
-            0: OUT_ldData = {4{IN_memc.sglLdRes.data[7:0]}}; 
-            1: OUT_ldData = {2{IN_memc.sglLdRes.data[15:0]}}; 
-            default: OUT_ldData = IN_memc.sglLdRes.data;
-        endcase
-        
     end
 end
 
@@ -123,12 +117,25 @@ always_ff@(posedge clk) begin
                 end
             end
             WAIT_LD: begin
-                if (IN_memc.sglLdRes.valid)
-                    state <= IDLE;
+                if (IN_memc.sglLdRes.valid) begin
+                    state <= DONE_LD;
+                    case (activeLd.size)
+                        0: OUT_ldData <= {4{IN_memc.sglLdRes.data[7:0]}}; 
+                        1: OUT_ldData <= {2{IN_memc.sglLdRes.data[15:0]}}; 
+                        default: OUT_ldData <= IN_memc.sglLdRes.data;
+                    endcase
+                end
             end
             WAIT_ST: begin
                 if (IN_memc.sglStRes.valid)
                     state <= IDLE;
+            end
+            DONE_LD: begin
+                if (!IN_ldStall) begin
+                    state <= IDLE;
+                    activeLd <= 'x;
+                    activeLd.valid <= 0;
+                end
             end
         endcase
     end
