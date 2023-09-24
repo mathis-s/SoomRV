@@ -90,6 +90,11 @@ always_comb begin
         if (entries[i].valid)
             empty = 0;
     end
+    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+        if (evicted[i].s.valid && !evicted[i].issued)
+            empty = 0;
+    end
+    if (IN_stAck.valid && IN_stAck.fail) empty = 0;
 end
 
 typedef struct packed
@@ -398,8 +403,7 @@ always_ff@(posedge clk) begin
     end
     
     else begin
-        reg doingEnqueue = 0;
-        reg doingDequeue = 0;
+        reg modified = 0;
         reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
 
         if (!IN_stallSt)
@@ -411,7 +415,7 @@ always_ff@(posedge clk) begin
                 entries[i].ready <= 1;
             end
         end
-        
+
         // Delete entry from evicted if we get a positive store ack
         if (stAck_r.valid) begin
             assert(stAckIdxValid);
@@ -426,8 +430,10 @@ always_ff@(posedge clk) begin
                 nextEvictedIn = nextEvictedIn - 1;
                 evictedUsedIds[stAck_r.id] <= 0;
             end
-            else
+            else begin
                 evicted[stAckIdx].issued <= 0;
+                modified = 1;
+            end
         end
         
         // Dequeue
@@ -440,7 +446,7 @@ always_ff@(posedge clk) begin
                 entries[idx].addrAvail
             ) begin
                 assert(evictedNextIdValid);
-                doingDequeue = 1;
+                modified = 1;
 
                 entries[idx].valid <= 0;        
                 OUT_uopSt.valid <= 1;
@@ -516,7 +522,7 @@ always_ff@(posedge clk) begin
                 entries[index] <= 'x;
                 entries[index].valid <= 0;
             end
-            doingEnqueue = 1;
+            modified = 1;
         end
 
         // Enqueue
@@ -576,10 +582,10 @@ always_ff@(posedge clk) begin
                     endcase
                 end
 
-                doingEnqueue = 1;
+                modified = 1;
             end
 
-        OUT_empty <= empty && !doingEnqueue;
+        OUT_empty <= empty && !modified;
         if (OUT_empty && flushing) begin
             flushing <= 0;
             if (flushing)

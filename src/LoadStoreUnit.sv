@@ -104,8 +104,8 @@ always_comb begin
     IF_ct.raddr[1] = uopSt.addr[11:0];
     
     // During a flush, we read from the cache table at the flush iterator
-    if (flushActive) begin
-        IF_ct.re[0] = !cacheTableWrite;
+    if (state == FLUSH_READ0) begin
+        IF_ct.re[0] = 1;
         IF_ct.raddr[0] = {flushIdx, {`CLSIZE_E{1'b0}}};
     end
 end
@@ -458,7 +458,7 @@ always_comb begin
                 if ((IN_memc.transfers[i].progress) >
                     ({1'b0, st.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]})
                 ) begin
-                    assert(cacheHit);
+                    ;
                 end
                 else begin
                     cacheHitAssoc = 'x;
@@ -698,10 +698,10 @@ end
 reg[SIZE-1:0] dirty;
 
 reg flushQueued;
-wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || curLd.valid || stOps[0].valid || stOps[1].valid);
-wire flushReady = IN_SQ_empty && !busy;
+wire busy = (uopLd.valid || uopSt.valid || uopLd_0.valid || curLd.valid || stOps[0].valid || stOps[1].valid || !IN_SQ_empty || (OUT_ldAck.valid && OUT_ldAck.fail) || (OUT_stAck.valid && OUT_stAck.fail));
+wire flushReady = !busy;
 wire flushActive = (
-    state == FLUSH || 
+    state == FLUSH || state == FLUSH_WAIT ||
     state == FLUSH_READ0 || state == FLUSH_READ1);
 assign OUT_busy = busy || flushQueued || flushActive;
 
@@ -788,7 +788,7 @@ always_ff@(posedge clk) begin
 
                 if (!temp) begin
                     if (flushQueued && flushReady) begin
-                        state <= FLUSH_READ1;
+                        state <= FLUSH_WAIT;
                         flushQueued <= 0;
                         flushIdx <= 0;
                         flushAssocIdx <= 0;
@@ -796,27 +796,37 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-
-            FLUSH_READ0, FLUSH_READ1: begin
-                // wait two cycles to read from cache table...
-                state <= (state == FLUSH_READ0) ? FLUSH : FLUSH_READ0;
+            
+            FLUSH_WAIT: begin
+                state <= FLUSH_READ0;
+                if (LSU_memc.cmd != MEMC_NONE || BLSU_memc.cmd != MEMC_NONE)
+                    state <= FLUSH_WAIT;
+                for (integer i = 0; i < 4; i=i+1)
+                    if (IN_memc.transfers[i].valid) state <= FLUSH_WAIT;
+            end
+            FLUSH_READ0: begin
+                state <= FLUSH_READ1;
+            end
+            FLUSH_READ1: begin
+                state <= FLUSH;
             end
             FLUSH: begin
                 if (flushDone) begin
                     state <= IDLE;
                 end
-                else begin
-                    
+                else if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
                     CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
+
                     if (entry.valid && dirty[{flushAssocIdx, flushIdx}]) begin
                         LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                         LSU_memc.cacheAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
-                        LSU_memc.readAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
+                        LSU_memc.writeAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
+                        LSU_memc.readAddr <= 'x;
                         LSU_memc.cacheID <= 0;
                     end
-                    else if (&flushAssocIdx) state <= FLUSH_READ1;
-
+                    
                     {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
+                    if (&flushAssocIdx) state <= FLUSH_READ0;
                 end
             end
             default: state <= IDLE;

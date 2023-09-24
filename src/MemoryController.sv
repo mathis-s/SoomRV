@@ -585,12 +585,16 @@ always_ff@(posedge clk) begin
             transfers[DCR_dataTId].evictProgress <= transfers[DCR_dataTId].evictProgress + 4;
         end
 
-        // Write ACK (only relevant for MMIO)
-        if (s_axi_bvalid && isMMIO[s_axi_bid]) begin
-            sglStRes.valid <= 1;
-            sglStRes.id <= transfers[s_axi_bid].cacheAddr;
-            transfers[s_axi_bid] <= 'x;
-            transfers[s_axi_bid].valid <= 0;
+        // Write ACK 
+        if (s_axi_bvalid) begin
+            if (isMMIO[s_axi_bid]) begin
+                sglStRes.valid <= 1;
+                sglStRes.id <= transfers[s_axi_bid].cacheAddr;
+            end
+            if (isMMIO[s_axi_bid] || transfers[s_axi_bid].cmd == MEMC_CP_CACHE_TO_EXT) begin
+                transfers[s_axi_bid] <= 'x;
+                transfers[s_axi_bid].valid <= 0;
+            end
         end
     end
 end
