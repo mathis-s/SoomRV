@@ -26,12 +26,15 @@ typedef struct packed
 ICacheTableEntry icacheTable[LEN-1:0][ASSOC-1:0];
 reg[$clog2(ASSOC)-1:0] counters[LEN-1:0];
 
+reg[`CACHE_SIZE_E-3:0] newCLAddr;
 reg doCacheLoad;
 reg cacheEntryFound;
 reg[$clog2(LEN)-1:0] cacheIndex;
 reg[$clog2(ASSOC)-1:0] cacheAssocIndex;
 always_comb begin
     cacheIndex = IN_lookupPC[`CLSIZE_E+:$clog2(LEN)];
+    newCLAddr = {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
+    
     cacheEntryFound = 0;
     cacheAssocIndex = 0;
     OUT_lookupAddress = 0;
@@ -51,7 +54,8 @@ always_comb begin
 
     for (integer i = 0; i < 4; i=i+1) begin
         if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 1 &&
-            IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E]
+            (IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E] ||
+            newCLAddr == IN_memc.transfers[i].cacheAddr)
         ) begin
             cacheEntryFound = 0;
             doCacheLoad = 0;
@@ -116,7 +120,7 @@ always_ff@(posedge clk) begin
                 state <= IDLE;
                 if (doCacheLoad && OUT_memc.cmd == MEMC_NONE) begin
                     OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                    OUT_memc.cacheAddr <= {counters[cacheIndex], cacheIndex, IN_lookupPC[`CLSIZE_E-1:4], 2'b0};
+                    OUT_memc.cacheAddr <= newCLAddr;
                     OUT_memc.readAddr <= {IN_lookupPC[31:4], 4'b0};
                     OUT_memc.cacheID <= 1;
 

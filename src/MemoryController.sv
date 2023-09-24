@@ -209,6 +209,7 @@ always_comb begin
             OUT_stat.transfers[i].valid = 1;
             OUT_stat.transfers[i].cacheID = transfers[i].cacheID;
             OUT_stat.transfers[i].progress = transfers[i].progress[`CLSIZE_E-2:0];
+            OUT_stat.transfers[i].cacheAddr = transfers[i].cacheAddr;
             OUT_stat.transfers[i].writeAddr = transfers[i].writeAddr;
             OUT_stat.transfers[i].readAddr = transfers[i].readAddr;
         end

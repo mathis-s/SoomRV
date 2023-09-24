@@ -333,6 +333,7 @@ typedef struct packed
 {
     logic[31:0] writeAddr;
     logic[31:0] readAddr;
+    logic[`CACHE_SIZE_E-3:0] cacheAddr;
     logic[`CLSIZE_E-2:0] progress;
     CacheID_t cacheID;
     logic valid;
