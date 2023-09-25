@@ -260,6 +260,30 @@ typedef struct packed
 
 CacheMiss miss[1:0];
 
+// [0] -> transfer exists; [1] -> allow pass thru
+function automatic logic[1:0] CheckTransfers(logic[31:0] addr);
+    logic[1:0] rv = 0;
+
+    for (integer i = 0; i < 4; i=i+1) begin
+        if (IN_memc.transfers[i].valid &&
+            IN_memc.transfers[i].cacheID == 0 &&
+            IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
+        ) begin
+            rv[0] = 1;
+            rv[1] = (IN_memc.transfers[i].progress) > 
+                ({1'b0, addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]});
+        end
+    end
+    
+    if (LSU_memc.cmd != MEMC_NONE && 
+        LSU_memc.readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
+    ) begin
+        rv = 2'b01;
+    end
+
+    return rv;
+endfunction
+
 // Load Result Output
 LD_UOp curLd;
 always_comb begin
@@ -298,24 +322,15 @@ always_comb begin
                 end
             end
             
-            // check if cache line is currently being transferred
-            for (integer i = 0; i < 4; i=i+1) begin
-                if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
-                    IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
-                ) begin
+            // check if address is already being transferred
+            begin
+                reg transferExists;
+                reg allowPassThru;
+                {allowPassThru, transferExists} = CheckTransfers(ld.addr);
+                if (transferExists) begin
                     doCacheLoad = 0;
-                    //cacheHit = 0;
-                    cacheHit = 
-                        (IN_memc.transfers[i].progress) >
-                        ({1'b0, ld.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]});
+                    cacheHit &= allowPassThru;
                 end
-            end
-            
-            if (LSU_memc.cmd != MEMC_NONE && 
-                LSU_memc.readAddr[31:`CLSIZE_E] == ld.addr[31:`CLSIZE_E]
-            ) begin
-                doCacheLoad = 0;
-                cacheHit = 0;
             end
             
             // don't care if cache is hit if this is a complete forward
@@ -449,28 +464,25 @@ always_comb begin
             end
         end
 
-        // check if cache line is currently being transferred
-        for (integer i = 0; i < 4; i=i+1) begin
-            if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 0 &&
-                IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
-            ) begin
-                doCacheLoad = 0;
-                if ((IN_memc.transfers[i].progress) >
-                    ({1'b0, st.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]})
-                ) begin
-                    ;
-                end
-                else begin
-                    cacheHitAssoc = 'x;
-                    cacheHit = 0;
-                end
+        // check if address is already being transferred
+        begin
+            reg transferExists;
+            reg allowPassThru;
+            {allowPassThru, transferExists} = CheckTransfers(st.addr);
+            if (transferExists) begin
+                doCacheLoad = 0; // this is only needed for one cycle
+                cacheHit &= allowPassThru;
             end
         end
-        if (LSU_memc.cmd != MEMC_NONE && 
-            LSU_memc.readAddr[31:`CLSIZE_E] == st.addr[31:`CLSIZE_E]
+
+
+        // check for conflict with currently issued MemC_Cmd
+        if (cacheHit && 
+            LSU_memc.cmd != MEMC_NONE && 
+            LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}
         ) begin
-            doCacheLoad = 0;
             cacheHit = 0;
+            doCacheLoad = 0;
             cacheHitAssoc = 'x;
         end
         
