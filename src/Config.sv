@@ -40,7 +40,7 @@
 `define MTIMECMP_ADDR 32'h1100_4000
 
 `define CACHE_SIZE_E 14
-`define CLSIZE_E 7
+`define CLSIZE_E 6
 `define CASSOC 4
 
 // External MMIO
