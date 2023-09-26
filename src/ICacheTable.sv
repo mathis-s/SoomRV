@@ -1,5 +1,5 @@
 
-module ICacheTable#(parameter ASSOC=2, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)))
+module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)))
 (
     input wire clk,
     input wire rst,
