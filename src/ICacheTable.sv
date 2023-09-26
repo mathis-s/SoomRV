@@ -57,8 +57,11 @@ always_comb begin
             (IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E] ||
             newCLAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == IN_memc.transfers[i].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2])
         ) begin
-            cacheEntryFound = 0;
             doCacheLoad = 0;
+            cacheEntryFound &=
+                (IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E] &&
+                IN_memc.transfers[i].progress > 
+                    ({1'b0, IN_lookupPC[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]}));
         end
     end
 
