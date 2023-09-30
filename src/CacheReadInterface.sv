@@ -25,10 +25,12 @@ module CacheReadInterface
     output reg OUT_CACHE_ce,
     output reg OUT_CACHE_we,
     output reg[ADDR_BITS-1:0] OUT_CACHE_addr,
-    input wire[31:0] IN_CACHE_data
+    input wire[CWIDTH-1:0] IN_CACHE_data
 );
 
 localparam WNUM = IWIDTH / CWIDTH;
+localparam CWIDTH_W_ = CWIDTH / 32;
+localparam CWIDTH_W = LEN_BITS'(CWIDTH_W_);
 
 logic[$clog2(BUF_LEN):0] FIFO_free;
 
@@ -150,7 +152,7 @@ always_comb begin
         
         readMeta.valid = 1;
         readMeta.id = cur.id;
-        readMeta.last = (cur.progress == cur.len) || cur.mmio;
+        readMeta.last = (cur.progress[LEN_BITS-1:$clog2(CWIDTH_W)] == cur.len[LEN_BITS-1:$clog2(CWIDTH_W)]) || cur.mmio;
         readMeta.mmio = cur.mmio;
         readMeta.mmioData = cur.mmioData;
     end
@@ -197,7 +199,7 @@ always_ff@(posedge clk) begin
                     incoming = Transfer'{default: 'x, valid: 0};
                 end
             end
-            else cur.progress <= cur.progress + 1;
+            else cur.progress <= cur.progress + CWIDTH_W;
         end
         
         if (incoming.valid) begin

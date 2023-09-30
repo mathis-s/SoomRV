@@ -44,7 +44,7 @@
 `define CASSOC 4
 
 `define CBANKS 4
-`define CWIDTH 1
+`define CWIDTH 4
 
 // External MMIO
 // - IS_MMIO_PMA must be true for this range.

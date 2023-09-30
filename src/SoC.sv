@@ -116,16 +116,6 @@ IF_CTable IF_ct();
 IF_MMIO IF_mmio();
 IF_CSR_MMIO IF_csr_mmio();
 
-CacheIF CORE_DC_if;
-always_comb begin
-    CORE_DC_if = '0;
-    CORE_DC_if.ce = IF_cache.we;
-    CORE_DC_if.we = IF_cache.we;
-    CORE_DC_if.wm[3:0] = IF_cache.wmask;
-    CORE_DC_if.addr = {IF_cache.wassoc, IF_cache.waddr[11:2]};
-    CORE_DC_if.data[31:0] = IF_cache.wdata;
-end
-
 wire CORE_instrReadEnable;
 wire[27:0] CORE_instrReadAddress;
 wire[127:0] CORE_instrReadData;
@@ -149,6 +139,26 @@ Core core
     .IN_memc(MemC_stat)
 );
 
+CacheIF CORE_DC_if;
+always_comb begin
+    CORE_DC_if.ce = IF_cache.we;
+    CORE_DC_if.we = IF_cache.we;
+    CORE_DC_if.addr = {IF_cache.wassoc, IF_cache.waddr[11:2]};
+end
+if (`CWIDTH == 1) always_comb begin
+    CORE_DC_if.wm = '0;
+    CORE_DC_if.wm[3:0] = IF_cache.wmask;
+    CORE_DC_if.data = 'x;
+    CORE_DC_if.data[31:0] = IF_cache.wdata;
+end
+else always_comb begin
+    CORE_DC_if.wm = '0;
+    CORE_DC_if.wm[(IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 4) +: 4] = IF_cache.wmask;
+
+    CORE_DC_if.data = 'x;
+    CORE_DC_if.data[(IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 32) +: 32] = IF_cache.wdata;
+end
+
 logic[127:0] DC_dataOut;
 // R port is exclusive to core
 CacheIF[`CBANKS-1:0] readIFs;
@@ -157,8 +167,8 @@ always_comb begin
         readIFs[i] = CacheIF'{ce: 1, we: 1, default: 'x};
     
     if (!IF_cache.re) begin
-        readIFs[IF_cache.raddr[2+:$clog2(`CBANKS)]].ce = IF_cache.re;
-        readIFs[IF_cache.raddr[2+:$clog2(`CBANKS)]].addr = {{$clog2(`CASSOC){1'bx}}, IF_cache.raddr[11:2]};
+        readIFs[IF_cache.raddr[2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re;
+        readIFs[IF_cache.raddr[2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {{$clog2(`CASSOC){1'bx}}, IF_cache.raddr[11:2]};
     end
 
     IF_cache.rbusy = 0;
@@ -196,7 +206,7 @@ for (genvar i = 0; i < `CBANKS; i=i+1)
         .IN_nwe(bankIFs[i].we),
         .IN_addr(bankIFs[i].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):$clog2(`CWIDTH)+$clog2(`CBANKS)]),
         .IN_data({`CASSOC{bankIFs[i].data[`CWIDTH*32-1:0]}}),
-        .IN_wm({{(`CASSOC*4-4){1'b0}}, bankIFs[i].wm[`CWIDTH*4-1:0]} << (bankIFs[i].addr[`CACHE_SIZE_E-3-:$clog2(`CASSOC)] * 4)),
+        .IN_wm((4 * `CASSOC * `CWIDTH)'(bankIFs[i].wm[`CWIDTH*4-1:0]) << (bankIFs[i].addr[`CACHE_SIZE_E-3-:$clog2(`CASSOC)] * `CWIDTH * 4)),
         .OUT_data(dcacheOut0[i]),
         
         .IN_nce1(readIFs[i].ce),
@@ -208,7 +218,9 @@ endgenerate
 logic[`CWIDTH-1:0][`CASSOC-1:0][31:0] dcacheOut1_t[`CBANKS-1:0];
 always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
-        dcacheOut1_t[i] = dcacheOut1[i];
+        for (integer a = 0; a < `CASSOC; a=a+1)
+            for (integer w = 0; w < `CWIDTH; w=w+1)
+                dcacheOut1_t[i][w][a] = dcacheOut1[i][a][w];  
 end
 
 always_comb begin
@@ -216,7 +228,7 @@ always_comb begin
     DC_dataOut[`CWIDTH*32-1:0] = dcacheOut0 [MEMC_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [MEMC_raddr[1][`CACHE_SIZE_E-3 -: $clog2(`CASSOC)]];
 end
 if (`CWIDTH == 1) assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
-else              assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [0 +: $clog2(`CWIDTH)];
+else              assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr[1][0 +: $clog2(`CWIDTH)]];
 
 
 MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable

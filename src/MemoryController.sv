@@ -57,6 +57,9 @@ module MemoryController
     input s_axi_rvalid
 );
 
+localparam WIDTH_W_ = (WIDTH / 32);
+localparam WIDTH_W = WIDTH_W_[`CLSIZE_E-2:0];
+
 always_comb begin
     OUT_CACHE_we[0] = 1;
     OUT_CACHE_ce[0] = 1;
@@ -264,7 +267,7 @@ logic DCW_CACHE_ready;
 logic DCW_CACHE_ce;
 logic DCW_CACHE_we;
 logic[`CACHE_SIZE_E-3:0] DCW_CACHE_addr;
-CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 32) dcacheWriteIF
+CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32) dcacheWriteIF
 (
     .clk(clk),
     .rst(rst),
@@ -282,7 +285,7 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 32) dcacheWriteIF
     .OUT_CACHE_ce(DCW_CACHE_ce),
     .OUT_CACHE_we(DCW_CACHE_we),
     .OUT_CACHE_addr(DCW_CACHE_addr),
-    .OUT_CACHE_data(OUT_CACHE_data[0][31:0])
+    .OUT_CACHE_data(OUT_CACHE_data[0][`CWIDTH*32-1:0])
 );
 
 // temp
@@ -362,7 +365,7 @@ logic DCR_CACHE_ready;
 logic DCR_CACHE_ce;
 logic DCR_CACHE_we;
 logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
-CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, 32, 4) dcacheReadIF
+CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 4) dcacheReadIF
 (
     .clk(clk),
     .rst(rst),
@@ -385,7 +388,7 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, 32, 4) dcacheReadIF
     .OUT_CACHE_ce(DCR_CACHE_ce),
     .OUT_CACHE_we(DCR_CACHE_we),
     .OUT_CACHE_addr(DCR_CACHE_addr),
-    .IN_CACHE_data(IN_CACHE_data[0][31:0])
+    .IN_CACHE_data(IN_CACHE_data[0][`CWIDTH*32-1:0])
 );
 
 // Begin Write Transactions
@@ -431,7 +434,7 @@ always_comb begin
     if (awIdxValid && transfers[awIdx].needWriteRq[1]) begin
         s_axi_awvalid = 1;
         s_axi_awburst = WRAP;
-        s_axi_awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
+        s_axi_awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - $clog2(WIDTH / 8))) - 1);
         s_axi_awaddr = transfers[awIdx].writeAddr;
         s_axi_awid = awIdx;
         
@@ -547,7 +550,7 @@ always_ff@(posedge clk) begin
         // Read Data
         if (s_axi_rvalid && s_axi_rready) begin
 
-            transfers[s_axi_rid].addrCounter <= transfers[s_axi_rid].addrCounter + 4;
+            transfers[s_axi_rid].addrCounter <= transfers[s_axi_rid].addrCounter + WIDTH_W;
             
             if (isMMIO[s_axi_rid]) begin
                 transfers[s_axi_rid] <= 'x;
@@ -561,14 +564,14 @@ always_ff@(posedge clk) begin
 
         // Read ACK
         if (DCW_ackValid) begin
-            transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + 4;
+            transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + WIDTH_W;
             if ((transfers[DCW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
                 transfers[DCW_ackId] <= 'x;
                 transfers[DCW_ackId].valid <= 0;
             end
         end
         if (ICW_ackValid) begin
-            transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + 4;
+            transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + WIDTH_W;
             if ((transfers[ICW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
                 transfers[ICW_ackId] <= 'x;
                 transfers[ICW_ackId].valid <= 0;
@@ -583,7 +586,7 @@ always_ff@(posedge clk) begin
 
         // Write Data
         if (DCR_dataValid && s_axi_wready) begin
-            transfers[DCR_dataTId].evictProgress <= transfers[DCR_dataTId].evictProgress + 4;
+            transfers[DCR_dataTId].evictProgress <= transfers[DCR_dataTId].evictProgress + WIDTH_W;
         end
 
         // Write ACK 
