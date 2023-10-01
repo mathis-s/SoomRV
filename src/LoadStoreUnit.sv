@@ -136,18 +136,21 @@ always_comb begin
         // do not issue load
     end
     else if (LMQ_ld.valid && 
-        (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0)
+        (!IN_branch.taken || LMQ_ld.external || $signed(LMQ_ld.sqN - IN_branch.sqN) <= 0) &&
+        (!IF_cache.rbusy || IF_cache.rbusyBank != LMQ_ld.addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
     ) begin
         uopLd = LMQ_ld;
         LMQ_dequeue = 1;
     end
     else if (IN_uopLd.valid &&
-        (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
+        (!IN_branch.taken || IN_uopLd.external || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0) &&
+        (!IF_cache.rbusy || IF_cache.rbusyBank != IN_uopLd.addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
     ) begin
         uopLd = IN_uopLd;
         OUT_ldStall = 0;
     end
-    else if (IN_uopELd.valid
+    else if (IN_uopELd.valid &&
+        (!IF_cache.rbusy || IF_cache.rbusyBank != IN_uopELd.addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
     ) begin
         uopLd.valid = 1;
         uopLd.external = 0;

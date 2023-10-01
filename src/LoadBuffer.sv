@@ -65,6 +65,7 @@ always_comb begin
     // If it needs forwarding from current cycle's store, we also delay the load.
     if (IN_uopLd.valid && $signed(IN_uopSt.loadSqN - IN_uopLd.loadSqN) <= 0 &&
         IN_uopSt.valid &&
+        (!IN_uopSt.doNotCommit || IN_uopSt.loadSqN != IN_uopLd.loadSqN) &&
         IN_uopLd.exception == AGU_NO_EXCEPTION &&
         IN_uopLd.addr[31:2] == IN_uopSt.addr[31:2] &&
             (IN_uopSt.size == 2 ||
@@ -100,6 +101,7 @@ always_comb begin
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         if (entries[i].valid && entries[i].issued &&
             $signed(IN_uopSt.loadSqN - {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) <= 0 &&
+            (!IN_uopSt.doNotCommit || IN_uopSt.loadSqN != {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) &&
             entries[i].addr[31:2] == IN_uopSt.addr[31:2] &&
                 (IN_uopSt.size == 2 ||
                 (IN_uopSt.size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uopSt.addr[1])) ||

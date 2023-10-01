@@ -14,6 +14,10 @@ module MemoryController
     output reg[WIDTH-1:0] OUT_CACHE_data[NUM_CACHES-1:0],
     input wire[WIDTH-1:0] IN_CACHE_data[NUM_CACHES-1:0],
 
+    output CacheIF OUT_dcacheW,
+    output CacheIF OUT_dcacheR,
+    input wire[32*`CWIDTH-1:0] IN_dcacheR,
+
     output[ID_LEN-1:0]  s_axi_awid, // write req id
     output[ADDR_LEN-1:0] s_axi_awaddr, // write addr
     output[7:0] s_axi_awlen, // write len
@@ -60,27 +64,6 @@ module MemoryController
 localparam WIDTH_W_ = (WIDTH / 32);
 localparam WIDTH_W = WIDTH_W_[`CLSIZE_E-2:0];
 
-always_comb begin
-    OUT_CACHE_we[0] = 1;
-    OUT_CACHE_ce[0] = 1;
-    OUT_CACHE_addr[0] = 'x;
-    DCR_CACHE_ready = 0;
-    DCW_CACHE_ready = 0;
-    
-    // read has higher priority than write
-    if (!DCR_CACHE_ce) begin
-        OUT_CACHE_we[0] = DCR_CACHE_we;
-        OUT_CACHE_ce[0] = DCR_CACHE_ce;
-        OUT_CACHE_addr[0] = DCR_CACHE_addr;
-        DCR_CACHE_ready = 1;
-    end
-    else if (!DCW_CACHE_ce) begin
-        OUT_CACHE_we[0] = DCW_CACHE_we;
-        OUT_CACHE_ce[0] = DCW_CACHE_ce;
-        OUT_CACHE_addr[0] = DCW_CACHE_addr;
-        DCW_CACHE_ready = 1;
-    end
-end
 
 typedef enum logic[1:0]
 {
@@ -174,7 +157,7 @@ always_comb begin
     arIdx = 'x;
     arIdxValid = 0;
     for (integer i = 0; i < NUM_TFS; i=i+1) begin
-        if (!arIdxValid && transfers[i].valid && transfers[i].needReadRq && transfers[i].needWriteRq == 0) begin
+        if (!arIdxValid && transfers[i].valid && transfers[i].needReadRq) begin
             arIdx = i[$clog2(NUM_TFS)-1:0];
             arIdxValid = 1;
         end
@@ -281,18 +264,16 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32) dcacheWriteIF
     .OUT_ackValid(DCW_ackValid),
     .OUT_ackId(DCW_ackId),
 
-    .IN_CACHE_ready(DCW_CACHE_ready),
-    .OUT_CACHE_ce(DCW_CACHE_ce),
-    .OUT_CACHE_we(DCW_CACHE_we),
-    .OUT_CACHE_addr(DCW_CACHE_addr),
-    .OUT_CACHE_data(OUT_CACHE_data[0][`CWIDTH*32-1:0])
+    .IN_CACHE_ready(1'b1),
+    .OUT_CACHE_ce(OUT_dcacheW.ce),
+    .OUT_CACHE_we(OUT_dcacheW.we),
+    .OUT_CACHE_addr(OUT_dcacheW.addr),
+    .OUT_CACHE_data(OUT_dcacheW.data)
 );
-
-// temp
-always_comb begin
-    OUT_CACHE_wm[0] = '1;
-    OUT_CACHE_wm[1] = '1;
-end
+assign OUT_dcacheW.wm = '1;
+assign OUT_CACHE_wm[1] = '1;
+assign OUT_dcacheR.wm = '0;
+assign OUT_dcacheR.data = 'x;
 
 function logic[`CACHE_SIZE_E-3:0] GetCacheRdAddr(Transfer t);
     case (t.cmd)
@@ -365,6 +346,9 @@ logic DCR_CACHE_ready;
 logic DCR_CACHE_ce;
 logic DCR_CACHE_we;
 logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
+
+logic DCR_cacheReadValid;
+logic[ID_LEN-1:0] DCR_cacheReadId;
 CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 4) dcacheReadIF
 (
     .clk(clk),
@@ -384,11 +368,14 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 4) dcacheReadIF
     .OUT_data(DCR_data),
     .OUT_last(DCR_dataLast),
     
-    .IN_CACHE_ready(DCR_CACHE_ready),
-    .OUT_CACHE_ce(DCR_CACHE_ce),
-    .OUT_CACHE_we(DCR_CACHE_we),
-    .OUT_CACHE_addr(DCR_CACHE_addr),
-    .IN_CACHE_data(IN_CACHE_data[0][`CWIDTH*32-1:0])
+    .IN_CACHE_ready(1'b1),
+    .OUT_CACHE_ce(OUT_dcacheR.ce),
+    .OUT_CACHE_we(OUT_dcacheR.we),
+    .OUT_CACHE_addr(OUT_dcacheR.addr),
+    .IN_CACHE_data(IN_dcacheR),
+
+    .OUT_cacheReadValid(DCR_cacheReadValid),
+    .OUT_cacheReadId(DCR_cacheReadId)
 );
 
 // Begin Write Transactions
@@ -585,8 +572,8 @@ always_ff@(posedge clk) begin
         end
 
         // Write Data
-        if (DCR_dataValid && s_axi_wready) begin
-            transfers[DCR_dataTId].evictProgress <= transfers[DCR_dataTId].evictProgress + WIDTH_W;
+        if (DCR_cacheReadValid) begin
+            transfers[DCR_cacheReadId].evictProgress <= transfers[DCR_cacheReadId].evictProgress + WIDTH_W;
         end
 
         // Write ACK 

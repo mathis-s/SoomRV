@@ -49,17 +49,11 @@ module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
     input s_axi_rvalid
 );
 
-typedef struct packed
-{
-    logic ce;
-    logic we;
-    logic[15:0] wm;
-    logic[`CACHE_SIZE_E-3:0] addr;
-    logic[127:0] data;
-} CacheIF;
-
-CacheIF MC_DC_if;
+CacheIF unused_MC_DC_if;
 CacheIF MC_IC_if;
+
+CacheIF MC_DC_rd;
+CacheIF MC_DC_wr;
 
 MemController_Req MemC_ctrl[2:0];
 MemController_Res MemC_stat;
@@ -71,12 +65,16 @@ MemoryController memc
     .IN_ctrl(MemC_ctrl),
     .OUT_stat(MemC_stat),
     
-    .OUT_CACHE_we('{MC_IC_if.we, MC_DC_if.we}),
-    .OUT_CACHE_ce('{MC_IC_if.ce, MC_DC_if.ce}),
-    .OUT_CACHE_wm('{MC_IC_if.wm, MC_DC_if.wm}),
-    .OUT_CACHE_addr('{MC_IC_if.addr, MC_DC_if.addr}),
-    .OUT_CACHE_data('{MC_IC_if.data, MC_DC_if.data}),
+    .OUT_CACHE_we('{MC_IC_if.we, unused_MC_DC_if.we}),
+    .OUT_CACHE_ce('{MC_IC_if.ce, unused_MC_DC_if.ce}),
+    .OUT_CACHE_wm('{MC_IC_if.wm, unused_MC_DC_if.wm}),
+    .OUT_CACHE_addr('{MC_IC_if.addr, unused_MC_DC_if.addr}),
+    .OUT_CACHE_data('{MC_IC_if.data, unused_MC_DC_if.data}),
     .IN_CACHE_data('{128'bx, DC_dataOut}),
+
+    .OUT_dcacheW(MC_DC_wr),
+    .OUT_dcacheR(MC_DC_rd),
+    .IN_dcacheR(DC_dataOut),
     
     .s_axi_awid(s_axi_awid),
     .s_axi_awaddr(s_axi_awaddr),
@@ -160,20 +158,25 @@ else always_comb begin
 end
 
 logic[127:0] DC_dataOut;
-// R port is exclusive to core
+// R port
 CacheIF[`CBANKS-1:0] readIFs;
 always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         readIFs[i] = CacheIF'{ce: 1, we: 1, default: 'x};
+    IF_cache.rbusy = 0;
+    IF_cache.rbusyBank = 'x;
     
     if (!IF_cache.re) begin
         readIFs[IF_cache.raddr[2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re;
         readIFs[IF_cache.raddr[2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {{$clog2(`CASSOC){1'bx}}, IF_cache.raddr[11:2]};
     end
-
-    IF_cache.rbusy = 0;
+    if (!MC_DC_rd.ce) begin
+        readIFs[MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_rd;
+        IF_cache.rbusy = 1;
+        IF_cache.rbusyBank = MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
+    end
 end
-// R/W port is shared by core and memory controller
+// W port
 CacheIF[`CBANKS-1:0] bankIFs;
 always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
@@ -181,18 +184,18 @@ always_comb begin
 
     if (!CORE_DC_if.ce)
         bankIFs[CORE_DC_if.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = CORE_DC_if;
-    if (!MC_DC_if.ce)
-        bankIFs[MC_DC_if.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_if;
+    if (!MC_DC_wr.ce)
+        bankIFs[MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_wr;
 
-    IF_cache.wbusy = !MC_DC_if.ce &&
-        (CORE_DC_if.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)] == MC_DC_if.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]);
+    IF_cache.wbusy = !MC_DC_wr.ce &&
+        (CORE_DC_if.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)] == MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]);
 end
 // Read Address Shift Registers
 logic[9:0] CORE_raddr[1:0];
 logic[`CACHE_SIZE_E-3:0] MEMC_raddr[1:0];
 always_ff@(posedge clk) begin
     CORE_raddr <= {CORE_raddr[0], IF_cache.raddr[11:2]};
-    MEMC_raddr <= {MEMC_raddr[0], MC_DC_if.addr};
+    MEMC_raddr <= {MEMC_raddr[0], MC_DC_rd.addr};
 end
 
 logic[`CASSOC-1:0][`CWIDTH-1:0][31:0] dcacheOut0[`CBANKS-1:0];
@@ -225,7 +228,7 @@ end
 
 always_comb begin
     DC_dataOut = 'x;
-    DC_dataOut[`CWIDTH*32-1:0] = dcacheOut0 [MEMC_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [MEMC_raddr[1][`CACHE_SIZE_E-3 -: $clog2(`CASSOC)]];
+    DC_dataOut[`CWIDTH*32-1:0] = dcacheOut1 [MEMC_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [MEMC_raddr[1][`CACHE_SIZE_E-3 -: $clog2(`CASSOC)]];
 end
 if (`CWIDTH == 1) assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
 else              assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr[1][0 +: $clog2(`CWIDTH)]];

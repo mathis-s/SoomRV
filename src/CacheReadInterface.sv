@@ -25,7 +25,11 @@ module CacheReadInterface
     output reg OUT_CACHE_ce,
     output reg OUT_CACHE_we,
     output reg[ADDR_BITS-1:0] OUT_CACHE_addr,
-    input wire[CWIDTH-1:0] IN_CACHE_data
+    input wire[CWIDTH-1:0] IN_CACHE_data,
+
+    // Cache Read Info
+    output reg OUT_cacheReadValid,
+    output reg[ID_LEN-1:0] OUT_cacheReadId
 );
 
 localparam WNUM = IWIDTH / CWIDTH;
@@ -159,8 +163,18 @@ always_comb begin
 end
 
 wire readSucc = readMeta.valid && (IN_CACHE_ready || readMeta.mmio);
-
 assign OUT_ready = !next.valid || (readSucc && readMeta.last);
+
+// Output read info to inform MemC that
+// this location may now be overwritten
+always_comb begin
+    OUT_cacheReadValid = 0;
+    OUT_cacheReadId = 'x;
+    if (readSucc) begin
+        OUT_cacheReadValid = 1;
+        OUT_cacheReadId = readMeta.id;
+    end
+end
 
 ReadMeta[1:0] readMetaSR;
 always_ff@(posedge clk) begin

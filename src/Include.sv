@@ -794,6 +794,15 @@ typedef struct packed
     logic valid;
 } TValProv;
 
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[4*`CWIDTH-1:0] wm;
+    logic[`CACHE_SIZE_E-3:0] addr;
+    logic[32*`CWIDTH-1:0] data;
+} CacheIF;
+
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
     logic[63:0] mtimecmp;
@@ -852,18 +861,19 @@ interface IF_Cache();
     logic[`CASSOC-1:0][31:0] rdata;
     
     logic rbusy;
+    logic[$clog2(`CBANKS)-1:0] rbusyBank;
     logic wbusy;
     
     modport HOST
     (
         output we, waddr, wassoc, wdata, wmask, re, raddr,
-        input rdata, rbusy, wbusy
+        input rdata, rbusy, rbusyBank, wbusy
     );
     
     modport MEM
     (
         input we, waddr, wassoc, wdata, wmask, re, raddr,
-        output rdata, rbusy, wbusy
+        output rdata, rbusy, rbusyBank, wbusy
     );
 endinterface
 
