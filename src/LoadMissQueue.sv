@@ -60,7 +60,9 @@ always_ff@(posedge clk) begin
                     if (IN_memc.transfers[j].valid && 
                         IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == queue[i].ld.addr[31:`CLSIZE_E]
                     ) begin
-                        queue[i].ready <= IN_memc.transfers[j].progress > 
+                        queue[i].ready <= 
+                            IN_memc.transfers[j].active &&
+                            (IN_memc.transfers[j].progress) >=
                             ({1'b0, queue[i].ld.addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[j].readAddr[`CLSIZE_E-1:2]});
                     end
                 end

@@ -546,12 +546,12 @@ static bool kbhit()
 
 static void HandleInput()
 {
-    /*auto emem = top->Top->extMem;
+    auto emem = top->Top->extMem;
     if (!emem->inputAvail && kbhit())
     {
         emem->inputAvail = 1;
         emem->inputByte = getchar();
-    }*/
+    }
 }
 
 void DumpState(FILE* stream, uint32_t pc, uint32_t inst)

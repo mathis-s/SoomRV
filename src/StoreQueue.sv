@@ -72,7 +72,8 @@ always_comb begin
     OUT_sqInfo.valid = loadBaseIndexValid;
     if (OUT_sqInfo.valid) begin
         if (entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].atomic &&
-            !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded
+            (!entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded ||
+             !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].addrAvail)
         ) begin
             // For atomics, do not allow commit until other UOps are done and store
             // data is known
@@ -333,7 +334,7 @@ always_comb begin
     reg[NUM_ENTRIES-1:0] isNotLoaded;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         isNotLoaded[i] =
-            entries[i].valid && !entries[i].loaded;
+            entries[i].valid && (!entries[i].loaded || !entries[i].addrAvail);
     end
 
     // Priority encode beginning at base index

@@ -336,6 +336,7 @@ typedef struct packed
     logic[`CACHE_SIZE_E-3:0] cacheAddr;
     logic[`CLSIZE_E-2:0] progress;
     CacheID_t cacheID;
+    logic active;
     logic valid;
 } MemController_Transf;
 

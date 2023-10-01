@@ -198,6 +198,11 @@ always_comb begin
             OUT_stat.transfers[i].cacheAddr = transfers[i].cacheAddr;
             OUT_stat.transfers[i].writeAddr = transfers[i].writeAddr;
             OUT_stat.transfers[i].readAddr = transfers[i].readAddr;
+
+            OUT_stat.transfers[i].active =
+                (transfers[i].needReadRq == 0) &&
+                (transfers[i].needWriteRq == 0) &&
+                (transfers[i].evictProgress != 0);
         end
     end
     
