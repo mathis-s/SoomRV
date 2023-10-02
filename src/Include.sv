@@ -804,6 +804,14 @@ typedef struct packed
     logic[32*`CWIDTH-1:0] data;
 } CacheIF;
 
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[`CACHE_SIZE_E-3:0] addr;
+    logic[127:0] data;
+} ICacheIF;
+
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
     logic[63:0] mtimecmp;

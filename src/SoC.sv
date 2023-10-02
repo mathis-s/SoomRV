@@ -49,8 +49,7 @@ module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
     input s_axi_rvalid
 );
 
-CacheIF unused_MC_DC_if;
-CacheIF MC_IC_if;
+ICacheIF MC_IC_wr;
 
 CacheIF MC_DC_rd;
 CacheIF MC_DC_wr;
@@ -65,14 +64,9 @@ MemoryController memc
     .IN_ctrl(MemC_ctrl),
     .OUT_stat(MemC_stat),
     
-    .OUT_CACHE_we('{MC_IC_if.we, unused_MC_DC_if.we}),
-    .OUT_CACHE_ce('{MC_IC_if.ce, unused_MC_DC_if.ce}),
-    .OUT_CACHE_wm('{MC_IC_if.wm, unused_MC_DC_if.wm}),
-    .OUT_CACHE_addr('{MC_IC_if.addr, unused_MC_DC_if.addr}),
-    .OUT_CACHE_data('{MC_IC_if.data, unused_MC_DC_if.data}),
-    .IN_CACHE_data('{128'bx, DC_dataOut}),
-
+    .OUT_icacheW(MC_IC_wr),
     .OUT_dcacheW(MC_DC_wr),
+
     .OUT_dcacheR(MC_DC_rd),
     .IN_dcacheR(DC_dataOut),
     
@@ -252,10 +246,10 @@ MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASS
 MemRTL#(128, (1 << (`CACHE_SIZE_E - 4)), 32) icache
 (
     .clk(clk),
-    .IN_nce(MC_IC_if.ce),
-    .IN_nwe(MC_IC_if.we),
-    .IN_addr(MC_IC_if.addr[(`CACHE_SIZE_E-3):2]),
-    .IN_data({MC_IC_if.data}),
+    .IN_nce(MC_IC_wr.ce),
+    .IN_nwe(MC_IC_wr.we),
+    .IN_addr(MC_IC_wr.addr[(`CACHE_SIZE_E-3):2]),
+    .IN_data({MC_IC_wr.data}),
     .IN_wm('1),
     .OUT_data(),
     

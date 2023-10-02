@@ -7,13 +7,7 @@ module MemoryController
     input MemController_Req IN_ctrl[NUM_TFS_IN-1:0],
     output MemController_Res OUT_stat,
     
-    output reg OUT_CACHE_we[NUM_CACHES-1:0],
-    output reg OUT_CACHE_ce[NUM_CACHES-1:0],
-    output reg[(WIDTH/8)-1:0] OUT_CACHE_wm[NUM_CACHES-1:0],
-    output reg[`CACHE_SIZE_E-3:0] OUT_CACHE_addr[NUM_CACHES-1:0],
-    output reg[WIDTH-1:0] OUT_CACHE_data[NUM_CACHES-1:0],
-    input wire[WIDTH-1:0] IN_CACHE_data[NUM_CACHES-1:0],
-
+    output ICacheIF OUT_icacheW,
     output CacheIF OUT_dcacheW,
     output CacheIF OUT_dcacheR,
     input wire[32*`CWIDTH-1:0] IN_dcacheR,
@@ -235,10 +229,10 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 128) icacheWriteIF
     .OUT_ackId(ICW_ackId),
 
     .IN_CACHE_ready(1'b1),
-    .OUT_CACHE_ce(OUT_CACHE_ce[1]),
-    .OUT_CACHE_we(OUT_CACHE_we[1]),
-    .OUT_CACHE_addr(OUT_CACHE_addr[1]),
-    .OUT_CACHE_data(OUT_CACHE_data[1])
+    .OUT_CACHE_ce(OUT_icacheW.ce),
+    .OUT_CACHE_we(OUT_icacheW.we),
+    .OUT_CACHE_addr(OUT_icacheW.addr),
+    .OUT_CACHE_data(OUT_icacheW.data)
 );
 
 logic DCW_ready;
@@ -276,7 +270,6 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32) dcacheWriteIF
     .OUT_CACHE_data(OUT_dcacheW.data)
 );
 assign OUT_dcacheW.wm = '1;
-assign OUT_CACHE_wm[1] = '1;
 assign OUT_dcacheR.wm = '0;
 assign OUT_dcacheR.data = 'x;
 
