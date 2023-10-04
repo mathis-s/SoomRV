@@ -47,6 +47,7 @@ logic s_axi_rvalid;
 ExternalAXISim extMem
 (
     .clk(clk),
+    .rst(rst),
 
     .s_axi_awid(s_axi_awid),
     .s_axi_awaddr(s_axi_awaddr),

@@ -7,6 +7,7 @@ module ExternalAXISim
 #(parameter ID_LEN=2, parameter WIDTH=128, parameter ADDR_LEN=32)
 (
     input wire clk,
+    input wire rst,
     
     // write request
     input[ID_LEN-1:0]  s_axi_awid, // write req id
@@ -168,10 +169,28 @@ always_comb begin
 end
 
 // Write Data Input
-// TODO: buffer input before processing
-// in case write transfer does not exist yet
-reg[NUM_TFS-1:0] writeDone;
+localparam W_LEN = $bits(s_axi_wdata) + $bits(s_axi_wstrb) + $bits(s_axi_wlast);
+logic[WIDTH-1:0] buf_wdata;
+logic[(WIDTH/8)-1:0] buf_wstrb;
+logic buf_wlast;
+logic buf_wvalid;
+logic buf_wready;
+FIFO#(W_LEN, 2, 1, 1) wFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
 
+    .IN_valid(s_axi_wvalid),
+    .IN_data({s_axi_wdata, s_axi_wstrb, s_axi_wlast}),
+    .OUT_ready(s_axi_wready),
+    
+    .OUT_valid(buf_wvalid),
+    .IN_ready(buf_wready),
+    .OUT_data({buf_wdata, buf_wstrb, buf_wlast})
+);
+
+reg[NUM_TFS-1:0] writeDone;
 reg[ID_LEN-1:0] writeIdx;
 reg writeIdxValid;
 always_comb begin
@@ -185,32 +204,32 @@ always_comb begin
         end
     end
 end
-assign s_axi_wready = writeIdxValid;
+assign buf_wready = writeIdxValid;
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = writeIdx;
 
-    if (s_axi_wready && s_axi_wvalid) begin
+    if (buf_wready && buf_wvalid) begin
         Transfer w = writes[idx];
         reg last = w.cur == w.len;
         reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
         assert(writeIdxValid);
         assert(w.valid);
-        assert(s_axi_wlast == last);
+        assert(buf_wlast == last);
 
         if (addr[31]) begin
             // Memory
             assert((addr & ($clog2(BWIDTH) - 1)) == 0);
             for (integer i = 0; i < BWIDTH; i=i+1) begin
-                if (s_axi_wstrb[i])
-                    mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= s_axi_wdata[8*i +: 8];
+                if (buf_wstrb[i])
+                    mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= buf_wdata[8*i +: 8];
             end
         end
         else begin
             // MMIO
             case (addr)
                 `SERIAL_ADDR: begin
-                    if (s_axi_wstrb[0]) begin
-                        $write("%c", s_axi_wdata[7:0] & 8'd127);
+                    if (buf_wstrb[0]) begin
+                        $write("%c", buf_wdata[7:0] & 8'd127);
                         $fflush(32'h80000001);
                     end
                 end
@@ -260,26 +279,83 @@ always_ff@(posedge clk) begin
     end
 end
 
+// Write Request FIFO
+localparam AW_LEN = 
+    $bits(s_axi_awid) + $bits(s_axi_awaddr) + $bits(s_axi_awsize) + $bits(s_axi_awlen) +
+    $bits(s_axi_awburst) + $bits(s_axi_awlock) + $bits(s_axi_awcache);
+
+logic[ID_LEN-1:0]  buf_awid;
+logic[ADDR_LEN-1:0] buf_awaddr;
+logic[7:0] buf_awlen;
+logic[2:0] buf_awsize;
+logic[1:0] buf_awburst;
+logic[0:0] buf_awlock;
+logic[3:0] buf_awcache;
+logic buf_awvalid;
+logic buf_awready;
+FIFO#(AW_LEN, 2, 1, 1) awFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
+
+    .IN_valid(s_axi_awvalid),
+    .IN_data({s_axi_awid, s_axi_awaddr, s_axi_awsize, s_axi_awlen, s_axi_awburst, s_axi_awlock, s_axi_awcache}),
+    .OUT_ready(s_axi_awready),
+    
+    .OUT_valid(buf_awvalid),
+    .IN_ready(buf_awready),
+    .OUT_data({buf_awid, buf_awaddr, buf_awsize, buf_awlen, buf_awburst, buf_awlock, buf_awcache})
+);
+
+// Read Request FIFO
+localparam AR_LEN = 
+    $bits(s_axi_arid) + $bits(s_axi_araddr) + $bits(s_axi_arsize) + $bits(s_axi_arlen) +
+    $bits(s_axi_arburst) + $bits(s_axi_arlock) + $bits(s_axi_arcache);
+
+logic[ID_LEN-1:0]  buf_arid;
+logic[ADDR_LEN-1:0] buf_araddr;
+logic[7:0] buf_arlen;
+logic[2:0] buf_arsize;
+logic[1:0] buf_arburst;
+logic[0:0] buf_arlock;
+logic[3:0] buf_arcache;
+logic buf_arvalid;
+logic buf_arready;
+FIFO#(AR_LEN, 2, 1, 1) arFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
+
+    .IN_valid(s_axi_arvalid),
+    .IN_data({s_axi_arid, s_axi_araddr, s_axi_arsize, s_axi_arlen, s_axi_arburst, s_axi_arlock, s_axi_arcache}),
+    .OUT_ready(s_axi_arready),
+    
+    .OUT_valid(buf_arvalid),
+    .IN_ready(buf_arready),
+    .OUT_data({buf_arid, buf_araddr, buf_arsize, buf_arlen, buf_arburst, buf_arlock, buf_arcache})
+);
+
 // Requests
-always_comb begin
-    s_axi_arready = !tfs[0][s_axi_arid].valid;
-    s_axi_awready = !tfs[1][s_axi_awid].valid;
-end
+assign buf_arready = !tfs[0][buf_arid].valid && buf_arvalid;
+assign buf_awready = !tfs[1][buf_awid].valid && buf_awvalid;
+
 always_ff@(posedge clk) begin
-    if (s_axi_arready && s_axi_arvalid) begin
-        tfs[0][s_axi_arid].valid <= 1;
-        tfs[0][s_axi_arid].addr <= s_axi_araddr;
-        tfs[0][s_axi_arid].btype <= BurstType'(s_axi_arburst);
-        tfs[0][s_axi_arid].len <= s_axi_arlen;
-        tfs[0][s_axi_arid].cur <= 0;
+    if (buf_arready) begin
+        tfs[0][buf_arid].valid <= 1;
+        tfs[0][buf_arid].addr <= buf_araddr;
+        tfs[0][buf_arid].btype <= BurstType'(buf_arburst);
+        tfs[0][buf_arid].len <= buf_arlen;
+        tfs[0][buf_arid].cur <= 0;
     end
-    if (s_axi_awready && s_axi_awvalid) begin
-        tfs[1][s_axi_awid].valid <= 1;
-        tfs[1][s_axi_awid].addr <= s_axi_awaddr;
-        tfs[1][s_axi_awid].btype <= BurstType'(s_axi_awburst);
-        tfs[1][s_axi_awid].len <= s_axi_awlen;
-        tfs[1][s_axi_awid].cur <= 0;
-        writeDone[s_axi_awid] <= 0;
+    if (buf_awready) begin
+        tfs[1][buf_awid].valid <= 1;
+        tfs[1][buf_awid].addr <= buf_awaddr;
+        tfs[1][buf_awid].btype <= BurstType'(buf_awburst);
+        tfs[1][buf_awid].len <= buf_awlen;
+        tfs[1][buf_awid].cur <= 0;
+        writeDone[buf_awid] <= 0;
     end
 end
 endmodule

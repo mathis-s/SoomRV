@@ -282,10 +282,31 @@ function logic[`CACHE_SIZE_E-3:0] GetCacheRdAddr(Transfer t);
     endcase
 endfunction
 
+// Read Data FIFO
+localparam R_LEN = $bits(s_axi_rid) + $bits(s_axi_rdata) + $bits(s_axi_rlast);
+logic[ID_LEN-1:0] buf_rid;
+logic[WIDTH-1:0] buf_rdata;
+logic buf_rlast;
+logic buf_rvalid;
+logic buf_rready;
+FIFO#(R_LEN, 2, 1, 1) rFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
+
+    .IN_valid(s_axi_rvalid),
+    .IN_data({s_axi_rid, s_axi_rdata, s_axi_rlast}),
+    .OUT_ready(s_axi_rready),
+    
+    .OUT_valid(buf_rvalid),
+    .IN_ready(buf_rready),
+    .OUT_data({buf_rid, buf_rdata, buf_rlast})
+);
 // Forward AXI read data to cache
 always_comb begin
     // Defaults
-    s_axi_rready = 0;
+    buf_rready = 0;
 
     ICW_valid = 0;
     ICW_addr = 'x;
@@ -298,27 +319,27 @@ always_comb begin
     DCW_id = 'x;
     
     // todo: add fifo to remove comb path from valid to ready
-    if (s_axi_rvalid) begin
-        if (isMMIO[s_axi_rid]) begin
-            s_axi_rready = 1;
+    if (buf_rvalid) begin
+        if (isMMIO[buf_rid]) begin
+            buf_rready = 1;
         end
         else begin
-            CacheID_t cID = transfers[s_axi_rid].cacheID;
+            CacheID_t cID = transfers[buf_rid].cacheID;
             case (cID)
-            0: if (DCW_ready && transfers[s_axi_rid].evictProgress > transfers[s_axi_rid].addrCounter) begin // dcache
-                s_axi_rready = 1;
+            0: if (DCW_ready && transfers[buf_rid].evictProgress > transfers[buf_rid].addrCounter) begin // dcache
+                buf_rready = 1;
                 DCW_valid = 1;
-                DCW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
-                DCW_data = s_axi_rdata;
-                DCW_id = s_axi_rid;
+                DCW_addr = GetCacheRdAddr(transfers[buf_rid]);
+                DCW_data = buf_rdata;
+                DCW_id = buf_rid;
             end
 
             1: if (ICW_ready) begin // icache
-                s_axi_rready = 1;
+                buf_rready = 1;
                 ICW_valid = 1;
-                ICW_addr = GetCacheRdAddr(transfers[s_axi_rid]);
-                ICW_data = s_axi_rdata;
-                ICW_id = s_axi_rid;
+                ICW_addr = GetCacheRdAddr(transfers[buf_rid]);
+                ICW_data = buf_rdata;
+                ICW_id = buf_rid;
             end
             endcase
         end
@@ -533,17 +554,17 @@ always_ff@(posedge clk) begin
         end
 
         // Read Data
-        if (s_axi_rvalid && s_axi_rready) begin
+        if (buf_rvalid && buf_rready) begin
 
-            transfers[s_axi_rid].addrCounter <= transfers[s_axi_rid].addrCounter + WIDTH_W;
+            transfers[buf_rid].addrCounter <= transfers[buf_rid].addrCounter + WIDTH_W;
             
-            if (isMMIO[s_axi_rid]) begin
-                transfers[s_axi_rid] <= 'x;
-                transfers[s_axi_rid].valid <= 0;
+            if (isMMIO[buf_rid]) begin
+                transfers[buf_rid] <= 'x;
+                transfers[buf_rid].valid <= 0;
                 
                 sglLdRes.valid <= 1;
-                sglLdRes.id <= transfers[s_axi_rid].cacheAddr;
-                sglLdRes.data <= s_axi_rdata[31:0];
+                sglLdRes.id <= transfers[buf_rid].cacheAddr;
+                sglLdRes.data <= buf_rdata[31:0];
             end
         end
 

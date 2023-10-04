@@ -44,7 +44,7 @@ logic[ID_LEN-1:0] FIFO_id;
 logic FIFO_last;
 logic FIFO_ready;
 
-FIFO#(IWIDTH + ID_LEN + 1, BUF_LEN) fifo
+FIFO#(IWIDTH + ID_LEN + 1, BUF_LEN, 1, 0) fifo
 (
     .clk(clk),
     .rst(rst),

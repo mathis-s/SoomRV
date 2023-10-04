@@ -1,4 +1,4 @@
-module FIFO#(parameter WIDTH=32, parameter NUM=4)
+module FIFO#(parameter WIDTH=32, parameter NUM=4, parameter FORWARD1 = 1, parameter FORWARD0 = 1)
 (
     input logic clk,
     input logic rst,
@@ -24,7 +24,8 @@ wire equal = (indexIn == indexOut);
 wire empty = !fullCond && equal;
 wire full = fullCond && equal;
 
-wire doExtract = !empty && (!OUT_valid || IN_ready);
+wire outputReady = !outValidReg || IN_ready;
+wire doExtract = !empty && outputReady;
 wire doInsert = IN_valid && OUT_ready;
 assign OUT_ready = !full || doExtract;
 
@@ -33,46 +34,70 @@ always_comb begin
     else free = (indexOut - indexIn) % NUM;
 end
 
+logic[WIDTH-1:0] outDataReg;
+logic outValidReg;
+logic combPassthru;
+always_comb begin
+    OUT_valid = outValidReg;
+    OUT_data = outDataReg;
+    combPassthru = 0;
+    
+    if (!OUT_valid && empty && FORWARD0) begin
+        OUT_valid = IN_valid;
+        OUT_data = IN_data;
+        combPassthru = 1;
+    end
+end
+
 always_ff@(posedge clk) begin
     if (rst) begin
         fullCond <= 0;
         indexIn <= 0;
         indexOut <= 0;
-        OUT_data <= 'x;
-        OUT_valid <= 0;
+        outDataReg <= 'x;
+        outValidReg <= 0;
     end
     else begin
 
-        if (!OUT_valid || IN_ready)
-            OUT_data <= 'x;
+        if (outputReady)
+            outDataReg <= 'x;
         if (IN_ready)
-            OUT_valid <= 0;
-
-        // Insert
-        if (doInsert) begin
-            mem[indexIn] <= IN_data;
-            // verilator lint_off WIDTHEXPAND
-            // verilator lint_off WIDTHTRUNC
-            indexIn <= (indexIn + 2'b1) % NUM;
-            // verilator lint_on WIDTHTRUNC
-            // verilator lint_on WIDTHEXPAND
-        end
-
-        // Extract
-        if (doExtract) begin
-            // verilator lint_off WIDTHEXPAND
-            // verilator lint_off WIDTHTRUNC
-            indexOut <= (indexOut + 2'b1) % NUM;
-            // verilator lint_on WIDTHTRUNC
-            // verilator lint_on WIDTHEXPAND
-            OUT_data <= mem[indexOut];
-            OUT_valid <= 1;
-        end
+            outValidReg <= 0;
         
-        // When pointers equal: full if last action was insert,
-        // empty if last action was extract
-        if (doInsert != doExtract)
-            fullCond <= doInsert;
+        if (combPassthru && IN_ready) begin
+            // Nothing to do, purely comb
+        end
+        else if (empty && doInsert && outputReady && FORWARD1) begin
+            outDataReg <= IN_data;
+            outValidReg <= 1;
+        end
+        else begin
+            // Insert
+            if (doInsert) begin
+                mem[indexIn] <= IN_data;
+                // verilator lint_off WIDTHEXPAND
+                // verilator lint_off WIDTHTRUNC
+                indexIn <= (indexIn + 1) % NUM;
+                // verilator lint_on WIDTHTRUNC
+                // verilator lint_on WIDTHEXPAND
+            end
+
+            // Extract
+            if (doExtract) begin
+                // verilator lint_off WIDTHEXPAND
+                // verilator lint_off WIDTHTRUNC
+                indexOut <= (indexOut + 1) % NUM;
+                // verilator lint_on WIDTHTRUNC
+                // verilator lint_on WIDTHEXPAND
+                outDataReg <= mem[indexOut];
+                outValidReg <= 1;
+            end
+            
+            // When pointers equal: full if last action was insert,
+            // empty if last action was extract
+            if (doInsert != doExtract)
+                fullCond <= doInsert;
+        end
     end
 end
 endmodule

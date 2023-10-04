@@ -228,12 +228,13 @@ if (`CWIDTH == 1) assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CW
 else              assign IF_cache.rdata = dcacheOut1_t [CORE_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr[1][0 +: $clog2(`CWIDTH)]];
 
 
+wire[11:0] dctAddr = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1];
 MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable
 (
     .clk(clk),
     .IN_nce(!(IF_ct.re[1] || IF_ct.we)),
     .IN_nwe(!IF_ct.we),
-    .IN_addr({IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1]}[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+    .IN_addr(dctAddr[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
     .IN_data({`CASSOC{IF_ct.wdata}}),
     .IN_wm(1 << IF_ct.wassoc),
     .OUT_data(IF_ct.rdata[1]),
