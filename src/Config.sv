@@ -46,6 +46,9 @@
 `define CBANKS 4
 `define CWIDTH 4
 
+`define AXI_NUM_TRANS 4
+`define AXI_ID_LEN $clog2(`AXI_NUM_TRANS)
+
 // External MMIO
 // - IS_MMIO_PMA must be true for this range.
 // - The upper three bits are not passed on to

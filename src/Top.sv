@@ -1,5 +1,5 @@
 
-module Top#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
+module Top#(parameter WIDTH=128, parameter ADDR_LEN=32)
 (
     input wire clk,
     input wire rst,
@@ -12,7 +12,7 @@ wire SOC_poweroff;
 wire SOC_reboot;
 assign OUT_halt = SOC_poweroff || SOC_reboot;
 
-logic[ID_LEN-1:0]  s_axi_awid;
+logic[`AXI_ID_LEN-1:0]  s_axi_awid;
 logic[ADDR_LEN-1:0] s_axi_awaddr;
 logic[7:0] s_axi_awlen;
 logic[2:0] s_axi_awsize;
@@ -27,9 +27,9 @@ logic s_axi_wlast;
 logic s_axi_wvalid;
 logic s_axi_wready;
 logic s_axi_bready;
-logic[ID_LEN-1:0] s_axi_bid;
+logic[`AXI_ID_LEN-1:0] s_axi_bid;
 logic s_axi_bvalid;
-logic[ID_LEN-1:0] s_axi_arid;
+logic[`AXI_ID_LEN-1:0] s_axi_arid;
 logic[ADDR_LEN-1:0] s_axi_araddr;
 logic[7:0] s_axi_arlen;
 logic[2:0] s_axi_arsize;
@@ -39,7 +39,7 @@ logic[3:0] s_axi_arcache;
 logic s_axi_arvalid;
 logic s_axi_arready;
 logic s_axi_rready;
-logic[ID_LEN-1:0] s_axi_rid;
+logic[`AXI_ID_LEN-1:0] s_axi_rid;
 logic[WIDTH-1:0] s_axi_rdata;
 logic s_axi_rlast;
 logic s_axi_rvalid;

@@ -267,7 +267,7 @@ CacheMiss miss[1:0];
 function automatic logic[1:0] CheckTransfers(logic[31:0] addr);
     logic[1:0] rv = 0;
 
-    for (integer i = 0; i < 4; i=i+1) begin
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
         if (IN_memc.transfers[i].valid &&
             IN_memc.transfers[i].cacheID == 0 &&
             IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
@@ -540,11 +540,11 @@ end
 // Store Conflict Misses
 always_comb begin
     stConflictMiss_c[0] = (redoStore &&
-        (stOps[1].addr[31:`CLSIZE_E] == uopSt.addr[31:`CLSIZE_E] ||
+        ((stOps[1].addr[31:2] == uopSt.addr[31:2] && |(stOps[1].wmask & uopSt.wmask)) ||
             stOps[1].isMMIO && uopSt.isMMIO));
 
     stConflictMiss_c[1] = (redoStore &&
-        (stOps[1].addr[31:`CLSIZE_E] == stOps[0].addr[31:`CLSIZE_E] ||
+        ((stOps[1].addr[31:2] == stOps[0].addr[31:2] && |(stOps[1].wmask & stOps[0].wmask)) ||
             (stOps[1].isMMIO && stOps[0].isMMIO))) || 
         stConflictMiss[0];
 end
@@ -561,15 +561,7 @@ reg LMQ_dequeue;
 
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
-reg LMQ_allowNewMisses;
-always_comb begin
-    LMQ_allowNewMisses = 0;
-    for (integer i = 0; i < 4; i=i+1)
-        if (!IN_memc.transfers[i].valid)
-            LMQ_allowNewMisses = 1;
-    if (LSU_memc.cmd != MEMC_NONE)
-        LMQ_allowNewMisses = 0;
-end
+wire LMQ_allowNewMisses = forwardMiss && !newMiss;
 LoadMissQueue#(4) loadMissQueue
 (
     .clk(clk),
@@ -624,7 +616,7 @@ always_comb begin
         missEvictConflict[i] = 0;
         
         // read after write
-        for (integer j = 0; j < 4; j=j+1) begin
+        for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
             if (miss[i].valid &&
                 IN_memc.transfers[j].valid &&
                 IN_memc.transfers[j].writeAddr[31:`CLSIZE_E] == miss[i].missAddr[31:`CLSIZE_E]
@@ -637,7 +629,7 @@ always_comb begin
             missEvictConflict[i] = 1;
         
         // write after read
-        for (integer j = 0; j < 4; j=j+1) begin
+        for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
             if (miss[i].valid &&
                 IN_memc.transfers[j].valid &&
                 IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == miss[i].writeAddr[31:`CLSIZE_E]
@@ -654,6 +646,7 @@ end
 
 // Cache Table Writes
 reg cacheTableWrite;
+reg newMiss;
 always_comb begin
     reg temp = 0;
     cacheTableWrite = 0;
@@ -661,12 +654,14 @@ always_comb begin
     IF_ct.waddr = 'x;
     IF_ct.wassoc = 'x;
     IF_ct.wdata = 'x;
+    newMiss = 0;
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < 2; i=i+1) begin
             if (forwardMiss && !missEvictConflict[i] && miss[i].valid && !temp &&
                 miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
                 temp = 1;
+                newMiss = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
                 // loads at the new address until the cache line is entirely loaded.
@@ -816,7 +811,7 @@ always_ff@(posedge clk) begin
                 state <= FLUSH_READ0;
                 if (LSU_memc.cmd != MEMC_NONE || BLSU_memc.cmd != MEMC_NONE)
                     state <= FLUSH_WAIT;
-                for (integer i = 0; i < 4; i=i+1)
+                for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
                     if (IN_memc.transfers[i].valid) state <= FLUSH_WAIT;
             end
             FLUSH_READ0: begin

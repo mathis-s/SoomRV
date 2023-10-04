@@ -52,7 +52,7 @@ always_comb begin
         end
     end
 
-    for (integer i = 0; i < 4; i=i+1) begin
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
         if (IN_memc.transfers[i].valid && IN_memc.transfers[i].cacheID == 1 &&
             (IN_lookupPC[31:`CLSIZE_E] == IN_memc.transfers[i].readAddr[31:`CLSIZE_E] ||
             newCLAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == IN_memc.transfers[i].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2])

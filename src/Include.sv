@@ -352,7 +352,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    MemController_Transf[3:0] transfers;
+    MemController_Transf[`AXI_NUM_TRANS-1:0] transfers;
     MemController_SglLdRes sglLdRes;
     MemController_SglStRes sglStRes;
     

@@ -1,4 +1,4 @@
-module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
+module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
 (
     input wire clk,
     input wire rst,
@@ -8,7 +8,7 @@ module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
     output wire OUT_reboot,
     
     // write request
-    output[ID_LEN-1:0]  s_axi_awid,
+    output[`AXI_ID_LEN-1:0]  s_axi_awid,
     output[ADDR_LEN-1:0] s_axi_awaddr,
     output[7:0] s_axi_awlen,
     output[2:0] s_axi_awsize,
@@ -27,11 +27,11 @@ module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
     
     // write response
     output s_axi_bready,
-    input[ID_LEN-1:0] s_axi_bid,
+    input[`AXI_ID_LEN-1:0] s_axi_bid,
     input s_axi_bvalid,
     
     // read request
-    output[ID_LEN-1:0] s_axi_arid,
+    output[`AXI_ID_LEN-1:0] s_axi_arid,
     output[ADDR_LEN-1:0] s_axi_araddr,
     output[7:0] s_axi_arlen,
     output[2:0] s_axi_arsize,
@@ -43,7 +43,7 @@ module SoC#(parameter WIDTH=128, parameter ID_LEN=2, parameter ADDR_LEN=32)
     
     // read stream
     output s_axi_rready,
-    input[ID_LEN-1:0] s_axi_rid,
+    input[`AXI_ID_LEN-1:0] s_axi_rid,
     input[WIDTH-1:0] s_axi_rdata,
     input s_axi_rlast,
     input s_axi_rvalid

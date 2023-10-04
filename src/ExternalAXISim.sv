@@ -4,7 +4,7 @@
 `define SERIAL_ADDR 32'h1000_0000
 
 module ExternalAXISim
-#(parameter ID_LEN=2, parameter WIDTH=128, parameter ADDR_LEN=32)
+#(parameter ID_LEN=`AXI_ID_LEN, parameter WIDTH=128, parameter ADDR_LEN=32)
 (
     input wire clk,
     input wire rst,
@@ -54,7 +54,7 @@ module ExternalAXISim
 );
 
 
-localparam NUM_TFS = 4;
+localparam NUM_TFS = 1<<ID_LEN;
 localparam BWIDTH = WIDTH / 8;
 localparam MADDR_LEN = 29 - $clog2(WIDTH / 8);
 localparam MEM_LEN = (1 << MADDR_LEN);
