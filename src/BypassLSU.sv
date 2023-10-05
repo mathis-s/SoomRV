@@ -1,4 +1,4 @@
-module BypassLSU#(parameter RQ_ID = 2)
+module BypassLSU
 (
     input wire clk,
     input wire rst,
@@ -30,11 +30,11 @@ wire invalidateActiveLd = !(activeLd.external || !IN_branch.taken || $signed(act
 enum logic[2:0]
 {
     IDLE,
-    LOAD_RQ,
-    LOAD_ACTIVE,
-    LOAD_DONE,
-    STORE_RQ,
-    STORE_ACTIVE
+    RQ_LD,
+    RQ_ST,
+    WAIT_LD,
+    WAIT_ST,
+    DONE_LD
 } state;
 
 always_comb begin
@@ -43,11 +43,9 @@ always_comb begin
 
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
-    OUT_ldData = 'x;
 
-    if (state == LOAD_DONE && !invalidateActiveLd) begin
+    if (state == DONE_LD && !invalidateActiveLd) begin
         OUT_uopLd = activeLd;
-        OUT_ldData = result;
     end
 end
 
@@ -55,6 +53,7 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         activeLd.valid <= 0;
+        OUT_memc <= '0;
         OUT_memc.cmd <= MEMC_NONE;
         state <= IDLE;
     end
@@ -64,72 +63,78 @@ always_ff@(posedge clk) begin
             activeLd <= 'x;
             activeLd.valid <= 0;
         end
-        
         case (state)
+
             default: begin
                 state <= IDLE;
                 if (IN_uopSt.valid && IN_uopStEn && !OUT_stStall) begin
-                    OUT_memc.cmd <= MEMC_WRITE_SINGLE;
-                    OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= {/*MMIO*/ 1'b0, IN_uopSt.wmask, /*ADDR*/ IN_uopSt.addr[26:2]};
+                    
+                    reg[1:0] addrLow;
+                    for (integer i = 3; i >= 0; i=i-1)
+                        if (IN_uopSt.wmask[i] == 1)
+                            addrLow = i[1:0];
+
+                    case (IN_uopSt.wmask)
+                        4'b0001, 4'b0010, 4'b0100, 4'b1000:
+                            OUT_memc.cmd <= MEMC_WRITE_BYTE;
+                        4'b0011, 4'b1100:
+                            OUT_memc.cmd <= MEMC_WRITE_HALF;
+                        4'b1111:
+                            OUT_memc.cmd <= MEMC_WRITE_WORD;
+                        default: assert(0);
+                    endcase
+
+                    OUT_memc.cacheAddr <= 'x;
+                    OUT_memc.writeAddr <= {IN_uopSt.addr[31:2], addrLow};
                     OUT_memc.cacheID <= 'x;
-                    OUT_memc.rqID <= RQ_ID;
                     OUT_memc.data <= IN_uopSt.data;
 
-                    state <= STORE_RQ;
+                    state <= RQ_ST;
                 end
                 else if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall && 
                     (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
                 ) begin
-                    reg[3:0] rmask;
-    
+                    
                     case (IN_uopLd.size)
-                        0: rmask = (4'b1 << IN_uopLd.addr[1:0]);
-                        1: rmask = ((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
-                        default: rmask = 4'b1111;
+                        0: OUT_memc.cmd <= MEMC_READ_BYTE;
+                        1: OUT_memc.cmd <= MEMC_READ_HALF;
+                        2: OUT_memc.cmd <= MEMC_READ_WORD;
+                        default: assert(0);
                     endcase
 
-                    OUT_memc.cmd <= MEMC_READ_SINGLE;
-                    OUT_memc.sramAddr <= 'x;
-                    OUT_memc.extAddr <= {/*MMIO*/ 1'b0, rmask, /*ADDR*/ IN_uopLd.addr[26:2]};
+                    OUT_memc.cacheAddr <= 'x;
+                    OUT_memc.readAddr <= IN_uopLd.addr[31:0];
                     OUT_memc.cacheID <= 'x;
-                    OUT_memc.rqID <= RQ_ID;
 
-                    state <= LOAD_RQ;
+                    state <= RQ_LD;
                     activeLd <= IN_uopLd;
                 end
             end
-            LOAD_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == RQ_ID) begin
-                    OUT_memc.cmd <= MEMC_NONE;
-                    state <= LOAD_ACTIVE;
+            RQ_LD, RQ_ST: begin
+                if (!IN_memc.stall[2]) begin
+                    OUT_memc <= MemController_Req'{default: 'x, cmd: MEMC_NONE};
+                    state <= state == RQ_LD ? WAIT_LD : WAIT_ST;
                 end
             end
-            LOAD_ACTIVE: begin
-                if (IN_memc.resultValid) begin
-                    result <= IN_memc.result;
-                    state <= LOAD_DONE;
-                    if (invalidateActiveLd)
-                        state <= IDLE;
+            WAIT_LD: begin
+                if (IN_memc.sglLdRes.valid) begin
+                    state <= DONE_LD;
+                    case (activeLd.size)
+                        0: OUT_ldData <= {4{IN_memc.sglLdRes.data[7:0]}}; 
+                        1: OUT_ldData <= {2{IN_memc.sglLdRes.data[15:0]}}; 
+                        default: OUT_ldData <= IN_memc.sglLdRes.data;
+                    endcase
                 end
             end
-            LOAD_DONE: begin
-                if (!IN_ldStall || invalidateActiveLd) begin
+            WAIT_ST: begin
+                if (IN_memc.sglStRes.valid)
+                    state <= IDLE;
+            end
+            DONE_LD: begin
+                if (!IN_ldStall) begin
                     state <= IDLE;
                     activeLd <= 'x;
                     activeLd.valid <= 0;
-                end
-            end
-
-            STORE_RQ: begin
-                if (IN_memc.busy && IN_memc.rqID == RQ_ID) begin
-                    OUT_memc.cmd <= MEMC_NONE;
-                    state <= STORE_ACTIVE;
-                end
-            end
-            STORE_ACTIVE: begin
-                if (!IN_memc.busy) begin
-                    state <= IDLE;
                 end
             end
         endcase

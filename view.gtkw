@@ -1,21 +1,21 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Tue Aug 29 23:14:33 2023
+[*] GTKWave Analyzer v3.3.117 (w)1999-2023 BSI
+[*] Sun Oct  1 11:44:32 2023
 [*]
 [dumpfile] "Top_tb.vcd"
-[dumpfile_mtime] "Tue Aug 29 23:12:46 2023"
-[dumpfile_size] 589837
+[dumpfile_mtime] "Sun Oct  1 11:43:30 2023"
+[dumpfile_size] 54005427
 [savefile] "view.gtkw"
-[timestart] 1085186836
-[size] 3840 2118
+[timestart] 4513
+[size] 3840 2113
 [pos] -1 -1
-*-3.430970 1085186978 123848 123790 123838 123858 134008 982664 986572 986578 12557784 12557810 12557826 12437634 19900674 1085186725 1085186731 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-2.230970 4528 69993049 69992801 69993237 69993241 70005413 530 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.extMem.
+[treeopen] TOP.Top.extMem.reads[0].
 [treeopen] TOP.Top.soc.
 [treeopen] TOP.Top.soc.core.
-[treeopen] TOP.Top.soc.core.aguLD.
 [treeopen] TOP.Top.soc.core.aguLD.aguUOp_c.
 [treeopen] TOP.Top.soc.core.aguLD.IN_tlb.
 [treeopen] TOP.Top.soc.core.aguLD.IN_uop.
@@ -24,16 +24,13 @@
 [treeopen] TOP.Top.soc.core.aguLD.OUT_eldOp.
 [treeopen] TOP.Top.soc.core.aguLD.OUT_tlb.
 [treeopen] TOP.Top.soc.core.aguLD.OUT_uop.
-[treeopen] TOP.Top.soc.core.aguLD.tmq.
 [treeopen] TOP.Top.soc.core.aguLD.tmq.queue[2].
 [treeopen] TOP.Top.soc.core.aguLD.tmq.queue[3].
 [treeopen] TOP.Top.soc.core.aguLD.TMQ_uop.
-[treeopen] TOP.Top.soc.core.aguST.
 [treeopen] TOP.Top.soc.core.aguST.IN_uop.
 [treeopen] TOP.Top.soc.core.aguST.issUOp_c.
 [treeopen] TOP.Top.soc.core.aguST.OUT_aguOp.
 [treeopen] TOP.Top.soc.core.aguST.OUT_uop.
-[treeopen] TOP.Top.soc.core.aguST.tmq.
 [treeopen] TOP.Top.soc.core.aguST.tmq.OUT_uop.
 [treeopen] TOP.Top.soc.core.aguST.tmq.queue[0].
 [treeopen] TOP.Top.soc.core.aguST.tmq.queue[2].
@@ -44,20 +41,15 @@
 [treeopen] TOP.Top.soc.core.DEC_decBranch.
 [treeopen] TOP.Top.soc.core.div.IN_uop.
 [treeopen] TOP.Top.soc.core.div.uop.
-[treeopen] TOP.Top.soc.core.dtlb.
 [treeopen] TOP.Top.soc.core.dtlb.IN_pw.
-[treeopen] TOP.Top.soc.core.fdiv.
 [treeopen] TOP.Top.soc.core.fdiv.IN_uop.
 [treeopen] TOP.Top.soc.core.fdiv.OUT_uop.
-[treeopen] TOP.Top.soc.core.ialu.
 [treeopen] TOP.Top.soc.core.ialu.IN_uop.
 [treeopen] TOP.Top.soc.core.ialu.OUT_branch.
 [treeopen] TOP.Top.soc.core.ialu.OUT_uop.
-[treeopen] TOP.Top.soc.core.ialu1.
 [treeopen] TOP.Top.soc.core.ialu1.IN_uop.
 [treeopen] TOP.Top.soc.core.ialu1.OUT_branch.
 [treeopen] TOP.Top.soc.core.ialu1.OUT_uop.
-[treeopen] TOP.Top.soc.core.idec.
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[0].
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[1].
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[2].
@@ -66,21 +58,18 @@
 [treeopen] TOP.Top.soc.core.idec.OUT_decBranch.
 [treeopen] TOP.Top.soc.core.idec.OUT_uop[2].
 [treeopen] TOP.Top.soc.core.ifetch.
-[treeopen] TOP.Top.soc.core.ifetch.bp.
 [treeopen] TOP.Top.soc.core.ifetch.bp.btb.entries[0][0].
 [treeopen] TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.
-[treeopen] TOP.Top.soc.core.ifetch.bp.retStack.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.OUT_predBr.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[2].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[3].
+[treeopen] TOP.Top.soc.core.ifetch.IN_memc.
 [treeopen] TOP.Top.soc.core.ifetch.OUT_instrs.
 [treeopen] TOP.Top.soc.core.ifetch.OUT_pw.
-[treeopen] TOP.Top.soc.core.iq0.
 [treeopen] TOP.Top.soc.core.iq0.OUT_uop.
 [treeopen] TOP.Top.soc.core.iq0.queue[0].
-[treeopen] TOP.Top.soc.core.iq1.
 [treeopen] TOP.Top.soc.core.iq1.OUT_uop.
 [treeopen] TOP.Top.soc.core.iq1.queue[0].
 [treeopen] TOP.Top.soc.core.iq2.IN_uop[1].
@@ -91,11 +80,11 @@
 [treeopen] TOP.Top.soc.core.iq3.IN_uop[2].
 [treeopen] TOP.Top.soc.core.iq3.OUT_uop.
 [treeopen] TOP.Top.soc.core.iq3.queue[0].
-[treeopen] TOP.Top.soc.core.lb.
 [treeopen] TOP.Top.soc.core.lb.entries[14].
 [treeopen] TOP.Top.soc.core.lb.IN_uopLd.
 [treeopen] TOP.Top.soc.core.lb.lateLoadUOp.
 [treeopen] TOP.Top.soc.core.lb.OUT_branch.
+[treeopen] TOP.Top.soc.core.ld.
 [treeopen] TOP.Top.soc.core.ld.IN_pcReadData[1].
 [treeopen] TOP.Top.soc.core.ld.IN_uop[0].
 [treeopen] TOP.Top.soc.core.ld.IN_uop[1].
@@ -107,6 +96,7 @@
 [treeopen] TOP.Top.soc.core.LD_uop[2].
 [treeopen] TOP.Top.soc.core.LD_uop[3].
 [treeopen] TOP.Top.soc.core.lsu.
+[treeopen] TOP.Top.soc.core.lsu.bypassLSU.
 [treeopen] TOP.Top.soc.core.lsu.curCacheMiss.
 [treeopen] TOP.Top.soc.core.lsu.curLd.
 [treeopen] TOP.Top.soc.core.lsu.IF_cache.
@@ -120,6 +110,7 @@
 [treeopen] TOP.Top.soc.core.lsu.IF_ct.wdata.
 [treeopen] TOP.Top.soc.core.lsu.IN_aguLd.
 [treeopen] TOP.Top.soc.core.lsu.IN_branch.
+[treeopen] TOP.Top.soc.core.lsu.IN_memc.
 [treeopen] TOP.Top.soc.core.lsu.IN_stFwd.
 [treeopen] TOP.Top.soc.core.lsu.IN_uopELd.
 [treeopen] TOP.Top.soc.core.lsu.IN_uopLd.
@@ -128,26 +119,21 @@
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[0].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].
-[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[2].
+[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[2].ld.
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[3].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[3].ld.
 [treeopen] TOP.Top.soc.core.lsu.miss[0].
 [treeopen] TOP.Top.soc.core.lsu.miss[1].
+[treeopen] TOP.Top.soc.core.lsu.OUT_memc.
 [treeopen] TOP.Top.soc.core.lsu.OUT_stAck.
 [treeopen] TOP.Top.soc.core.lsu.OUT_uopLd.
 [treeopen] TOP.Top.soc.core.lsu.stOps[0].
 [treeopen] TOP.Top.soc.core.lsu.stOps[1].
-[treeopen] TOP.Top.soc.core.lsu.unnamedblk11.
-[treeopen] TOP.Top.soc.core.lsu.unnamedblk11.unnamedblk12.
-[treeopen] TOP.Top.soc.core.lsu.unnamedblk14.
-[treeopen] TOP.Top.soc.core.lsu.unnamedblk7.
-[treeopen] TOP.Top.soc.core.lsu.unnamedblk9.
 [treeopen] TOP.Top.soc.core.lsu.uopLd.
 [treeopen] TOP.Top.soc.core.lsu.uopLd_0.
 [treeopen] TOP.Top.soc.core.lsu.uopSt.
 [treeopen] TOP.Top.soc.core.mul.OUT_uop.
-[treeopen] TOP.Top.soc.core.pageWalker.
 [treeopen] TOP.Top.soc.core.pageWalker.IN_ldResUOp.
 [treeopen] TOP.Top.soc.core.pageWalker.OUT_res.
 [treeopen] TOP.Top.soc.core.PC_MC_if.
@@ -158,6 +144,7 @@
 [treeopen] TOP.Top.soc.core.preDec.OUT_instrs[2].
 [treeopen] TOP.Top.soc.core.preDec.OUT_instrs[3].
 [treeopen] TOP.Top.soc.core.rf.
+[treeopen] TOP.Top.soc.core.rn.
 [treeopen] TOP.Top.soc.core.rn.OUT_uop[0].
 [treeopen] TOP.Top.soc.core.rn.rt.rat[2].
 [treeopen] TOP.Top.soc.core.RN_uop[0].
@@ -173,9 +160,11 @@
 [treeopen] TOP.Top.soc.core.sq.entries[0].data.m.
 [treeopen] TOP.Top.soc.core.sq.entries[14].
 [treeopen] TOP.Top.soc.core.sq.entries[15].
+[treeopen] TOP.Top.soc.core.sq.entries[15].data.
 [treeopen] TOP.Top.soc.core.sq.entries[17].
 [treeopen] TOP.Top.soc.core.sq.entries[17].data.
 [treeopen] TOP.Top.soc.core.sq.entries[1].data.
+[treeopen] TOP.Top.soc.core.sq.entries[23].
 [treeopen] TOP.Top.soc.core.sq.evicted[0].
 [treeopen] TOP.Top.soc.core.sq.evicted[0].s.
 [treeopen] TOP.Top.soc.core.sq.evicted[1].
@@ -190,28 +179,42 @@
 [treeopen] TOP.Top.soc.core.sq.OUT_fwd.
 [treeopen] TOP.Top.soc.core.sq.OUT_uopSt.
 [treeopen] TOP.Top.soc.core.sq.unnamedblk10.
-[treeopen] TOP.Top.soc.core.sq.unnamedblk12.
-[treeopen] TOP.Top.soc.core.sq.unnamedblk16.unnamedblk18.
 [treeopen] TOP.Top.soc.core.sq.unnamedblk2.
+[treeopen] TOP.Top.soc.core.trapHandler.IN_trapInstr.
 [treeopen] TOP.Top.soc.core.trapHandler.OUT_trapInfo.
 [treeopen] TOP.Top.soc.core.tvalSelect.IN_tvalProvs[0].
-[treeopen] TOP.Top.soc.dcache0.
-[treeopen] TOP.Top.soc.dcache1.
-[treeopen] TOP.Top.soc.MC_DC_if[0].
-[treeopen] TOP.Top.soc.MC_DC_if[1].
+[treeopen] TOP.Top.soc.genblk2[0].
+[treeopen] TOP.Top.soc.genblk2[0].dcache.
+[treeopen] TOP.Top.soc.genblk2[1].
+[treeopen] TOP.Top.soc.genblk2[2].
+[treeopen] TOP.Top.soc.genblk2[3].
+[treeopen] TOP.Top.soc.icache.
 [treeopen] TOP.Top.soc.memc.
-[treeopen] TOP.Top.soc.memc.IN_ctrl.
-[treeopen] TOP.Top.soc.memc.memoryIF.
+[treeopen] TOP.Top.soc.memc.dcacheReadIF.
+[treeopen] TOP.Top.soc.memc.dcacheReadIF.cur.
+[treeopen] TOP.Top.soc.memc.dcacheWriteIF.cur.
+[treeopen] TOP.Top.soc.memc.icacheWriteIF.cur.
+[treeopen] TOP.Top.soc.memc.IN_ctrl[0].
+[treeopen] TOP.Top.soc.memc.OUT_stat.
+[treeopen] TOP.Top.soc.memc.OUT_stat.transfers[0].
+[treeopen] TOP.Top.soc.memc.OUT_stat.transfers[1].
+[treeopen] TOP.Top.soc.memc.OUT_stat.transfers[2].
+[treeopen] TOP.Top.soc.memc.OUT_stat.transfers[3].
+[treeopen] TOP.Top.soc.memc.transfers[0].
+[treeopen] TOP.Top.soc.memc.transfers[1].
+[treeopen] TOP.Top.soc.memc.transfers[2].
+[treeopen] TOP.Top.soc.memc.transfers[3].
 [sst_width] 315
-[signals_width] 596
+[signals_width] 552
 [sst_expanded] 1
-[sst_vpaned_height] 1511
+[sst_vpaned_height] 1474
 @28
 TOP.Top.soc.clk
 TOP.Top.soc.en
 TOP.Top.soc.rst
 TOP.Top.soc.core.mispredFlush
 TOP.Top.soc.core.branch.taken
+TOP.Top.soc.core.branch.flush
 @22
 TOP.Top.soc.core.branch.sqN[6:0]
 TOP.Top.soc.core.branch.dstPC[31:0]
@@ -260,6 +263,12 @@ TOP.Top.soc.core.RN_nextStoreSqN[6:0]
 @1401200
 -group_end
 @200
+-
+@28
+TOP.Top.soc.core.TH_disableIFetch
+TOP.Top.soc.core.PD_full
+TOP.Top.soc.core.MEMSUB_busy
+@200
 -RetStack
 @24
 TOP.Top.soc.core.ifetch.bp.retStack.rindex[1:0]
@@ -297,7 +306,276 @@ TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[2].fetchID[4:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[3].addr[30:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[3].fetchID[4:0]
 @200
+-EMem
+@28
+TOP.Top.extMem.reads[0].valid
+@22
+TOP.Top.extMem.reads[0].addr[31:0]
+TOP.Top.extMem.reads[0].cur[7:0]
+TOP.Top.extMem.reads[0].len[7:0]
+@200
 -
+@22
+TOP.Top.extMem.s_axi_araddr[31:0]
+@200
+-
+@22
+TOP.Top.extMem.s_axi_rdata[127:0]
+@28
+TOP.Top.extMem.s_axi_rid[1:0]
+TOP.Top.extMem.s_axi_rvalid
+TOP.Top.extMem.s_axi_rready
+@200
+-
+@22
+TOP.Top.extMem.s_axi_awaddr[31:0]
+TOP.Top.extMem.s_axi_awlen[7:0]
+TOP.Top.extMem.s_axi_wdata[127:0]
+@28
+TOP.Top.extMem.s_axi_wvalid
+@22
+TOP.Top.extMem.s_axi_wdata[127:0]
+@28
+TOP.Top.extMem.s_axi_wlast
+@200
+-
+@28
+TOP.Top.soc.memc.s_axi_bvalid
+TOP.Top.soc.memc.s_axi_bready
+TOP.Top.soc.memc.s_axi_bid[1:0]
+@200
+-MemC
+@28
+TOP.Top.soc.memc.transfers[0].valid
+TOP.Top.soc.memc.transfers[1].valid
+TOP.Top.soc.memc.transfers[2].valid
+TOP.Top.soc.memc.transfers[3].valid
+@200
+-
+@22
+TOP.Top.soc.memc.transfers[0].evictProgress[4:0]
+TOP.Top.soc.memc.transfers[1].evictProgress[4:0]
+TOP.Top.soc.memc.transfers[2].evictProgress[4:0]
+TOP.Top.soc.memc.transfers[3].evictProgress[4:0]
+@200
+-
+@22
+TOP.Top.soc.memc.OUT_stat.transfers[0].progress[4:0]
+TOP.Top.soc.memc.OUT_stat.transfers[1].progress[4:0]
+TOP.Top.soc.memc.OUT_stat.transfers[2].progress[4:0]
+TOP.Top.soc.memc.OUT_stat.transfers[3].progress[4:0]
+@200
+-
+@c00022
+TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+@28
+(0)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(1)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(2)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(3)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(4)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(5)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(6)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(7)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(8)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(9)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(10)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(11)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(12)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(13)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(14)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(15)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(16)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(17)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(18)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(19)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(20)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(21)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(22)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(23)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(24)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(25)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(26)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(27)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(28)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(29)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(30)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+(31)TOP.Top.soc.memc.OUT_stat.transfers[0].writeAddr[31:0]
+@1401200
+-group_end
+@22
+TOP.Top.soc.memc.OUT_stat.transfers[1].writeAddr[31:0]
+TOP.Top.soc.memc.OUT_stat.transfers[2].writeAddr[31:0]
+TOP.Top.soc.memc.OUT_stat.transfers[3].writeAddr[31:0]
+@200
+-
+@22
+TOP.Top.soc.memc.OUT_stat.transfers[0].readAddr[31:0]
+TOP.Top.soc.memc.OUT_stat.transfers[1].readAddr[31:0]
+TOP.Top.soc.memc.OUT_stat.transfers[2].readAddr[31:0]
+@c00022
+TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+@28
+(0)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(1)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(2)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(3)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(4)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(5)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(6)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(7)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(8)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(9)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(10)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(11)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(12)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(13)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(14)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(15)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(16)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(17)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(18)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(19)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(20)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(21)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(22)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(23)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(24)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(25)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(26)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(27)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(28)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(29)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(30)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+(31)TOP.Top.soc.memc.OUT_stat.transfers[3].readAddr[31:0]
+@1401200
+-group_end
+@200
+-
+@22
+TOP.Top.soc.memc.OUT_stat.transfers[0].cacheAddr[11:0]
+TOP.Top.soc.memc.OUT_stat.transfers[1].cacheAddr[11:0]
+TOP.Top.soc.memc.OUT_stat.transfers[2].cacheAddr[11:0]
+TOP.Top.soc.memc.OUT_stat.transfers[3].cacheAddr[11:0]
+@200
+-
+@28
+TOP.Top.soc.memc.OUT_stat.transfers[0].cacheID[0]
+TOP.Top.soc.memc.OUT_stat.transfers[1].cacheID[0]
+TOP.Top.soc.memc.OUT_stat.transfers[2].cacheID[0]
+@200
+-
+@22
+TOP.Top.soc.memc.isMMIO[3:0]
+@28
+TOP.Top.soc.memc.OUT_stat.sglLdRes.valid
+TOP.Top.soc.memc.OUT_stat.sglStRes.valid
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.ict.doCacheLoad
+@200
+-
+-dcache
+@22
+TOP.Top.soc.memc.dcacheReadIF.cur.len[7:0]
+TOP.Top.soc.memc.dcacheReadIF.cur.progress[7:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[0].dcache.ce_reg
+TOP.Top.soc.genblk2[0].dcache.we_reg
+@22
+TOP.Top.soc.genblk2[0].dcache.addr_reg[5:0]
+TOP.Top.soc.genblk2[0].dcache.data_reg[511:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[1].dcache.ce_reg
+TOP.Top.soc.genblk2[1].dcache.we_reg
+@22
+TOP.Top.soc.genblk2[1].dcache.addr_reg[5:0]
+TOP.Top.soc.genblk2[1].dcache.data_reg[511:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[2].dcache.ce_reg
+TOP.Top.soc.genblk2[2].dcache.we_reg
+@22
+TOP.Top.soc.genblk2[2].dcache.addr_reg[5:0]
+TOP.Top.soc.genblk2[2].dcache.data_reg[511:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[3].dcache.ce_reg
+TOP.Top.soc.genblk2[3].dcache.we_reg
+@22
+TOP.Top.soc.genblk2[3].dcache.addr_reg[5:0]
+TOP.Top.soc.genblk2[3].dcache.data_reg[511:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[0].dcache.ce1_reg
+@22
+TOP.Top.soc.genblk2[0].dcache.addr1_reg[5:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[1].dcache.ce1_reg
+@22
+TOP.Top.soc.genblk2[1].dcache.addr1_reg[5:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[2].dcache.ce1_reg
+@22
+TOP.Top.soc.genblk2[2].dcache.addr1_reg[5:0]
+@200
+-
+@28
+TOP.Top.soc.genblk2[3].dcache.ce1_reg
+@23
+TOP.Top.soc.genblk2[3].dcache.addr1_reg[5:0]
+@200
+-icache
+@22
+TOP.Top.soc.icache.wm_reg[3:0]
+TOP.Top.soc.icache.data_reg[127:0]
+TOP.Top.soc.icache.addr_reg[9:0]
+@28
+TOP.Top.soc.icache.ce_reg
+TOP.Top.soc.icache.we_reg
+@200
+-
+@22
+TOP.Top.soc.icache.addr1_reg[9:0]
+TOP.Top.soc.icache.OUT_data1[127:0]
+@28
+TOP.Top.soc.icache.ce1_reg
+@200
+-
+@22
+TOP.Top.soc.memc.icacheWriteIF.IN_addr[11:0]
+@28
+TOP.Top.soc.memc.icacheWriteIF.IN_valid
+TOP.Top.soc.memc.icacheWriteIF.OUT_ready
+@200
+-
+@22
+TOP.Top.soc.memc.icacheWriteIF.cur.addr[11:0]
+@28
+TOP.Top.soc.memc.icacheWriteIF.cur.valid
+@200
+-
+@22
+TOP.Top.soc.memc.icacheWriteIF.cur.data[127:0]
+TOP.Top.soc.memc.icacheWriteIF.OUT_CACHE_addr[11:0]
+@200
+-
+@28
+TOP.Top.soc.memc.s_axi_rvalid
+TOP.Top.soc.memc.s_axi_rready
+@200
 -ifetch
 @22
 TOP.Top.soc.core.ifetch.pcFull[31:0]
@@ -346,6 +624,7 @@ TOP.Top.soc.core.ifetch.pc[30:0]
 -group_end
 @200
 -
+-
 @28
 TOP.Top.soc.core.ifetch.tryReadICache
 TOP.Top.soc.core.ifetch.icacheStall
@@ -355,7 +634,6 @@ TOP.Top.soc.core.ifetch.OUT_instrAddr[27:0]
 TOP.Top.soc.core.ifetch.OUT_instrReadEnable
 @22
 TOP.Top.soc.core.ifetch.IN_instrRaw[127:0]
-TOP.Top.soc.core.ifetch.instrRaw[127:0]
 @200
 -
 @28
@@ -386,6 +664,7 @@ TOP.Top.soc.core.ifetch.OUT_instrReadEnable
 -
 @28
 TOP.Top.soc.core.ifetch.en1
+TOP.Top.soc.core.ifetch.IN_en
 @200
 -
 @28
@@ -526,126 +805,6 @@ TOP.Top.soc.core.idec.OUT_uop[0].valid
 TOP.Top.soc.core.idec.OUT_uop[1].valid
 TOP.Top.soc.core.idec.OUT_uop[2].valid
 TOP.Top.soc.core.idec.OUT_uop[3].valid
-@200
--dcache
-@28
-TOP.Top.soc.dcache0.ce_reg
-TOP.Top.soc.dcache0.we_reg
-@22
-TOP.Top.soc.dcache0.addr_reg[8:0]
-TOP.Top.soc.dcache0.wm_reg[15:0]
-TOP.Top.soc.dcache0.data_reg[127:0]
-TOP.Top.soc.dcache0.OUT_data[127:0]
-@200
--
-@28
-TOP.Top.soc.dcache0.ce1_reg
-@22
-TOP.Top.soc.dcache0.addr1_reg[8:0]
-TOP.Top.soc.dcache0.OUT_data1[127:0]
-@200
--
-@28
-TOP.Top.soc.dcache1.ce_reg
-TOP.Top.soc.dcache1.we_reg
-@22
-TOP.Top.soc.dcache1.addr_reg[8:0]
-TOP.Top.soc.dcache1.data_reg[127:0]
-TOP.Top.soc.dcache1.wm_reg[15:0]
-@200
--
-@28
-TOP.Top.soc.dcache1.ce1_reg
-@22
-TOP.Top.soc.dcache1.addr1_reg[8:0]
-TOP.Top.soc.dcache1.OUT_data1[127:0]
-@200
--ExtMem
-@22
-TOP.Top.extMem.IN_bus[31:0]
-TOP.Top.extMem.outBus[31:0]
-TOP.Top.extMem.addr[31:0]
-@28
-TOP.Top.extMem.en
-TOP.Top.extMem.state[1:0]
-@200
--
--MemIF
-@28
-TOP.Top.soc.memc.memoryIF.OUT_advance
-TOP.Top.soc.memc.memoryIF.OUT_busy
-@22
-TOP.Top.soc.memc.memoryIF.OUT_data[31:0]
-TOP.Top.soc.memc.memoryIF.lenCnt[7:0]
-@28
-TOP.Top.soc.memc.memoryIF.active
-TOP.Top.soc.memc.memoryIF.OUT_EXT_en
-@200
--MemC
-@22
-TOP.Top.soc.memc.OUT_CACHE_data[0][31:0]
-@24
-TOP.Top.soc.memc.OUT_CACHE_addr[0][11:0]
-@22
-TOP.Top.soc.memc.IN_CACHE_data[0][31:0]
-@200
--
-@28
-TOP.Top.soc.memc.OUT_stat.busy
-@c00022
-TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-@28
-(0)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(1)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(2)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(3)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(4)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(5)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(6)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(7)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(8)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(9)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(10)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(11)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(12)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(13)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(14)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(15)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(16)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(17)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(18)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(19)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(20)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(21)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(22)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(23)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(24)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(25)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(26)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(27)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(28)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-(29)TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-@1401200
--group_end
-@22
-TOP.Top.soc.memc.IN_ctrl.sramAddr[11:0]
-@28
-TOP.Top.soc.memc.IN_ctrl.cmd[2:0]
-TOP.Top.soc.memc.memoryIF.IN_en
-TOP.Top.soc.memc.state[2:0]
-@22
-TOP.Top.soc.memc.memoryIF.IN_addr[29:0]
-TOP.Top.soc.memc.extAddr[29:0]
-@200
--
-@22
-TOP.Top.soc.memc.IN_ctrl.extAddr[29:0]
-@200
--
-@28
-TOP.Top.soc.memc.OUT_stat.resultValid
-@22
-TOP.Top.soc.memc.OUT_stat.result[31:0]
 @200
 -RN_uop[0]
 @22
@@ -1008,6 +1167,8 @@ TOP.Top.soc.core.pageWalker.OUT_res.ppn[21:0]
 @200
 -LSU
 @28
+TOP.Top.soc.core.lsu.busy
+TOP.Top.soc.core.lsu.IN_SQ_empty
 TOP.Top.soc.core.lsu.IN_branch.taken
 @200
 -
@@ -1057,33 +1218,42 @@ TOP.Top.soc.core.lsu.uopLd_0.addr[31:0]
 TOP.Top.soc.core.lsu.isCacheBypassLdUOp
 @200
 -
+@22
+TOP.Top.soc.core.lsu.OUT_BLSU_memc.cmd[3:0]
+TOP.Top.soc.core.lsu.OUT_BLSU_memc.writeAddr[31:0]
+TOP.Top.soc.core.lsu.OUT_BLSU_memc.readAddr[31:0]
+@28
+TOP.Top.soc.core.lsu.IN_memc.sglLdRes.valid
+@22
+TOP.Top.soc.core.lsu.IN_memc.sglLdRes.id[11:0]
+TOP.Top.soc.core.lsu.IN_memc.sglLdRes.data[31:0]
+@200
+-
+@28
+TOP.Top.soc.core.lsu.bypassLSU.state[2:0]
+TOP.Top.soc.core.lsu.bypassLSU.OUT_uopLd.valid
+@22
+TOP.Top.soc.core.lsu.bypassLSU.OUT_uopLd.addr[31:0]
+TOP.Top.soc.core.lsu.bypassLSU.OUT_uopLd.sqN[6:0]
+@200
+-
 @28
 TOP.Top.soc.core.lsu.curLd.valid
 @22
 TOP.Top.soc.core.lsu.curLd.sqN[6:0]
 TOP.Top.soc.core.lsu.curLd.addr[31:0]
-@200
--
 @28
 TOP.Top.soc.core.lsu.miss[0].valid
-TOP.Top.soc.core.lsu.miss[0].mtype[2:0]
+@200
+-
+@22
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].readAddr[31:0]
+@28
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].valid
 @200
 -
 @28
 TOP.Top.soc.core.lsu.bypassLSU.IN_uopLdEn
-@c00028
-TOP.Top.soc.core.lsu.bypassLSU.state[2:0]
-@28
-(0)TOP.Top.soc.core.lsu.bypassLSU.state[2:0]
-(1)TOP.Top.soc.core.lsu.bypassLSU.state[2:0]
-(2)TOP.Top.soc.core.lsu.bypassLSU.state[2:0]
-@1401200
--group_end
-@28
-TOP.Top.soc.core.lsu.bypassLSU.OUT_ldStall
-TOP.Top.soc.core.lsu.bypassLSU.OUT_stStall
-@200
--
 @22
 TOP.Top.soc.core.lsu.uopSt.addr[31:0]
 TOP.Top.soc.core.lsu.uopSt.data[31:0]
@@ -1119,6 +1289,7 @@ TOP.Top.soc.core.lsu.stOps[1].data[31:0]
 TOP.Top.soc.core.lsu.stOps[1].isMMIO
 TOP.Top.soc.core.lsu.OUT_stAck.valid
 TOP.Top.soc.core.lsu.OUT_stAck.id[1:0]
+TOP.Top.soc.core.lsu.OUT_stAck.fail
 @200
 -
 @28
@@ -1161,9 +1332,8 @@ TOP.Top.soc.core.lsu.loadMissQueue.queue[0].ld.addr[31:0]
 TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.addr[31:0]
 TOP.Top.soc.core.lsu.loadMissQueue.queue[2].ld.addr[31:0]
 TOP.Top.soc.core.lsu.loadMissQueue.queue[3].ld.addr[31:0]
-@28
-TOP.Top.soc.core.lsu.loadMissQueue.OUT_full
 @200
+-
 -
 @28
 TOP.Top.soc.core.lsu.IF_ct.wdata.valid
@@ -1175,16 +1345,8 @@ TOP.Top.soc.core.lsu.IF_ct.we
 TOP.Top.soc.core.lsu.IF_ct.wassoc[1:0]
 @200
 -
-@28
-TOP.Top.soc.core.lsu.cacheLoadActive
-@22
-TOP.Top.soc.core.lsu.cacheLoadAddr[24:0]
 @24
-TOP.Top.soc.core.lsu.cacheLoadAssoc[1:0]
 TOP.Top.soc.core.lsu.curCacheMiss.assoc[1:0]
-@22
-TOP.Top.soc.core.lsu.cacheLoadProgress[5:0]
-TOP.Top.soc.core.lsu.lastCacheLoadProgress[5:0]
 @28
 TOP.Top.soc.core.lsu.IF_ct.we
 @22
@@ -1193,20 +1355,13 @@ TOP.Top.soc.core.lsu.IF_ct.waddr[11:0]
 TOP.Top.soc.core.lsu.IF_ct.wassoc[1:0]
 @200
 -
-@22
-TOP.Top.soc.core.lsu.state[3:0]
 @28
 TOP.Top.soc.core.lsu.curCacheMiss.valid
 @22
-TOP.Top.soc.core.lsu.curCacheMiss.oldAddr[31:0]
+TOP.Top.soc.core.lsu.curCacheMiss.writeAddr[31:0]
 TOP.Top.soc.core.lsu.curCacheMiss.missAddr[31:0]
-TOP.Top.soc.core.lsu.dirty[127:0]
 @28
 TOP.Top.soc.core.lsu.setDirty
-@22
-TOP.Top.soc.core.lsu.setDirtyIdx[6:0]
-@28
-TOP.Top.soc.core.lsu.curCacheMiss.mtype[2:0]
 @22
 TOP.Top.soc.core.lsu.curCacheMiss.missAddr[31:0]
 @28
@@ -1214,60 +1369,10 @@ TOP.Top.soc.core.lsu.curCacheMiss.assoc[1:0]
 @200
 -
 @28
-TOP.Top.soc.core.lsu.OUT_memc.cmd[2:0]
-@22
-TOP.Top.soc.core.lsu.OUT_memc.extAddr[29:0]
-TOP.Top.soc.core.lsu.OUT_memc.sramAddr[11:0]
-@200
--
-@28
 TOP.Top.soc.core.lsu.IN_stFwd.valid
 @22
 TOP.Top.soc.core.lsu.IN_stFwd.mask[3:0]
 TOP.Top.soc.core.lsu.IN_stFwd.data[31:0]
-@200
--
-@28
-TOP.Top.soc.core.lsu.IN_stFwd.valid
-@c00022
-TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-@28
-(0)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(1)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(2)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(3)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(4)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(5)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(6)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(7)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(8)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(9)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(10)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(11)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(12)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(13)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(14)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(15)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(16)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(17)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(18)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(19)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(20)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(21)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(22)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(23)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(24)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(25)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(26)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(27)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(28)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(29)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(30)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-(31)TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
-@1401200
--group_end
-@22
-TOP.Top.soc.core.lsu.IN_stFwd.mask[3:0]
 @200
 -
 @28
@@ -1279,6 +1384,10 @@ TOP.Top.soc.core.lsu.ldOps[1].addr[31:0]
 TOP.Top.soc.core.lsu.ldOps[1].size[1:0]
 @22
 TOP.Top.soc.core.lsu.OUT_uopLd.sqN[6:0]
+@28
+TOP.Top.soc.core.lsu.OUT_uopLd.valid
+@22
+TOP.Top.soc.core.lsu.OUT_uopLd.result[31:0]
 @200
 -IALU1
 -
@@ -1440,19 +1549,17 @@ TOP.Top.soc.core.sq.loadData[31:0]
 @28
 TOP.Top.soc.core.sq.loadIsAtomic
 TOP.Top.soc.core.sq.loadValid
+@22
+TOP.Top.soc.core.sq.loadIndex[4:0]
 @200
 -
 @28
-TOP.Top.soc.core.sq.entries[15].valid
-TOP.Top.soc.core.sq.entries[15].atomic
+TOP.Top.soc.core.sq.entries[23].valid
+TOP.Top.soc.core.sq.entries[23].loaded
 @22
-TOP.Top.soc.core.sq.entries[15].addr[29:0]
-TOP.Top.soc.core.sq.entries[15].data._data[31:0]
+TOP.Top.soc.core.sq.entries[23].data._data[31:0]
 @28
-TOP.Top.soc.core.sq.entries[15].loaded
-TOP.Top.soc.core.sq.entries[15].ready
-@22
-TOP.Top.soc.core.sq.entries[15].wmask[3:0]
+TOP.Top.soc.core.sq.entries[23].ready
 @200
 -
 @22
@@ -1467,17 +1574,6 @@ TOP.Top.soc.core.sq.IN_uopLd.valid
 TOP.Top.soc.core.sq.lookupMask[3:0]
 @22
 TOP.Top.soc.core.sq.lookupData[31:0]
-@201
--
-@28
-TOP.Top.soc.core.sq.evictedIn[2:0]
-@200
--
-@28
-TOP.Top.soc.core.sq.evicted[0].issued
-TOP.Top.soc.core.sq.evicted[0].s.valid
-@22
-TOP.Top.soc.core.sq.evicted[0].s.addr[29:0]
 @200
 -
 @28

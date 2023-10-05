@@ -60,6 +60,7 @@ always_ff@(posedge clk) begin
             curTVal.tval <= earliest.tval;
             curTVal.sqN <= earliest.sqN;
             curTVal.live <= 1;
+            invalidateCurTVal <= 0;
         end
     end
 end

@@ -35,11 +35,11 @@ BranchPredictionTable basePredictor
 (
     .clk(clk),
     .rst(rst),
-    .IN_readAddr(IN_predAddr[7:0]),
+    .IN_readAddr(IN_predAddr[`BP_BASEP_ID_LEN-1:0]),
     .OUT_taken(predictions[0]),
     
     .IN_writeEn(IN_writeValid),
-    .IN_writeAddr(IN_writeAddr[7:0]),
+    .IN_writeAddr(IN_writeAddr[`BP_BASEP_ID_LEN-1:0]),
     .IN_writeTaken(IN_writeTaken)
 );
 // Base Predictor is always valid

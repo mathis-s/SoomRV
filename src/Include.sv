@@ -8,6 +8,7 @@ typedef logic[11:0] BHist_t;
 typedef logic[2:0] TageUseful_t;
 typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
+typedef logic[0:0] CacheID_t;
 
 typedef enum logic[5:0]
 {
@@ -297,34 +298,65 @@ typedef enum logic[1:0]
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
-typedef enum logic[2:0]
+typedef enum logic[3:0]
 {
     MEMC_NONE,
+
+    // cache line operations
+    MEMC_REPLACE,
     MEMC_CP_CACHE_TO_EXT,
     MEMC_CP_EXT_TO_CACHE,
-    MEMC_PAGE_WALK,
-    MEMC_READ_SINGLE,
-    MEMC_WRITE_SINGLE
+
+    // single access
+    MEMC_READ_BYTE,
+    MEMC_READ_HALF,
+    MEMC_READ_WORD,
+    MEMC_WRITE_BYTE,
+    MEMC_WRITE_HALF,
+    MEMC_WRITE_WORD
 } MemC_Cmd;
 
 typedef struct packed
 {
-    MemC_Cmd cmd;
     logic[31:0] data;
-    logic[`CACHE_SIZE_E-3:0] sramAddr;
-    logic[29:0] extAddr;
-    logic[0:0] cacheID;
-    logic[2:0] rqID;
+    logic[`CACHE_SIZE_E-3:0] id;
+    logic valid;
+} MemController_SglLdRes;
+
+typedef struct packed
+{
+    logic[`CACHE_SIZE_E-3:0] id;
+    logic valid;
+} MemController_SglStRes;
+
+typedef struct packed
+{
+    logic[31:0] writeAddr;
+    logic[31:0] readAddr;
+    logic[`CACHE_SIZE_E-3:0] cacheAddr;
+    logic[`CLSIZE_E-2:0] progress;
+    CacheID_t cacheID;
+    logic active;
+    logic valid;
+} MemController_Transf;
+
+typedef struct packed
+{
+    MemC_Cmd cmd;
+    logic[31:0] data; // only used for MMIO stores
+    logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
+    logic[31:0] readAddr;
+    logic[31:0] writeAddr;
+    CacheID_t cacheID;
 } MemController_Req;
 
 typedef struct packed
 {
-    logic[9:0] progress;
+    MemController_Transf[`AXI_NUM_TRANS-1:0] transfers;
+    MemController_SglLdRes sglLdRes;
+    MemController_SglStRes sglStRes;
     
-    logic[31:0] result;
-    logic resultValid;
-    
-    logic[2:0] rqID;
+    logic[2:0] stall;
     logic busy;
 } MemController_Res;
 
@@ -649,6 +681,9 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] addr;
+    logic[31:0] data;
+    logic[3:0] wmask;
     StID_t id;
     logic fail;
     logic valid;
@@ -763,6 +798,23 @@ typedef struct packed
     logic valid;
 } TValProv;
 
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[4*`CWIDTH-1:0] wm;
+    logic[`CACHE_SIZE_E-3:0] addr;
+    logic[32*`CWIDTH-1:0] data;
+} CacheIF;
+
+typedef struct packed
+{
+    logic ce;
+    logic we;
+    logic[`CACHE_SIZE_E-3:0] addr;
+    logic[127:0] data;
+} ICacheIF;
+
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
     logic[63:0] mtimecmp;
@@ -821,18 +873,19 @@ interface IF_Cache();
     logic[`CASSOC-1:0][31:0] rdata;
     
     logic rbusy;
+    logic[$clog2(`CBANKS)-1:0] rbusyBank;
     logic wbusy;
     
     modport HOST
     (
         output we, waddr, wassoc, wdata, wmask, re, raddr,
-        input rdata, rbusy, wbusy
+        input rdata, rbusy, rbusyBank, wbusy
     );
     
     modport MEM
     (
         input we, waddr, wassoc, wdata, wmask, re, raddr,
-        output rdata, rbusy, wbusy
+        output rdata, rbusy, rbusyBank, wbusy
     );
 endinterface
 

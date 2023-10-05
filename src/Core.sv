@@ -13,17 +13,13 @@ module Core
     output wire OUT_instrReadEnable,
     input wire[127:0] IN_instrRaw,
         
-    output MemController_Req OUT_memc,
+    output MemController_Req OUT_memc[2:0],
     input MemController_Res IN_memc
 );
 
-
-always_comb begin
-    if (LSU_MC_if.cmd != MEMC_NONE)
-        OUT_memc = LSU_MC_if;
-    else
-        OUT_memc = PC_MC_if;
-end
+assign OUT_memc[0] = PC_MC_if;
+assign OUT_memc[1] = LSU_MC_if;
+assign OUT_memc[2] = BLSU_MC_if;
 
 localparam NUM_WBS = 4;
 RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
@@ -640,6 +636,7 @@ LD_Ack LSU_ldAck;
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
+MemController_Req BLSU_MC_if;
 ST_Ack LSU_stAck;
 LoadStoreUnit lsu
 (
@@ -672,6 +669,7 @@ LoadStoreUnit lsu
     .OUT_stAck(LSU_stAck),
     
     .OUT_memc(LSU_MC_if),
+    .OUT_BLSU_memc(BLSU_MC_if),
     .IN_memc(IN_memc),
 
     .OUT_uopLd(wbUOp[2])
@@ -777,7 +775,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || IN_memc.busy || SQ_uop.valid || AGU_LD_uop.valid || LSU_busy;
+wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || AGU_LD_uop.valid || LSU_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;

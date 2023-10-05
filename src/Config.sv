@@ -40,8 +40,14 @@
 `define MTIMECMP_ADDR 32'h1100_4000
 
 `define CACHE_SIZE_E 14
-`define CLSIZE_E 7
+`define CLSIZE_E 6
 `define CASSOC 4
+
+`define CBANKS 4
+`define CWIDTH 4
+
+`define AXI_NUM_TRANS 4
+`define AXI_ID_LEN $clog2(`AXI_NUM_TRANS)
 
 // External MMIO
 // - IS_MMIO_PMA must be true for this range.

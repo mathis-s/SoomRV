@@ -12,7 +12,7 @@
 #include "VTop.h"
 #include "VTop_CSR.h"
 #include "VTop_Core.h"
-#include "VTop_ExternalMemorySim.h"
+#include "VTop_ExternalAXISim.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
@@ -1099,7 +1099,7 @@ int main(int argc, char** argv)
     else
     {
         for (size_t i = 0; i < (1 << 24); i++)
-            top->Top->extMem->mem[i] = pram[i];
+            top->Top->extMem->mem[i >> 2][i & 3] = pram[i];
 
         // Reset
         top->rst = 1;
