@@ -1491,14 +1491,6 @@ always_comb begin
                     else
                         retUpd_c.addr = IN_instrs[i].pc;
                     
-                    // Delete matching regular branch prediction entries
-                    btUpdate_c.valid = 1;
-                    btUpdate_c.clean = 1;
-                    
-                    if (!IN_instrs[i].predInvalid)
-                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                    else
-                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
                     
                     // Branch back to following instruction if this is not a branch at all,
                     // or branch to correct destination if this is a branch.
@@ -1506,11 +1498,41 @@ always_comb begin
                         OUT_decBranch.dst = IN_instrs[i].pc;
                         invalidEnc = 1;
                         uop.valid = 0;
+                        
+                        // Delete matching regular branch prediction entries
+                        btUpdate_c.valid = 1;
+                        btUpdate_c.clean = 1;
+                        btUpdate_c.multiple = 0;
+                        btUpdate_c.multipleOffs = 'x;
+                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
+                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
                     end
-                    else if (isBranch)
+                    else if (isBranch) begin
                         OUT_decBranch.dst = branchTarget;
-                    else
+                        // Correct matching regular branch prediction entries
+                        btUpdate_c.valid = 1;
+                        btUpdate_c.clean = 0;
+                        btUpdate_c.multiple = 0;
+                        btUpdate_c.multipleOffs = 'x;
+                        btUpdate_c.isCall = isCall;
+                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
+                        btUpdate_c.dst = {branchTarget, 1'b0};
+                        btUpdate_c.compressed = uop.compressed;
+                        btUpdate_c.isJump = isJump;
+                        
+                    end
+                    else begin
                         OUT_decBranch.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
+
+                        // Delete matching regular branch prediction entries
+                        btUpdate_c.valid = 1;
+                        btUpdate_c.clean = 1;
+                        btUpdate_c.multiple = 0;
+                        btUpdate_c.multipleOffs = 'x;
+                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
+                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                    end
                 end
             end
             else begin
@@ -1527,9 +1549,12 @@ always_comb begin
                     btUpdate_c.clean = 0;
                     btUpdate_c.isCall = isCall;
                     btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
+                    btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
                     btUpdate_c.dst = {branchTarget, 1'b0};
                     btUpdate_c.compressed = uop.compressed;
                     btUpdate_c.isJump = isJump;
+                    btUpdate_c.multiple = uop.fetchOffs > IN_instrs[i].fetchPredOffs;
+                    btUpdate_c.multipleOffs = IN_instrs[i].fetchPredOffs + 1;
                 end
                 
                 // Update return stack

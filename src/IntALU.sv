@@ -152,6 +152,8 @@ always_comb begin
     endcase
 end
 
+wire[31:0] finalHalfwPC = IN_uop.compressed ? IN_uop.pc : pcPlus2;
+
 always_ff@(posedge clk) begin
     
     OUT_uop <= 'x;
@@ -184,7 +186,10 @@ always_ff@(posedge clk) begin
                 // Send branch target to BTB if unknown.
                 if (branchTaken && !IN_uop.bpi.predicted) begin
                     // Uncompressed branches are predicted only when their second halfword is fetched
-                    OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
+                    OUT_btUpdate.src <= finalHalfwPC;
+                    OUT_btUpdate.fetchStartOffs <= IN_uop.fetchStartOffs;
+                    OUT_btUpdate.multiple <= (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
+                    OUT_btUpdate.multipleOffs <= IN_uop.fetchPredOffs + 1;
                     OUT_btUpdate.isJump <= 0;
                     OUT_btUpdate.isCall <= 0;
                     OUT_btUpdate.compressed <= IN_uop.compressed;
@@ -219,7 +224,10 @@ always_ff@(posedge clk) begin
                         OUT_branch.rIdx <= IN_uop.bpi.rIdx + 1;
                     
                     if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
-                        OUT_btUpdate.src <= (IN_uop.compressed ? IN_uop.pc : (pcPlus2));
+                        OUT_btUpdate.src <= finalHalfwPC;
+                        OUT_btUpdate.fetchStartOffs <= IN_uop.fetchStartOffs;
+                        OUT_btUpdate.multiple <= (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
+                        OUT_btUpdate.multipleOffs <= IN_uop.fetchPredOffs + 1;
                         OUT_btUpdate.dst <= indBranchDst;
                         OUT_btUpdate.isJump <= 1;
                         OUT_btUpdate.isCall <= (IN_uop.opcode == INT_V_JALR);

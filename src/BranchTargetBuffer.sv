@@ -23,126 +23,91 @@ typedef struct packed
     logic isJump;
     logic isCall; // TODO unify fields
     logic compr;
-    logic used;
     logic valid;
     logic[30:0] dst;
     logic[`BTB_TAG_SIZE-1:0] src;
     FetchOff_t offs;
 } BTBEntry;
 
-localparam LENGTH = `BTB_ENTRIES / `BTB_ASSOC;
+localparam LENGTH = `BTB_ENTRIES;/// `BTB_ASSOC;
 
-BTBEntry[`BTB_ASSOC-1:0] entries[LENGTH-1:0];
+BTBEntry entries[LENGTH-1:0];
+logic multiple[LENGTH-1:0];
 
-reg[$clog2(`BTB_ASSOC)-1:0] usedID;
-
+wire BTBEntry fetched = entries[IN_pc[$clog2(LENGTH)-1:0]];
 always_comb begin
-    BTBEntry[`BTB_ASSOC-1:0] fetched = entries[IN_pc[$clog2(LENGTH)+2:3]];
     
     OUT_branchFound = 0;
-    OUT_multipleBranches = 0;
+    OUT_multipleBranches = 'x;
     OUT_branchDst = 'x;
     OUT_branchIsJump = 0;
     OUT_branchIsCall = 0;
     OUT_branchCompr = 0;
     OUT_branchSrcOffs = 'x;
-    usedID = 0;
     
-    if (IN_pcValid) begin
-        for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-            if (fetched[i].valid &
-                fetched[i].src == IN_pc[$clog2(LENGTH)+3 +: `BTB_TAG_SIZE] &&
-                fetched[i].offs >= IN_pc[2:0] &&
-                (!OUT_branchFound || fetched[i].offs < OUT_branchSrcOffs)
-            ) begin
-                
-                if (OUT_branchFound)
-                    OUT_multipleBranches = 1;
-                OUT_branchFound = 1;
-                OUT_branchIsJump = fetched[i].isJump;
-                OUT_branchIsCall = fetched[i].isCall;
-                OUT_branchDst = fetched[i].dst;
-                OUT_branchSrcOffs = fetched[i].offs;
-                OUT_branchCompr = fetched[i].compr;
-                usedID = i[$clog2(`BTB_ASSOC)-1:0];
-            end
-        end
-    end
-end
-
-// Shift the index at which we begin searching for unused
-// entries in a line for improved distribution of entries
-reg[$clog2(`BTB_ASSOC)-1:0] searchIdx;
-always_ff@(posedge clk) begin
-    searchIdx <= searchIdx + 1;
-end
-
-reg[$clog2(`BTB_ASSOC)-1:0] insertAssocIdx;
-reg insertAssocIdxValid;
-always_comb begin
-    insertAssocIdxValid = 0;
-    insertAssocIdx = 'x;
-
-    for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-        reg[$clog2(`BTB_ASSOC)-1:0] assocIdx = searchIdx + i[$clog2(`BTB_ASSOC)-1:0];
-        if (!entries[IN_btUpdate.src[$clog2(LENGTH)+3:4]][assocIdx].used) begin
-            insertAssocIdx = assocIdx;
-            insertAssocIdxValid = 1;
-        end
-    end
-
-    for (integer i = 0; i < `BTB_ASSOC; i=i+1) begin
-        
-        reg[$clog2(`BTB_ASSOC)-1:0] assocIdx = searchIdx + i[$clog2(`BTB_ASSOC)-1:0];
-        reg[$clog2(LENGTH)-1:0] idx = IN_btUpdate.src[$clog2(LENGTH)+3:4];
-
-        if (entries[idx][assocIdx].src == IN_btUpdate.src[$clog2(LENGTH)+4 +: `BTB_TAG_SIZE] &&
-            entries[idx][assocIdx].offs == IN_btUpdate.src[1 +: $bits(FetchOff_t)]
-        ) begin
-            insertAssocIdx = assocIdx;
-            insertAssocIdxValid = 1;
-        end
+    if (IN_pcValid && fetched.valid && fetched.src == IN_pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
+        OUT_branchFound = 1;
+        OUT_multipleBranches = multiple[IN_pc[$clog2(LENGTH)-1:0]];
+        OUT_branchDst = fetched.dst;
+        OUT_branchIsJump = fetched.isJump;
+        OUT_branchIsCall = fetched.isCall;
+        OUT_branchCompr = fetched.compr;
+        OUT_branchSrcOffs = fetched.offs;
     end
 end
 
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        `ifdef SYNC_RESET
-        for (integer i = 0; i < LENGTH; i=i+1)
-            for (integer j = 0; j < `BTB_ASSOC; j=j+1) begin
-                entries[i][j].valid <= 0;
-                entries[i][j].used <= 0;
-            end
-        `endif
+        //`ifdef SYNC_RESET
+        //for (integer i = 0; i < LENGTH; i=i+1)
+        //    entries[i].valid <= 0;
+        //`endif
     end
     else begin
         if (IN_btUpdate.valid) begin
-            reg[$clog2(LENGTH)-1:0] idx = IN_btUpdate.src[$clog2(LENGTH)+3:4];
-            if (!IN_btUpdate.clean) begin
-                if (insertAssocIdxValid) begin
-                    entries[idx][insertAssocIdx].valid <= 1;
-                    entries[idx][insertAssocIdx].used <= 0;
-                    entries[idx][insertAssocIdx].compr <= IN_btUpdate.compressed;
-                    entries[idx][insertAssocIdx].isJump <= IN_btUpdate.isJump;
-                    entries[idx][insertAssocIdx].isCall <= IN_btUpdate.isCall;
-                    entries[idx][insertAssocIdx].dst <= IN_btUpdate.dst[31:1];
-                    entries[idx][insertAssocIdx].src <= IN_btUpdate.src[$clog2(LENGTH)+4 +: `BTB_TAG_SIZE];
-                    entries[idx][insertAssocIdx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
-                end
-                else begin
-                    for (integer i = 0; i < `BTB_ASSOC; i=i+1)
-                        entries[idx][i].used <= 0;
-                end
+            reg[$clog2(LENGTH)-1:0] idx = {IN_btUpdate.src[$clog2(LENGTH):4], IN_btUpdate.fetchStartOffs};
+            if (IN_btUpdate.clean) begin
+                entries[idx] <= 'x;
+                entries[idx].valid <= 0;
             end
             else begin
-                entries[idx][insertAssocIdx].valid <= 0;
-                entries[idx][insertAssocIdx].used <= 0;
+                
+                if (IN_btUpdate.multiple) begin
+                    // Special handling for multiple branches in the same fetch package:
+                    // For previous branch, set "multiple" to end fetch package after not-taken prediction.
+                    multiple[idx] <= 1;
+                    // Write target of following branch into entry after previous branch.
+                    idx[$bits(FetchOff_t)-1:0] = IN_btUpdate.multipleOffs;
+                end
+
+                entries[idx].valid <= 1;
+                entries[idx].compr <= IN_btUpdate.compressed;
+                entries[idx].isJump <= IN_btUpdate.isJump;
+                entries[idx].isCall <= IN_btUpdate.isCall;
+                entries[idx].dst <= IN_btUpdate.dst[31:1];
+                entries[idx].src <= IN_btUpdate.src[$clog2(LENGTH)+1 +: `BTB_TAG_SIZE];
+                entries[idx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
+                multiple[idx] <= 0;
             end
-        end
-        else if (IN_pcValid && OUT_branchFound && (IN_BPT_branchTaken || OUT_branchIsJump)) begin
-            entries[IN_pc[$clog2(LENGTH)+2:3]][usedID].used <= 1;
         end
     end
 end
+
+logic[$clog2(`BTB_ENTRIES):0] dbgOcc;
+
+logic[`BTB_ENTRIES-1:0] dbgValid;
+logic[`BTB_ENTRIES-1:0] dbgUsed;
+
+always_comb begin
+    dbgOcc = 0;
+    dbgValid = 0;
+    dbgUsed = 0;
+    for (integer i = 0; i < LENGTH; i=i+1)
+        if (entries[i].valid) begin
+            dbgOcc = dbgOcc + 1;
+            dbgValid[i] = 1;
+        end
+end
+
 endmodule

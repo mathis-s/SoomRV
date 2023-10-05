@@ -1,11 +1,10 @@
 
 // Branch Target Buffer
-`define BTB_ENTRIES 128
-`define BTB_ASSOC 8
+`define BTB_ENTRIES 1024
 `define BTB_TAG_SIZE 16
 
 // Tage Base Predictor
-`define BP_BASEP_ID_LEN 8
+`define BP_BASEP_ID_LEN 10
 
 // IFetch
 `define DEC_WIDTH 4

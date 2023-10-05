@@ -406,7 +406,7 @@ always_ff@(posedge clk) begin
                     histLast <= BP_branchHistory;
                     infoLast <= BP_info;
                     pcLast <= pc;
-                    branchPosLast <= predBr.offs;
+                    branchPosLast <= predBr.valid ? predBr.offs : 3'b111;
                     multipleLast <= BP_multipleBranches;
                     returnAddrPredLast <= BP_curRetAddr;
                     

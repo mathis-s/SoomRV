@@ -23,9 +23,9 @@ typedef struct packed
     logic[27:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;
-    logic[2:0] firstValid;
-    logic[2:0] lastValid;
-    logic[2:0] predPos;
+    FetchOff_t firstValid;
+    FetchOff_t lastValid;
+    FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
     BHist_t history;
@@ -75,6 +75,7 @@ always_ff@(posedge clk) begin
                         
                         OUT_instrs[i].valid <= 1;
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
+                        
                         OUT_instrs[i].predInvalid <= 0;
                         
                         if (subIndexOut == cur.lastValid) begin
@@ -92,6 +93,8 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].fetchFault <= buffer[bufIndexOut].fetchFault;
                         OUT_instrs[i].rIdx <= buffer[bufIndexOut].rIdx;
                         OUT_instrs[i].is16bit <= 0;
+                        OUT_instrs[i].fetchStartOffs <= buffer[bufIndexOut].firstValid;
+                        OUT_instrs[i].fetchPredOffs <= buffer[bufIndexOut].predPos;
                         
                         if (subIndexOut > buffer[bufIndexOut].predPos)
                             // predTaken is zero as this is a post-branch instruction in the same fetch package
@@ -110,6 +113,8 @@ always_ff@(posedge clk) begin
                     end
                     else if (instr[1:0] != 2'b11 || invalidBranch || cur.fetchFault != IF_FAULT_NONE) begin
                         OUT_instrs[i].pc <= {buffer[bufIndexOut].pc, subIndexOut};
+                        OUT_instrs[i].fetchStartOffs <= buffer[bufIndexOut].firstValid;
+                        OUT_instrs[i].fetchPredOffs <= buffer[bufIndexOut].predPos;
                         OUT_instrs[i].instr <= invalidBranch ? 32'bx : {16'bx, instr};
                         OUT_instrs[i].fetchID <= buffer[bufIndexOut].fetchID;
                         OUT_instrs[i].predTaken <= buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;

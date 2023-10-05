@@ -274,24 +274,10 @@ typedef enum logic[3:0]
 
 } FlagsFP;
 
-typedef enum logic[2:0]
-{
-    MODE_USER,
-    MODE_WMASK,
-    MODE_RMASK,
-    MODE_NO_CREGS_RD,
-    MODE_NO_CREGS_WR,
-    MODE_TMR,
-    MODE_NO_BRK,
-    MODE_NO_EXT
-} ModeFlagsIDs;
-
 typedef enum logic[1:0] 
 {
     PRIV_USER=0, PRIV_SUPERVISOR=1, PRIV_MACHINE=3
 } PrivLevel;
-
-typedef logic[7:0] ModeFlags;
 
 typedef enum logic[1:0]
 {
@@ -383,8 +369,11 @@ typedef struct packed
 {
     logic[31:0] src;
     logic[31:0] dst;
+    FetchOff_t fetchStartOffs;
     logic isJump;
     logic isCall;
+    FetchOff_t multipleOffs;
+    logic multiple;
     logic compressed;
     logic clean;
     logic valid;
@@ -434,7 +423,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[30:0] pc;
-    logic[2:0] branchPos;
+    FetchOff_t branchPos;
     BranchPredInfo bpi;
     BHist_t hist;
 } PCFileEntry;
@@ -444,9 +433,9 @@ typedef struct packed
     logic[27:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;
-    logic[2:0] firstValid;
-    logic[2:0] lastValid;
-    logic[2:0] predPos;
+    FetchOff_t firstValid;
+    FetchOff_t lastValid;
+    FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
     BHist_t history;
@@ -460,6 +449,8 @@ typedef struct packed
 {
     logic[31:0] instr;
     logic[30:0] pc;
+    FetchOff_t fetchStartOffs;
+    FetchOff_t fetchPredOffs;
     logic[30:0] predTarget;
     logic targetIsRetAddr;
     BHist_t history;
@@ -537,6 +528,8 @@ typedef struct packed
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] pc;
+    FetchOff_t fetchStartOffs;
+    FetchOff_t fetchPredOffs;
     logic[31:0] imm;
     logic[5:0] opcode;
     Tag tagDst;

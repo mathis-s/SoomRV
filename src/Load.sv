@@ -76,11 +76,9 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= IN_uop[i].tagDst;
                 OUT_uop[i].opcode <= IN_uop[i].opcode;
                 
-                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:3], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
-                //assert(
-                //    ({IN_pcReadData[i].pc[30:2], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2)) ==
-                //    IN_uop[i].pc
-                //);
+                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
+                OUT_uop[i].fetchStartOffs <= IN_pcReadData[i].pc[$bits(FetchOff_t)-1:0];
+                OUT_uop[i].fetchPredOffs <= IN_pcReadData[i].branchPos;
                 
                 OUT_uop[i].fetchID <= IN_uop[i].fetchID;
                 
