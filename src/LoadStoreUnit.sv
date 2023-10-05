@@ -604,6 +604,9 @@ wire redoStore = stOps[1].valid &&
         (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT || miss[1].mtype == TRANS_IN_PROG) : 
         (!stOps[1].isMMIO && IF_cache.wbusy));
 
+assign OUT_stAck.addr = stOps[1].addr;
+assign OUT_stAck.data = stOps[1].data;
+assign OUT_stAck.wmask = stOps[1].wmask;
 assign OUT_stAck.id = stOps[1].id;
 assign OUT_stAck.valid = stOps[1].valid;
 assign OUT_stAck.fail = redoStore;

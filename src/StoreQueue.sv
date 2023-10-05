@@ -92,7 +92,7 @@ always_comb begin
             empty = 0;
     end
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].s.valid && !evicted[i].issued)
+        if (evicted[i].s.valid && !evicted[i].issued) // todo: strict
             empty = 0;
     end
     if (IN_stAck.valid && IN_stAck.fail) empty = 0;
@@ -224,7 +224,7 @@ always_comb begin
                 (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
                 (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
 
-            ((evicted[i].s.addr == entries[baseIndexI].addr) || 
+            ((evicted[i].s.addr == entries[baseIndexI].addr) || // todo: be less strict by looking at wmask
                 (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
                 (evicted[i].s.wmask == 0)))
             allowDequeue = 0;
@@ -377,6 +377,30 @@ always_comb begin
     endcase
 end
 
+// Select evicted entry to re-issue
+logic reIssueValid;
+logic[$clog2(NUM_EVICTED)-1:0] reIssueIdx;
+always_comb begin
+    reIssueValid = 0;
+    reIssueIdx = 'x;
+
+    for (integer i = NUM_EVICTED - 1; i >= 0; i=i-1) begin
+        if (evicted[i].s.valid && !evicted[i].issued) begin
+            reIssueValid = 1;
+            reIssueIdx = i[$clog2(NUM_EVICTED)-1:0];
+        end
+    end
+    
+    // check for collisions with incoming store NACKs
+    reIssueValid &= 
+        (!stAck_r.valid || !stAck_r.fail || 
+            (stAck_r.addr[31:2] != evicted[reIssueIdx].s.addr && 
+                !(`IS_MMIO_PMA(stAck_r.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr)))) &&
+        (!IN_stAck.valid || !IN_stAck.fail || 
+            (IN_stAck.addr[31:2] != evicted[reIssueIdx].s.addr && 
+                !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr))));
+end
+
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
@@ -416,7 +440,7 @@ always_ff@(posedge clk) begin
                 entries[i].ready <= 1;
             end
         end
-
+        
         // Delete entry from evicted if we get a positive store ack
         if (stAck_r.valid) begin
             assert(stAckIdxValid);
@@ -428,6 +452,7 @@ always_ff@(posedge clk) begin
                 end
                 evicted[NUM_EVICTED-1] <= 'x;
                 evicted[NUM_EVICTED-1].s.valid <= 0;
+
                 nextEvictedIn = nextEvictedIn - 1;
                 evictedUsedIds[stAck_r.id] <= 0;
             end
@@ -436,7 +461,7 @@ always_ff@(posedge clk) begin
                 modified = 1;
             end
         end
-        
+
         // Dequeue
         if (!IN_stallSt) begin
             reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
@@ -467,14 +492,20 @@ always_ff@(posedge clk) begin
             end
 
             // Re-issue op that previously missed cache
-            else if (evicted[0].s.valid && !evicted[0].issued) begin
+            else if (reIssueValid) begin
                 OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evicted[0].id;
-                OUT_uopSt.addr <= {evicted[0].s.addr, 2'b0};
-                OUT_uopSt.data <= evicted[0].s.data;
-                OUT_uopSt.wmask <= evicted[0].s.wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[0].s.addr);
-                evicted[0].issued <= 1;
+                OUT_uopSt.id <= evicted[reIssueIdx].id;
+                OUT_uopSt.addr <= {evicted[reIssueIdx].s.addr, 2'b0};
+                OUT_uopSt.data <= evicted[reIssueIdx].s.data;
+                OUT_uopSt.wmask <= evicted[reIssueIdx].s.wmask;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr);
+                
+                if (stAck_r.valid && !stAck_r.fail && reIssueIdx >= stAckIdx)
+                    evicted[reIssueIdx - 1].issued <= 1;
+                else
+                    evicted[reIssueIdx].issued <= 1;
+
+                modified = 1;
             end
         end
         

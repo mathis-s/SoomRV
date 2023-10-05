@@ -681,6 +681,9 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] addr;
+    logic[31:0] data;
+    logic[3:0] wmask;
     StID_t id;
     logic fail;
     logic valid;
