@@ -83,7 +83,7 @@ always_comb begin
         end
 end
 
-reg[30:0] rstack[SIZE-1:0];
+reg[30:0] rstack[SIZE-1:0] /* verilator public */;
 
 reg[$clog2(RQSIZE)-1:0] qindex;
 reg[$clog2(RQSIZE)-1:0] qindexEnd;

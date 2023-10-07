@@ -111,7 +111,7 @@ PreDecode preDec
 );
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
-DecodeBranchProv DEC_decBranch;
+DecodeBranchProv DEC_decBranch /*verilator public*/;
 ReturnDecUpdate DEC_retUpd;
 InstrDecoder idec
 (

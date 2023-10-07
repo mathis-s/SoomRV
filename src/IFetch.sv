@@ -167,7 +167,7 @@ wire tryReadICache =
 
 // When first encountering a fault, we output a single fake fault instruction.
 // Thus ifetch is still enabled during this first fault cycle.
-wire ifetchEn = 
+wire ifetchEn /* verilator public */ = 
     baseEn &&
     (!icacheStall || fetchIsFault);
 
@@ -224,7 +224,7 @@ IFetchFault pcPPNfault;
 
 IFetchFault fault;
 
-FetchID_t fetchID;
+FetchID_t fetchID /* verilator public */;
 FetchID_t fetchIDlast;
 BHist_t histLast;
 BranchPredInfo infoLast;
@@ -257,9 +257,9 @@ reg pageWalkAccepted;
 reg waitForPWComplete;
 reg[19:0] pageWalkVPN;
 
-reg waitForInterrupt;
+reg waitForInterrupt /* verilator public */;
 
-reg en1;
+reg en1 /* verilator public */;
 always_ff@(posedge clk) begin
     OUT_pw.valid <= 0;
     if (rst) begin

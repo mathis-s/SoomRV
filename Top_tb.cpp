@@ -13,10 +13,13 @@
 #include "VTop_CSR.h"
 #include "VTop_Core.h"
 #include "VTop_ExternalAXISim.h"
+#include "VTop_IFetch.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable__N8.h"
+#include "VTop_BranchPredictor__N3.h"
+#include "VTop_ReturnStack.h"
 #include "VTop_SoC.h"
 #include "VTop_TagBuffer.h"
 #include "VTop_Top.h"
@@ -290,7 +293,8 @@ class SpikeSimif : public simif_t
 
     virtual int cosim_instr(const Inst& inst)
     {
-        if (main_time > DEBUG_TIME) processor->set_debug(true);
+        if (main_time > DEBUG_TIME)
+            processor->set_debug(true);
         uint32_t initialSpikePC = get_pc();
         uint32_t instSIM;
 
@@ -588,7 +592,8 @@ void LogFlush(Inst& inst);
 void LogCommit(Inst& inst)
 {
 #ifdef COSIM
-    if (simif.doRestore) simif.restore_from_top(inst);
+    if (simif.doRestore)
+        simif.restore_from_top(inst);
 #endif
     if (inst.interrupt == Inst::IR_SQUASH)
     {
@@ -640,7 +645,8 @@ void LogPredec(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
-    fprintf(konataFile, "L\t%u\t%u\t%.8x: %s\n", inst.id, 0, inst.pc, simif.disasm(inst.inst).c_str());
+    fprintf(konataFile, "L\t%u\t%u\t%.8x (%.8x): %s\n", inst.id, 0, inst.pc, inst.inst,
+            simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
@@ -710,6 +716,7 @@ void LogInstructions()
     auto core = top->Top->soc->core;
 
     bool brTaken = core->branch[0] & 1;
+    bool decBrTaken = core->DEC_decBranch & 1;
     int brSqN = ExtractField(core->branch, 74 - 32 - 7, 7);
 
     // Issue
@@ -865,7 +872,7 @@ void LogInstructions()
         if (!core->RN_stall && core->frontendEn)
         {
             for (size_t i = 0; i < 4; i++)
-                if (core->PD_instrs[i].at(0) & 1)
+                if ((core->PD_instrs[i].at(0) & 1) && !decBrTaken)
                 {
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
@@ -884,18 +891,18 @@ void LogInstructions()
                     state.pd[i].valid = false;
         }
 
-        if (core->__PVT__ifetch__DOT__en1)
+        if (core->ifetch->en1)
         {
-            int fetchID = core->__PVT__ifetch__DOT__fetchID;
+            int fetchID = core->ifetch->fetchID;
             state.fetches[fetchID] = state.fetch0;
         }
-        
+
         // Fetch 0
-        if (core->__PVT__ifetch__DOT__ifetchEn)
+        if (core->ifetch->ifetchEn)
         {
             for (size_t i = 0; i < 4; i++)
-                state.fetch0.returnAddr[i] = core->__PVT__ifetch__DOT__bp__DOT__retStack__DOT__rstack[i];
-        } 
+                state.fetch0.returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
+        }
     }
     LogCycle();
 }
@@ -929,7 +936,7 @@ void restore_model(std::string fileName)
     if (fread(&state, sizeof(state), 1, f) != 1)
         abort();
     fclose(f);
-    
+
     long offset = state.insts[state.lastComSqN].id;
     for (size_t i = 0; i < 128; i++)
         state.insts[i].id -= offset;
@@ -983,11 +990,16 @@ static void ParseArgs(int argc, char** argv, Args& args)
         fprintf(stderr,
                 "usage: %s [options] <ELF BINARY>.elf|<BACKUP FILE>.backup|<ASSEMBLY FILE>\n"
                 "Options:\n"
-                "\t" "--device-tree, -d: Load device tree binary, store address in a1 at boot.\n"
-                "\t" "--backup-file, -b: Periodically save state in specified file. Reload by specifying backup file as program.\n"
-                "\t" "--dump-mem, -o:    Dump memory into output file after loading binary.\n"
-                "\t" "--perfc, p:        Periodically dump performance counter stats.\n"
-                , argv[0]);
+                "\t"
+                "--device-tree, -d: Load device tree binary, store address in a1 at boot.\n"
+                "\t"
+                "--backup-file, -b: Periodically save state in specified file. Reload by specifying backup file as "
+                "program.\n"
+                "\t"
+                "--dump-mem, -o:    Dump memory into output file after loading binary.\n"
+                "\t"
+                "--perfc, p:        Periodically dump performance counter stats.\n",
+                argv[0]);
         // clang-format on
         exit(-1);
     }
@@ -1061,6 +1073,31 @@ void Initialize(int argc, char** argv, Args& args)
             fclose(dtbFile);
         }
     }
+}
+
+void LogPerf(VTop_Core* core)
+{
+    std::array<uint64_t, 5> counters = {
+        core->csr->mcycle,       core->csr->minstret,     core->csr->mhpmcounter3,
+        core->csr->mhpmcounter4, core->csr->mhpmcounter5,
+    };
+    static std::array<uint64_t, 5> lastCounters;
+
+    std::array<uint64_t, 5> current;
+    for (size_t i = 0; i < counters.size(); i++)
+        current[i] = counters[i] - lastCounters[i];
+
+    double ipc = (double)current[1] / current[0];
+    double mpki = (double)current[4] / (current[1] / 1000.0);
+    double bmrate = ((double)current[3] / current[2]) * 100.0;
+
+    fprintf(stderr, "cycles:             %lu\n", current[0]);
+    fprintf(stderr, "instret:            %lu # %f IPC \n", current[1], ipc);
+    fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
+    fprintf(stderr, "branches:           %lu\n", current[2]);
+    fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
+
+    lastCounters = counters;
 }
 
 int main(int argc, char** argv)
@@ -1146,7 +1183,7 @@ int main(int argc, char** argv)
             HandleInput();
 
         // Hang Detection
-        if ((main_time & (0x3fff)) == 0 && !args.restoreSave && !core->__PVT__ifetch__DOT__waitForInterrupt)
+        if ((main_time & (0x3fff)) == 0 && !args.restoreSave && !core->ifetch->waitForInterrupt)
         {
             uint64_t minstret = core->csr->minstret;
             if (minstret == lastMInstret)
@@ -1162,43 +1199,17 @@ int main(int argc, char** argv)
         if ((main_time & 0xffffff) == 0)
         {
             if (args.logPerformance)
-            {
-                std::array<uint64_t, 5> counters = {
-                    core->csr->mcycle,
-                    core->csr->minstret,
-                    core->csr->mhpmcounter3,
-                    core->csr->mhpmcounter4,
-                    core->csr->mhpmcounter5,
-                };
-                static std::array<uint64_t, 5> lastCounters;
-
-                std::array<uint64_t, 5> current;
-                for (size_t i = 0; i < counters.size(); i++)
-                    current[i] = counters[i] - lastCounters[i];
-
-                double ipc = (double)current[1] / current[0];
-                double mpki = (double)current[4] / (current[1] / 1000.0);
-                double bmrate = ((double)current[3] / current[2]) * 100.0;
-
-                fprintf(stderr, "cycles:             %lu\n", current[0]);
-                fprintf(stderr, "instret:            %lu # %f IPC \n", current[1], ipc);
-                fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
-                fprintf(stderr, "branches:           %lu\n", current[2]);
-                fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
-
-                lastCounters = counters;
-            }
+                LogPerf(core);
 
             if (!args.backupFile.empty())
                 save_model(args.backupFile);
-
         }
         args.restoreSave = 0;
         main_time++;
     }
 
     // Run a few more cycles ...
-    for (int i = 0; i < 3200; i = i + 1)
+    for (int i = 0; i < 128; i = i + 1)
     {
         top->clk = !top->clk;
         top->eval(); // Evaluate model
@@ -1207,6 +1218,8 @@ int main(int argc, char** argv)
 #endif
         main_time++; // Time passes...
     }
+
+    // LogPerf(core);
 
     printf("%lu cycles\n", main_time / 2);
 
