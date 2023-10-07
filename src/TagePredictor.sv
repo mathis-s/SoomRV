@@ -12,14 +12,14 @@ module TagePredictor
     
     input wire[30:0] IN_predAddr,
     input BHist_t IN_predHistory,
-    output reg[2:0] OUT_predTageID,
+    output TageID_t OUT_predTageID,
     output reg OUT_altPred,
     output reg OUT_predTaken,
     
     input wire IN_writeValid,
     input wire[30:0] IN_writeAddr,
     input BHist_t IN_writeHistory,
-    input wire[2:0] IN_writeTageID,
+    input TageID_t IN_writeTageID,
     input wire IN_writeTaken,
     input wire IN_writeAltPred,
     input wire IN_writePred
@@ -155,7 +155,7 @@ always_comb begin
     
     for (integer i = 0; i < NUM_STAGES; i=i+1) begin
         if (valid[i]) begin
-            OUT_predTageID = i[2:0];
+            OUT_predTageID = i[$bits(TageID_t)-1:0];
             OUT_altPred = OUT_predTaken;
             OUT_predTaken = predictions[i];
         end

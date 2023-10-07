@@ -3,7 +3,7 @@ VERILATOR_FLAGS = \
 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --x-assign unique --x-initial unique -O3 -sv \
 	-CFLAGS "-march=native" \
 	-LDFLAGS "-ldl" \
-	-MAKEFLAGS -j16
+	-MAKEFLAGS -j $(nproc)
 
 VERILATOR_CFG = --exe Top_tb.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 

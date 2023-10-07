@@ -5,7 +5,7 @@ typedef logic[11:0] BrID;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[11:0] BHist_t;
-typedef logic[2:0] TageUseful_t;
+typedef logic[2:0] TageID_t;
 typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
@@ -359,7 +359,7 @@ typedef struct packed
 {
     logic predicted;
     logic taken;
-    logic[2:0] tageID;
+    TageID_t tageID;
     logic altPred;
     RetStackIdx_t rIdx;
     logic isJump;
