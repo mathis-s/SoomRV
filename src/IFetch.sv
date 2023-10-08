@@ -33,7 +33,7 @@ module IFetch
     input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate0 IN_bpUpdate0,
-    input BPUpdate IN_bpUpdate,
+    input BPUpdate1 IN_bpUpdate1,
     
     input FetchID_t IN_pcReadAddr[4:0],
     output PCFileEntry OUT_pcReadData[4:0],
@@ -109,7 +109,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_retDecUpd(IN_retDecUpd),
     .IN_btUpdates(IN_btUpdates),
     .IN_bpUpdate0(IN_bpUpdate0),
-    .IN_bpUpdate(IN_bpUpdate)
+    .IN_bpUpdate1(IN_bpUpdate1)
 );
 
 TLB_Req TLB_req;

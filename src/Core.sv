@@ -76,7 +76,7 @@ IFetch ifetch
     .IN_flushTLB(TH_flushTLB),
     .IN_btUpdates(BP_btUpdates),
     .IN_bpUpdate0(ROB_bpUpdate0),
-    .IN_bpUpdate(TH_bpUpdate),
+    .IN_bpUpdate1(TH_bpUpdate1),
     
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
@@ -786,7 +786,7 @@ wire TH_flushTLB;
 wire TH_startFence;
 wire TH_disableIFetch;
 wire TH_clearICache;
-BPUpdate TH_bpUpdate;
+BPUpdate1 TH_bpUpdate1;
 TrapInfoUpdate TH_trapInfo;
 TrapHandler trapHandler
 (
@@ -798,7 +798,7 @@ TrapHandler trapHandler
     .IN_pcReadData(PC_readData[4]),
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(TH_trapInfo),
-    .OUT_bpUpdate(TH_bpUpdate),
+    .OUT_bpUpdate1(TH_bpUpdate1),
     .OUT_branch(branchProvs[3]),
     
     .IN_MEM_busy(MEMSUB_busy),

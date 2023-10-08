@@ -359,8 +359,6 @@ typedef struct packed
 {
     logic predicted;
     logic taken;
-    TageID_t tageID;
-    logic altPred;
     RetStackIdx_t rIdx;
     logic isJump;
 } BranchPredInfo;
@@ -714,22 +712,17 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[30:0] pc;
-    logic compressed;
-    FetchID_t fetchID;
-    BranchPredInfo bpi;
-    logic branchTaken;
-    logic valid;
-} BPUpdate;
-
-typedef struct packed
-{
-    logic compressed;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
     logic branchTaken;
     logic valid;
 } BPUpdate0;
+
+typedef struct packed
+{
+    logic[30:0] pc;
+    logic valid;
+} BPUpdate1;
 
 typedef struct packed
 {

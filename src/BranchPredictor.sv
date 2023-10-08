@@ -37,7 +37,7 @@ module BranchPredictor
     
     // Branch ROB Interface
     input BPUpdate0 IN_bpUpdate0,
-    input BPUpdate IN_bpUpdate
+    input BPUpdate1 IN_bpUpdate1
 );
 
 assign OUT_stall = RET_stall || recovery.valid;
@@ -57,12 +57,12 @@ typedef struct packed
 BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;
-    bpBackup.rIdx = OUT_branchInfo.rIdx;
+    bpBackup.rIdx = RET_idx;
     bpBackup.predTaken = OUT_branchInfo.taken;
     bpBackup.predOffs = OUT_predBr.offs;
     bpBackup.pred = OUT_branchInfo.predicted;
-    bpBackup.tageID = OUT_branchInfo.tageID;
-    bpBackup.altPred = OUT_branchInfo.altPred;
+    bpBackup.tageID = TAGE_tageID;
+    bpBackup.altPred = TAGE_altPred;
 end
 BPBackup bpBackupLast;
 
@@ -96,6 +96,8 @@ wire[30:0] branchAddr = IN_pc[31:1];
 
 reg BTB_branchTaken;
 always_comb begin
+    OUT_branchInfo.rIdx = RET_idx;
+
     if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
         OUT_branchTaken = BTB_br.valid && (BTB_br.isJump || TAGE_taken);
@@ -142,6 +144,8 @@ BranchTargetBuffer btb
 );
 
 wire TAGE_taken;
+TageID_t TAGE_tageID;
+wire TAGE_altPred;
 TagePredictor tagePredictor
 (
     .clk(clk),
@@ -149,21 +153,22 @@ TagePredictor tagePredictor
     
     .IN_predAddr(branchAddr),
     .IN_predHistory(history),
-    .OUT_predTageID(OUT_branchInfo.tageID),
-    .OUT_altPred(OUT_branchInfo.altPred),
+    .OUT_predTageID(TAGE_tageID),
+    .OUT_altPred(TAGE_altPred),
     .OUT_predTaken(TAGE_taken),
     
-    .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush && !IN_bpUpdate.bpi.isJump),
-    .IN_writeAddr(IN_bpUpdate.pc[30:0]),
+    .IN_writeValid(IN_bpUpdate1.valid),
+    .IN_writeAddr(IN_bpUpdate1.pc[30:0]),
     .IN_writeHistory(bpBackupUpd.history),
-    .IN_writeTageID(IN_bpUpdate.bpi.tageID),
-    .IN_writeTaken(IN_bpUpdate.branchTaken),
-    .IN_writeAltPred(IN_bpUpdate.bpi.altPred),
-    .IN_writePred(IN_bpUpdate.bpi.taken)
+    .IN_writeTageID(bpBackupUpd.tageID),
+    .IN_writeTaken(update.branchTaken),
+    .IN_writeAltPred(bpBackupUpd.altPred),
+    .IN_writePred(bpBackupUpd.predTaken)
 );
 
 PredBranch RET_br;
 wire RET_stall;
+RetStackIdx_t RET_idx;
 ReturnStack retStack
 (
     .clk(clk),
@@ -184,7 +189,7 @@ ReturnStack retStack
     .IN_setIdx(IN_mispr),
     .IN_idx(IN_misprRIdx),
     
-    .OUT_curIdx(OUT_branchInfo.rIdx),
+    .OUT_curIdx(RET_idx),
     .OUT_predBr(RET_br),
 
     .IN_returnUpd(IN_retDecUpd)

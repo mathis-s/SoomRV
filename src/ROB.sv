@@ -237,7 +237,6 @@ always_ff@(posedge clk) begin
                         OUT_bpUpdate0.branchTaken <= (deqEntries[i].flags == FLAGS_PRED_TAKEN);
                         OUT_bpUpdate0.fetchID <= deqEntries[i].fetchID;
                         OUT_bpUpdate0.fetchOffs <= deqEntries[i].fetchOffs;
-                        OUT_bpUpdate0.compressed <= deqEntries[i].compressed;
                     end
                                     
                     if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR))) begin

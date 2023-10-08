@@ -11,7 +11,7 @@ module TrapHandler
     input TrapControlState IN_trapControl,
     output TrapInfoUpdate OUT_trapInfo,
 
-    output BPUpdate OUT_bpUpdate,
+    output BPUpdate1 OUT_bpUpdate1,
     output BranchProv OUT_branch,
 
     input wire IN_MEM_busy,
@@ -42,8 +42,8 @@ always_ff@(posedge clk) begin
     OUT_fence <= 0;
     OUT_clearICache <= 0;
     
-    OUT_bpUpdate <= 'x;
-    OUT_bpUpdate.valid <= 0;
+    OUT_bpUpdate1 <= 'x;
+    OUT_bpUpdate1.valid <= 0;
     OUT_branch <= 'x;
     OUT_branch.taken <= 0;
     OUT_trapInfo <= 'x;
@@ -182,12 +182,8 @@ always_ff@(posedge clk) begin
             // Branch Prediction Updates
             else begin
                 if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
-                    OUT_bpUpdate.valid <= 1;
-                    OUT_bpUpdate.pc <= IN_pcReadData.pc;
-                    OUT_bpUpdate.compressed <= IN_trapInstr.compressed;
-                    OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
-                    OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
-                    OUT_bpUpdate.fetchID <= IN_trapInstr.fetchID;
+                    OUT_bpUpdate1.valid <= 1;
+                    OUT_bpUpdate1.pc <= IN_pcReadData.pc;
                 end
             end
         end
