@@ -717,7 +717,7 @@ void LogInstructions()
 
     bool brTaken = core->branch[0] & 1;
     bool decBrTaken = core->DEC_decBranch & 1;
-    int brSqN = ExtractField(core->branch, 74 - 32 - 7, 7);
+    int brSqN = ExtractField(core->branch, 74 - 32 - 7 - 12, 7);
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -736,9 +736,9 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 232 - 32 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 232 - 32 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32 - 32 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 232 - 12 - 32 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 232 - 12 - 32 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 12 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }
@@ -749,7 +749,7 @@ void LogInstructions()
         {
             uint32_t sqn = ExtractField(uop, 156 - 32 * 2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
             state.insts[sqn].memAddr = ExtractField(uop, 156 - 32 - 32, 32);
-            state.insts[sqn].memData = 0;//ExtractField(uop, 156 - 32 * 2, 32);
+            state.insts[sqn].memData = 0; // ExtractField(uop, 156 - 32 * 2, 32);
         }
 
     // Result
@@ -877,8 +877,8 @@ void LogInstructions()
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
                     state.pd[i].id = state.id++;
-                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 31 - 32, 31) << 1;
-                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 32, 32);
+                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 12 - 31 - 32, 31) << 1;
+                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 12 - 32, 32);
                     state.pd[i].fetchID = ExtractField(top->Top->soc->core->PD_instrs[i], 4, 5);
                     state.pd[i].retIdx =
                         ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);

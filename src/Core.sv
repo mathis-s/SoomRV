@@ -75,6 +75,7 @@ IFetch ifetch
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
     .IN_btUpdates(BP_btUpdates),
+    .IN_bpUpdate0(ROB_bpUpdate0),
     .IN_bpUpdate(TH_bpUpdate),
     
     .IN_pcReadAddr(PC_readAddress),
@@ -751,6 +752,7 @@ FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
 wire[3:0] ROB_validRetire /*verilator public*/;
 wire[3:0] ROB_retireBranch;
+BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 ROB rob
 (
@@ -771,7 +773,10 @@ ROB rob
     .OUT_PERFC_validRetire(ROB_validRetire),
     .OUT_PERFC_retireBranch(ROB_retireBranch),
     .OUT_curFetchID(ROB_curFetchID),
+    
     .OUT_trapUOp(ROB_trapUOp),
+    .OUT_bpUpdate0(ROB_bpUpdate0),
+
     .OUT_mispredFlush(mispredFlush)
 );
 

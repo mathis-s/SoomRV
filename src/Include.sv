@@ -379,22 +379,26 @@ typedef struct packed
     logic valid;
 } BTUpdate;
 
-typedef struct packed
+typedef enum logic[1:0]
 {
-    logic[30:0] src;
-    logic[30:0] dst;
-    logic valid;
-} IndirBranchInfo;
+    RET_NONE, RET_PUSH, RET_POP
+} RetStackAction;
+
+typedef enum logic[1:0]
+{
+    HIST_NONE, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
+} HistoryAction;
 
 typedef struct packed
 {
+    RetStackAction retAct;
+    HistoryAction histAct;
     logic[31:0] dstPC;
     SqN sqN;
     SqN storeSqN;
     SqN loadSqN;
     logic flush;
     FetchID_t fetchID;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic taken;
 } BranchProv;
@@ -412,9 +416,10 @@ typedef struct packed
 
 typedef struct packed
 {
+    RetStackAction retAct;
+    HistoryAction histAct;
     logic[30:0] dst;
     logic[4:0] fetchID;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic wfi;
     logic taken;
@@ -425,7 +430,6 @@ typedef struct packed
     logic[30:0] pc;
     FetchOff_t branchPos;
     BranchPredInfo bpi;
-    BHist_t hist;
 } PCFileEntry;
 
 typedef struct packed
@@ -438,7 +442,6 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic[7:0][15:0] instrs;
     
@@ -453,7 +456,6 @@ typedef struct packed
     FetchOff_t fetchPredOffs;
     logic[30:0] predTarget;
     logic targetIsRetAddr;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic predTaken;
     logic predInvalid;
@@ -536,7 +538,6 @@ typedef struct packed
     SqN sqN;
     FetchID_t fetchID;
     BranchPredInfo bpi;
-    BHist_t history;
     SqN storeSqN;
     SqN loadSqN;
     FuncUnit fu;
@@ -577,7 +578,6 @@ typedef struct packed
     SqN storeSqN;
     SqN loadSqN;
     FetchID_t fetchID;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic doNotCommit;
     AGU_Exception exception;
@@ -716,11 +716,20 @@ typedef struct packed
 {
     logic[30:0] pc;
     logic compressed;
+    FetchID_t fetchID;
     BranchPredInfo bpi;
-    BHist_t history;
     logic branchTaken;
     logic valid;
 } BPUpdate;
+
+typedef struct packed
+{
+    logic compressed;
+    FetchOff_t fetchOffs;
+    FetchID_t fetchID;
+    logic branchTaken;
+    logic valid;
+} BPUpdate0;
 
 typedef struct packed
 {

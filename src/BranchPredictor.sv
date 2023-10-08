@@ -5,15 +5,17 @@ module BranchPredictor
 (
     input wire clk,
     input wire rst,
-    output wire OUT_stall,
+    input wire en1,
 
+    output wire OUT_stall,
     input wire IN_clearICache,
     
     input wire IN_mispredFlush,
     input wire IN_mispr,
     input FetchID_t IN_misprFetchID,
-    input BHist_t IN_misprHist,
     input RetStackIdx_t IN_misprRIdx,
+    input RetStackAction IN_misprRetAct,
+    input HistoryAction IN_misprHistAct,
     
     // IF interface
     input wire IN_pcValid,
@@ -21,7 +23,6 @@ module BranchPredictor
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
     output reg OUT_branchTaken,
-    output BHist_t OUT_branchHistory,
     output BranchPredInfo OUT_branchInfo,
     output reg OUT_multipleBranches,
     output wire[30:0] OUT_curRetAddr,
@@ -35,12 +36,50 @@ module BranchPredictor
     
     
     // Branch ROB Interface
+    input BPUpdate0 IN_bpUpdate0,
     input BPUpdate IN_bpUpdate
 );
 
+assign OUT_stall = RET_stall || recovery.valid;
 
-BHist_t gHistory;
-BHist_t gHistoryCom;
+typedef struct packed
+{
+    TageID_t tageID;
+    logic altPred;
+
+    BHist_t history;
+    RetStackIdx_t rIdx;
+    logic predTaken;
+    FetchOff_t predOffs;
+    logic pred;
+} BPBackup;
+
+BPBackup bpBackup;
+always_comb begin
+    bpBackup.history = history;
+    bpBackup.rIdx = OUT_branchInfo.rIdx;
+    bpBackup.predTaken = OUT_branchInfo.taken;
+    bpBackup.predOffs = OUT_predBr.offs;
+    bpBackup.pred = OUT_branchInfo.predicted;
+    bpBackup.tageID = OUT_branchInfo.tageID;
+    bpBackup.altPred = OUT_branchInfo.altPred;
+end
+BPBackup bpBackupLast;
+
+BPBackup bpBackupRec;
+BPBackup bpBackupUpd;
+RegFile#($bits(BPBackup), 1 << $bits(FetchID_t), 2, 1) bpFile
+(
+    .clk(clk),
+    
+    .IN_re({IN_mispr, IN_bpUpdate0.valid}),
+    .IN_raddr({IN_misprFetchID, IN_bpUpdate0.fetchID}),
+    .OUT_rdata({bpBackupRec, bpBackupUpd}),
+    
+    .IN_we(en1),
+    .IN_waddr(IN_fetchID),
+    .IN_wdata(bpBackupLast)
+);
 
 // Try to find valid branch target update
 BTUpdate btUpdate;
@@ -54,8 +93,6 @@ always_comb begin
 end
 
 wire[30:0] branchAddr = IN_pc[31:1];
-
-assign OUT_branchHistory = gHistory;
 
 reg BTB_branchTaken;
 always_comb begin
@@ -111,14 +148,14 @@ TagePredictor tagePredictor
     .rst(rst),
     
     .IN_predAddr(branchAddr),
-    .IN_predHistory(gHistory),
+    .IN_predHistory(history),
     .OUT_predTageID(OUT_branchInfo.tageID),
     .OUT_altPred(OUT_branchInfo.altPred),
     .OUT_predTaken(TAGE_taken),
     
     .IN_writeValid(IN_bpUpdate.valid && IN_bpUpdate.bpi.predicted && !IN_mispredFlush && !IN_bpUpdate.bpi.isJump),
     .IN_writeAddr(IN_bpUpdate.pc[30:0]),
-    .IN_writeHistory(IN_bpUpdate.history),
+    .IN_writeHistory(bpBackupUpd.history),
     .IN_writeTageID(IN_bpUpdate.bpi.tageID),
     .IN_writeTaken(IN_bpUpdate.branchTaken),
     .IN_writeAltPred(IN_bpUpdate.bpi.altPred),
@@ -126,11 +163,12 @@ TagePredictor tagePredictor
 );
 
 PredBranch RET_br;
+wire RET_stall;
 ReturnStack retStack
 (
     .clk(clk),
     .rst(rst),
-    .OUT_stall(OUT_stall),
+    .OUT_stall(RET_stall),
 
     .IN_valid(IN_pcValid),
     .IN_pc(IN_pc[31:1]),
@@ -152,23 +190,64 @@ ReturnStack retStack
     .IN_returnUpd(IN_retDecUpd)
 );
 
+BPUpdate0 update;
+
+typedef struct packed
+{
+    logic valid;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
+    RetStackAction retAct;
+    HistoryAction histAct;
+} Recovery;
+Recovery recovery;
+BHist_t recHistory;
+always_comb begin
+    recHistory = bpBackupRec.history;
+
+    case (recovery.histAct)
+        HIST_WRITE_0,
+        HIST_WRITE_1: recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_WRITE_1 ? 1'b1 : 1'b0};
+        default: begin
+            if (bpBackupRec.pred && bpBackupRec.predOffs <= recovery.fetchOffs)
+                recHistory = {recHistory[$bits(BHist_t)-2:0], bpBackupRec.predTaken};
+        end
+    endcase
+
+    if (recovery.histAct == HIST_APPEND_1)
+        recHistory = {recHistory[$bits(BHist_t)-2:0], 1'b1};
+end
+
+BHist_t history;
 always_ff@(posedge clk) begin
+    
+    recovery <= 'x;
+    recovery.valid <= 0;
+
+    update <= 'x;
+    update.valid <= 0;
 
     if (rst) begin
-        gHistory <= 0;
-        gHistoryCom <= 0;
     end
     else begin
         if (OUT_predBr.valid && !OUT_predBr.isJump)
-            gHistory <= {gHistory[$bits(BHist_t)-2:0], OUT_branchTaken};
-        
-        if (IN_bpUpdate.valid && !IN_mispredFlush) begin
-            gHistoryCom <= {gHistoryCom[$bits(BHist_t)-2:0], IN_bpUpdate.branchTaken};
+            history <= {history[$bits(BHist_t)-2:0], OUT_branchTaken};
+
+        if (IN_pcValid)
+            bpBackupLast <= bpBackup;
+
+        if (IN_mispr) begin
+            recovery.valid <= 1;
+            recovery.fetchID <= IN_misprFetchID;
+            recovery.retAct <= IN_misprRetAct;
+            recovery.histAct <= IN_misprHistAct;
         end
-    end
-    
-    if (!rst && IN_mispr) begin
-        gHistory <= IN_misprHist;
+        if (recovery.valid) begin
+            history <= recHistory;
+        end
+
+        if (IN_bpUpdate0.valid)
+            update <= IN_bpUpdate0;
     end
 end
 

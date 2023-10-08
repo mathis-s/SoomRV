@@ -65,6 +65,7 @@ SRC_FILES = \
 	src/CacheWriteInterface.sv \
 	src/CacheReadInterface.sv \
 	src/FIFO.sv \
+	src/RegFileRTL.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

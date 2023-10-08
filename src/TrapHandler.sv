@@ -32,14 +32,8 @@ assign OUT_pcReadAddr = IN_trapInstr.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
 wire[31:0] nextInstr = {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
 
-BHist_t baseIndexHist;
 BranchPredInfo baseIndexBPI;
 always_comb begin
-    if (IN_pcReadData.bpi.predicted && !IN_pcReadData.bpi.isJump && IN_trapInstr.fetchOffs > IN_pcReadData.branchPos)
-        baseIndexHist = {IN_pcReadData.hist[$bits(BHist_t)-2:0], IN_pcReadData.bpi.taken};
-    else
-        baseIndexHist = IN_pcReadData.hist;
-        
     baseIndexBPI = IN_pcReadData.bpi;
 end
 
@@ -118,12 +112,14 @@ always_ff@(posedge clk) begin
                 OUT_branch.taken <= 1;
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
-                OUT_branch.history <= baseIndexHist;
                 OUT_branch.rIdx <= baseIndexBPI.rIdx;
                 
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= 0;
+
+                OUT_branch.histAct <= HIST_NONE;
+                OUT_branch.retAct <= RET_NONE;
             end
 
 
@@ -173,12 +169,14 @@ always_ff@(posedge clk) begin
                 OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
-                OUT_branch.history <= baseIndexHist;
                 OUT_branch.rIdx <= baseIndexBPI.rIdx;
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
                 OUT_branch.fetchID <= 0;
+
+                OUT_branch.histAct <= HIST_NONE;
+                OUT_branch.retAct <= RET_NONE;
             end
 
             // Branch Prediction Updates
@@ -187,11 +185,9 @@ always_ff@(posedge clk) begin
                     OUT_bpUpdate.valid <= 1;
                     OUT_bpUpdate.pc <= IN_pcReadData.pc;
                     OUT_bpUpdate.compressed <= IN_trapInstr.compressed;
-                    OUT_bpUpdate.history <= IN_pcReadData.hist;
-                    OUT_branch.rIdx <= baseIndexBPI.rIdx;
-
                     OUT_bpUpdate.bpi <= IN_pcReadData.bpi;
                     OUT_bpUpdate.branchTaken <= IN_trapInstr.flags == FLAGS_PRED_TAKEN;
+                    OUT_bpUpdate.fetchID <= IN_trapInstr.fetchID;
                 end
             end
         end

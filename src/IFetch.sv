@@ -32,6 +32,7 @@ module IFetch
     input wire IN_clearICache,
     input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
+    input BPUpdate0 IN_bpUpdate0,
     input BPUpdate IN_bpUpdate,
     
     input FetchID_t IN_pcReadAddr[4:0],
@@ -71,7 +72,6 @@ BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 );
 
 wire BP_branchTaken;
-BHist_t BP_branchHistory;
 BranchPredInfo BP_info;
 wire BP_multipleBranches;
 PredBranch predBr;
@@ -81,6 +81,8 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 (
     .clk(clk),
     .rst(rst),
+    .en1(pcFileWriteEn),
+
     .OUT_stall(BP_stall),
     
     .IN_clearICache(IN_clearICache),
@@ -88,15 +90,15 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_mispredFlush(IN_mispredFlush),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
     .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
-    .IN_misprHist(OUT_branch.taken ? OUT_branch.history : IN_decBranch.history),
     .IN_misprRIdx(OUT_branch.taken ? OUT_branch.rIdx : IN_decBranch.rIdx),
+    .IN_misprRetAct(OUT_branch.taken ? OUT_branch.retAct : IN_decBranch.retAct),
+    .IN_misprHistAct(OUT_branch.taken ? OUT_branch.histAct : IN_decBranch.histAct),
     
     .IN_pcValid(ifetchEn && fault == IF_FAULT_NONE && !pageWalkRequired),
     .IN_pc({pc, 1'b0}),
     .IN_fetchID(fetchID),
     .IN_comFetchID(IN_ROB_curFetchID),
     .OUT_branchTaken(BP_branchTaken),
-    .OUT_branchHistory(BP_branchHistory),
     .OUT_branchInfo(BP_info),
     .OUT_multipleBranches(BP_multipleBranches),
     .OUT_curRetAddr(BP_curRetAddr),
@@ -106,6 +108,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 
     .IN_retDecUpd(IN_retDecUpd),
     .IN_btUpdates(IN_btUpdates),
+    .IN_bpUpdate0(IN_bpUpdate0),
     .IN_bpUpdate(IN_bpUpdate)
 );
 
@@ -225,8 +228,6 @@ IFetchFault pcPPNfault;
 IFetchFault fault;
 
 FetchID_t fetchID /* verilator public */;
-FetchID_t fetchIDlast;
-BHist_t histLast;
 BranchPredInfo infoLast;
 reg[2:0] branchPosLast;
 reg[30:0] returnAddrPredLast;
@@ -234,14 +235,14 @@ reg multipleLast;
 
 PCFileEntry PCF_writeData;
 assign PCF_writeData.pc = pcLast;
-assign PCF_writeData.hist = histLast;
 assign PCF_writeData.bpi = infoLast;
 assign PCF_writeData.branchPos = branchPosLast;
+wire pcFileWriteEn = ifetchEn && en1;
 PCFile#($bits(PCFileEntry)) pcFile
 (
     .clk(clk),
     
-    .wen0(ifetchEn && en1),
+    .wen0(pcFileWriteEn),
     .waddr0(fetchID),
     .wdata0(PCF_writeData),
     
@@ -376,10 +377,9 @@ always_ff@(posedge clk) begin
                 outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : (3'b111);
                 // If no branch was predicted, we use the predTarget field to store
                 // the current return address. In case a unpredicted return is found
-                // in decode, this is a slightly better target prediction than lateReturnAddr
+                // in decode, this is a slightly better target prediction than lateRetAddr
                 // at decode time, as lateRetAddr might change until then.
                 outInstrs_r.predTarget <= infoLast.taken ? pc : returnAddrPredLast;
-                outInstrs_r.history <= histLast;
                 outInstrs_r.rIdx <= infoLast.rIdx;
             
                 fetchID <= fetchID + 1;
@@ -393,7 +393,6 @@ always_ff@(posedge clk) begin
                     en1 <= 1;
                     pcLast <= pc;
                     // this might be polluted with predictions from squashed insts
-                    histLast <= BP_branchHistory;
                     infoLast <= 0;
                     multipleLast <= 1;
                     branchPosLast <= pc[2:0];
@@ -403,7 +402,6 @@ always_ff@(posedge clk) begin
                 // Valid Fetch
                 else begin
                     en1 <= 1;
-                    histLast <= BP_branchHistory;
                     infoLast <= BP_info;
                     pcLast <= pc;
                     branchPosLast <= predBr.valid ? predBr.offs : 3'b111;

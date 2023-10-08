@@ -172,15 +172,10 @@ always_ff@(posedge clk) begin
             OUT_btUpdate.valid <= 0;
             OUT_branch.taken <= 0;
             OUT_branch.flush <= 0;
-
-            if (isBranch)
-                OUT_branch.history <= {IN_uop.history[$bits(BHist_t)-2:0], branchTaken};
-            else
-                OUT_branch.history <= IN_uop.history;
             
             OUT_branch.rIdx <= IN_uop.bpi.rIdx;
-            
             OUT_branch.fetchID <= IN_uop.fetchID;
+            OUT_branch.histAct <= HIST_NONE;
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
@@ -210,6 +205,15 @@ always_ff@(posedge clk) begin
                         OUT_btUpdate.dst <= pcPlus4;
                     end
                     OUT_branch.taken <= 1;
+                    
+                    // if predicted but wrong, correct existing history bit
+                    if (IN_uop.bpi.predicted)
+                        OUT_branch.histAct <= branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
+                    // else append to history
+                    else begin
+                        assert(branchTaken);
+                        OUT_branch.histAct <= HIST_APPEND_1;
+                    end
                 end
             end
             // Check speculated return address

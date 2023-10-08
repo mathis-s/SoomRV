@@ -239,6 +239,8 @@ always_comb begin
     decBranch_c = 'x;
     decBranch_c.wfi = 0;
     decBranch_c.taken = 0;
+    decBranch_c.retAct = RET_NONE;
+    decBranch_c.histAct = HIST_NONE;
 
     validMask = 4'b1111;
     
@@ -1469,7 +1471,6 @@ always_comb begin
                     IN_instrs[i].predInvalid) begin
                     
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
 
                     if (isCall && !isReturn)
@@ -1540,7 +1541,6 @@ always_comb begin
                 // Handle non-predicted taken jumps
                 if (isJump) begin
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
                     decBranch_c.dst = branchTarget;
                     decBranch_c.rIdx = IN_instrs[i].rIdx;
@@ -1572,7 +1572,6 @@ always_comb begin
                     
                     if (isIndirBranch) begin
                         decBranch_c.taken = 1;
-                        decBranch_c.history = IN_instrs[i].history;
                         decBranch_c.fetchID = IN_instrs[i].fetchID;
                         decBranch_c.dst = retUpd_c.addr;
                     end
@@ -1588,7 +1587,6 @@ always_comb begin
                     retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
                     
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
                     decBranch_c.rIdx = IN_instrs[i].rIdx - 1;
                     decBranch_c.dst = lateReturnAddr;
@@ -1600,7 +1598,6 @@ always_comb begin
             if (isWFI) begin
                 decBranch_c.taken = 1;
                 decBranch_c.wfi = 1;
-                decBranch_c.history = IN_instrs[i].history;
                 decBranch_c.fetchID = IN_instrs[i].fetchID;
                 decBranch_c.rIdx = IN_instrs[i].rIdx;
                 decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));

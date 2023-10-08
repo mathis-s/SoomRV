@@ -252,9 +252,10 @@ always_ff@(posedge clk) begin
                 OUT_branch.loadSqN <= IN_uopSt.loadSqN + (IN_uopSt.doNotCommit ? 1 : 0);
                 OUT_branch.storeSqN <= IN_uopSt.storeSqN;
                 OUT_branch.fetchID <= IN_uopSt.fetchID;
-                OUT_branch.history <= IN_uopSt.history;
                 OUT_branch.rIdx <= IN_uopSt.rIdx;
                 OUT_branch.flush <= 0;
+                OUT_branch.histAct <= HIST_NONE;
+                OUT_branch.retAct <= RET_NONE;
             end
         end
         
