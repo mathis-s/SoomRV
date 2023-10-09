@@ -359,7 +359,6 @@ typedef struct packed
 {
     logic predicted;
     logic taken;
-    RetStackIdx_t rIdx;
     logic isJump;
 } BranchPredInfo;
 
@@ -397,7 +396,6 @@ typedef struct packed
     SqN loadSqN;
     logic flush;
     FetchID_t fetchID;
-    RetStackIdx_t rIdx;
     logic taken;
 } BranchProv;
 
@@ -418,7 +416,6 @@ typedef struct packed
     HistoryAction histAct;
     logic[30:0] dst;
     logic[4:0] fetchID;
-    RetStackIdx_t rIdx;
     logic wfi;
     logic taken;
 } DecodeBranchProv;
@@ -576,7 +573,6 @@ typedef struct packed
     SqN storeSqN;
     SqN loadSqN;
     FetchID_t fetchID;
-    RetStackIdx_t rIdx;
     logic doNotCommit;
     AGU_Exception exception;
     logic compressed;

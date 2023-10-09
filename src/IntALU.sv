@@ -173,9 +173,9 @@ always_ff@(posedge clk) begin
             OUT_branch.taken <= 0;
             OUT_branch.flush <= 0;
             
-            OUT_branch.rIdx <= IN_uop.bpi.rIdx;
             OUT_branch.fetchID <= IN_uop.fetchID;
             OUT_branch.histAct <= HIST_NONE;
+            OUT_branch.retAct <= RET_NONE;
             
             if (isBranch) begin
                 // Send branch target to BTB if unknown.
@@ -221,11 +221,11 @@ always_ff@(posedge clk) begin
                 if (!indBranchCorrect) begin
                     OUT_branch.dstPC <= indBranchDst;
                     OUT_branch.taken <= 1;
-
+                    
                     if (IN_uop.opcode == INT_V_RET)
-                        OUT_branch.rIdx <= IN_uop.bpi.rIdx - 1;
+                        OUT_branch.retAct <= RET_POP;
                     if (IN_uop.opcode == INT_V_JALR)
-                        OUT_branch.rIdx <= IN_uop.bpi.rIdx + 1;
+                        OUT_branch.retAct <= RET_PUSH;
                     
                     if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                         OUT_btUpdate.src <= finalHalfwPC;

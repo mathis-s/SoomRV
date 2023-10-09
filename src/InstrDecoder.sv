@@ -1474,11 +1474,11 @@ always_comb begin
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
 
                     if (isCall && !isReturn)
-                        decBranch_c.rIdx = IN_instrs[i].rIdx + 1;
+                        decBranch_c.retAct = RET_PUSH;
                     else if (!isCall && isReturn)
-                        decBranch_c.rIdx = IN_instrs[i].rIdx - 1;
+                        decBranch_c.retAct = RET_POP;
                     else
-                        decBranch_c.rIdx = IN_instrs[i].rIdx;
+                        decBranch_c.retAct = RET_NONE;
                 
                     // Delete matching return prediction entries
                     // TODO: Only clean if this actually was an invalid return pred
@@ -1543,8 +1543,7 @@ always_comb begin
                     decBranch_c.taken = 1;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
                     decBranch_c.dst = branchTarget;
-                    decBranch_c.rIdx = IN_instrs[i].rIdx;
-                    
+
                     // Register branch target
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 0;
@@ -1568,12 +1567,12 @@ always_comb begin
                     retUpd_c.idx = IN_instrs[i].rIdx;
                     retUpd_c.addr = uop.compressed ? {IN_instrs[i].pc} : ({IN_instrs[i].pc} + 1);
 
-                    decBranch_c.rIdx = IN_instrs[i].rIdx + 1;
+                    decBranch_c.retAct = RET_PUSH;
                     
                     if (isIndirBranch) begin
                         decBranch_c.taken = 1;
                         decBranch_c.fetchID = IN_instrs[i].fetchID;
-                        decBranch_c.dst = retUpd_c.addr;
+                        decBranch_c.dst = retUpd_c.addr + 1;
                     end
                 end
                 // Update return stack for non-predicted rets
@@ -1588,7 +1587,7 @@ always_comb begin
                     
                     decBranch_c.taken = 1;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.rIdx = IN_instrs[i].rIdx - 1;
+                    decBranch_c.retAct = RET_POP;
                     decBranch_c.dst = lateReturnAddr;
                 end
             end
@@ -1599,7 +1598,6 @@ always_comb begin
                 decBranch_c.taken = 1;
                 decBranch_c.wfi = 1;
                 decBranch_c.fetchID = IN_instrs[i].fetchID;
-                decBranch_c.rIdx = IN_instrs[i].rIdx;
                 decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
             end
         end

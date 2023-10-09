@@ -39,7 +39,6 @@ always_comb begin
             if (i == 3)
                 OUT_branch.flush = IN_branches[i].flush;
             OUT_branch.fetchID = IN_branches[i].fetchID;
-            OUT_branch.rIdx = IN_branches[i].rIdx;
 
             OUT_branch.histAct = IN_branches[i].histAct;
             OUT_branch.retAct = IN_branches[i].retAct;
@@ -57,7 +56,6 @@ always_comb begin
         OUT_branch.storeSqN = IN_branches[3].storeSqN;
         OUT_branch.flush = IN_branches[3].flush;
         OUT_branch.fetchID = IN_branches[3].fetchID;
-        OUT_branch.rIdx = IN_branches[3].rIdx;
         OUT_branch.histAct = IN_branches[3].histAct;
         OUT_branch.retAct = IN_branches[3].retAct;
         OUT_PERFC_branchMispr = 0;

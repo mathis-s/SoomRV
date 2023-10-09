@@ -17,7 +17,6 @@ module ReturnStack
     input wire IN_brValid,
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
-    input FetchID_t IN_misprFetchID,
     input FetchOff_t IN_brOffs,
     input wire IN_isCall,
 
@@ -25,8 +24,10 @@ module ReturnStack
     // Low effort prediction for returns that are detected late, in decode.
     output wire[30:0] OUT_lateRetAddr,
 
-    input wire IN_setIdx,
-    input RetStackIdx_t IN_idx,
+    input wire IN_mispr,
+    input RetStackAction IN_misprAct,
+    input RetStackIdx_t IN_misprIdx,
+    input FetchID_t IN_misprFetchID,
 
     output RetStackIdx_t OUT_curIdx,
     output PredBranch OUT_predBr,
@@ -89,13 +90,30 @@ reg[$clog2(RQSIZE)-1:0] qindex;
 reg[$clog2(RQSIZE)-1:0] qindexEnd;
 RetRecQEntry rrqueue[RQSIZE-1:0]; // return addr recovery
 
+
+reg forwardRindex;
+RetStackAction recAct;
+
+// On mispredict it takes a cycle to read the old return stack index,
+// so we forward it combinatorially.
+RetStackIdx_t rindexReg;
 RetStackIdx_t rindex;
+always_comb begin
+    rindex = rindexReg;
+    if (forwardRindex) begin
+        case (recAct)
+            default: rindex = IN_misprIdx;
+            //RET_POP: rindex = IN_misprIdx - 1;
+            //RET_PUSH: rindex = IN_misprIdx + 1;
+        endcase
+    end
+end
+
 reg[$clog2(RET_PRED_ASSOC)-1:0] lookupAssocIdx;
 always_comb begin
 
     OUT_curIdx = rindex;
     OUT_predBr.dst = rstack[rindex];
-    //OUT_lateRetAddr = rstack[rindex];
     OUT_curRetAddr = rstack[rindex];
 
     OUT_predBr.isJump = 1;
@@ -105,7 +123,7 @@ always_comb begin
 
     lookupAssocIdx = 'x;
     
-    if (IN_valid && !IN_setIdx) begin
+    if (IN_valid && !IN_mispr) begin
         for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
             if (rtable[lookupIdx][i].valid && 
                 rtable[lookupIdx][i].tag == lookupTag && 
@@ -128,7 +146,9 @@ FetchID_t recoveryBase;
 FetchID_t lastInvalComFetchID;
 
 always_ff@(posedge clk) begin
-
+    
+    forwardRindex <= 0;
+    
     if (rst) begin
         for (integer i = 0; i < RET_PRED_LEN; i=i+1)
             for (integer j = 0; j < RET_PRED_ASSOC; j=j+1)
@@ -145,9 +165,12 @@ always_ff@(posedge clk) begin
         lastInvalComFetchID <= 0;
     end
     else begin
-
-        if (IN_setIdx) begin
-            rindex <= IN_idx;
+        
+        rindexReg <= rindex;
+        
+        if (IN_mispr) begin
+            forwardRindex <= 1;
+            recAct <= IN_misprAct;
             recoveryInProgress = 1;
             recoveryID = IN_misprFetchID;
             recoveryBase = lastInvalComFetchID;
@@ -217,11 +240,11 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else if (!IN_setIdx && IN_valid) begin
+        else if (!IN_mispr && IN_valid) begin
             if (OUT_predBr.valid && (!IN_brValid || IN_brOffs >= OUT_predBr.offs)) begin
                 
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
-                rindex <= rindex - 1;
+                rindexReg <= rindex - 1;
                 
                 // Store the popped address in the return recovery queue
                 rrqueue[qindex].fetchOffs <= IN_pc[$bits(FetchOff_t)-1:0];
@@ -237,7 +260,7 @@ always_ff@(posedge clk) begin
             end
             else if (IN_brValid && IN_isCall) begin
                 rstack[rindex + 1] <= {IN_pc[30:$bits(FetchOff_t)], IN_brOffs} + 1;
-                rindex <= rindex + 1;
+                rindexReg <= rindex + 1;
             end
         end
     end

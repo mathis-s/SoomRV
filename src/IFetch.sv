@@ -77,6 +77,7 @@ wire BP_multipleBranches;
 PredBranch predBr;
 wire BP_stall;
 wire[30:0] BP_curRetAddr;
+RetStackIdx_t BP_rIdx;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
 (
     .clk(clk),
@@ -90,7 +91,6 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_mispredFlush(IN_mispredFlush),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
     .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
-    .IN_misprRIdx(OUT_branch.taken ? OUT_branch.rIdx : IN_decBranch.rIdx),
     .IN_misprRetAct(OUT_branch.taken ? OUT_branch.retAct : IN_decBranch.retAct),
     .IN_misprHistAct(OUT_branch.taken ? OUT_branch.histAct : IN_decBranch.histAct),
     
@@ -100,6 +100,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_comFetchID(IN_ROB_curFetchID),
     .OUT_branchTaken(BP_branchTaken),
     .OUT_branchInfo(BP_info),
+    .OUT_rIdx(BP_rIdx),
     .OUT_multipleBranches(BP_multipleBranches),
     .OUT_curRetAddr(BP_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
@@ -232,6 +233,7 @@ BranchPredInfo infoLast;
 reg[2:0] branchPosLast;
 reg[30:0] returnAddrPredLast;
 reg multipleLast;
+RetStackIdx_t rIdxLast;
 
 PCFileEntry PCF_writeData;
 assign PCF_writeData.pc = pcLast;
@@ -380,7 +382,7 @@ always_ff@(posedge clk) begin
                 // in decode, this is a slightly better target prediction than lateRetAddr
                 // at decode time, as lateRetAddr might change until then.
                 outInstrs_r.predTarget <= infoLast.taken ? pc : returnAddrPredLast;
-                outInstrs_r.rIdx <= infoLast.rIdx;
+                outInstrs_r.rIdx <= rIdxLast;
             
                 fetchID <= fetchID + 1;
             end
@@ -392,17 +394,17 @@ always_ff@(posedge clk) begin
 
                     en1 <= 1;
                     pcLast <= pc;
-                    // this might be polluted with predictions from squashed insts
-                    infoLast <= 0;
+                    infoLast <= '0;
+                    rIdxLast <= BP_rIdx;
                     multipleLast <= 1;
                     branchPosLast <= pc[2:0];
-
                     fault <= fault_c;
                 end
                 // Valid Fetch
                 else begin
                     en1 <= 1;
                     infoLast <= BP_info;
+                    rIdxLast <= BP_rIdx;
                     pcLast <= pc;
                     branchPosLast <= predBr.valid ? predBr.offs : 3'b111;
                     multipleLast <= BP_multipleBranches;

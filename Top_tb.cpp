@@ -715,9 +715,9 @@ void LogInstructions()
 {
     auto core = top->Top->soc->core;
 
-    bool brTaken = core->branch[0] & 1;
+    bool brTaken = core->branch & 1;
     bool decBrTaken = core->DEC_decBranch & 1;
-    int brSqN = ExtractField(core->branch, 74 - 32 - 7 - 12, 7);
+    int brSqN = (core->branch >> (1 + 5 + 1  + 7 + 7)) & 127;
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -735,10 +735,10 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 232 - 12 - 32 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 232 - 12 - 32 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 12 - 32 - 32 - 32 - 32 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 6 + 7 + 7 + 3 + 5, 7);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 224 - 12 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }

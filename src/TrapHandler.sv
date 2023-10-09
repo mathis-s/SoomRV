@@ -112,12 +112,11 @@ always_ff@(posedge clk) begin
                 OUT_branch.taken <= 1;
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
-                OUT_branch.rIdx <= baseIndexBPI.rIdx;
                 
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= 0;
 
+                OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.histAct <= HIST_NONE;
                 OUT_branch.retAct <= RET_NONE;
             end
@@ -169,12 +168,12 @@ always_ff@(posedge clk) begin
                 OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
-                OUT_branch.rIdx <= baseIndexBPI.rIdx;
+
                 // These don't matter, the entire pipeline will be flushed
                 OUT_branch.storeSqN <= 0;
                 OUT_branch.loadSqN <= 0;
-                OUT_branch.fetchID <= 0;
 
+                OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.histAct <= HIST_NONE;
                 OUT_branch.retAct <= RET_NONE;
             end

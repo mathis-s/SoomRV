@@ -13,7 +13,6 @@ module BranchPredictor
     input wire IN_mispredFlush,
     input wire IN_mispr,
     input FetchID_t IN_misprFetchID,
-    input RetStackIdx_t IN_misprRIdx,
     input RetStackAction IN_misprRetAct,
     input HistoryAction IN_misprHistAct,
     
@@ -24,6 +23,7 @@ module BranchPredictor
     input FetchID_t IN_comFetchID,
     output reg OUT_branchTaken,
     output BranchPredInfo OUT_branchInfo,
+    output RetStackIdx_t OUT_rIdx,
     output reg OUT_multipleBranches,
     output wire[30:0] OUT_curRetAddr,
     output wire[30:0] OUT_lateRetAddr,
@@ -97,9 +97,12 @@ end
 wire[30:0] branchAddr = IN_pc[31:1];
 
 reg BTB_branchTaken;
+reg isCall;
+reg isReturn;
 always_comb begin
-    OUT_branchInfo.rIdx = RET_idx;
-
+    OUT_rIdx = RET_idx;
+    isCall = 0;
+    isReturn = 0;
     if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
         OUT_branchTaken = BTB_br.valid && (BTB_br.isJump || TAGE_taken);
@@ -109,6 +112,8 @@ always_comb begin
         OUT_branchInfo.predicted = 1;
         OUT_branchInfo.taken = OUT_branchTaken;
         OUT_branchInfo.isJump = OUT_predBr.isJump;
+
+        isCall = BTB_isCall;
     end
     else begin
         OUT_predBr = RET_br;
@@ -120,6 +125,8 @@ always_comb begin
         OUT_branchInfo.isJump = 1;
 
         BTB_branchTaken = 0;
+
+        isReturn = 1;
     end
 end
 
@@ -181,15 +188,16 @@ ReturnStack retStack
     .IN_pc(IN_pc[31:1]),
     .IN_fetchID(IN_fetchID),
     .IN_comFetchID(IN_comFetchID),
-    .IN_misprFetchID(IN_misprFetchID),
     .IN_brValid(BTB_br.valid),
     .IN_brOffs(BTB_br.offs),
     .IN_isCall(BTB_isCall),
     .OUT_curRetAddr(OUT_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
 
-    .IN_setIdx(IN_mispr),
-    .IN_idx(IN_misprRIdx),
+    .IN_mispr(IN_mispr),
+    .IN_misprAct(IN_misprRetAct),
+    .IN_misprIdx(recRIdx),
+    .IN_misprFetchID(IN_misprFetchID),
     
     .OUT_curIdx(RET_idx),
     .OUT_predBr(RET_br),
@@ -229,6 +237,17 @@ always_comb begin
 
     if (recovery.histAct == HIST_APPEND_1)
         recHistory = {recHistory[$bits(BHist_t)-2:0], 1'b1};
+end
+
+RetStackIdx_t recRIdx;
+always_comb begin
+    recRIdx = bpBackupRec.rIdx;
+    // Apply new push/pop
+    case (recovery.retAct)
+        RET_POP: recRIdx = recRIdx - 1;
+        RET_PUSH: recRIdx = recRIdx + 1;
+        default: ;
+    endcase
 end
 
 BHist_t lookupHistory;
