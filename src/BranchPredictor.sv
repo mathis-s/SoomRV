@@ -40,7 +40,7 @@ module BranchPredictor
     input BPUpdate1 IN_bpUpdate1
 );
 
-assign OUT_stall = RET_stall || recovery.valid;
+assign OUT_stall = RET_stall;
 
 typedef struct packed
 {
@@ -49,6 +49,7 @@ typedef struct packed
 
     BHist_t history;
     RetStackIdx_t rIdx;
+    logic isJump;
     logic predTaken;
     FetchOff_t predOffs;
     logic pred;
@@ -56,8 +57,9 @@ typedef struct packed
 
 BPBackup bpBackup;
 always_comb begin
-    bpBackup.history = history;
+    bpBackup.history = lookupHistory;
     bpBackup.rIdx = RET_idx;
+    bpBackup.isJump = OUT_branchInfo.isJump;
     bpBackup.predTaken = OUT_branchInfo.taken;
     bpBackup.predOffs = OUT_predBr.offs;
     bpBackup.pred = OUT_branchInfo.predicted;
@@ -152,14 +154,14 @@ TagePredictor tagePredictor
     .rst(rst),
     
     .IN_predAddr(branchAddr),
-    .IN_predHistory(history),
+    .IN_predHistory(lookupHistory),
     .OUT_predTageID(TAGE_tageID),
     .OUT_altPred(TAGE_altPred),
     .OUT_predTaken(TAGE_taken),
     
     .IN_writeValid(IN_bpUpdate1.valid),
     .IN_writeAddr(IN_bpUpdate1.pc[30:0]),
-    .IN_writeHistory(bpBackupUpd.history),
+    .IN_writeHistory(updHistory),
     .IN_writeTageID(bpBackupUpd.tageID),
     .IN_writeTaken(update.branchTaken),
     .IN_writeAltPred(bpBackupUpd.altPred),
@@ -196,6 +198,12 @@ ReturnStack retStack
 );
 
 BPUpdate0 update;
+BHist_t updHistory;
+always_comb begin
+    updHistory = bpBackupUpd.history;
+    //if (bpBackupUpd.pred && !bpBackupUpd.isJump && update.fetchOffs > bpBackupUpd.predOffs)
+    //    updHistory = {updHistory[$bits(BHist_t)-2:0], bpBackupUpd.predTaken};
+end
 
 typedef struct packed
 {
@@ -223,6 +231,13 @@ always_comb begin
         recHistory = {recHistory[$bits(BHist_t)-2:0], 1'b1};
 end
 
+BHist_t lookupHistory;
+always_comb begin
+    lookupHistory = history;
+    if (recovery.valid)
+        lookupHistory = recHistory;
+end
+
 BHist_t history;
 always_ff@(posedge clk) begin
     
@@ -235,9 +250,6 @@ always_ff@(posedge clk) begin
     if (rst) begin
     end
     else begin
-        if (OUT_predBr.valid && !OUT_predBr.isJump)
-            history <= {history[$bits(BHist_t)-2:0], OUT_branchTaken};
-
         if (IN_pcValid)
             bpBackupLast <= bpBackup;
 
@@ -247,12 +259,14 @@ always_ff@(posedge clk) begin
             recovery.retAct <= IN_misprRetAct;
             recovery.histAct <= IN_misprHistAct;
         end
-        if (recovery.valid) begin
+        if (recovery.valid)
             history <= recHistory;
-        end
 
         if (IN_bpUpdate0.valid)
             update <= IN_bpUpdate0;
+
+        if (OUT_predBr.valid && !OUT_predBr.isJump)
+            history <= {lookupHistory[$bits(BHist_t)-2:0], OUT_branchTaken};
     end
 end
 
