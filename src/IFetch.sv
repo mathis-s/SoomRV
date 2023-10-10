@@ -13,9 +13,8 @@ module IFetch
 
     input wire IN_interruptPending,
     
-    output wire OUT_instrReadEnable,
-    output wire[27:0] OUT_instrAddr,
-    input wire[127:0] IN_instrRaw,
+    IF_ICTable.HOST IF_ict,
+    IF_ICache.HOST IF_icache,
     
     input BranchProv IN_branches[NUM_BRANCH_PROVS-1:0],
     input wire IN_mispredFlush,
@@ -175,42 +174,42 @@ wire ifetchEn /* verilator public */ =
     baseEn &&
     (!icacheStall || fetchIsFault);
 
-assign OUT_instrReadEnable = !(tryReadICache && !icacheStall);
+//assign OUT_instrReadEnable = !(tryReadICache && !icacheStall);
 
 wire icacheStall;
+wire icacheMiss;
+wire[127:0] instrRaw;
 ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
+    .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
+
     .IN_lookupValid(tryReadICache),
     .IN_lookupPC(phyPCFull),
-    
-    .OUT_lookupAddress(OUT_instrAddr),
     .OUT_stall(icacheStall),
+    .OUT_icacheMiss(icacheMiss),
+    
+    .IF_icache(IF_icache),
+    .IF_ict(IF_ict),
+    
+    .IN_dataReady(IN_en),
+    .OUT_instrData(instrRaw),
     
     .OUT_memc(OUT_memc),
     .IN_memc(IN_memc)
 );
 
-reg[127:0] instrRawBackup;
-reg useInstrRawBackup;
-always_ff@(posedge clk) begin
-    if (rst)
-        useInstrRawBackup <= 0;
-    else if (!ifetchEn) begin
-        instrRawBackup <= instrRaw;
-        useInstrRawBackup <= 1;
-    end
-    else useInstrRawBackup <= 0;
-end
-wire[127:0] instrRaw = useInstrRawBackup ? instrRawBackup : IN_instrRaw;
-
 
 IF_Instr outInstrs_r;
 always_comb begin
-    OUT_instrs = outInstrs_r;
-    for (integer i = 0; i < NUM_BLOCKS; i=i+1)
-        OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
+    OUT_instrs = 'x;
+    OUT_instrs.valid = 0;
+    if (!icacheMiss) begin
+        OUT_instrs = outInstrs_r;
+        for (integer i = 0; i < NUM_BLOCKS; i=i+1)
+            OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
+    end
 end
 
 // virtual page number
@@ -347,7 +346,7 @@ always_ff@(posedge clk) begin
             end
         end
     
-        if (OUT_branch.taken || IN_decBranch.taken) begin
+        if (OUT_branch.taken || IN_decBranch.taken || icacheMiss) begin
             if (OUT_branch.taken) begin
                 pc <= OUT_branch.dstPC[31:1];
                 fetchID <= OUT_branch.fetchID + 1;
@@ -359,6 +358,10 @@ always_ff@(posedge clk) begin
                 // We also use WFI to temporarily disable the frontend
                 // for ops that always flush the pipeline
                 waitForInterrupt <= IN_decBranch.wfi;
+            end
+            else if (icacheMiss) begin
+                pc <= {outInstrs_r.pc, outInstrs_r.firstValid};
+                fetchID <= outInstrs_r.fetchID; // no increment
             end
             fault <= IF_FAULT_NONE;
             en1 <= 0;

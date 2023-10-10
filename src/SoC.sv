@@ -108,9 +108,8 @@ IF_CTable IF_ct();
 IF_MMIO IF_mmio();
 IF_CSR_MMIO IF_csr_mmio();
 
-wire CORE_instrReadEnable;
-wire[27:0] CORE_instrReadAddress;
-wire[127:0] CORE_instrReadData;
+IF_ICache IF_icache();
+IF_ICTable IF_ict();
 
 Core core
 (
@@ -122,10 +121,9 @@ Core core
     .IF_ct(IF_ct),
     .IF_mmio(IF_mmio),
     .IF_csr_mmio(IF_csr_mmio),
-    
-    .OUT_instrAddr(CORE_instrReadAddress),
-    .OUT_instrReadEnable(CORE_instrReadEnable),
-    .IN_instrRaw(CORE_instrReadData),
+
+    .IF_icache(IF_icache),
+    .IF_ict(IF_ict),
     
     .OUT_memc(MemC_ctrl),
     .IN_memc(MemC_stat)
@@ -244,19 +242,35 @@ MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASS
     .OUT_data1(IF_ct.rdata[0])
 );
 
-MemRTL#(128, (1 << (`CACHE_SIZE_E - 4)), 32) icache
+
+MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) ictable
+(
+    .clk(clk),
+    .IN_nce(!IF_ict.we),
+    .IN_nwe(!IF_ict.we),
+    .IN_addr(IF_ict.waddr[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+    .IN_data({`CASSOC{IF_ict.wdata}}),
+    .IN_wm(1 << IF_ict.wassoc),
+    .OUT_data(),
+    
+    .IN_nce1(!IF_ict.re),
+    .IN_addr1(IF_ict.raddr[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+    .OUT_data1(IF_ict.rdata)
+);
+
+MemRTL#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 128) icache
 (
     .clk(clk),
     .IN_nce(MC_IC_wr.ce),
     .IN_nwe(MC_IC_wr.we),
-    .IN_addr(MC_IC_wr.addr[(`CACHE_SIZE_E-3):2]),
-    .IN_data({MC_IC_wr.data}),
-    .IN_wm('1),
+    .IN_addr(MC_IC_wr.addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):2]),
+    .IN_data({`CASSOC{MC_IC_wr.data}}),
+    .IN_wm(1 << (MC_IC_wr.addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])),
     .OUT_data(),
     
-    .IN_nce1(CORE_instrReadEnable),
-    .IN_addr1(CORE_instrReadAddress[(`CACHE_SIZE_E-5):0]),
-    .OUT_data1(CORE_instrReadData[127:0])
+    .IN_nce1(!IF_icache.re),
+    .IN_addr1(IF_icache.raddr[11:4]),
+    .OUT_data1(IF_icache.rdata)
 );
 
 MMIO mmio

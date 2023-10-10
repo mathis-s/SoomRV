@@ -1569,6 +1569,8 @@ always_comb begin
 
                     decBranch_c.retAct = RET_PUSH;
                     
+                    // We need to make sure that all rets after the call use the correct return address.
+                    // A ret may have been fetched already (for short functions), so flush the fetch pipeline.
                     if (isIndirBranch) begin
                         decBranch_c.taken = 1;
                         decBranch_c.fetchID = IN_instrs[i].fetchID;

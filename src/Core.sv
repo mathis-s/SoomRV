@@ -9,9 +9,8 @@ module Core
     IF_MMIO.HOST IF_mmio,
     IF_CSR_MMIO.CSR IF_csr_mmio,
     
-    output wire[27:0] OUT_instrAddr,
-    output wire OUT_instrReadEnable,
-    input wire[127:0] IN_instrRaw,
+    IF_ICTable.HOST IF_ict,
+    IF_ICache.HOST IF_icache,
         
     output MemController_Req OUT_memc[2:0],
     input MemController_Res IN_memc
@@ -57,10 +56,9 @@ IFetch ifetch
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
     
-    .OUT_instrReadEnable(OUT_instrReadEnable),
-    .OUT_instrAddr(OUT_instrAddr),
-    .IN_instrRaw(IN_instrRaw),
-    
+    .IF_ict(IF_ict),
+    .IF_icache(IF_icache),
+
     .IN_branches(branchProvs),
     .IN_mispredFlush(mispredFlush),
     .IN_ROB_curFetchID(ROB_curFetchID),

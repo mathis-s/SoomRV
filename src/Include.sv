@@ -137,7 +137,6 @@ typedef enum logic[2:0]
 
 typedef enum logic[5:0]
 {
-    // These don't
     // For these, the upper 3 opcode bits are 'b101
     //FPU_FMVXW,
     //FPU_FMVWX,
@@ -945,5 +944,48 @@ interface IF_MMIO();
     (
         input we, waddr, wdata, wmask, re, raddr, rsize,
         output rdata, rbusy, wbusy
+    );
+endinterface
+
+interface IF_ICTable();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    CTEntry wdata;
+    
+    logic re;
+    logic[11:0] raddr;
+    CTEntry[`CASSOC-1:0] rdata;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, re, raddr,
+        output rdata
+    );
+endinterface
+
+interface IF_ICache();
+    
+    logic re;
+    logic[11:0] raddr;
+    logic[`CASSOC-1:0][127:0] rdata;
+    
+    modport HOST
+    (
+        output re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input re, raddr,
+        output rdata
     );
 endinterface
