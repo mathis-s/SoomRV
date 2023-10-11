@@ -71,36 +71,32 @@ FIFO#(128, 2, 1, 1) outFIFO
 
 // Check Tags
 always_comb begin
+    logic transferExists = 'x;
+    logic allowPassThru = 'x;
+
     // TODO: vmem
     cacheHit = 0;
     instrData = 'x;
     assocHit = 'x;
-    doCacheLoad = 0;
+    doCacheLoad = 1;
 
     if (fetch1.valid) begin
         for (integer i = 0; i < `CASSOC; i=i+1) begin
             if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == fetch1.pc[31:12]) begin
                 assert(!cacheHit);
                 cacheHit = 1;
+                doCacheLoad = 0;
                 assocHit = i[$clog2(`CASSOC)-1:0];
                 instrData = IF_icache.rdata[i];
             end
         end
 
-        doCacheLoad = !cacheHit;
-        for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
-            if (IN_memc.transfers[i].valid &&
-                IN_memc.transfers[i].cacheID == 1 &&
-                IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == fetch1.pc[31:`CLSIZE_E]
-            ) begin
-                cacheHit = 0;
+        begin
+            {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, fetch1.pc);
+            if (transferExists) begin
                 doCacheLoad = 0;
+                cacheHit &= allowPassThru;
             end
-        end
-
-        if (OUT_memc.cmd != MEMC_NONE && OUT_memc.readAddr[31:`CLSIZE_E] == fetch1.pc[31:`CLSIZE_E]) begin
-            cacheHit = 0;
-            doCacheLoad = 0;
         end
     end
 end
