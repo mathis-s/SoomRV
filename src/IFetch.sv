@@ -174,8 +174,6 @@ wire ifetchEn /* verilator public */ =
     baseEn &&
     (!icacheStall || fetchIsFault);
 
-//assign OUT_instrReadEnable = !(tryReadICache && !icacheStall);
-
 wire icacheStall;
 wire icacheMiss;
 wire[127:0] instrRaw;
@@ -193,7 +191,7 @@ ICacheTable ict
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),
     
-    .IN_dataReady(IN_en),
+    .IN_dataReady(IN_en && outInstrs_r.valid),
     .OUT_instrData(instrRaw),
     
     .OUT_memc(OUT_memc),

@@ -57,7 +57,7 @@ wire FIFO_outValid;
 FIFO#(128, 2, 1, 1) outFIFO
 (
     .clk(clk),
-    .rst(rst),
+    .rst(rst || OUT_icacheMiss || IN_mispr),
     .free(),
 
     .IN_valid(cacheHit),
@@ -114,7 +114,7 @@ always_comb begin
     else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
         OUT_memc_c = OUT_memc;
     end
-    else if (fetch1.valid && !cacheHit && doCacheLoad) begin
+    else if (fetch1.valid && !cacheHit && doCacheLoad && !IN_mispr) begin
         OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
         OUT_memc_c.cacheAddr = {assocCnt, fetch1.pc[11:4], 2'b0};
         OUT_memc_c.readAddr = {fetch1.pc[31:4], 4'b0};
