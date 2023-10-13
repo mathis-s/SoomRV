@@ -890,19 +890,6 @@ void LogInstructions()
                 else
                     state.pd[i].valid = false;
         }
-
-        if (core->ifetch->en1)
-        {
-            int fetchID = core->ifetch->fetchID;
-            state.fetches[fetchID] = state.fetch0;
-        }
-
-        // Fetch 0
-        if (core->ifetch->ifetchEn)
-        {
-            for (size_t i = 0; i < 4; i++)
-                state.fetch0.returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
-        }
     }
     LogCycle();
 }

@@ -50,7 +50,6 @@ module IFetch
 
 // these are virtual addresses when address translation is active
 reg[30:0] pc;
-reg[30:0] pcLast;
 wire[31:0] pcFull = {pc, 1'b0};
 
 wire[31:0] phyPCFull = {physicalPC, 1'b0};
@@ -162,53 +161,41 @@ end
 wire baseEn = IN_en && !waitForInterrupt && !BP_stall &&
     (IN_ROB_curFetchID != fetchID);
 
-wire tryReadICache = 
-    baseEn &&
-    fault == IF_FAULT_NONE &&
-    !fetchIsFault &&
-    !pageWalkRequired;
-
 // When first encountering a fault, we output a single fake fault instruction.
 // Thus ifetch is still enabled during this first fault cycle.
 wire ifetchEn /* verilator public */ = 
-    baseEn &&
-    (!icacheStall || fetchIsFault);
+    baseEn && !icacheStall;
 
 wire icacheStall;
 wire icacheMiss;
-wire[127:0] instrRaw;
+wire[31:0] icacheMissPC;
+FetchID_t icacheMissFetchID;
 ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
+    .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
 
-    .IN_lookupValid(tryReadICache),
-    .IN_lookupPC(phyPCFull),
+    .IN_ifetchOp(ifetchOp),
     .OUT_stall(icacheStall),
+
+    .OUT_fetchID(fetchID),
+    .OUT_pcFileWE(pcFileWriteEn),
+    .OUT_pcFileEntry(PCF_writeData),
+
     .OUT_icacheMiss(icacheMiss),
+    .OUT_icacheMissPC(icacheMissPC),
     
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),
     
-    .IN_dataReady(IN_en && outInstrs_r.valid),
-    .OUT_instrData(instrRaw),
+    .IN_ready(IN_en),
+    .OUT_instrs(OUT_instrs),
     
     .OUT_memc(OUT_memc),
     .IN_memc(IN_memc)
 );
-
-
-IF_Instr outInstrs_r;
-always_comb begin
-    OUT_instrs = 'x;
-    OUT_instrs.valid = 0;
-    if (!icacheMiss) begin
-        OUT_instrs = outInstrs_r;
-        for (integer i = 0; i < NUM_BLOCKS; i=i+1)
-            OUT_instrs.instrs[i] = (outInstrs_r.fetchFault != IF_FAULT_NONE) ? 16'b0 : instrRaw[(16*i)+:16];
-    end
-end
 
 // virtual page number
 // If this has changed, we do a page walk to find the new PPN
@@ -226,17 +213,8 @@ IFetchFault pcPPNfault;
 IFetchFault fault;
 
 FetchID_t fetchID /* verilator public */;
-BranchPredInfo infoLast;
-reg[2:0] branchPosLast;
-reg[30:0] returnAddrPredLast;
-reg multipleLast;
-RetStackIdx_t rIdxLast;
-
 PCFileEntry PCF_writeData;
-assign PCF_writeData.pc = pcLast;
-assign PCF_writeData.bpi = infoLast;
-assign PCF_writeData.branchPos = branchPosLast;
-wire pcFileWriteEn = ifetchEn && en1;
+wire pcFileWriteEn;
 PCFile#($bits(PCFileEntry)) pcFile
 (
     .clk(clk),
@@ -252,6 +230,27 @@ PCFile#($bits(PCFileEntry)) pcFile
     .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
 );
 
+IFetchOp ifetchOp;
+always_comb begin
+    ifetchOp = IFetchOp'{valid: 0, default: 'x};
+
+    if (OUT_branch.taken || IN_decBranch.taken || icacheMiss) begin
+    end
+    else if (ifetchEn) begin
+        if (fault == IF_FAULT_NONE) begin
+            ifetchOp.valid = 1;
+            ifetchOp.pc = {pc, 1'b0};
+            ifetchOp.fetchID = 'x; // set in next cycle
+            ifetchOp.fetchFault = fault_c;
+            ifetchOp.lastValid = ((BP_info.taken || BP_multipleBranches) && predBr.valid) ? predBr.offs : (3'b111);
+            ifetchOp.predPos = BP_info.predicted ? (predBr.valid ? predBr.offs : 3'b111) : 3'b111;
+            ifetchOp.bpi = BP_info;
+            ifetchOp.predTarget = BP_info.taken ? predBr.dst : BP_curRetAddr;
+            ifetchOp.rIdx = BP_rIdx;
+        end
+    end
+end
+
 reg pageWalkActive;
 reg pageWalkAccepted;
 reg waitForPWComplete;
@@ -259,15 +258,10 @@ reg[19:0] pageWalkVPN;
 
 reg waitForInterrupt /* verilator public */;
 
-reg en1 /* verilator public */;
 always_ff@(posedge clk) begin
     OUT_pw.valid <= 0;
     if (rst) begin
         pc <= 31'(`ENTRY_POINT >> 1);
-        fetchID <= 0;
-        en1 <= 0;
-        outInstrs_r <= 'x;
-        outInstrs_r.valid <= 0;
         lastVPN_valid <= 0;
         pageWalkActive <= 0;
         pageWalkAccepted <= 0;
@@ -277,11 +271,6 @@ always_ff@(posedge clk) begin
         waitForInterrupt <= 0;
     end
     else begin
-        
-        if (IN_en) begin
-            outInstrs_r <= 'x;
-            outInstrs_r.valid <= 0;
-        end
 
         if (IN_interruptPending)
             waitForInterrupt <= 0;
@@ -347,70 +336,29 @@ always_ff@(posedge clk) begin
         if (OUT_branch.taken || IN_decBranch.taken || icacheMiss) begin
             if (OUT_branch.taken) begin
                 pc <= OUT_branch.dstPC[31:1];
-                fetchID <= OUT_branch.fetchID + 1;
                 waitForInterrupt <= 0;
             end
             else if (IN_decBranch.taken) begin
                 pc <= IN_decBranch.dst;
-                fetchID <= IN_decBranch.fetchID + 1;
                 // We also use WFI to temporarily disable the frontend
                 // for ops that always flush the pipeline
                 waitForInterrupt <= IN_decBranch.wfi;
             end
             else if (icacheMiss) begin
-                pc <= {outInstrs_r.pc, outInstrs_r.firstValid};
-                fetchID <= outInstrs_r.fetchID; // no increment
+                pc <= icacheMissPC[31:1];
             end
             fault <= IF_FAULT_NONE;
-            en1 <= 0;
-            outInstrs_r <= 'x;
-            outInstrs_r.valid <= 0;
         end
         else if (ifetchEn) begin
-            
-            // Output fetched package (or fault) to pre-dec
-            if (en1) begin
-                outInstrs_r.valid <= 1;
-                outInstrs_r.pc <= pcLast[30:3];
-                outInstrs_r.fetchID <= fetchID;
-                outInstrs_r.fetchFault <= fault;
-                outInstrs_r.predTaken <= infoLast.taken;
-                outInstrs_r.predPos <= infoLast.predicted ? branchPosLast : 3'b111;
-                outInstrs_r.firstValid <= pcLast[2:0];
-                outInstrs_r.lastValid <= (infoLast.taken || multipleLast) ? branchPosLast : (3'b111);
-                // If no branch was predicted, we use the predTarget field to store
-                // the current return address. In case a unpredicted return is found
-                // in decode, this is a slightly better target prediction than lateRetAddr
-                // at decode time, as lateRetAddr might change until then.
-                outInstrs_r.predTarget <= infoLast.taken ? pc : returnAddrPredLast;
-                outInstrs_r.rIdx <= rIdxLast;
-            
-                fetchID <= fetchID + 1;
-            end
 
             // Fetch package (if no fault)
             if (fault == IF_FAULT_NONE && !pageWalkRequired) begin
                 // Handle Page Fault, Access Fault and Interrupts
                 if (fetchIsFault) begin
-
-                    en1 <= 1;
-                    pcLast <= pc;
-                    infoLast <= '0;
-                    rIdxLast <= BP_rIdx;
-                    multipleLast <= 1;
-                    branchPosLast <= pc[2:0];
                     fault <= fault_c;
                 end
                 // Valid Fetch
                 else begin
-                    en1 <= 1;
-                    infoLast <= BP_info;
-                    rIdxLast <= BP_rIdx;
-                    pcLast <= pc;
-                    branchPosLast <= predBr.valid ? predBr.offs : 3'b111;
-                    multipleLast <= BP_multipleBranches;
-                    returnAddrPredLast <= BP_curRetAddr;
-                    
                     if (predBr.valid) begin
                         if (predBr.isJump || BP_branchTaken) begin
                             pc <= predBr.dst;
@@ -433,7 +381,6 @@ always_ff@(posedge clk) begin
 
                 end
             end
-            else en1 <= 0;
         end
     end
 end

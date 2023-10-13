@@ -428,6 +428,20 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] pc;
+    FetchID_t fetchID;
+    IFetchFault fetchFault;
+    FetchOff_t lastValid;
+    FetchOff_t predPos;
+    BranchPredInfo bpi;
+    logic[30:0] predTarget;
+    RetStackIdx_t rIdx;
+
+    logic valid;
+} IFetchOp;
+
+typedef struct packed
+{
     logic[27:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;

@@ -3,28 +3,40 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
 (
     input logic clk,
     input logic rst,
-    input logic IN_mispr,
 
-    input logic IN_lookupValid,
-    input logic[31:0] IN_lookupPC,
+    input logic IN_mispr,
+    input FetchID_t IN_misprFetchID,
+    
+    input IFetchOp IN_ifetchOp,
     output logic OUT_stall,
+
+    output FetchID_t OUT_fetchID,
+    output logic OUT_pcFileWE,
+    output PCFileEntry OUT_pcFileEntry,
+
     output logic OUT_icacheMiss,
+    output logic[31:0] OUT_icacheMissPC,
 
     IF_ICache.HOST IF_icache,
     IF_ICTable.HOST IF_ict,
 
-    input logic IN_dataReady,
-    output logic[127:0] OUT_instrData,
+    input logic IN_ready,
+    output IF_Instr OUT_instrs, 
 
     output MemController_Req OUT_memc,
     input MemController_Res IN_memc
 );
 
-typedef struct packed
-{
-    logic[31:0] pc;
-    logic valid;
-} IFetch;
+always_comb begin
+    OUT_pcFileWE = 0;
+    OUT_pcFileEntry = 'x;
+    if (fetch0.valid) begin
+        OUT_pcFileWE = 1;
+        OUT_pcFileEntry.pc = fetch0.pc[31:1];
+        OUT_pcFileEntry.branchPos = fetch0.predPos;
+        OUT_pcFileEntry.bpi = fetch0.bpi;
+    end
+end
 
 // Read ICache at current PC
 always_comb begin
@@ -36,67 +48,86 @@ always_comb begin
     IF_ict.re = 0;
     IF_ict.raddr = 'x;
 
-    if (IN_lookupValid) begin
+    if (IN_ifetchOp.valid && !OUT_stall) begin
         IF_icache.re = 1;
-        IF_icache.raddr = IN_lookupPC[11:0];
+        IF_icache.raddr = IN_ifetchOp.pc[11:0];
         IF_ict.re = 1;
-        IF_ict.raddr = IN_lookupPC[11:0];
+        IF_ict.raddr = IN_ifetchOp.pc[11:0];
     end
 end
-
 
 reg[$clog2(`CASSOC)-1:0] assocCnt;
 reg cacheHit;
 reg doCacheLoad;
 reg[$clog2(`CASSOC)-1:0] assocHit;
 
-reg[127:0] instrData;
-
 wire FIFO_outValid;
+IF_Instr FIFO_out;
 // todo: just one entry is required
-FIFO#(128, 2, 1, 1) outFIFO
+FIFO#($bits(IF_Instr), 2, 1, 1) outFIFO
 (
     .clk(clk),
-    .rst(rst || OUT_icacheMiss || IN_mispr),
+    .rst(rst || IN_mispr),
     .free(),
 
-    .IN_valid(cacheHit),
-    .IN_data(instrData),
+    .IN_valid(packet.valid),
+    .IN_data(packet),
     .OUT_ready(),
 
     .OUT_valid(FIFO_outValid),
-    .IN_ready(FIFO_outValid && IN_dataReady),
-    .OUT_data(OUT_instrData)
+    .IN_ready(FIFO_outValid && IN_ready),
+    .OUT_data(FIFO_out)
 );
+always_comb begin
+    OUT_instrs = 'x;
+    OUT_instrs.valid = 0;
+    if (FIFO_outValid)
+        OUT_instrs = FIFO_out;
+end
 
 // Check Tags
+IF_Instr packet;
 always_comb begin
     logic transferExists = 'x;
     logic allowPassThru = 'x;
 
-    // TODO: vmem
+    packet = IF_Instr'{valid: 0, default: 'x};
+
     cacheHit = 0;
-    instrData = 'x;
     assocHit = 'x;
     doCacheLoad = 1;
 
     if (fetch1.valid) begin
+        // TODO: vmem
+
+        // Check cache tags
         for (integer i = 0; i < `CASSOC; i=i+1) begin
             if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == fetch1.pc[31:12]) begin
                 assert(!cacheHit);
                 cacheHit = 1;
                 doCacheLoad = 0;
                 assocHit = i[$clog2(`CASSOC)-1:0];
-                instrData = IF_icache.rdata[i];
+                packet.instrs = IF_icache.rdata[i];
             end
         end
-
         begin
             {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, fetch1.pc);
             if (transferExists) begin
                 doCacheLoad = 0;
                 cacheHit &= allowPassThru;
             end
+        end
+
+        if (cacheHit) begin
+            packet.pc = fetch1.pc[31:4];
+            packet.firstValid = fetch1.pc[3:1];
+            packet.lastValid = fetch1.lastValid;
+            packet.predPos = fetch1.predPos;
+            packet.predTaken = fetch1.bpi.taken;
+            packet.predTarget = fetch1.predTarget;
+            packet.rIdx = fetch1.rIdx;
+            packet.fetchID = fetch1.fetchID;
+            packet.valid = 1;
         end
     end
 end
@@ -136,34 +167,45 @@ always_comb begin
         IF_ict.we = 1;
     end
 end
-// todo: don't forward on IN_mispr
+
 always_ff@(posedge clk) OUT_memc <= OUT_memc_c;
 
-assign OUT_icacheMiss = fetch1.valid && !cacheHit;
+always_comb begin
+    OUT_icacheMissPC = 'x;
+    OUT_icacheMiss = fetch1.valid && !cacheHit;
+    if (OUT_icacheMiss) begin
+        OUT_icacheMissPC = fetch1.pc;
+    end
+end
 
-IFetch fetch0;
-IFetch fetch1;
+FetchID_t fetchID;
+assign OUT_fetchID = fetchID;
+
+IFetchOp fetch0;
+IFetchOp fetch1;
 always_ff@(posedge clk) begin
-    fetch0 <= IFetch'{valid: 0, default: 'x};
-    fetch1 <= IFetch'{valid: 0, default: 'x};
+    fetch0 <= IFetchOp'{valid: 0, default: 'x};
+    fetch1 <= IFetchOp'{valid: 0, default: 'x};
 
     if (rst) begin
-        
+        fetchID <= 0;
     end
     else if (IN_mispr) begin
-
+        fetchID <= IN_misprFetchID + 1;
     end
     else begin
         if (fetch1.valid && !cacheHit) begin
             // miss, flush pipeline
+            fetchID <= fetch1.fetchID;
         end
         else begin
-            if (IN_lookupValid) begin
-                fetch0.valid <= 1;
-                fetch0.pc <= IN_lookupPC;
+            if (IN_ifetchOp.valid && !OUT_stall) begin
+                fetch0 <= IN_ifetchOp;
             end
             if (fetch0.valid) begin
                 fetch1 <= fetch0;
+                fetch1.fetchID <= fetchID;
+                fetchID <= fetchID + 1;
             end
         end
 
