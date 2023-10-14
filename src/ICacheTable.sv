@@ -1,5 +1,5 @@
 
-module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)))
+module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0)
 (
     input logic clk,
     input logic rst,
@@ -22,6 +22,12 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
 
     input logic IN_ready,
     output IF_Instr OUT_instrs, 
+    
+    input wire IN_clearICache,
+    input wire IN_flushTLB,
+    input VirtMemState IN_vmem,
+    output PageWalk_Req OUT_pw,
+    input PageWalk_Res IN_pw,
 
     output MemController_Req OUT_memc,
     input MemController_Res IN_memc
@@ -38,9 +44,10 @@ always_comb begin
     end
 end
 
+assign OUT_stall = IN_pw.busy && IN_pw.rqID == RQ_ID;
+
 // Read ICache at current PC
 always_comb begin
-    OUT_stall = 0;
     
     IF_icache.re = 0;
     IF_icache.raddr = 'x;
@@ -56,14 +63,190 @@ always_comb begin
     end
 end
 
-reg[$clog2(`CASSOC)-1:0] assocCnt;
-reg cacheHit;
-reg doCacheLoad;
-reg[$clog2(`CASSOC)-1:0] assocHit;
+// Address Translation
+TLB_Req TLB_req;
+always_comb begin
+    TLB_req.vpn = fetch0.pc[31:12];
+    TLB_req.valid = fetch0.valid && !IN_mispr && !cacheMiss;
+end
+TLB_Res TLB_res_c;
+TLB_Res TLB_res;
+TLB#(1, 8, 4, 1) itlb
+(
+    .clk(clk),
+    .rst(rst),
+    .clear(IN_clearICache || IN_flushTLB),
+    .IN_pw(IN_pw),
+    .IN_rqs('{TLB_req}),
+    .OUT_res('{TLB_res_c})
+);
+always_ff@(posedge clk) TLB_res <= TLB_res_c;
 
+
+logic[$clog2(`CASSOC)-1:0] assocCnt;
+logic tlbMiss;
+logic cacheHit;
+logic cacheMiss;
+logic doCacheLoad;
+logic[$clog2(`CASSOC)-1:0] assocHit;
+logic[31:0] phyPC;
+
+// Check Tags
+IF_Instr packet;
+always_comb begin
+    logic transferExists = 'x;
+    logic allowPassThru = 'x;
+
+    phyPC = 'x;
+
+    packet = IF_Instr'{valid: 0, default: 'x};
+    packet.fetchFault = fetch1.fetchFault;
+    
+    tlbMiss = 0;
+    cacheHit = 0;
+    cacheMiss = 0;
+    assocHit = 'x;
+    doCacheLoad = 1;
+
+    if (fetch1.valid) begin
+
+        // Check TLB
+        if (IN_vmem.sv32en_ifetch && packet.fetchFault == IF_FAULT_NONE) begin
+            if (TLB_res.hit) begin
+                if ((TLB_res.pageFault) || 
+                    (!TLB_res.rwx[0]) || 
+                    (IN_vmem.priv == PRIV_USER && !TLB_res.user) ||
+                    (IN_vmem.priv == PRIV_SUPERVISOR && TLB_res.user && !IN_vmem.supervUserMemory)
+                ) begin
+                    packet.fetchFault = IF_PAGE_FAULT;
+                end
+                else phyPC = {TLB_res.isSuper ? {TLB_res.ppn[19:10], fetch1.pc[21:12]} : TLB_res.ppn, fetch1.pc[11:0]};
+            end
+            else tlbMiss = 1;
+        end
+        else phyPC = fetch1.pc;
+        
+        // Check PMAs
+        if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
+            if (!`IS_LEGAL_ADDR(phyPC) || `IS_MMIO_PMA(phyPC))
+                packet.fetchFault = IF_ACCESS_FAULT;
+        end
+
+        // Check cache tags
+        if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
+            for (integer i = 0; i < `CASSOC; i=i+1) begin
+                if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == phyPC[31:12]) begin
+                    assert(!cacheHit);
+                    cacheHit = 1;
+                    doCacheLoad = 0;
+                    assocHit = i[$clog2(`CASSOC)-1:0];
+                    packet.instrs = IF_icache.rdata[i];
+                end
+            end
+            begin
+                {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, phyPC);
+                if (transferExists) begin
+                    doCacheLoad = 0;
+                    cacheHit &= allowPassThru;
+                end
+            end
+
+            cacheMiss = !cacheHit;
+        end
+        
+        if (packet.fetchFault != IF_FAULT_NONE) begin
+            packet.pc = fetch1.pc[31:4];
+            packet.firstValid = fetch1.pc[3:1];
+            packet.lastValid = fetch1.pc[3:1];
+            packet.predPos = 3'b111;
+            packet.predTaken = 0;
+            packet.predTarget = 'x;
+            packet.rIdx = fetch1.rIdx;
+            packet.fetchID = fetch1.fetchID;
+            packet.instrs = '0;
+            packet.valid = 1;
+        end
+        else if (!tlbMiss && cacheHit) begin
+            packet.pc = fetch1.pc[31:4];
+            packet.firstValid = fetch1.pc[3:1];
+            packet.lastValid = fetch1.lastValid;
+            packet.predPos = fetch1.predPos;
+            packet.predTaken = fetch1.bpi.taken;
+            packet.predTarget = fetch1.predTarget;
+            packet.rIdx = fetch1.rIdx;
+            packet.fetchID = fetch1.fetchID;
+            packet.valid = 1;
+        end
+    end
+end
+
+// TLB Miss Handling
+PageWalk_Req OUT_pw_c;
+always_comb begin
+    OUT_pw_c = PageWalk_Req'{valid: 0, default: 'x};
+    
+    if (rst) begin
+    end
+    else if (OUT_pw.valid && IN_pw.busy) begin
+        OUT_pw_c = OUT_pw;
+    end
+    else if (tlbMiss) begin
+        OUT_pw_c.addr = fetch1.pc;
+        OUT_pw_c.rootPPN = IN_vmem.rootPPN;
+        OUT_pw_c.valid = 1;
+    end
+end
+always_ff@(posedge clk) OUT_pw <= OUT_pw_c;
+
+// Cache Miss Handling
+MemController_Req OUT_memc_c;
+logic handlingMiss;
+always_comb begin
+    OUT_memc_c = 'x;
+    OUT_memc_c.cmd = MEMC_NONE;
+    handlingMiss = 0;
+    
+    if (rst) begin
+    end
+    else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
+        OUT_memc_c = OUT_memc;
+    end
+    else if (cacheMiss && doCacheLoad && !IN_mispr) begin
+        OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
+        OUT_memc_c.cacheAddr = {assocCnt, phyPC[11:4], 2'b0};
+        OUT_memc_c.readAddr = {phyPC[31:4], 4'b0};
+        OUT_memc_c.cacheID = 1;
+        handlingMiss = 1;
+    end
+end
+always_comb begin
+    IF_ict.wdata = 'x;
+    IF_ict.wassoc = 'x;
+    IF_ict.waddr = 'x;
+    IF_ict.we = 0;
+
+    if (handlingMiss) begin
+        IF_ict.wdata.valid = 1;
+        IF_ict.wdata.addr = phyPC[31:12];
+        IF_ict.wassoc = assocCnt;
+        IF_ict.waddr = phyPC[11:0];
+        IF_ict.we = 1;
+    end
+end
+
+always_ff@(posedge clk) OUT_memc <= OUT_memc_c;
+
+always_comb begin
+    OUT_icacheMissPC = 'x;
+    OUT_icacheMiss = cacheMiss || tlbMiss;
+    if (OUT_icacheMiss) begin
+        OUT_icacheMissPC = fetch1.pc;
+    end
+end
+
+// Output Buffering
 wire FIFO_outValid;
 IF_Instr FIFO_out;
-// todo: just one entry is required
 FIFO#($bits(IF_Instr), 2, 1, 1) outFIFO
 (
     .clk(clk),
@@ -85,98 +268,6 @@ always_comb begin
         OUT_instrs = FIFO_out;
 end
 
-// Check Tags
-IF_Instr packet;
-always_comb begin
-    logic transferExists = 'x;
-    logic allowPassThru = 'x;
-
-    packet = IF_Instr'{valid: 0, default: 'x};
-
-    cacheHit = 0;
-    assocHit = 'x;
-    doCacheLoad = 1;
-
-    if (fetch1.valid) begin
-        // TODO: vmem
-
-        // Check cache tags
-        for (integer i = 0; i < `CASSOC; i=i+1) begin
-            if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == fetch1.pc[31:12]) begin
-                assert(!cacheHit);
-                cacheHit = 1;
-                doCacheLoad = 0;
-                assocHit = i[$clog2(`CASSOC)-1:0];
-                packet.instrs = IF_icache.rdata[i];
-            end
-        end
-        begin
-            {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, fetch1.pc);
-            if (transferExists) begin
-                doCacheLoad = 0;
-                cacheHit &= allowPassThru;
-            end
-        end
-
-        if (cacheHit) begin
-            packet.pc = fetch1.pc[31:4];
-            packet.firstValid = fetch1.pc[3:1];
-            packet.lastValid = fetch1.lastValid;
-            packet.predPos = fetch1.predPos;
-            packet.predTaken = fetch1.bpi.taken;
-            packet.predTarget = fetch1.predTarget;
-            packet.rIdx = fetch1.rIdx;
-            packet.fetchID = fetch1.fetchID;
-            packet.valid = 1;
-        end
-    end
-end
-
-// Cache Miss Handling
-MemController_Req OUT_memc_c;
-logic handlingMiss;
-always_comb begin
-    OUT_memc_c = 'x;
-    OUT_memc_c.cmd = MEMC_NONE;
-    handlingMiss = 0;
-    
-    if (rst) begin
-    end
-    else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
-        OUT_memc_c = OUT_memc;
-    end
-    else if (fetch1.valid && !cacheHit && doCacheLoad && !IN_mispr) begin
-        OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
-        OUT_memc_c.cacheAddr = {assocCnt, fetch1.pc[11:4], 2'b0};
-        OUT_memc_c.readAddr = {fetch1.pc[31:4], 4'b0};
-        OUT_memc_c.cacheID = 1;
-        handlingMiss = 1;
-    end
-end
-always_comb begin
-    IF_ict.wdata = 'x;
-    IF_ict.wassoc = 'x;
-    IF_ict.waddr = 'x;
-    IF_ict.we = 0;
-
-    if (handlingMiss) begin
-        IF_ict.wdata.valid = 1;
-        IF_ict.wdata.addr = fetch1.pc[31:12];
-        IF_ict.wassoc = assocCnt;
-        IF_ict.waddr = fetch1.pc[11:0];
-        IF_ict.we = 1;
-    end
-end
-
-always_ff@(posedge clk) OUT_memc <= OUT_memc_c;
-
-always_comb begin
-    OUT_icacheMissPC = 'x;
-    OUT_icacheMiss = fetch1.valid && !cacheHit;
-    if (OUT_icacheMiss) begin
-        OUT_icacheMissPC = fetch1.pc;
-    end
-end
 
 FetchID_t fetchID;
 assign OUT_fetchID = fetchID;
@@ -194,7 +285,7 @@ always_ff@(posedge clk) begin
         fetchID <= IN_misprFetchID + 1;
     end
     else begin
-        if (fetch1.valid && !cacheHit) begin
+        if (cacheMiss || tlbMiss) begin
             // miss, flush pipeline
             fetchID <= fetch1.fetchID;
         end
