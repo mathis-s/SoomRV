@@ -1,11 +1,15 @@
 
-module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0)
+module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=4)
 (
     input logic clk,
     input logic rst,
 
+    
+
     input logic IN_mispr,
     input FetchID_t IN_misprFetchID,
+
+    input FetchID_t IN_ROB_curFetchID,
     
     input IFetchOp IN_ifetchOp,
     output logic OUT_stall,
@@ -15,6 +19,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     output PCFileEntry OUT_pcFileEntry,
 
     output logic OUT_icacheMiss,
+    output FetchID_t OUT_icacheMissFetchID,
     output logic[31:0] OUT_icacheMissPC,
 
     IF_ICache.HOST IF_icache,
@@ -44,7 +49,17 @@ always_comb begin
     end
 end
 
-assign OUT_stall = IN_pw.busy && IN_pw.rqID == RQ_ID;
+always_comb begin
+    OUT_stall = 0;
+    if (IN_pw.busy && IN_pw.rqID == RQ_ID)
+        OUT_stall = 1;
+
+    if ($signed(FIFO_free - $clog2(FIFO_SIZE)'(fetch0.valid) - $clog2(FIFO_SIZE)'(fetch1.valid) - 1) <= -1)
+        OUT_stall = 1;
+
+    if (IN_ROB_curFetchID == (OUT_fetchID + FetchID_t'(fetch0.valid)))
+        OUT_stall = 1;
+end
 
 // Read ICache at current PC
 always_comb begin
@@ -237,28 +252,32 @@ end
 always_ff@(posedge clk) OUT_memc <= OUT_memc_c;
 
 always_comb begin
+    OUT_icacheMissFetchID = 'x;
     OUT_icacheMissPC = 'x;
     OUT_icacheMiss = cacheMiss || tlbMiss;
     if (OUT_icacheMiss) begin
         OUT_icacheMissPC = fetch1.pc;
+        OUT_icacheMissFetchID = fetch1.fetchID;
     end
 end
 
 // Output Buffering
 wire FIFO_outValid;
 IF_Instr FIFO_out;
-FIFO#($bits(IF_Instr), 2, 1, 1) outFIFO
+wire[$clog2(FIFO_SIZE):0] FIFO_free;
+wire FIFO_ready;
+FIFO#($bits(IF_Instr), FIFO_SIZE, 1, 1) outFIFO
 (
     .clk(clk),
     .rst(rst || IN_mispr),
-    .free(),
+    .free(FIFO_free),
 
     .IN_valid(packet.valid),
     .IN_data(packet),
-    .OUT_ready(),
+    .OUT_ready(FIFO_ready),
 
     .OUT_valid(FIFO_outValid),
-    .IN_ready(FIFO_outValid && IN_ready),
+    .IN_ready(IN_ready),
     .OUT_data(FIFO_out)
 );
 always_comb begin
@@ -267,10 +286,15 @@ always_comb begin
     if (FIFO_outValid)
         OUT_instrs = FIFO_out;
 end
-
+always_ff@(posedge clk) begin
+    if (!(rst || IN_mispr) && packet.valid)
+        assert(FIFO_ready);
+end
 
 FetchID_t fetchID;
 assign OUT_fetchID = fetchID;
+
+FetchID_t fetchID_c;
 
 IFetchOp fetch0;
 IFetchOp fetch1;

@@ -7,7 +7,6 @@ module PreDecode
 (
     input wire clk,
     input wire rst,
-    input wire ifetchValid,
     input wire outEn,
     input wire mispred,
     
@@ -134,7 +133,7 @@ always_ff@(posedge clk) begin
             end
         end
         
-        if (ifetchValid && IN_instrs.valid) begin
+        if (!OUT_full && IN_instrs.valid) begin
 
             buffer[bufIndexIn].pc <= IN_instrs.pc;
             buffer[bufIndexIn].fetchID <= IN_instrs.fetchID;

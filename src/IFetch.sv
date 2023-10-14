@@ -36,6 +36,7 @@ module IFetch
     input FetchID_t IN_pcReadAddr[4:0],
     output PCFileEntry OUT_pcReadData[4:0],
     
+    input wire IN_ready,
     output IF_Instr OUT_instrs,
     output wire[30:0] OUT_lateRetAddr,
     
@@ -84,10 +85,10 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_clearICache(IN_clearICache),
     
     .IN_mispredFlush(IN_mispredFlush),
-    .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
-    .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
-    .IN_misprRetAct(OUT_branch.taken ? OUT_branch.retAct : IN_decBranch.retAct),
-    .IN_misprHistAct(OUT_branch.taken ? OUT_branch.histAct : IN_decBranch.histAct),
+    .IN_mispr(OUT_branch.taken || IN_decBranch.taken || icacheMiss),
+    .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.taken ? IN_decBranch.fetchID : icacheMissFetchID),
+    .IN_misprRetAct(OUT_branch.taken ? OUT_branch.retAct : IN_decBranch.taken ? IN_decBranch.retAct : RET_NONE),
+    .IN_misprHistAct(OUT_branch.taken ? OUT_branch.histAct : IN_decBranch.taken ? IN_decBranch.histAct : HIST_NONE),
     
     .IN_pcValid(ifetchEn),
     .IN_pc({pc, 1'b0}),
@@ -108,8 +109,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_bpUpdate1(IN_bpUpdate1)
 );
 
-wire baseEn = IN_en && !waitForInterrupt && !issuedInterrupt && !BP_stall &&
-    (IN_ROB_curFetchID != fetchID);
+wire baseEn = IN_en && !waitForInterrupt && !issuedInterrupt && !BP_stall;
 
 // When first encountering a fault, we output a single fake fault instruction.
 // Thus ifetch is still enabled during this first fault cycle.
@@ -126,6 +126,8 @@ ICacheTable ict
     .rst(rst || IN_clearICache),
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
     .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
+    
+    .IN_ROB_curFetchID(IN_ROB_curFetchID),
 
     .IN_ifetchOp(ifetchOp),
     .OUT_stall(icacheStall),
@@ -135,12 +137,13 @@ ICacheTable ict
     .OUT_pcFileEntry(PCF_writeData),
 
     .OUT_icacheMiss(icacheMiss),
+    .OUT_icacheMissFetchID(icacheMissFetchID),
     .OUT_icacheMissPC(icacheMissPC),
     
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),
     
-    .IN_ready(IN_en),
+    .IN_ready(IN_ready),
     .OUT_instrs(OUT_instrs),
 
     .IN_clearICache(IN_clearICache),
@@ -209,21 +212,20 @@ always_ff@(posedge clk) begin
             if (OUT_branch.taken) begin
                 pc <= OUT_branch.dstPC[31:1];
                 waitForInterrupt <= 0;
-                issuedInterrupt <= 0;
             end
             else if (IN_decBranch.taken) begin
                 pc <= IN_decBranch.dst;
                 // We also use WFI to temporarily disable the frontend
                 // for ops that always flush the pipeline
                 waitForInterrupt <= IN_decBranch.wfi;
-                issuedInterrupt <= 0;
             end
             else if (icacheMiss) begin
                 pc <= icacheMissPC[31:1];
             end
+            issuedInterrupt <= 0;
         end
         else if (ifetchEn) begin
-            // Handle Page Fault, Access Fault and Interrupts
+            // Interrupts
             if (IN_interruptPending) begin
                 issuedInterrupt <= 1;
             end

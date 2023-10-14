@@ -30,7 +30,7 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire ifetchEn = !PD_full && !TH_disableIFetch;
+wire ifetchEn = !TH_disableIFetch;
 
 wire[30:0] BP_lateRetAddr;
 
@@ -79,6 +79,7 @@ IFetch ifetch
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
     
+    .IN_ready(!PD_full),
     .OUT_instrs(IF_instrs),
     .OUT_lateRetAddr(BP_lateRetAddr),
     
@@ -99,7 +100,6 @@ PreDecode preDec
 (
     .clk(clk),
     .rst(rst),
-    .ifetchValid(ifetchEn),
     .outEn(!RN_stall && frontendEn),
 
     .OUT_full(PD_full),
