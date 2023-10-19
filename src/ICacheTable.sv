@@ -4,7 +4,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     input logic clk,
     input logic rst,
 
-    
+    input wire IN_MEM_busy,
 
     input logic IN_mispr,
     input FetchID_t IN_misprFetchID,
@@ -58,6 +58,9 @@ always_comb begin
         OUT_stall = 1;
 
     if (IN_ROB_curFetchID == (OUT_fetchID + FetchID_t'(fetch0.valid)))
+        OUT_stall = 1;
+
+    if (flushState != FLUSH_IDLE)
         OUT_stall = 1;
 end
 
@@ -239,8 +242,15 @@ always_comb begin
     IF_ict.wassoc = 'x;
     IF_ict.waddr = 'x;
     IF_ict.we = 0;
-
-    if (handlingMiss) begin
+    
+    if (flushState == FLUSH_ACTIVE) begin
+        IF_ict.wdata.valid = 0;
+        IF_ict.wdata.addr = '0;
+        IF_ict.wassoc = flushAssocIter;
+        IF_ict.waddr = {flushAddrIter, {`CLSIZE_E{1'b0}}};
+        IF_ict.we = 1;
+    end
+    else if (handlingMiss) begin
         IF_ict.wdata.valid = 1;
         IF_ict.wdata.addr = phyPC[31:12];
         IF_ict.wassoc = assocCnt;
@@ -294,16 +304,29 @@ end
 FetchID_t fetchID;
 assign OUT_fetchID = fetchID;
 
+// pipeline
 FetchID_t fetchID_c;
-
 IFetchOp fetch0;
 IFetchOp fetch1;
+
+typedef enum logic[1:0]
+{
+    FLUSH_IDLE,
+    FLUSH_QUEUED,
+    FLUSH_ACTIVE,
+    FLUSH_FINALIZE
+} FlushState;
+FlushState flushState;
+logic[$clog2(`CASSOC)-1:0] flushAssocIter;
+logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
+
 always_ff@(posedge clk) begin
     fetch0 <= IFetchOp'{valid: 0, default: 'x};
     fetch1 <= IFetchOp'{valid: 0, default: 'x};
 
     if (rst) begin
         fetchID <= 0;
+        flushState <= FLUSH_QUEUED;
     end
     else if (IN_mispr) begin
         fetchID <= IN_misprFetchID + 1;
@@ -326,6 +349,36 @@ always_ff@(posedge clk) begin
 
         if (handlingMiss)
             assocCnt <= assocCnt + 1;
+    end
+
+    if (!rst) begin
+        case (flushState)
+            default: begin
+                flushState <= FLUSH_IDLE;
+                if (IN_clearICache)
+                    flushState <= FLUSH_QUEUED;
+                flushAssocIter <= 0;
+                flushAddrIter <= 0;
+            end
+            FLUSH_QUEUED: begin
+                flushState <= FLUSH_ACTIVE;
+                if (fetch0.valid || fetch1.valid)
+                    flushState <= FLUSH_QUEUED;
+            end
+            FLUSH_ACTIVE: begin
+                reg flushDone;
+                reg[$bits(flushAssocIter)-1:0] nextFlushAssoc;
+                reg[$bits(flushAddrIter)-1:0] nextFlushAddr;
+                {flushDone, nextFlushAssoc, nextFlushAddr} = {flushAssocIter, flushAddrIter} + 1;
+                
+                flushAssocIter <= nextFlushAssoc;
+                flushAddrIter <= nextFlushAddr;
+                if (flushDone) flushState <= IN_MEM_busy ? FLUSH_FINALIZE : FLUSH_IDLE;
+            end
+            FLUSH_FINALIZE: begin
+                if (!IN_MEM_busy) flushState <= FLUSH_IDLE;
+            end
+        endcase
     end
 end
 

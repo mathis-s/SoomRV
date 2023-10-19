@@ -23,10 +23,8 @@ module TrapHandler
 );
 
 reg memoryWait;
-reg instrFence;
 
 assign OUT_disableIFetch = memoryWait;
-
 
 assign OUT_pcReadAddr = IN_trapInstr.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
@@ -52,18 +50,11 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         memoryWait <= 0;
-        instrFence <= 0;
     end
     else begin
         
         if (memoryWait && !IN_MEM_busy) begin
-            if (instrFence) begin
-                instrFence <= 0;
-                OUT_clearICache <= 1;
-            end
-            else begin
-                memoryWait <= 0;
-            end
+            memoryWait <= 0;
         end
             
         // Exception and branch prediction update handling
@@ -82,7 +73,7 @@ always_ff@(posedge clk) begin
                         OUT_branch.dstPC <= nextInstr;
                     end
                     FLAGS_FENCE: begin
-                        instrFence <= 1;
+                        OUT_clearICache <= 1;
                         memoryWait <= 1;
                         OUT_fence <= 1;
                         OUT_branch.dstPC <= nextInstr;

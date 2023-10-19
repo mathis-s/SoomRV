@@ -55,6 +55,7 @@ IFetch ifetch
     .IN_en(ifetchEn),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
+    .IN_MEM_busy(MEMSUB_busy),
     
     .IF_ict(IF_ict),
     .IF_icache(IF_icache),

@@ -11,6 +11,7 @@ module IFetch
     input wire IN_en,
 
     input wire IN_interruptPending,
+    input wire IN_MEM_busy,
     
     IF_ICTable.HOST IF_ict,
     IF_ICache.HOST IF_icache,
@@ -124,6 +125,8 @@ ICacheTable ict
 (
     .clk(clk),
     .rst(rst || IN_clearICache),
+    .IN_MEM_busy(IN_MEM_busy),
+
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
     .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.fetchID),
     
