@@ -352,6 +352,7 @@ typedef struct packed
     logic compr;
     logic isCall;
     logic isJump;
+    logic isRet;
     logic multiple;
     logic taken;
     logic valid;

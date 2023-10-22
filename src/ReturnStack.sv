@@ -14,11 +14,11 @@ module ReturnStack
     // IFetch time push/pop
     input wire IN_valid,
     input wire[30:0] IN_pc,
-    input wire IN_brValid,
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
-    input FetchOff_t IN_brOffs,
-    input wire IN_isCall,
+    
+    input wire[30:0] IN_lastPC,
+    input PredBranch IN_branch,
 
     output reg[30:0] OUT_curRetAddr,
     // Low effort prediction for returns that are detected late, in decode.
@@ -50,7 +50,6 @@ typedef struct packed
     logic[30:0] addr;
     RetStackIdx_t idx;
     FetchID_t fetchID;
-    FetchOff_t fetchOffs;
 } RetRecQEntry;
 
 RetPredEntry rtable[RET_PRED_LEN-1:0][RET_PRED_ASSOC-1:0];
@@ -98,44 +97,59 @@ RetStackAction recAct;
 // so we forward it combinatorially.
 RetStackIdx_t rindexReg;
 RetStackIdx_t rindex;
+
+wire[30:0] addrToPush = {IN_lastPC[30:$bits(FetchOff_t)], IN_branch.offs} + 1;
+
 always_comb begin
     rindex = rindexReg;
     if (forwardRindex) begin
-        case (recAct)
-            default: rindex = IN_misprIdx;
-            //RET_POP: rindex = IN_misprIdx - 1;
-            //RET_PUSH: rindex = IN_misprIdx + 1;
-        endcase
+        rindex = IN_misprIdx;
+    end
+    else if (IN_branch.valid && IN_branch.isCall) begin
+        rindex = rindex + 1;
+    end
+    else if (IN_branch.valid && IN_branch.isRet) begin
+        rindex = rindex - 1;
     end
 end
 
 reg[$clog2(RET_PRED_ASSOC)-1:0] lookupAssocIdx;
-always_comb begin
+always_ff@(posedge clk) begin
+    if (IN_valid) begin
+        OUT_curIdx <= rindex;
 
-    OUT_curIdx = rindex;
-    OUT_predBr.dst = rstack[rindex];
-    OUT_curRetAddr = rstack[rindex];
+        if (IN_branch.valid && IN_branch.isCall) begin
+            // If the immediately preceeding prediction was a call,
+            // we need to forward the return address.
+            OUT_curRetAddr <= addrToPush;
+            OUT_predBr.dst <= addrToPush;
+        end
+        else begin
+            OUT_curRetAddr <= rstack[rindex];
+            OUT_predBr.dst <= rstack[rindex];
+        end
 
-    OUT_predBr.taken = 1;
-    OUT_predBr.isJump = 1;
-    OUT_predBr.isCall = 0;
-    OUT_predBr.valid = 0;
-    OUT_predBr.offs = 'x;
-    OUT_predBr.compr = 'x;
-    OUT_predBr.multiple = 'x;
+        OUT_predBr.taken <= 1;
+        OUT_predBr.isJump <= 1;
+        OUT_predBr.isCall <= 0;
+        OUT_predBr.isRet <= 1;
+        OUT_predBr.valid <= 0;
+        OUT_predBr.offs <= 'x;
+        OUT_predBr.compr <= 'x;
+        OUT_predBr.multiple <= 'x;
 
-    lookupAssocIdx = 'x;
-    
-    if (IN_valid && !IN_mispr) begin
+        lookupAssocIdx <= 'x;
+        
         for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
             if (rtable[lookupIdx][i].valid && 
                 rtable[lookupIdx][i].tag == lookupTag && 
                 rtable[lookupIdx][i].offs >= lookupOffs &&
-                (!OUT_predBr.valid || OUT_predBr.offs > rtable[lookupIdx][i].offs)) begin
-                OUT_predBr.valid = 1;
-                OUT_predBr.offs = rtable[lookupIdx][i].offs;
-                OUT_predBr.compr = rtable[lookupIdx][i].compr;
-                lookupAssocIdx = i[$clog2(RET_PRED_ASSOC)-1:0];
+                (!OUT_predBr.valid || OUT_predBr.offs > rtable[lookupIdx][i].offs)
+            ) begin
+                OUT_predBr.valid <= 1;
+                OUT_predBr.offs <= rtable[lookupIdx][i].offs;
+                OUT_predBr.compr <= rtable[lookupIdx][i].compr;
+                lookupAssocIdx <= i[$clog2(RET_PRED_ASSOC)-1:0];
             end
         end
     end
@@ -156,10 +170,6 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < RET_PRED_LEN; i=i+1)
             for (integer j = 0; j < RET_PRED_ASSOC; j=j+1)
                 rtable[i][j].valid <= 0;
-        
-        // Not strictly necessary
-        for (integer i = 0; i < SIZE; i=i+1)
-            rstack[i] <= 0;
 
         qindex <= 0;
         qindexEnd <= 0;
@@ -169,8 +179,6 @@ always_ff@(posedge clk) begin
     end
     else begin
         
-        rindexReg <= rindex;
-        
         if (IN_mispr) begin
             forwardRindex <= 1;
             recAct <= IN_misprAct;
@@ -179,6 +187,7 @@ always_ff@(posedge clk) begin
             recoveryBase = lastInvalComFetchID;
             OUT_stall <= 1;
         end
+        else rindexReg <= rindex;
         
         // Recover entries by copying from rrqueue back to stack after mispredict
         if (recoveryInProgress) begin
@@ -243,17 +252,15 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else if (!IN_mispr && IN_valid) begin
-            if (OUT_predBr.valid && (!IN_brValid || IN_brOffs >= OUT_predBr.offs)) begin
+        else if (!IN_mispr) begin
+            if (IN_branch.valid && IN_branch.isRet) begin
                 
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
-                rindexReg <= rindex - 1;
                 
                 // Store the popped address in the return recovery queue
-                rrqueue[qindex].fetchOffs <= IN_pc[$bits(FetchOff_t)-1:0];
-                rrqueue[qindex].fetchID <= IN_fetchID + 1;
-                rrqueue[qindex].idx <= rindex;
-                rrqueue[qindex].addr <= OUT_predBr.dst;
+                rrqueue[qindex].fetchID <= IN_fetchID;
+                rrqueue[qindex].idx <= rindexReg;
+                rrqueue[qindex].addr <= IN_branch.dst;
                 qindex <= qindex + 1;
                 
                 // overwrite old backups if full, even if they're
@@ -261,9 +268,8 @@ always_ff@(posedge clk) begin
                 if (qindexEnd == qindex + 1'b1)
                     qindexEnd <= qindexEnd + 1;
             end
-            else if (IN_brValid && IN_isCall) begin
-                rstack[rindex + 1] <= {IN_pc[30:$bits(FetchOff_t)], IN_brOffs} + 1;
-                rindexReg <= rindex + 1;
+            else if (IN_branch.valid && IN_branch.isCall) begin
+                rstack[rindex] <= addrToPush;
             end
         end
     end

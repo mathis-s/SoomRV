@@ -19,12 +19,6 @@ module BranchPredictor
     
     // IF interface
     input wire IN_pcValid,
-    //input wire[31:0] IN_pc,
-    //input FetchID_t IN_fetchID,
-    //input FetchID_t IN_comFetchID,
-    //output reg OUT_branchTaken,
-    //output BranchPredInfo OUT_branchInfo,
-    //output RetStackIdx_t OUT_rIdx,
     
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
@@ -37,6 +31,8 @@ module BranchPredictor
     output RetStackIdx_t OUT_rIdx,
     
     output PredBranch OUT_predBr,
+
+    
     input ReturnDecUpdate IN_retDecUpd,
     
     // Branch XU interface
@@ -106,13 +102,8 @@ reg[30:0] pcReg;
 reg[30:0] pcRegNoInc;
 
 reg ignorePred;
-
-reg isCall;
-reg isReturn;
 always_comb begin
     OUT_rIdx = RET_idx;
-    isCall = 0;
-    isReturn = 0;
 
     OUT_predBr = '0;
     OUT_predBr.dst = OUT_curRetAddr;
@@ -124,12 +115,10 @@ always_comb begin
     if (ignorePred) begin
         // ignore
     end
-    else if (BTB_br.valid/*(!RET_br.valid || RET_br.offs > BTB_br.offs)*/) begin
+    else if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
         OUT_predBr.taken = BTB_br.isJump || TAGE_taken;
-        OUT_predBr.multiple = !OUT_predBr.taken && (BTB_br.multiple/* || RET_br.valid*/);
-
-        isCall = BTB_br.isCall;
+        OUT_predBr.multiple = !OUT_predBr.taken && (BTB_br.multiple || RET_br.valid);
 
         if (OUT_predBr.taken) begin
             OUT_pc = OUT_predBr.dst;
@@ -140,24 +129,16 @@ always_comb begin
             OUT_pc = {pcRegNoInc[30:3], OUT_predBr.offs + 1'b1};
         end
     end
-    /*else if (0) begin
+    else if (RET_br.valid) begin
         OUT_predBr = RET_br;
-
-        branchTaken = RET_br.valid;
-        multipleBranches = 0;
-
-        OUT_branchInfo.predicted = RET_br.valid;
-        OUT_branchInfo.taken = RET_br.valid;
-        OUT_branchInfo.isJump = 1;
-
-        isReturn = 1;
-
-        OUT_pc = RET_br.dst;
-    end*/
+        OUT_pc = OUT_predBr.dst;
+        OUT_lastOffs = OUT_predBr.offs;
+    end
 end
 
 PredBranch BTB_br;
 assign BTB_br.taken = 'x;
+assign BTB_br.isRet = 0;
 
 wire BTB_multipleBranches;
 BranchTargetBuffer btb
@@ -214,9 +195,10 @@ ReturnStack retStack
     .IN_pc(OUT_pc),
     .IN_fetchID(IN_fetchID),
     .IN_comFetchID(IN_comFetchID),
-    .IN_brValid(BTB_br.valid),
-    .IN_brOffs(BTB_br.offs),
-    .IN_isCall(BTB_br.isCall),
+    
+    .IN_lastPC(pcRegNoInc),
+    .IN_branch(OUT_predBr),
+
     .OUT_curRetAddr(OUT_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
 
