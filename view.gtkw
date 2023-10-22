@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.117 (w)1999-2023 BSI
-[*] Sun Oct  1 11:44:32 2023
+[*] Sun Oct 22 18:16:41 2023
 [*]
 [dumpfile] "Top_tb.vcd"
-[dumpfile_mtime] "Sun Oct  1 11:43:30 2023"
-[dumpfile_size] 54005427
+[dumpfile_mtime] "Sun Oct 22 18:14:32 2023"
+[dumpfile_size] 1738871
 [savefile] "view.gtkw"
-[timestart] 4513
-[size] 3840 2113
+[timestart] 665
+[size] 3840 2118
 [pos] -1 -1
-*-2.230970 4528 69993049 69992801 69993237 69993241 70005413 530 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-1.776306 702 69993049 69992801 69993237 69993241 70005413 530 1370 21100119 334682 7563836 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.extMem.
@@ -37,6 +37,7 @@
 [treeopen] TOP.Top.soc.core.aguST.tmq.queue[3].
 [treeopen] TOP.Top.soc.core.branch.
 [treeopen] TOP.Top.soc.core.branchProvs[2].
+[treeopen] TOP.Top.soc.core.branchProvs[3].
 [treeopen] TOP.Top.soc.core.csr.
 [treeopen] TOP.Top.soc.core.DEC_decBranch.
 [treeopen] TOP.Top.soc.core.div.IN_uop.
@@ -47,9 +48,11 @@
 [treeopen] TOP.Top.soc.core.ialu.IN_uop.
 [treeopen] TOP.Top.soc.core.ialu.OUT_branch.
 [treeopen] TOP.Top.soc.core.ialu.OUT_uop.
+[treeopen] TOP.Top.soc.core.ialu1.
 [treeopen] TOP.Top.soc.core.ialu1.IN_uop.
 [treeopen] TOP.Top.soc.core.ialu1.OUT_branch.
 [treeopen] TOP.Top.soc.core.ialu1.OUT_uop.
+[treeopen] TOP.Top.soc.core.idec.
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[0].
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[1].
 [treeopen] TOP.Top.soc.core.idec.IN_instrs[2].
@@ -58,13 +61,23 @@
 [treeopen] TOP.Top.soc.core.idec.OUT_decBranch.
 [treeopen] TOP.Top.soc.core.idec.OUT_uop[2].
 [treeopen] TOP.Top.soc.core.ifetch.
-[treeopen] TOP.Top.soc.core.ifetch.bp.btb.entries[0][0].
+[treeopen] TOP.Top.soc.core.ifetch.bp.
+[treeopen] TOP.Top.soc.core.ifetch.bp.btb.
 [treeopen] TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.
+[treeopen] TOP.Top.soc.core.ifetch.bp.BTB_br.
+[treeopen] TOP.Top.soc.core.ifetch.bp.btUpdate.
+[treeopen] TOP.Top.soc.core.ifetch.bp.OUT_predBr.
+[treeopen] TOP.Top.soc.core.ifetch.bp.retStack.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.OUT_predBr.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[2].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[3].
+[treeopen] TOP.Top.soc.core.ifetch.bp.tagePredictor.
+[treeopen] TOP.Top.soc.core.ifetch.ict.
+[treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.
+[treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[3].
+[treeopen] TOP.Top.soc.core.ifetch.ict.OUT_pcFileEntry.
 [treeopen] TOP.Top.soc.core.ifetch.IN_memc.
 [treeopen] TOP.Top.soc.core.ifetch.OUT_instrs.
 [treeopen] TOP.Top.soc.core.ifetch.OUT_pw.
@@ -117,6 +130,7 @@
 [treeopen] TOP.Top.soc.core.lsu.IN_uopSt.
 [treeopen] TOP.Top.soc.core.lsu.ldOps[1].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.
+[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.IN_memc.
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[0].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.
@@ -169,6 +183,7 @@
 [treeopen] TOP.Top.soc.core.sq.evicted[0].s.
 [treeopen] TOP.Top.soc.core.sq.evicted[1].
 [treeopen] TOP.Top.soc.core.sq.evicted[2].
+[treeopen] TOP.Top.soc.core.sq.evicted[3].
 [treeopen] TOP.Top.soc.core.sq.evicted[3].s.
 [treeopen] TOP.Top.soc.core.sq.IN_branch.
 [treeopen] TOP.Top.soc.core.sq.IN_resultUOp[2].
@@ -178,10 +193,14 @@
 [treeopen] TOP.Top.soc.core.sq.IN_uopSt.
 [treeopen] TOP.Top.soc.core.sq.OUT_fwd.
 [treeopen] TOP.Top.soc.core.sq.OUT_uopSt.
+[treeopen] TOP.Top.soc.core.sq.stAck_r.
 [treeopen] TOP.Top.soc.core.sq.unnamedblk10.
 [treeopen] TOP.Top.soc.core.sq.unnamedblk2.
+[treeopen] TOP.Top.soc.core.trapHandler.
 [treeopen] TOP.Top.soc.core.trapHandler.IN_trapInstr.
 [treeopen] TOP.Top.soc.core.trapHandler.OUT_trapInfo.
+[treeopen] TOP.Top.soc.core.tvalSelect.
+[treeopen] TOP.Top.soc.core.tvalSelect.curTVal.
 [treeopen] TOP.Top.soc.core.tvalSelect.IN_tvalProvs[0].
 [treeopen] TOP.Top.soc.genblk2[0].
 [treeopen] TOP.Top.soc.genblk2[0].dcache.
@@ -192,9 +211,9 @@
 [treeopen] TOP.Top.soc.memc.
 [treeopen] TOP.Top.soc.memc.dcacheReadIF.
 [treeopen] TOP.Top.soc.memc.dcacheReadIF.cur.
-[treeopen] TOP.Top.soc.memc.dcacheWriteIF.cur.
-[treeopen] TOP.Top.soc.memc.icacheWriteIF.cur.
+[treeopen] TOP.Top.soc.memc.icacheWriteIF.
 [treeopen] TOP.Top.soc.memc.IN_ctrl[0].
+[treeopen] TOP.Top.soc.memc.IN_ctrl[1].
 [treeopen] TOP.Top.soc.memc.OUT_stat.
 [treeopen] TOP.Top.soc.memc.OUT_stat.transfers[0].
 [treeopen] TOP.Top.soc.memc.OUT_stat.transfers[1].
@@ -205,9 +224,9 @@
 [treeopen] TOP.Top.soc.memc.transfers[2].
 [treeopen] TOP.Top.soc.memc.transfers[3].
 [sst_width] 315
-[signals_width] 552
+[signals_width] 478
 [sst_expanded] 1
-[sst_vpaned_height] 1474
+[sst_vpaned_height] 1086
 @28
 TOP.Top.soc.clk
 TOP.Top.soc.en
@@ -216,16 +235,21 @@ TOP.Top.soc.core.mispredFlush
 TOP.Top.soc.core.branch.taken
 TOP.Top.soc.core.branch.flush
 @22
-TOP.Top.soc.core.branch.sqN[6:0]
 TOP.Top.soc.core.branch.dstPC[31:0]
 @28
-TOP.Top.soc.core.branch.rIdx[1:0]
+TOP.Top.soc.core.branch.retAct[1:0]
+@200
+-
+@28
+TOP.Top.soc.core.branchProvs[3].taken
+@200
+-
+@28
 TOP.Top.soc.core.DEC_decBranch.taken
 @22
 TOP.Top.soc.core.DEC_decBranch.dst[30:0]
 TOP.Top.soc.core.DEC_decBranch.fetchID[4:0]
 @28
-TOP.Top.soc.core.DEC_decBranch.rIdx[1:0]
 TOP.Top.soc.core.SQ_empty
 @200
 -
@@ -269,9 +293,73 @@ TOP.Top.soc.core.TH_disableIFetch
 TOP.Top.soc.core.PD_full
 TOP.Top.soc.core.MEMSUB_busy
 @200
+-BTB
+@28
+TOP.Top.soc.core.ifetch.bp.IN_mispr
+@22
+TOP.Top.soc.core.ifetch.bp.IN_misprFetchID[4:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.bpFile.IN_raddr[0][4:0]
+TOP.Top.soc.core.ifetch.bp.bpFile.IN_waddr[0][4:0]
+TOP.Top.soc.core.ifetch.IN_ROB_curFetchID[4:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_writeHistory[11:0]
+@28
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_predHistory[11:0]
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.bp.OUT_predBr.valid
+TOP.Top.soc.core.ifetch.bp.OUT_predBr.isJump
+TOP.Top.soc.core.ifetch.bp.OUT_predBr.taken
+@22
+TOP.Top.soc.core.ifetch.bp.OUT_predBr.dst[30:0]
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.valid
+@22
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.dst[31:0]
+@28
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.fetchStartOffs[2:0]
+@22
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.src[31:0]
+@28
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.isJump
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.isCall
+TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.clean
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.bp.btb.IN_pcValid
+@22
+TOP.Top.soc.core.ifetch.pcFull[31:0]
+@28
+TOP.Top.soc.core.ifetch.bp.btb.OUT_branchFound
+@200
+-
+-
+-
+-
+@22
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_writeHistory[11:0]
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_predAddr[30:0]
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_writeAddr[30:0]
+@28
+TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_writeValid
+@200
 -RetStack
 @24
+TOP.Top.soc.core.ifetch.bp.retStack.rindexReg[1:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rindex[1:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.recAct[1:0]
+TOP.Top.soc.core.ifetch.bp.retStack.forwardRindex
+TOP.Top.soc.core.ifetch.bp.retStack.IN_misprIdx[1:0]
 @200
 -
 @22
@@ -322,7 +410,6 @@ TOP.Top.extMem.s_axi_araddr[31:0]
 @22
 TOP.Top.extMem.s_axi_rdata[127:0]
 @28
-TOP.Top.extMem.s_axi_rid[1:0]
 TOP.Top.extMem.s_axi_rvalid
 TOP.Top.extMem.s_axi_rready
 @200
@@ -342,7 +429,6 @@ TOP.Top.extMem.s_axi_wlast
 @28
 TOP.Top.soc.memc.s_axi_bvalid
 TOP.Top.soc.memc.s_axi_bready
-TOP.Top.soc.memc.s_axi_bid[1:0]
 @200
 -MemC
 @28
@@ -459,14 +545,27 @@ TOP.Top.soc.memc.OUT_stat.transfers[2].cacheAddr[11:0]
 TOP.Top.soc.memc.OUT_stat.transfers[3].cacheAddr[11:0]
 @200
 -
+@22
+TOP.Top.soc.memc.transfers[0].cmd[3:0]
+TOP.Top.soc.memc.transfers[1].cmd[3:0]
+TOP.Top.soc.memc.transfers[2].cmd[3:0]
+TOP.Top.soc.memc.transfers[3].cmd[3:0]
+@200
+-
 @28
 TOP.Top.soc.memc.OUT_stat.transfers[0].cacheID[0]
 TOP.Top.soc.memc.OUT_stat.transfers[1].cacheID[0]
 TOP.Top.soc.memc.OUT_stat.transfers[2].cacheID[0]
 @200
 -
+@28
+TOP.Top.soc.memc.transfers[3].needWriteRq[1:0]
+TOP.Top.soc.memc.transfers[3].valid
 @22
-TOP.Top.soc.memc.isMMIO[3:0]
+TOP.Top.soc.memc.transfers[3].evictProgress[4:0]
+TOP.Top.soc.memc.transfers[3].cmd[3:0]
+@200
+-
 @28
 TOP.Top.soc.memc.OUT_stat.sglLdRes.valid
 TOP.Top.soc.memc.OUT_stat.sglStRes.valid
@@ -477,6 +576,103 @@ TOP.Top.soc.core.ifetch.ict.doCacheLoad
 @200
 -
 -dcache
+@28
+TOP.Top.soc.core.sq.reIssueValid
+TOP.Top.soc.core.sq.OUT_uopSt.valid
+@22
+TOP.Top.soc.core.sq.OUT_uopSt.addr[31:0]
+@c00022
+TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+@28
+(0)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(1)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(2)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(3)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(4)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(5)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(6)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(7)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(8)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(9)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(10)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(11)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(12)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(13)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(14)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(15)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(16)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(17)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(18)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(19)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(20)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(21)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(22)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(23)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(24)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(25)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(26)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(27)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(28)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(29)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(30)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+(31)TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
+@1401200
+-group_end
+@28
+TOP.Top.soc.core.sq.IN_stallSt
+@200
+-
+@28
+TOP.Top.soc.core.sq.evicted[0].s.valid
+TOP.Top.soc.core.sq.evicted[1].s.valid
+TOP.Top.soc.core.sq.evicted[2].s.valid
+TOP.Top.soc.core.sq.evicted[3].s.valid
+@200
+-
+@28
+TOP.Top.soc.core.sq.evicted[0].issued
+TOP.Top.soc.core.sq.evicted[1].issued
+TOP.Top.soc.core.sq.evicted[2].issued
+TOP.Top.soc.core.sq.evicted[3].issued
+@200
+-
+@28
+TOP.Top.soc.core.sq.IN_stAck.valid
+TOP.Top.soc.core.sq.IN_stAck.fail
+@200
+-
+@28
+TOP.Top.soc.core.sq.stAckIdxValid
+TOP.Top.soc.core.sq.stAck_r.valid
+TOP.Top.soc.core.sq.stAck_r.fail
+@201
+-
+@28
+TOP.Top.soc.core.lsu.stOps[1].valid
+@22
+TOP.Top.soc.core.lsu.stOps[1].addr[31:0]
+@28
+TOP.Top.soc.core.lsu.miss[0].valid
+TOP.Top.soc.core.lsu.miss[1].valid
+@200
+-
+@28
+TOP.Top.soc.core.lsu.miss[1].valid
+@22
+TOP.Top.soc.core.lsu.miss[1].missAddr[31:0]
+TOP.Top.soc.core.lsu.miss[1].mtype[3:0]
+@200
+-
+@22
+TOP.Top.soc.memc.IN_ctrl[1].cmd[3:0]
+@200
+-
+@28
+TOP.Top.soc.memc.dcacheReadIF.IN_valid
+@200
+-
+@28
+TOP.Top.soc.memc.dcacheReadIF.cur.valid
 @22
 TOP.Top.soc.memc.dcacheReadIF.cur.len[7:0]
 TOP.Top.soc.memc.dcacheReadIF.cur.progress[7:0]
@@ -534,56 +730,45 @@ TOP.Top.soc.genblk2[2].dcache.addr1_reg[5:0]
 -
 @28
 TOP.Top.soc.genblk2[3].dcache.ce1_reg
-@23
+@22
 TOP.Top.soc.genblk2[3].dcache.addr1_reg[5:0]
 @200
 -icache
 @22
 TOP.Top.soc.icache.wm_reg[3:0]
-TOP.Top.soc.icache.data_reg[127:0]
-TOP.Top.soc.icache.addr_reg[9:0]
+TOP.Top.soc.icache.data_reg[511:0]
 @28
 TOP.Top.soc.icache.ce_reg
 TOP.Top.soc.icache.we_reg
 @200
 -
-@22
-TOP.Top.soc.icache.addr1_reg[9:0]
-TOP.Top.soc.icache.OUT_data1[127:0]
+-icacheCont
 @28
-TOP.Top.soc.icache.ce1_reg
-@200
--
+TOP.Top.soc.core.ifetch.ict.fetch0.valid
 @22
-TOP.Top.soc.memc.icacheWriteIF.IN_addr[11:0]
-@28
-TOP.Top.soc.memc.icacheWriteIF.IN_valid
-TOP.Top.soc.memc.icacheWriteIF.OUT_ready
-@200
--
-@22
-TOP.Top.soc.memc.icacheWriteIF.cur.addr[11:0]
-@28
-TOP.Top.soc.memc.icacheWriteIF.cur.valid
-@200
--
-@22
-TOP.Top.soc.memc.icacheWriteIF.cur.data[127:0]
-TOP.Top.soc.memc.icacheWriteIF.OUT_CACHE_addr[11:0]
+TOP.Top.soc.core.ifetch.ict.fetch0.pc[31:0]
 @200
 -
 @28
-TOP.Top.soc.memc.s_axi_rvalid
-TOP.Top.soc.memc.s_axi_rready
+TOP.Top.soc.core.ifetch.ict.fetch1.valid
+@22
+TOP.Top.soc.core.ifetch.ict.fetch1.pc[31:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.ict.OUT_pcFileEntry.pc[30:0]
+@28
+TOP.Top.soc.core.ifetch.ict.OUT_pcFileWE
+@22
+TOP.Top.soc.core.ifetch.ict.OUT_fetchID[4:0]
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.ict.OUT_stall
 @200
 -ifetch
 @22
 TOP.Top.soc.core.ifetch.pcFull[31:0]
-TOP.Top.soc.core.ifetch.phyPCFull[31:0]
-@28
-TOP.Top.soc.core.ifetch.BP_branchTaken
-TOP.Top.soc.core.ifetch.BP_multipleBranches
-@22
 TOP.Top.soc.core.ifetch.fetchID[4:0]
 TOP.Top.soc.core.ifetch.IN_ROB_curFetchID[4:0]
 @c00022
@@ -626,21 +811,12 @@ TOP.Top.soc.core.ifetch.pc[30:0]
 -
 -
 @28
-TOP.Top.soc.core.ifetch.tryReadICache
 TOP.Top.soc.core.ifetch.icacheStall
-@22
-TOP.Top.soc.core.ifetch.OUT_instrAddr[27:0]
-@28
-TOP.Top.soc.core.ifetch.OUT_instrReadEnable
-@22
-TOP.Top.soc.core.ifetch.IN_instrRaw[127:0]
+TOP.Top.soc.core.ifetch.icacheMiss
 @200
 -
 @28
 TOP.Top.soc.core.ifetch.IN_vmem.sv32en_ifetch
-TOP.Top.soc.core.ifetch.pageWalkRequired
-TOP.Top.soc.core.ifetch.pageWalkActive
-TOP.Top.soc.core.ifetch.pageWalkAccepted
 @200
 -
 @28
@@ -654,17 +830,13 @@ TOP.Top.soc.core.ifetch.IN_pw.busy
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.fault[1:0]
-TOP.Top.soc.core.ifetch.pcPPNfault[1:0]
 TOP.Top.soc.core.PC_stall
 TOP.Top.soc.core.ifetch.icacheStall
-TOP.Top.soc.core.ifetch.useInstrRawBackup
-TOP.Top.soc.core.ifetch.OUT_instrReadEnable
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.en1
 TOP.Top.soc.core.ifetch.IN_en
+TOP.Top.soc.core.ifetch.ifetchEn
 @200
 -
 @28
@@ -697,7 +869,6 @@ TOP.Top.soc.core.ifetch.bp.btb.IN_btUpdate.valid
 TOP.Top.soc.core.ifetch.bp.btb.IN_pc[30:0]
 TOP.Top.soc.core.ifetch.bp.btb.OUT_branchDst[30:0]
 @28
-TOP.Top.soc.core.ifetch.bp.btb.IN_BPT_branchTaken
 TOP.Top.soc.core.ifetch.bp.btb.OUT_branchFound
 TOP.Top.soc.core.ifetch.bp.btb.OUT_branchIsCall
 @200
@@ -721,7 +892,6 @@ TOP.Top.soc.core.ifetch.bp.retStack.rstack[2][30:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack[3][30:0]
 @28
 TOP.Top.soc.core.ifetch.bp.retStack.rindex[1:0]
-TOP.Top.soc.core.ifetch.bp.retStack.IN_setIdx
 @200
 -
 @28
@@ -738,21 +908,20 @@ TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.isRet
 TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.idx[1:0]
 @200
 -
-@28
-TOP.Top.soc.core.ifetch.bp.retStack.IN_brValid
-TOP.Top.soc.core.ifetch.bp.retStack.IN_brOffs[2:0]
-TOP.Top.soc.core.ifetch.bp.retStack.IN_isCall
-@200
 -
 -idec
 @28
 TOP.Top.soc.core.idec.OUT_decBranch.taken
-TOP.Top.soc.core.idec.OUT_btUpdate.clean
-TOP.Top.soc.core.idec.OUT_btUpdate.valid
 @22
-TOP.Top.soc.core.idec.OUT_btUpdate.src[31:0]
+TOP.Top.soc.core.idec.OUT_decBranch.fetchID[4:0]
+TOP.Top.soc.core.idec.OUT_decBranch.dst[30:0]
+@200
+-
 @28
-TOP.Top.soc.core.idec.IN_invalidate
+TOP.Top.soc.core.idec.IN_instrs[0].valid
+TOP.Top.soc.core.idec.IN_instrs[1].valid
+TOP.Top.soc.core.idec.IN_instrs[2].valid
+TOP.Top.soc.core.idec.IN_instrs[3].valid
 @200
 -
 @22
@@ -933,6 +1102,15 @@ TOP.Top.soc.core.iq3.queue[3].sqN[6:0]
 -LD
 @22
 TOP.Top.soc.core.ld.IN_uop[2].sqN[6:0]
+@200
+-
+@28
+TOP.Top.soc.core.ld.IN_pcReadData[0].branchPos[2:0]
+TOP.Top.soc.core.ld.IN_pcReadData[1].branchPos[2:0]
+TOP.Top.soc.core.ld.IN_pcReadData[2].branchPos[2:0]
+TOP.Top.soc.core.ld.IN_pcReadData[3].branchPos[2:0]
+@22
+TOP.Top.soc.core.ld.IN_pcReadData[3].pc[30:0]
 @200
 -IALU0
 @28
@@ -1167,6 +1345,22 @@ TOP.Top.soc.core.pageWalker.OUT_res.ppn[21:0]
 @200
 -LSU
 @28
+TOP.Top.soc.core.lsu.LMQ_allowNewMisses
+@200
+-
+@28
+TOP.Top.soc.core.lsu.IN_memc.transfers[0].valid
+TOP.Top.soc.core.lsu.IN_memc.transfers[1].valid
+TOP.Top.soc.core.lsu.IN_memc.transfers[2].valid
+TOP.Top.soc.core.lsu.IN_memc.transfers[3].valid
+TOP.Top.soc.core.lsu.newMiss
+@22
+TOP.Top.soc.core.lsu.OUT_memc.cmd[3:0]
+@28
+TOP.Top.soc.core.lsu.forwardMiss
+@200
+-
+@28
 TOP.Top.soc.core.lsu.busy
 TOP.Top.soc.core.lsu.IN_SQ_empty
 TOP.Top.soc.core.lsu.IN_branch.taken
@@ -1247,6 +1441,14 @@ TOP.Top.soc.core.lsu.miss[0].valid
 @200
 -
 @22
+TOP.Top.soc.core.lsu.loadMissQueue.queue[0].ld.sqN[6:0]
+TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.sqN[6:0]
+@28
+TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.valid
+TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ready
+@200
+-
+@22
 TOP.Top.soc.core.lsu.IN_memc.transfers[0].readAddr[31:0]
 @28
 TOP.Top.soc.core.lsu.IN_memc.transfers[0].valid
@@ -1259,7 +1461,6 @@ TOP.Top.soc.core.lsu.uopSt.addr[31:0]
 TOP.Top.soc.core.lsu.uopSt.data[31:0]
 TOP.Top.soc.core.lsu.uopSt.wmask[3:0]
 @28
-TOP.Top.soc.core.lsu.uopSt.id[1:0]
 TOP.Top.soc.core.lsu.uopSt.valid
 TOP.Top.soc.core.lsu.OUT_stStall
 @200
@@ -1277,7 +1478,6 @@ TOP.Top.soc.core.lsu.stOps[0].addr[31:0]
 TOP.Top.soc.core.lsu.stOps[0].data[31:0]
 @28
 TOP.Top.soc.core.lsu.stOps[0].isMMIO
-TOP.Top.soc.core.lsu.stOps[0].id[1:0]
 @200
 -
 @28
@@ -1288,7 +1488,6 @@ TOP.Top.soc.core.lsu.stOps[1].data[31:0]
 @28
 TOP.Top.soc.core.lsu.stOps[1].isMMIO
 TOP.Top.soc.core.lsu.OUT_stAck.valid
-TOP.Top.soc.core.lsu.OUT_stAck.id[1:0]
 TOP.Top.soc.core.lsu.OUT_stAck.fail
 @200
 -
@@ -1396,6 +1595,9 @@ TOP.Top.soc.core.ialu1.OUT_uop.valid
 @22
 TOP.Top.soc.core.ialu1.OUT_uop.tagDst[6:0]
 TOP.Top.soc.core.ialu1.OUT_uop.sqN[6:0]
+@28
+TOP.Top.soc.core.ialu1.isBranch
+TOP.Top.soc.core.ialu1.IN_uop.bpi.predicted
 @200
 -LB
 @28
@@ -1576,12 +1778,6 @@ TOP.Top.soc.core.sq.lookupMask[3:0]
 TOP.Top.soc.core.sq.lookupData[31:0]
 @200
 -
-@28
-TOP.Top.soc.core.sq.evicted[0].id[1:0]
-TOP.Top.soc.core.sq.evicted[1].id[1:0]
-TOP.Top.soc.core.sq.evicted[2].id[1:0]
-TOP.Top.soc.core.sq.evicted[3].id[1:0]
-@200
 -
 @28
 TOP.Top.soc.core.sq.evicted[0].issued
@@ -1592,13 +1788,11 @@ TOP.Top.soc.core.sq.evicted[3].issued
 -
 @28
 TOP.Top.soc.core.sq.IN_stAck.valid
-TOP.Top.soc.core.sq.IN_stAck.id[1:0]
 TOP.Top.soc.core.sq.IN_stAck.fail
 @200
 -
 @28
 TOP.Top.soc.core.sq.OUT_uopSt.valid
-TOP.Top.soc.core.sq.OUT_uopSt.id[1:0]
 @22
 TOP.Top.soc.core.sq.OUT_uopSt.addr[31:0]
 TOP.Top.soc.core.sq.OUT_uopSt.data[31:0]
@@ -1607,7 +1801,6 @@ TOP.Top.soc.core.sq.OUT_uopSt.wmask[3:0]
 -
 @28
 TOP.Top.soc.core.sq.IN_stAck.valid
-TOP.Top.soc.core.sq.IN_stAck.id[1:0]
 @200
 -FPU
 -Mul
@@ -1619,6 +1812,25 @@ TOP.Top.soc.core.mul.OUT_uop.tagDst[6:0]
 TOP.Top.soc.core.mul.OUT_uop.result[31:0]
 @200
 -TVal Select
+@28
+TOP.Top.soc.core.tvalSelect.IN_branch.taken
+@22
+TOP.Top.soc.core.tvalSelect.IN_branch.sqN[6:0]
+@200
+-
+@28
+TOP.Top.soc.core.tvalSelect.IN_tvalProvs[0].valid
+@22
+TOP.Top.soc.core.tvalSelect.IN_tvalProvs[0].tval[31:0]
+TOP.Top.soc.core.tvalSelect.IN_tvalProvs[0].sqN[6:0]
+@200
+-
+@28
+TOP.Top.soc.core.tvalSelect.IN_tvalProvs[1].valid
+@22
+TOP.Top.soc.core.tvalSelect.IN_tvalProvs[1].tval[31:0]
+@200
+-
 @28
 TOP.Top.soc.core.tvalSelect.curTVal.live
 @22
@@ -1665,6 +1877,10 @@ TOP.Top.soc.core.rob.entries[22].flags[3:0]
 @200
 -
 -TH
+@28
+TOP.Top.soc.core.trapHandler.OUT_branch.taken
+@200
+-
 @22
 TOP.Top.soc.core.trapHandler.OUT_trapInfo.cause[3:0]
 @28

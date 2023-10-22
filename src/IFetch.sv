@@ -68,7 +68,7 @@ BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
 );
 
 FetchOff_t BP_lastOffs;
-PredBranch predBr;
+PredBranch predBr /*verilator public*/;
 wire BP_stall;
 wire[30:0] BP_curRetAddr;
 RetStackIdx_t BP_rIdx;
@@ -134,6 +134,7 @@ ICacheTable ict
     .OUT_stall(icacheStall),
 
     .IN_predBranch(predBr),
+    .IN_rIdx(BP_rIdx),
     .IN_lastValid(BP_lastOffs),
 
     .OUT_fetchID(fetchID),
@@ -188,9 +189,9 @@ always_comb begin
         ifetchOp.valid = 1;
         ifetchOp.pc = {pc, 1'b0};
         ifetchOp.fetchFault = IN_interruptPending ? IF_INTERRUPT : IF_FAULT_NONE;
-        ifetchOp.rIdx = BP_rIdx;
-        
+
         // set in next cycle
+        //ifetchOp.rIdx = BP_rIdx;
         //ifetchOp.fetchID = 'x;
         //ifetchOp.lastValid = BP_lastOffs;
         //ifetchOp.predPos = BP_info.predicted ? (predBr.valid ? predBr.offs : 3'b111) : 3'b111;
@@ -203,7 +204,7 @@ reg waitForInterrupt /* verilator public */;
 reg issuedInterrupt;
 
 always_ff@(posedge clk) begin
-    OUT_pw.valid <= 0;
+    
     if (rst) begin
         waitForInterrupt <= 0;
         issuedInterrupt <= 0;

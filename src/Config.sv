@@ -62,6 +62,6 @@
     (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
 
 // Un-defining this disables synchronous reset for some memories.
-// This is useful for mapping to FPGA memories, which are are reset
+// This is useful for mapping to FPGA memories, which are reset
 // after programming anyways.
 `define SYNC_RESET

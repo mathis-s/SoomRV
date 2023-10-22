@@ -17,6 +17,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     
     // second cycle
     input PredBranch IN_predBranch,
+    input RetStackIdx_t IN_rIdx,
     input FetchOff_t IN_lastValid,
     
     // pc file write
@@ -314,13 +315,13 @@ always_ff@(posedge clk) begin
         assert(FIFO_ready);
 end
 
-FetchID_t fetchID;
+FetchID_t fetchID /* verilator public */;
 assign OUT_fetchID = fetchID;
 
 // pipeline
 FetchID_t fetchID_c;
-IFetchOp fetch0;
-IFetchOp fetch1;
+IFetchOp fetch0 /* verilator public */;
+IFetchOp fetch1 /* verilator public */;
 
 typedef enum logic[1:0]
 {
@@ -362,6 +363,7 @@ always_ff@(posedge clk) begin
                 fetch1.bpi.taken <= IN_predBranch.taken;
                 fetch1.bpi.isJump <= IN_predBranch.isJump;
                 fetch1.predTarget <= IN_predBranch.dst;
+                fetch1.rIdx <= IN_rIdx;
 
                 fetchID <= fetchID + 1;
             end

@@ -14,6 +14,7 @@
 #include "VTop_Core.h"
 #include "VTop_ExternalAXISim.h"
 #include "VTop_IFetch.h"
+#include "VTop_ICacheTable.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
@@ -358,9 +359,9 @@ class SpikeSimif : public simif_t
         }
 
         bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
-        if (!instrEqual)
-            return -1;
         if (inst.pc != initialSpikePC)
+            return -1;
+        if (!instrEqual)
             return -2;
         if (!writeValid)
             return -3;
@@ -645,6 +646,12 @@ void LogPredec(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
+    // For return stack debugging
+    /*fprintf(konataFile, "L\t%u\t%u\t (%.5ld) %d %.3x %.3x %.3x %.3x| \n", inst.id, 0, main_time, inst.retIdx,
+        state.fetches[inst.fetchID].returnAddr[0] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[1] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[2] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[3] * 2 & 0xfff);*/
     fprintf(konataFile, "L\t%u\t%u\t%.8x (%.8x): %s\n", inst.id, 0, inst.pc, inst.inst,
             simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
@@ -889,6 +896,12 @@ void LogInstructions()
                 }
                 else
                     state.pd[i].valid = false;
+        }
+
+        if (core->ifetch->ict->fetch0[0] & 1)
+        {
+            for (int i = 0; i < 4; i++)
+                state.fetches[core->ifetch->ict->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
         }
     }
     LogCycle();

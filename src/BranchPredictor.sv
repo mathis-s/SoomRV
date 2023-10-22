@@ -43,7 +43,7 @@ module BranchPredictor
     input BPUpdate1 IN_bpUpdate1
 );
 
-assign OUT_stall = 0;//RET_stall;
+assign OUT_stall = RET_stall;
 
 typedef struct packed
 {
@@ -61,7 +61,7 @@ typedef struct packed
 BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;
-    bpBackup.rIdx = RET_idx;
+    bpBackup.rIdx = OUT_rIdx; //1.449044
     bpBackup.isJump = OUT_predBr.isJump;
     bpBackup.predTaken = OUT_predBr.taken;
     bpBackup.predOffs = OUT_predBr.offs;
@@ -103,7 +103,6 @@ reg[30:0] pcRegNoInc;
 
 reg ignorePred;
 always_comb begin
-    OUT_rIdx = RET_idx;
 
     OUT_predBr = '0;
     OUT_predBr.dst = OUT_curRetAddr;
@@ -185,6 +184,7 @@ TagePredictor tagePredictor
 PredBranch RET_br;
 wire RET_stall;
 RetStackIdx_t RET_idx;
+assign OUT_rIdx = RET_idx;
 ReturnStack retStack
 (
     .clk(clk),
@@ -276,8 +276,6 @@ always_ff@(posedge clk) begin
     update <= 'x;
     update.valid <= 0;
 
-    ignorePred <= 0;
-
     if (rst) begin
         pcReg <= 31'(`ENTRY_POINT >> 1);
         ignorePred <= 1;
@@ -286,6 +284,7 @@ always_ff@(posedge clk) begin
         if (IN_pcValid) begin
             pcReg <= {OUT_pc[30:3] + 1'b1, 3'b0};
             pcRegNoInc <= OUT_pc;
+            ignorePred <= 0;
         end
         if (IN_mispr) begin
             recovery.valid <= 1;

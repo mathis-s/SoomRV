@@ -2,7 +2,7 @@ module ReturnStack
 #(
     parameter SIZE=4,
     parameter RQSIZE=4,
-    parameter RET_PRED_SIZE=32,
+    parameter RET_PRED_SIZE=64,
     parameter RET_PRED_ASSOC=2,
     parameter RET_PRED_TAG_LEN=10
 )
@@ -93,22 +93,21 @@ RetRecQEntry rrqueue[RQSIZE-1:0]; // return addr recovery
 reg forwardRindex;
 RetStackAction recAct;
 
+wire[30:0] addrToPush = {IN_lastPC[30:$bits(FetchOff_t)], IN_branch.offs} + 1;
+
 // On mispredict it takes a cycle to read the old return stack index,
 // so we forward it combinatorially.
 RetStackIdx_t rindexReg;
 RetStackIdx_t rindex;
-
-wire[30:0] addrToPush = {IN_lastPC[30:$bits(FetchOff_t)], IN_branch.offs} + 1;
-
 always_comb begin
     rindex = rindexReg;
     if (forwardRindex) begin
         rindex = IN_misprIdx;
     end
-    else if (IN_branch.valid && IN_branch.isCall) begin
+    else if (IN_branch.valid && IN_branch.isCall && lastValid) begin
         rindex = rindex + 1;
     end
-    else if (IN_branch.valid && IN_branch.isRet) begin
+    else if (IN_branch.valid && IN_branch.isRet && lastValid) begin
         rindex = rindex - 1;
     end
 end
@@ -162,6 +161,8 @@ FetchID_t recoveryID;
 FetchID_t recoveryBase;
 FetchID_t lastInvalComFetchID;
 
+reg lastValid;
+
 always_ff@(posedge clk) begin
     
     forwardRindex <= 0;
@@ -176,9 +177,12 @@ always_ff@(posedge clk) begin
         recoveryInProgress = 0;
         OUT_stall <= 0;
         lastInvalComFetchID <= 0;
+        lastValid <= 0;
     end
     else begin
         
+        lastValid <= IN_valid;
+
         if (IN_mispr) begin
             forwardRindex <= 1;
             recAct <= IN_misprAct;
@@ -186,6 +190,7 @@ always_ff@(posedge clk) begin
             recoveryID = IN_misprFetchID;
             recoveryBase = lastInvalComFetchID;
             OUT_stall <= 1;
+            lastValid <= 0;
         end
         else rindexReg <= rindex;
         
@@ -252,7 +257,7 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else if (!IN_mispr) begin
+        else if (!IN_mispr && lastValid) begin
             if (IN_branch.valid && IN_branch.isRet) begin
                 
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
