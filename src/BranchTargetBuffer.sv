@@ -13,7 +13,6 @@ module BranchTargetBuffer
     output reg OUT_branchIsCall,
     output reg OUT_branchCompr,
     output reg OUT_multipleBranches,
-    input wire IN_BPT_branchTaken,
     
     input BTUpdate IN_btUpdate
 );
@@ -34,35 +33,35 @@ localparam LENGTH = `BTB_ENTRIES;/// `BTB_ASSOC;
 BTBEntry entries[LENGTH-1:0];
 logic multiple[LENGTH-1:0];
 
-wire BTBEntry fetched = entries[IN_pc[$clog2(LENGTH)-1:0]];
-always_comb begin
+always_ff@(posedge clk) begin
+
+    BTBEntry fetched = entries[IN_pc[$clog2(LENGTH)-1:0]];
     
-    OUT_branchFound = 0;
-    OUT_multipleBranches = 'x;
-    OUT_branchDst = 'x;
-    OUT_branchIsJump = 0;
-    OUT_branchIsCall = 0;
-    OUT_branchCompr = 0;
-    OUT_branchSrcOffs = 'x;
-    
-    if (IN_pcValid && fetched.valid && fetched.src == IN_pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
-        OUT_branchFound = 1;
-        OUT_multipleBranches = multiple[IN_pc[$clog2(LENGTH)-1:0]];
-        OUT_branchDst = fetched.dst;
-        OUT_branchIsJump = fetched.isJump;
-        OUT_branchIsCall = fetched.isCall;
-        OUT_branchCompr = fetched.compr;
-        OUT_branchSrcOffs = fetched.offs;
+    if (IN_pcValid) begin
+        OUT_branchFound <= 0;
+        OUT_multipleBranches <= 'x;
+        OUT_branchDst <= 'x;
+        OUT_branchIsJump <= 0;
+        OUT_branchIsCall <= 0;
+        OUT_branchCompr <= 0;
+        OUT_branchSrcOffs <= 'x;
+        
+        if (fetched.valid && fetched.src == IN_pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
+            OUT_branchFound <= 1;
+            OUT_multipleBranches <= multiple[IN_pc[$clog2(LENGTH)-1:0]];
+            OUT_branchDst <= fetched.dst;
+            OUT_branchIsJump <= fetched.isJump;
+            OUT_branchIsCall <= fetched.isCall;
+            OUT_branchCompr <= fetched.compr;
+            OUT_branchSrcOffs <= fetched.offs;
+        end
     end
 end
 
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        //`ifdef SYNC_RESET
-        //for (integer i = 0; i < LENGTH; i=i+1)
-        //    entries[i].valid <= 0;
-        //`endif
+
     end
     else begin
         if (IN_btUpdate.valid) begin

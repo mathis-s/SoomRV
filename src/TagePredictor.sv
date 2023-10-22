@@ -10,8 +10,10 @@ module TagePredictor
     input wire clk,
     input wire rst,
     
+    input wire IN_predValid,
     input wire[30:0] IN_predAddr,
     input BHist_t IN_predHistory,
+
     output TageID_t OUT_predTageID,
     output reg OUT_altPred,
     output reg OUT_predTaken,
@@ -145,21 +147,19 @@ generate
     end
 endgenerate
 
-
-always_comb begin
-    
-    OUT_altPred = predictions[0];
-    OUT_predTaken = predictions[0];
-
-    OUT_predTageID = 0;
-    
-    for (integer i = 0; i < NUM_STAGES; i=i+1) begin
-        if (valid[i]) begin
-            OUT_predTageID = i[$bits(TageID_t)-1:0];
-            OUT_altPred = OUT_predTaken;
-            OUT_predTaken = predictions[i];
+always_ff@(posedge clk) begin
+    if (IN_predValid) begin
+        OUT_altPred <= predictions[0];
+        OUT_predTaken <= predictions[0];
+        OUT_predTageID <= 0;
+        
+        for (integer i = 0; i < NUM_STAGES; i=i+1) begin
+            if (valid[i]) begin
+                OUT_predTageID <= i[$bits(TageID_t)-1:0];
+                OUT_altPred <= OUT_predTaken;
+                OUT_predTaken <= predictions[i];
+            end
         end
     end
-    
 end
 endmodule

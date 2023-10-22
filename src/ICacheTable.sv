@@ -11,13 +11,20 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
 
     input FetchID_t IN_ROB_curFetchID,
     
+    // first cycle
     input IFetchOp IN_ifetchOp,
     output logic OUT_stall,
-
+    
+    // second cycle
+    input PredBranch IN_predBranch,
+    input FetchOff_t IN_lastValid,
+    
+    // pc file write
     output FetchID_t OUT_fetchID,
     output logic OUT_pcFileWE,
     output PCFileEntry OUT_pcFileEntry,
-
+    
+    // miss
     output logic OUT_icacheMiss,
     output FetchID_t OUT_icacheMissFetchID,
     output logic[31:0] OUT_icacheMissPC,
@@ -26,7 +33,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     IF_ICTable.HOST IF_ict,
 
     input logic IN_ready,
-    output IF_Instr OUT_instrs, 
+    output IF_Instr OUT_instrs,
     
     input wire IN_clearICache,
     input wire IN_flushTLB,
@@ -44,8 +51,10 @@ always_comb begin
     if (fetch0.valid) begin
         OUT_pcFileWE = 1;
         OUT_pcFileEntry.pc = fetch0.pc[31:1];
-        OUT_pcFileEntry.branchPos = fetch0.predPos;
-        OUT_pcFileEntry.bpi = fetch0.bpi;
+        OUT_pcFileEntry.branchPos = IN_predBranch.offs;
+        OUT_pcFileEntry.bpi.predicted = IN_predBranch.valid;
+        OUT_pcFileEntry.bpi.taken = IN_predBranch.taken;
+        OUT_pcFileEntry.bpi.isJump = IN_predBranch.isJump;
     end
 end
 
@@ -62,6 +71,10 @@ always_comb begin
 
     if (flushState != FLUSH_IDLE)
         OUT_stall = 1;
+
+    // Could possibly check if cache line at PC is currently
+    // being loaded. This will be caught later anyways, but
+    // it would save us a flush if we stall here.
 end
 
 // Read ICache at current PC
@@ -343,6 +356,13 @@ always_ff@(posedge clk) begin
             if (fetch0.valid) begin
                 fetch1 <= fetch0;
                 fetch1.fetchID <= fetchID;
+                fetch1.lastValid <= IN_lastValid;
+                fetch1.predPos <= IN_predBranch.valid ? IN_predBranch.offs : 3'b111;
+                fetch1.bpi.predicted <= IN_predBranch.valid;
+                fetch1.bpi.taken <= IN_predBranch.taken;
+                fetch1.bpi.isJump <= IN_predBranch.isJump;
+                fetch1.predTarget <= IN_predBranch.dst;
+
                 fetchID <= fetchID + 1;
             end
         end

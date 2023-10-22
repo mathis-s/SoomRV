@@ -350,7 +350,10 @@ typedef struct packed
     logic[30:0] dst;
     FetchOff_t offs;
     logic compr;
+    logic isCall;
     logic isJump;
+    logic multiple;
+    logic taken;
     logic valid;
 } PredBranch;
 

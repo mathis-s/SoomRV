@@ -49,7 +49,6 @@ module IFetch
     input MemController_Res IN_memc
 );
 
-// these are virtual addresses when address translation is active
 reg[30:0] pc;
 wire[31:0] pcFull = {pc, 1'b0};
 
@@ -68,9 +67,7 @@ BranchSelector#(.NUM_BRANCHES(NUM_BRANCH_PROVS)) bsel
     .IN_mispredFlush(IN_mispredFlush)
 );
 
-wire BP_branchTaken;
-BranchPredInfo BP_info;
-wire BP_multipleBranches;
+FetchOff_t BP_lastOffs;
 PredBranch predBr;
 wire BP_stall;
 wire[30:0] BP_curRetAddr;
@@ -90,18 +87,19 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
     .IN_misprFetchID(OUT_branch.taken ? OUT_branch.fetchID : IN_decBranch.taken ? IN_decBranch.fetchID : icacheMissFetchID),
     .IN_misprRetAct(OUT_branch.taken ? OUT_branch.retAct : IN_decBranch.taken ? IN_decBranch.retAct : RET_NONE),
     .IN_misprHistAct(OUT_branch.taken ? OUT_branch.histAct : IN_decBranch.taken ? IN_decBranch.histAct : HIST_NONE),
+    .IN_misprDst(OUT_branch.taken ? OUT_branch.dstPC[31:1] : IN_decBranch.taken ? IN_decBranch.dst : icacheMissPC[31:1]),
     
     .IN_pcValid(ifetchEn),
-    .IN_pc({pc, 1'b0}),
     .IN_fetchID(fetchID),
     .IN_comFetchID(IN_ROB_curFetchID),
-    .OUT_branchTaken(BP_branchTaken),
-    .OUT_branchInfo(BP_info),
-    .OUT_rIdx(BP_rIdx),
-    .OUT_multipleBranches(BP_multipleBranches),
+    
+    .OUT_pc(pc),
+    .OUT_lastOffs(BP_lastOffs),
+
     .OUT_curRetAddr(BP_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
-    
+    .OUT_rIdx(BP_rIdx),
+
     .OUT_predBr(predBr),
 
     .IN_retDecUpd(IN_retDecUpd),
@@ -134,6 +132,9 @@ ICacheTable ict
 
     .IN_ifetchOp(ifetchOp),
     .OUT_stall(icacheStall),
+
+    .IN_predBranch(predBr),
+    .IN_lastValid(BP_lastOffs),
 
     .OUT_fetchID(fetchID),
     .OUT_pcFileWE(pcFileWriteEn),
@@ -186,13 +187,15 @@ always_comb begin
     else if (ifetchEn) begin
         ifetchOp.valid = 1;
         ifetchOp.pc = {pc, 1'b0};
-        ifetchOp.fetchID = 'x; // set in next cycle
         ifetchOp.fetchFault = IN_interruptPending ? IF_INTERRUPT : IF_FAULT_NONE;
-        ifetchOp.lastValid = ((BP_info.taken || BP_multipleBranches) && predBr.valid) ? predBr.offs : (3'b111);
-        ifetchOp.predPos = BP_info.predicted ? (predBr.valid ? predBr.offs : 3'b111) : 3'b111;
-        ifetchOp.bpi = BP_info;
-        ifetchOp.predTarget = BP_info.taken ? predBr.dst : BP_curRetAddr;
         ifetchOp.rIdx = BP_rIdx;
+        
+        // set in next cycle
+        //ifetchOp.fetchID = 'x;
+        //ifetchOp.lastValid = BP_lastOffs;
+        //ifetchOp.predPos = BP_info.predicted ? (predBr.valid ? predBr.offs : 3'b111) : 3'b111;
+        //ifetchOp.bpi = BP_info;
+        //ifetchOp.predTarget = BP_info.taken ? predBr.dst : BP_curRetAddr;
     end
 end
 
@@ -202,7 +205,6 @@ reg issuedInterrupt;
 always_ff@(posedge clk) begin
     OUT_pw.valid <= 0;
     if (rst) begin
-        pc <= 31'(`ENTRY_POINT >> 1);
         waitForInterrupt <= 0;
         issuedInterrupt <= 0;
     end
@@ -213,17 +215,17 @@ always_ff@(posedge clk) begin
     
         if (OUT_branch.taken || IN_decBranch.taken || icacheMiss) begin
             if (OUT_branch.taken) begin
-                pc <= OUT_branch.dstPC[31:1];
+                //pc <= OUT_branch.dstPC[31:1];
                 waitForInterrupt <= 0;
             end
             else if (IN_decBranch.taken) begin
-                pc <= IN_decBranch.dst;
+                //pc <= IN_decBranch.dst;
                 // We also use WFI to temporarily disable the frontend
                 // for ops that always flush the pipeline
                 waitForInterrupt <= IN_decBranch.wfi;
             end
             else if (icacheMiss) begin
-                pc <= icacheMissPC[31:1];
+                //pc <= icacheMissPC[31:1];
             end
             issuedInterrupt <= 0;
         end
@@ -234,25 +236,7 @@ always_ff@(posedge clk) begin
             end
             // Valid Fetch
             else begin
-                if (predBr.valid) begin
-                    if (predBr.isJump || BP_branchTaken) begin
-                        pc <= predBr.dst;
-                    end
-                    // Branch found, not taken
-                    else begin                    
-                        // There is a second branch in this block,
-                        // go there.
-                        if (BP_multipleBranches && predBr.offs != 3'b111) begin
-                            pc <= {pc[30:3], predBr.offs + 3'b1};
-                        end
-                        else begin
-                            pc <= {pc[30:3] + 28'b1, 3'b000};
-                        end
-                    end
-                end
-                else begin
-                    pc <= {pc[30:3] + 28'b1, 3'b000};
-                end
+                
             end
         end
     end

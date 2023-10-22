@@ -116,10 +116,13 @@ always_comb begin
     OUT_predBr.dst = rstack[rindex];
     OUT_curRetAddr = rstack[rindex];
 
+    OUT_predBr.taken = 1;
     OUT_predBr.isJump = 1;
+    OUT_predBr.isCall = 0;
     OUT_predBr.valid = 0;
     OUT_predBr.offs = 'x;
     OUT_predBr.compr = 'x;
+    OUT_predBr.multiple = 'x;
 
     lookupAssocIdx = 'x;
     
