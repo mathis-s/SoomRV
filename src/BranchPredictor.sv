@@ -61,7 +61,7 @@ typedef struct packed
 BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;
-    bpBackup.rIdx = OUT_rIdx; //1.449044
+    bpBackup.rIdx = OUT_rIdx;
     bpBackup.isJump = OUT_predBr.isJump;
     bpBackup.predTaken = OUT_predBr.taken;
     bpBackup.predOffs = OUT_predBr.offs;
