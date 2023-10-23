@@ -3,8 +3,9 @@ module BranchPredictionTable
     input wire clk,
     input wire rst,
     
+    input wire IN_readValid,
     input wire[`BP_BASEP_ID_LEN-1:0] IN_readAddr,
-    output wire OUT_taken,
+    output reg OUT_taken,
     
     input wire IN_writeEn,
     input wire[`BP_BASEP_ID_LEN-1:0] IN_writeAddr,
@@ -14,9 +15,12 @@ module BranchPredictionTable
 localparam NUM_COUNTERS = (1 << `BP_BASEP_ID_LEN);
 reg[1:0] counters[NUM_COUNTERS-1:0];
 
-assign OUT_taken = counters[IN_readAddr][1];
+always_ff@(posedge clk) begin
+    if (IN_readValid)
+        OUT_taken <= counters[IN_readAddr][1];
+end
 
-always@(posedge clk) begin
+always_ff@(posedge clk) begin
     
     if (rst) begin
         // NOTE: Reset state for easier debugging + perf analysis, remove this before synthesis.

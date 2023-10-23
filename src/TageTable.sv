@@ -10,6 +10,7 @@ module TageTable
     input wire clk,
     input wire rst,
     
+    input wire IN_readValid,
     input wire[$clog2(SIZE)-1:0] IN_readAddr,
     input wire[TAG_SIZE-1:0] IN_readTag,
     output reg OUT_readValid,
@@ -39,9 +40,11 @@ typedef struct packed
 TageEntry entries[SIZE-1:0];
 
 // Prediction: Read from entry, check tag
-always_comb begin
-    OUT_readValid = entries[IN_readAddr].tag == IN_readTag;
-    OUT_readTaken = entries[IN_readAddr].counter[CNT_SIZE-1];
+always_ff@(posedge clk) begin
+    if (IN_readValid) begin
+        OUT_readValid <= entries[IN_readAddr].tag == IN_readTag;
+        OUT_readTaken <= entries[IN_readAddr].counter[CNT_SIZE-1];
+    end
 end
 
 always_comb begin
