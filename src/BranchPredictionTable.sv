@@ -13,29 +13,47 @@ module BranchPredictionTable
 );
 
 localparam NUM_COUNTERS = (1 << `BP_BASEP_ID_LEN);
-reg[1:0] counters[NUM_COUNTERS-1:0];
+
+reg pred[NUM_COUNTERS-1:0];
+reg hist[NUM_COUNTERS-1:0];
 
 always_ff@(posedge clk) begin
     if (IN_readValid)
-        OUT_taken <= counters[IN_readAddr][1];
+        OUT_taken <= pred[IN_readAddr];
+end
+
+typedef struct packed
+{
+    logic[`BP_BASEP_ID_LEN-1:0] addr;
+    logic taken;
+    logic valid;
+} Write;
+
+reg[1:0] writeTempReg;
+
+Write write_c;
+Write write_r;
+always_comb begin
+    write_c.valid = IN_writeEn;
+    write_c.addr = IN_writeAddr;
+    write_c.taken = IN_writeTaken;
 end
 
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        // NOTE: Reset state for easier debugging + perf analysis, remove this before synthesis.
-        `ifdef __ICARUS__
-        for (integer i = 0; i < NUM_COUNTERS; i=i+1) begin
-            counters[i] <= 2'b10;
-        end
-        `endif
+    
     end
     else begin
-        if (IN_writeEn) begin
-            if (IN_writeTaken) 
-                counters[IN_writeAddr] <= (counters[IN_writeAddr] == 2'b11) ? (2'b11) : (counters[IN_writeAddr] + 1);
-            else
-                counters[IN_writeAddr] <= (counters[IN_writeAddr] == 2'b00) ? (2'b00) : (counters[IN_writeAddr] - 1);
+        write_r <= write_c;
+        if (write_c.valid) begin
+            writeTempReg <= {pred[write_c.addr], hist[write_c.addr]};
+        end
+        if (write_r.valid) begin
+            if (writeTempReg != 2'b11 && write_r.taken)
+                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg + 1'b1;
+            if (writeTempReg != 2'b00 && !write_r.taken)
+                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg - 1'b1;
         end
     end
 end
