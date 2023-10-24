@@ -44,6 +44,7 @@ BranchPredictionTable basePredictor
     
     .IN_writeEn(IN_writeValid),
     .IN_writeAddr(IN_writeAddr[`BP_BASEP_ID_LEN-1:0]),
+    .IN_writeInit(0), // base predictor does not use explicit allocation
     .IN_writeTaken(IN_writeTaken)
 );
 // Base Predictor is always valid

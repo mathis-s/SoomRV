@@ -4,7 +4,7 @@ module TageTable
     parameter TAG_SIZE=9,
     parameter USF_SIZE=2,
     parameter CNT_SIZE=2,
-    parameter INTERVAL=20
+    parameter INTERVAL=`TAGE_CLEAR_INTERVAL
 )
 (
     input wire clk,
@@ -14,7 +14,7 @@ module TageTable
     input wire[$clog2(SIZE)-1:0] IN_readAddr,
     input wire[TAG_SIZE-1:0] IN_readTag,
     output reg OUT_readValid,
-    output reg OUT_readTaken,
+    output wire OUT_readTaken,
     
     input wire IN_writeValid,
     input wire[$clog2(SIZE)-1:0] IN_writeAddr,
@@ -30,25 +30,40 @@ module TageTable
     input wire IN_allocFailed
 );
 
-typedef struct packed
-{
-    logic[TAG_SIZE-1:0] tag;
-    logic[USF_SIZE-1:0] useful;
-    logic[CNT_SIZE-1:0] counter;
-} TageEntry;
+BranchPredictionTable#($clog2(SIZE)) counters
+(
+    .clk(clk),
+    .rst(rst),
 
-TageEntry entries[SIZE-1:0];
+    .IN_readValid(IN_readValid),
+    .IN_readAddr(IN_readAddr),
+    .OUT_taken(OUT_readTaken),
+    
+    .IN_writeEn(IN_writeValid && (IN_writeUpdate || (IN_doAlloc && useful[IN_writeAddr] == 0))),
+    .IN_writeAddr(IN_writeAddr),
+    .IN_writeInit(!IN_writeUpdate),
+    .IN_writeTaken(IN_writeTaken)
+);
+
+logic[TAG_SIZE-1:0] tag[SIZE-1:0];
+logic[USF_SIZE-1:0] useful[SIZE-1:0];
 
 // Prediction: Read from entry, check tag
+
+reg[TAG_SIZE-1:0] tagRegA;
+reg[TAG_SIZE-1:0] tagRegB;
 always_ff@(posedge clk) begin
     if (IN_readValid) begin
-        OUT_readValid <= entries[IN_readAddr].tag == IN_readTag;
-        OUT_readTaken <= entries[IN_readAddr].counter[CNT_SIZE-1];
+        tagRegA <= tag[IN_readAddr];
+        tagRegB <= IN_readTag;
     end
+end
+always_comb begin
+    OUT_readValid = (tagRegA == tagRegB);
 end
 
 always_comb begin
-    OUT_allocAvail = entries[IN_writeAddr].useful == 0;
+    OUT_allocAvail = useful[IN_writeAddr] == 0;
 end
 
 reg[INTERVAL-1:0] decrCnt;
@@ -57,51 +72,38 @@ always_ff@(posedge clk) begin
          
     if (rst) begin
         decrCnt <= 0;
-`ifdef SYNC_RESET
-        for (integer i = 0; i < SIZE; i=i+1)
-            entries[i] <= '0;
-`endif
     end
     else if (IN_writeValid) begin
         if (IN_writeUpdate) begin
-
-            // Update prediction counter
-            if (IN_writeTaken && entries[IN_writeAddr].counter != {CNT_SIZE{1'b1}})
-                entries[IN_writeAddr].counter <= entries[IN_writeAddr].counter + 1;
-            else if (!IN_writeTaken && entries[IN_writeAddr].counter != {CNT_SIZE{1'b0}})
-                entries[IN_writeAddr].counter <= entries[IN_writeAddr].counter - 1;
-            
-            // Update useful counter
-
             // Update when altpred different from final pred
             if (IN_writeUseful) begin
                 // Increment if correct, decrement if not.
-                if (IN_writeCorrect && entries[IN_writeAddr].useful != {USF_SIZE{1'b1}})
-                    entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful + 1;
-                else if (!IN_writeCorrect && entries[IN_writeAddr].useful != {USF_SIZE{1'b0}})
-                    entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful - 1;
+                if (IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b1}})
+                    useful[IN_writeAddr] <= useful[IN_writeAddr] + 1;
+                else if (!IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b0}})
+                    useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
             end
         end
         else if (IN_doAlloc) begin
-            if (entries[IN_writeAddr].useful == 0) begin
-                entries[IN_writeAddr].tag <= IN_writeTag;
-                entries[IN_writeAddr].counter <= {IN_writeTaken, {(CNT_SIZE-1){1'b0}}};
-                entries[IN_writeAddr].useful <= 0;
+            if (useful[IN_writeAddr] == 0) begin
+                tag[IN_writeAddr] <= IN_writeTag;
             end
         end
         else if (IN_allocFailed) begin
-            assert(entries[IN_writeAddr].useful != 0);
-            entries[IN_writeAddr].useful <= entries[IN_writeAddr].useful - 1;
+            assert(useful[IN_writeAddr] != 0);
+            useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
         end
     end
     
+`ifdef `TAGE_CLEAR_ENABLE
     // Clear low or high bit of useful counters alternatingly periodically
     if (decrCnt == 0) begin
         for (integer i = 0; i < SIZE; i=i+1)
-            entries[i].useful[decrBit] <= 0;
+            useful[i][decrBit] <= 0;
         decrBit <= !decrBit;
     end
     decrCnt <= decrCnt - 1;
+`endif
 end
 
 endmodule

@@ -3,8 +3,10 @@
 `define BTB_ENTRIES 1024
 `define BTB_TAG_SIZE 16
 
-// Tage Base Predictor
+// TAGE Predictor
 `define BP_BASEP_ID_LEN 10
+`define TAGE_CLEAR_ENABLE
+`define TAGE_CLEAR_INTERVAL 20
 
 // IFetch
 `define DEC_WIDTH 4
