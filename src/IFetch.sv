@@ -122,7 +122,7 @@ FetchID_t icacheMissFetchID;
 ICacheTable ict
 (
     .clk(clk),
-    .rst(rst || IN_clearICache),
+    .rst(rst),
     .IN_MEM_busy(IN_MEM_busy),
 
     .IN_mispr(OUT_branch.taken || IN_decBranch.taken),
