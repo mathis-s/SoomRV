@@ -95,7 +95,7 @@ always_ff@(posedge clk) begin
         end
     end
     
-`ifdef `TAGE_CLEAR_ENABLE
+`ifdef TAGE_CLEAR_ENABLE
     // Clear low or high bit of useful counters alternatingly periodically
     if (decrCnt == 0) begin
         for (integer i = 0; i < SIZE; i=i+1)
