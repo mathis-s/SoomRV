@@ -401,6 +401,24 @@ always_comb begin
                 !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr))));
 end
 
+// Sort uops to enqueue by storeSqN
+R_UOp rnUOpSorted[`DEC_WIDTH-1:0];
+always_comb begin
+    for (integer i = 0; i < `DEC_WIDTH; i=i+1) begin
+        rnUOpSorted[i] = 'x;
+        rnUOpSorted[i].valid = 0;
+        
+        for (integer j = 0; j < `DEC_WIDTH; j=j+1) begin
+            // This could be one-hot...
+            if (IN_rnUOp[j].valid && IN_rnUOp[j].storeSqN[$clog2(`DEC_WIDTH)-1:0] == i[$clog2(`DEC_WIDTH)-1:0] &&
+                (IN_rnUOp[j].fu == FU_ST || IN_rnUOp[j].fu == FU_ATOMIC)
+            ) begin
+                rnUOpSorted[i] = IN_rnUOp[j];
+            end
+        end
+    end
+end
+
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
@@ -559,11 +577,10 @@ always_ff@(posedge clk) begin
 
         // Enqueue
         for (integer i = 0; i < WIDTH_RN; i=i+1)
-            if (IN_rnUOp[i].valid && (!IN_branch.taken || ($signed(IN_rnUOp[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush)) &&
-                (IN_rnUOp[i].fu == FU_ST || IN_rnUOp[i].fu == FU_ATOMIC)) begin
+            if (rnUOpSorted[i].valid && (!IN_branch.taken || ($signed(rnUOpSorted[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))) begin
                 
-                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_rnUOp[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];
-                assert(IN_rnUOp[i].storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
+                reg[$clog2(NUM_ENTRIES)-1:0] index = {rnUOpSorted[i].storeSqN[$clog2(NUM_ENTRIES)-1:$clog2(`DEC_WIDTH)], i[0+:$clog2(`DEC_WIDTH)]};
+                assert(rnUOpSorted[i].storeSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 
                 entries[index].data <= 'x;
                 entries[index].addr <= 'x;
@@ -574,19 +591,19 @@ always_ff@(posedge clk) begin
                 entries[index].atomic <= 0;
                 entries[index].ready <= 0;
                 entries[index].loaded <= 0;
-                entries[index].sqN <= IN_rnUOp[i].sqN;
+                entries[index].sqN <= rnUOpSorted[i].sqN;
                 entries[index].addrAvail <= 0;
-                entries[index].avail <= IN_rnUOp[i].availB;
-                entries[index].data.m.tag <= IN_rnUOp[i].tagB;
+                entries[index].avail <= rnUOpSorted[i].availB;
+                entries[index].data.m.tag <= rnUOpSorted[i].tagB;
 
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1)
-                    if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && IN_rnUOp[i].tagB == IN_resultUOp[j].tagDst)
+                    if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && rnUOpSorted[i].tagB == IN_resultUOp[j].tagDst)
                         entries[index].avail <= 1;
 
                 // Atomic Ops special handling
-                if (IN_rnUOp[i].fu == FU_ATOMIC) begin
+                if (rnUOpSorted[i].fu == FU_ATOMIC) begin
                     entries[index].atomic <= 1;
-                    if (IN_rnUOp[i].opcode != ATOMIC_AMOSWAP_W) begin
+                    if (rnUOpSorted[i].opcode != ATOMIC_AMOSWAP_W) begin
                         
                         entries[index].atomicLd <= 1;
                         entries[index].data.m.tag <= 'x;
@@ -596,8 +613,8 @@ always_ff@(posedge clk) begin
                 end
                 
                 // Cache Block Ops special handling
-                if (IN_rnUOp[i].fu == FU_ST) begin
-                    case (IN_rnUOp[i].opcode)
+                if (rnUOpSorted[i].fu == FU_ST) begin
+                    case (rnUOpSorted[i].opcode)
                         LSU_CBO_CLEAN: begin
                             entries[index].data <= {30'bx, 2'd0};
                             entries[index].loaded <= 1;

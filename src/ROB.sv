@@ -54,16 +54,14 @@ module ROB
 localparam LENGTH = 1 << ID_LEN;
 
 R_UOp rnUOpSorted[WIDTH_RN-1:0];
-reg rnUOpValidSorted[WIDTH_RN-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-        rnUOpValidSorted[i] = 0;
         rnUOpSorted[i] = 'x;
+        rnUOpSorted[i].valid = 0;
         
         for (integer j = 0; j < WIDTH_RN; j=j+1) begin
             // This could be one-hot...
             if (IN_uop[j].valid && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
-                rnUOpValidSorted[i] = 1;
                 rnUOpSorted[i] = IN_uop[j];
             end
         end
@@ -289,7 +287,7 @@ always_ff@(posedge clk) begin
         
         // Enqueue ops directly from Rename
         for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-            if (rnUOpValidSorted[i] && (!IN_branch.taken)) begin
+            if (rnUOpSorted[i].valid && (!IN_branch.taken)) begin
                 
                 reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
                 
