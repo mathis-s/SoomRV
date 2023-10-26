@@ -18,7 +18,7 @@ module IssueQueue
 (
     input wire clk,
     input wire rst,
-    input wire frontEn,
+    output reg[NUM_UOPS-1:0] OUT_stall,
     
     input wire IN_stall,
     input wire IN_doNotIssueFU1,
@@ -43,8 +43,7 @@ module IssueQueue
     input SqN IN_maxLoadSqN,
     input SqN IN_commitSqN,
     
-    output IS_UOp OUT_uop,
-    output reg OUT_full
+    output IS_UOp OUT_uop
 );
 
 localparam ID_LEN = $clog2(SIZE);
@@ -117,9 +116,10 @@ reg[NUM_UOPS-1:0] acceptIncoming;
 always_comb begin
     reg[$clog2(SIZE):0] count = 0;
     acceptIncoming = 0;
+    OUT_stall = '0;
+
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        if (IN_uop[i].valid &&
-            
+        if (IN_uop[i].validIQ[PORT_IDX] &&
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
                     (PORT_IDX == 0 && IN_uop[i].fu == FU_ATOMIC)) &&
@@ -127,10 +127,10 @@ always_comb begin
             (PORT_IDX != 0 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
             count = count + 1;
-            acceptIncoming[i] = 1;
+            OUT_stall[i] = (insertIndex > (SIZE[$clog2(SIZE):0] - count)) || IN_branch.taken;
+            acceptIncoming[i] = !OUT_stall[i];
         end
     end
-    OUT_full = insertIndex > (SIZE[$clog2(SIZE):0] - count);
 end
 
 always_ff@(posedge clk) begin
@@ -182,8 +182,8 @@ always_ff@(posedge clk) begin
                             queue[i].fu != FU_CSR || (i == 0 && queue[i].sqN == IN_commitSqN)) &&
                         
                         // Only issue stores that fit into store queue
-                        ((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST && FU3 != FU_ST) || 
-                            queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
+                        //((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST && FU3 != FU_ST) || 
+                        //    queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
                         
                         // Only issue loads that fit into load order buffer
                         ((FU0 != FU_LD && FU1 != FU_LD && FU2 != FU_LD && FU3 != FU_LD) || 
@@ -239,81 +239,79 @@ always_ff@(posedge clk) begin
         end
         
         // Enqueue
-        if (frontEn && !IN_branch.taken) begin
-            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                if (acceptIncoming[i]) begin
-                    R_ST_UOp temp;
-                    
-                    temp.imm = 0;
-                    temp.imm[REGULAR_IMM_BITS-1:0] = IN_uop[i].imm[REGULAR_IMM_BITS-1:0];
-                    
-                    temp.avail[0] = IN_uop[i].availA;
-                    temp.tags[0] = IN_uop[i].tagA;
-                    
-                    if (NUM_OPERANDS >= 2) begin
-                        // verilator lint_off SELRANGE
-                        temp.avail[1] = IN_uop[i].availB;
-                        temp.tags[1] = IN_uop[i].tagB;
-                        // verilator lint_on SELRANGE
-                    end
-                    
-                    temp.immB = IN_uop[i].immB;
-                    temp.sqN = IN_uop[i].sqN;
-                    temp.tagDst = IN_uop[i].tagDst;
-                    temp.opcode = IN_uop[i].opcode;
-                    temp.fetchID = IN_uop[i].fetchID;
-                    temp.fetchOffs = IN_uop[i].fetchOffs;
-                    temp.storeSqN = IN_uop[i].storeSqN;
-                    temp.loadSqN = IN_uop[i].loadSqN;
-                    temp.fu = IN_uop[i].fu;
-                    temp.compressed = IN_uop[i].compressed;
-                    
-                    
-                    // Check if the result for this op is being broadcasted in the current cycle
-                    for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-                        if (IN_resultValid[j]) begin
-                            for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                                if (k < 2 && temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
-                        end
-                    end
-                    
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+            if (acceptIncoming[i]) begin
+                R_ST_UOp temp;
+                
+                temp.imm = 0;
+                temp.imm[REGULAR_IMM_BITS-1:0] = IN_uop[i].imm[REGULAR_IMM_BITS-1:0];
+                
+                temp.avail[0] = IN_uop[i].availA;
+                temp.tags[0] = IN_uop[i].tagA;
+                
+                if (NUM_OPERANDS >= 2) begin
                     // verilator lint_off SELRANGE
-                    // Ports 0, 2, 3 are used for atomics
-                    if (PORT_IDX == 0 || PORT_IDX == 2 || PORT_IDX == 3)
-                        if (temp.fu == FU_ATOMIC) begin
-                            temp.fu = FuncUnit'(FU0);
-                            // INT port
-                            if (PORT_IDX == 0) begin
-                                temp.tags[0] = temp.tagDst;
-                                temp.avail[0] = 0;
-                                temp.tagDst = 7'h40;
-                            end
-
-                            // STORE port
-                            if (PORT_IDX == 3) begin
-                                temp.tagDst = 7'h40;
-                            end
-                        end
-                    
-                    // Special handling for jalr
-                    if (IN_uop[i].fu == FU_INT && (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)) begin
-                        assert(IMM_BITS == 36);
-                        
-                        // Use {imm[0], tags[1]} to encode 8 bits of imm12
-                        temp.tags[1] = IN_uop[i].imm12[6:0];
-                        temp.imm[0] = IN_uop[i].imm12[7];
-
-                        // rest goes into upper 4 bits of 36 (!) immediate bits
-                        temp.imm[35:32] = IN_uop[i].imm12[11:8];
-
-                        // tags[1] is not used for register encoding, thus is always valid
-                        temp.avail[1] = 1;
-                    end
+                    temp.avail[1] = IN_uop[i].availB;
+                    temp.tags[1] = IN_uop[i].tagB;
                     // verilator lint_on SELRANGE
-                    
-                    queue[insertIndex[ID_LEN-1:0]] <= temp;
-                    insertIndex = insertIndex + 1;
                 end
+                
+                temp.immB = IN_uop[i].immB;
+                temp.sqN = IN_uop[i].sqN;
+                temp.tagDst = IN_uop[i].tagDst;
+                temp.opcode = IN_uop[i].opcode;
+                temp.fetchID = IN_uop[i].fetchID;
+                temp.fetchOffs = IN_uop[i].fetchOffs;
+                temp.storeSqN = IN_uop[i].storeSqN;
+                temp.loadSqN = IN_uop[i].loadSqN;
+                temp.fu = IN_uop[i].fu;
+                temp.compressed = IN_uop[i].compressed;
+                
+                
+                // Check if the result for this op is being broadcasted in the current cycle
+                for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
+                    if (IN_resultValid[j]) begin
+                        for (integer k = 0; k < NUM_OPERANDS; k=k+1)
+                            if (k < 2 && temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
+                    end
+                end
+                
+                // verilator lint_off SELRANGE
+                // Ports 0, 2, 3 are used for atomics
+                if (PORT_IDX == 0 || PORT_IDX == 2 || PORT_IDX == 3)
+                    if (temp.fu == FU_ATOMIC) begin
+                        temp.fu = FuncUnit'(FU0);
+                        // INT port
+                        if (PORT_IDX == 0) begin
+                            temp.tags[0] = temp.tagDst;
+                            temp.avail[0] = 0;
+                            temp.tagDst = 7'h40;
+                        end
+
+                        // STORE port
+                        if (PORT_IDX == 3) begin
+                            temp.tagDst = 7'h40;
+                        end
+                    end
+                
+                // Special handling for jalr
+                if (IN_uop[i].fu == FU_INT && (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)) begin
+                    assert(IMM_BITS == 36);
+                    
+                    // Use {imm[0], tags[1]} to encode 8 bits of imm12
+                    temp.tags[1] = IN_uop[i].imm12[6:0];
+                    temp.imm[0] = IN_uop[i].imm12[7];
+
+                    // rest goes into upper 4 bits of 36 (!) immediate bits
+                    temp.imm[35:32] = IN_uop[i].imm12[11:8];
+
+                    // tags[1] is not used for register encoding, thus is always valid
+                    temp.avail[1] = 1;
+                end
+                // verilator lint_on SELRANGE
+                
+                queue[insertIndex[ID_LEN-1:0]] <= temp;
+                insertIndex = insertIndex + 1;
             end
         end
     end

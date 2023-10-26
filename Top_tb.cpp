@@ -840,23 +840,22 @@ void LogInstructions()
     else
     {
         // Rename
-        if (core->IQS_ready)
-            for (size_t i = 0; i < 4; i++)
-                if (core->RN_uop[i][0] & 1)
-                {
-                    int sqn = ExtractField<4>(core->RN_uop[i], 46, 7);
-                    int fu = ExtractField<4>(core->RN_uop[i], 2, 4);
-                    uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 - 7, 7);
+        for (size_t i = 0; i < 4; i++)
+            if (core->RN_uop[i][0] & 1)
+            {
+                int sqn = ExtractField<4>(core->RN_uop[i], 46+4, 7);
+                int fu = ExtractField<4>(core->RN_uop[i], 2+4, 4);
+                uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 + 4 - 7, 7);
 
-                    state.insts[sqn].valid = 1;
-                    state.insts[sqn] = state.de[i];
-                    state.insts[sqn].sqn = sqn;
-                    state.insts[sqn].fu = fu;
-                    state.insts[sqn].tag = tagDst;
-                    state.nextSqN = (sqn + 1) & 127;
+                state.insts[sqn].valid = 1;
+                state.insts[sqn] = state.de[i];
+                state.insts[sqn].sqn = sqn;
+                state.insts[sqn].fu = fu;
+                state.insts[sqn].tag = tagDst;
+                state.nextSqN = (sqn + 1) & 127;
 
-                    LogRename(state.insts[sqn]);
-                }
+                LogRename(state.insts[sqn]);
+            }
 
         // Decode
         if (core->frontendEn && !core->RN_stall)

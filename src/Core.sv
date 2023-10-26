@@ -48,6 +48,7 @@ wire PC_stall;
 
 MemController_Req PC_MC_if;
 PageWalk_Req PC_PW_rq;
+
 IFetch ifetch
 (
     .clk(clk),
@@ -134,7 +135,7 @@ InstrDecoder idec
 );
 
 wire frontendEn /*verilator public*/ = 
-    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH - 1)) &&
+    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH)) &&
     ($signed((RN_nextStoreSqN) - SQ_maxStoreSqN) <= -(`DEC_WIDTH - 1)) &&
     !branch.taken &&
     en &&
@@ -151,7 +152,7 @@ Rename rn
     .frontEn(frontendEn),
     .rst(rst),
     
-    .IN_stall(!IQS_ready),
+    .IN_stalls(IQ_stalls),
     .OUT_stall(RN_stall),
 
     .IN_uop(DE_uop),
@@ -181,13 +182,14 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
-wire IQ0_full;
+wire[3:0][`DEC_WIDTH-1:0] IQ_stalls;
+//wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
+//wire IQ0_full;
 IssueQueue#(`IQ_0_SIZE,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(IQS_ready),
+    .OUT_stall(IQ_stalls[0]),
     
     .IN_stall(stall[0]),
     .IN_doNotIssueFU1(DIV_doNotIssue),
@@ -209,15 +211,13 @@ IssueQueue#(`IQ_0_SIZE,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33)
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_uop(IS_uop[0]),
-    .OUT_full(IQ0_full)
+    .OUT_uop(IS_uop[0])
 );
-wire IQ1_full;
 IssueQueue#(`IQ_1_SIZE,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(IQS_ready),
+    .OUT_stall(IQ_stalls[1]),
     
     .IN_stall(stall[1]),
     .IN_doNotIssueFU1(MUL_doNotIssue),
@@ -239,15 +239,13 @@ IssueQueue#(`IQ_1_SIZE,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_uop(IS_uop[1]),
-    .OUT_full(IQ1_full)
+    .OUT_uop(IS_uop[1])
 );
-wire IQ2_full;
 IssueQueue#(`IQ_2_SIZE,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(IQS_ready),
+    .OUT_stall(IQ_stalls[2]),
     
     .IN_stall(stall[2]),
     .IN_doNotIssueFU1(1'b0),
@@ -269,15 +267,13 @@ IssueQueue#(`IQ_2_SIZE,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_uop(IS_uop[2]),
-    .OUT_full(IQ2_full)
+    .OUT_uop(IS_uop[2])
 );
-wire IQ3_full;
 IssueQueue#(`IQ_3_SIZE,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),
-    .frontEn(IQS_ready),
+    .OUT_stall(IQ_stalls[3]),
     
     .IN_stall(stall[3]),
     .IN_doNotIssueFU1(1'b0),
@@ -299,8 +295,7 @@ IssueQueue#(`IQ_3_SIZE,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq
     .IN_maxLoadSqN(LB_maxLoadSqN),
     .IN_commitSqN(ROB_curSqN),
     
-    .OUT_uop(IS_uop[3]),
-    .OUT_full(IQ3_full)
+    .OUT_uop(IS_uop[3])
 );
 
 wire[5:0] RF_readAddress[7:0];

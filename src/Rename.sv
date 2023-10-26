@@ -9,7 +9,7 @@ module Rename
     input wire frontEn,
     input wire rst,
     
-    input wire IN_stall,
+    input wire[3:0][WIDTH_ISSUE-1:0] IN_stalls,
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
@@ -45,6 +45,14 @@ typedef struct packed
     logic valid;
 } LrScRsv;
 
+reg[3:0] portStall;
+always_comb begin
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+        portStall[i] = 0;
+        for (integer j = 0; j < 4; j=j+1)
+            portStall[i] |= IN_stalls[j][i];
+    end
+end
 
 wire RAT_lookupAvail[2*WIDTH_ISSUE-1:0];
 wire[6:0] RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
@@ -76,7 +84,8 @@ LrScRsv lrScRsv;
 LrScRsv nextLrScRsv;
 
 always_comb begin
-    OUT_stall = IN_stall;
+
+    OUT_stall = |portStall;
 
     nextCounterSqN = counterSqN;
     nextLrScRsv = lrScRsv;
@@ -241,7 +250,6 @@ end
 always_ff@(posedge clk) begin
 
     if (rst) begin
-        
         counterSqN <= 0;
         counterStoreSqN = -1;
         counterLoadSqN = 0;
@@ -253,6 +261,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;
+            OUT_uop[i].validIQ <= 0;
         end
     end
     else if (IN_branchTaken) begin
@@ -263,12 +272,34 @@ always_ff@(posedge clk) begin
         counterStoreSqN = IN_branchStoreSqN;
         
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i] <= 'x;
-            OUT_uop[i].valid <= 0;
+            if ($signed(OUT_uop[i].sqN - IN_branchSqN) > 0) begin
+                OUT_uop[i] <= 'x;
+                OUT_uop[i].valid <= 0;
+                OUT_uop[i].validIQ <= 0;
+            end
         end
     end
 
-    else if (frontEn && !OUT_stall) begin
+    if (!rst && |portStall) begin
+        // If frontend is stalled right now we need to make sure 
+        // the ops we're stalled on are kept up-to-date, as they will be
+        // read later.
+        for (integer i = 0; i < WIDTH_WR; i=i+1) begin
+            if (IN_wbHasResult[i]) begin
+                for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
+                    if (|OUT_uop[j].validIQ) begin
+                        if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
+                            OUT_uop[j].availA <= 1;
+                        if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)
+                            OUT_uop[j].availB <= 1;
+                    end
+                end
+            end
+        end
+    end
+
+    if (rst) ;
+    else if (!IN_branchTaken && frontEn && !OUT_stall) begin
 
         // Look up tags and availability of operands for new instructions
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
@@ -300,6 +331,7 @@ always_ff@(posedge clk) begin
             if (IN_uop[i].valid) begin
                 
                 OUT_uop[i].valid <= 1;
+                OUT_uop[i].validIQ <= '1;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
@@ -332,34 +364,23 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].tagDst <= newTags[i];
             end
             else begin
-                OUT_uop[i] <= 'x;
-                OUT_uop[i].valid <= 0;
+                OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
             end
         end
         counterSqN <= nextCounterSqN;
         lrScRsv <= nextLrScRsv;
     end
-    else if (!IN_stall) begin
-        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i] <= 'x;
+    else begin
+        // R_UOp carries two seperate valid signals. "valid" is the plain signal
+        // used by ROB and SQ. This signal is only ever set for one cycle, ROB and SQ
+        // do not stall.
+        // "validIQ" contains an individual valid bit for each IQ, these bits may be set
+        // for multiple cycles should IQs stall.
+        for (integer i = 0; i < WIDTH_ISSUE; i++) begin
             OUT_uop[i].valid <= 0;
-        end
-    end
-    
-    if (!rst && !IN_branchTaken && IN_stall) begin
-        // If frontend is stalled right now we need to make sure 
-        // the ops we're stalled on are kept up-to-date, as they will be
-        // read later.
-        for (integer i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_wbHasResult[i]) begin
-                for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
-                    if (OUT_uop[j].valid) begin
-                        if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
-                            OUT_uop[j].availA <= 1;
-                        if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)
-                            OUT_uop[j].availB <= 1;
-                    end
-                end
+
+            for (integer j = 0; j < 4; j=j+1) begin
+                if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
             end
         end
     end
