@@ -142,11 +142,8 @@ if (`CWIDTH == 1) always_comb begin
     CORE_DC_if.data[31:0] = IF_cache.wdata;
 end
 else always_comb begin
-    CORE_DC_if.wm = '0;
-    CORE_DC_if.wm[(IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 4) +: 4] = IF_cache.wmask;
-
-    CORE_DC_if.data = 'x;
-    CORE_DC_if.data[(IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 32) +: 32] = IF_cache.wdata;
+    CORE_DC_if.wm = (4*`CWIDTH)'(IF_cache.wmask) << (IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 4);
+    CORE_DC_if.data = {`CWIDTH{IF_cache.wdata}};
 end
 
 logic[127:0] DC_dataOut;
