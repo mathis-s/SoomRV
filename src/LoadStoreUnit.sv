@@ -1,3 +1,29 @@
+
+// [0] -> transfer exists; [1] -> allow pass thru
+function automatic logic[1:0] CheckTransfers(MemController_Req memcReq, MemController_Res memcRes, CacheID_t cacheID, logic[31:0] addr);
+    logic[1:0] rv = 0;
+
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
+        if (memcRes.transfers[i].valid &&
+            memcRes.transfers[i].cacheID == cacheID &&
+            memcRes.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
+        ) begin
+            rv[0] = 1;
+            rv[1] = (memcRes.transfers[i].progress) > 
+                ({1'b0, addr[`CLSIZE_E-1:2]} - {1'b0, memcRes.transfers[i].readAddr[`CLSIZE_E-1:2]});
+        end
+    end
+    
+    if ((memcReq.cmd == MEMC_REPLACE || memcReq.cmd == MEMC_CP_EXT_TO_CACHE) && 
+        memcReq.readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E] &&
+        memcReq.cacheID == cacheID
+    ) begin
+        rv = 2'b01;
+    end
+
+    return rv;
+endfunction
+
 module LoadStoreUnit
 #(
     parameter SIZE=(1<<(`CACHE_SIZE_E - `CLSIZE_E)),
@@ -263,30 +289,6 @@ typedef struct packed
 
 CacheMiss miss[1:0];
 
-// [0] -> transfer exists; [1] -> allow pass thru
-function automatic logic[1:0] CheckTransfers(logic[31:0] addr);
-    logic[1:0] rv = 0;
-
-    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
-        if (IN_memc.transfers[i].valid &&
-            IN_memc.transfers[i].cacheID == 0 &&
-            IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
-        ) begin
-            rv[0] = 1;
-            rv[1] = (IN_memc.transfers[i].progress) > 
-                ({1'b0, addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]});
-        end
-    end
-    
-    if (LSU_memc.cmd != MEMC_NONE && 
-        LSU_memc.readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
-    ) begin
-        rv = 2'b01;
-    end
-
-    return rv;
-endfunction
-
 // Load Result Output
 LD_UOp curLd;
 always_comb begin
@@ -329,7 +331,7 @@ always_comb begin
             begin
                 reg transferExists;
                 reg allowPassThru;
-                {allowPassThru, transferExists} = CheckTransfers(ld.addr);
+                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, ld.addr);
                 if (transferExists) begin
                     doCacheLoad = 0;
                     cacheHit &= allowPassThru;
@@ -471,7 +473,7 @@ always_comb begin
         begin
             reg transferExists;
             reg allowPassThru;
-            {allowPassThru, transferExists} = CheckTransfers(st.addr);
+            {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr);
             if (transferExists) begin
                 doCacheLoad = 0; // this is only needed for one cycle
                 cacheHit &= allowPassThru;

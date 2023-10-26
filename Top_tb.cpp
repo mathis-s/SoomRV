@@ -14,6 +14,7 @@
 #include "VTop_Core.h"
 #include "VTop_ExternalAXISim.h"
 #include "VTop_IFetch.h"
+#include "VTop_ICacheTable.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
@@ -358,9 +359,9 @@ class SpikeSimif : public simif_t
         }
 
         bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
-        if (!instrEqual)
-            return -1;
         if (inst.pc != initialSpikePC)
+            return -1;
+        if (!instrEqual)
             return -2;
         if (!writeValid)
             return -3;
@@ -645,6 +646,12 @@ void LogPredec(Inst& inst)
 {
 #ifdef KONATA
     fprintf(konataFile, "I\t%u\t%u\t%u\n", inst.id, inst.fetchID, 0);
+    // For return stack debugging
+    /*fprintf(konataFile, "L\t%u\t%u\t (%.5ld) %d %.3x %.3x %.3x %.3x| \n", inst.id, 0, main_time, inst.retIdx,
+        state.fetches[inst.fetchID].returnAddr[0] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[1] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[2] * 2 & 0xfff,
+        state.fetches[inst.fetchID].returnAddr[3] * 2 & 0xfff);*/
     fprintf(konataFile, "L\t%u\t%u\t%.8x (%.8x): %s\n", inst.id, 0, inst.pc, inst.inst,
             simif.disasm(inst.inst).c_str());
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
@@ -715,9 +722,9 @@ void LogInstructions()
 {
     auto core = top->Top->soc->core;
 
-    bool brTaken = core->branch[0] & 1;
+    bool brTaken = core->branch & 1;
     bool decBrTaken = core->DEC_decBranch & 1;
-    int brSqN = ExtractField(core->branch, 74 - 32 - 7, 7);
+    int brSqN = (core->branch >> (1 + 5 + 1  + 7 + 7)) & 127;
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -735,10 +742,10 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 226 - 32 * 5 - 6 - 7 - 7, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 232 - 32 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 232 - 32 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 226 - 32 - 32 - 32 - 32 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 6 + 7 + 7 + 3 + 5, 7);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 224 - 12 - 32 - 32 - 32 - 32 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }
@@ -749,7 +756,7 @@ void LogInstructions()
         {
             uint32_t sqn = ExtractField(uop, 156 - 32 * 2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
             state.insts[sqn].memAddr = ExtractField(uop, 156 - 32 - 32, 32);
-            state.insts[sqn].memData = 0;//ExtractField(uop, 156 - 32 * 2, 32);
+            state.insts[sqn].memData = 0; // ExtractField(uop, 156 - 32 * 2, 32);
         }
 
     // Result
@@ -877,8 +884,8 @@ void LogInstructions()
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
                     state.pd[i].id = state.id++;
-                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 31 - 32, 31) << 1;
-                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 32, 32);
+                    state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 12 - 31 - 32, 31) << 1;
+                    state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 126 - 12 - 32, 32);
                     state.pd[i].fetchID = ExtractField(top->Top->soc->core->PD_instrs[i], 4, 5);
                     state.pd[i].retIdx =
                         ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
@@ -891,17 +898,10 @@ void LogInstructions()
                     state.pd[i].valid = false;
         }
 
-        if (core->ifetch->en1)
+        if (core->ifetch->ict->fetch0[0] & 1)
         {
-            int fetchID = core->ifetch->fetchID;
-            state.fetches[fetchID] = state.fetch0;
-        }
-
-        // Fetch 0
-        if (core->ifetch->ifetchEn)
-        {
-            for (size_t i = 0; i < 4; i++)
-                state.fetch0.returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
+            for (int i = 0; i < 4; i++)
+                state.fetches[core->ifetch->ict->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
         }
     }
     LogCycle();

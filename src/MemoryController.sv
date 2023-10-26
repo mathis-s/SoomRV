@@ -117,9 +117,14 @@ always_comb begin
     end
 end
 
+function logic IsCacheOp(MemC_Cmd cmd);
+    return cmd == MEMC_REPLACE || cmd == MEMC_CP_CACHE_TO_EXT || cmd == MEMC_CP_EXT_TO_CACHE;
+endfunction
+
 // Select Incoming Transfer
 MemController_Req selReq;
 always_comb begin
+    reg cacheAddrColl = 'x;
     OUT_stat.stall = '1;
     selReq = 'x;
     selReq.cmd = MEMC_NONE;
@@ -127,8 +132,17 @@ always_comb begin
     if (enqIdxValid) begin
         for (integer i = 0; i < NUM_TFS_IN; i=i+1) begin
             if (selReq.cmd == MEMC_NONE && IN_ctrl[i].cmd != MEMC_NONE) begin
-                selReq = IN_ctrl[i];
-                OUT_stat.stall[i] = 1'b0;
+                cacheAddrColl = 0;
+                for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1)
+                    cacheAddrColl |= 
+                        IsCacheOp(IN_ctrl[i].cmd) &&
+                        IsCacheOp(transfers[j].cmd) &&
+                        IN_ctrl[i].cacheID == transfers[j].cacheID &&
+                        IN_ctrl[i].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == transfers[j].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2];
+                if (!cacheAddrColl) begin
+                    selReq = IN_ctrl[i];
+                    OUT_stat.stall[i] = 1'b0;
+                end
             end
         end
     end

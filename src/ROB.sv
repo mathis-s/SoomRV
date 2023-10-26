@@ -45,6 +45,7 @@ module ROB
     output FetchID_t OUT_curFetchID,
     
     output Trap_UOp OUT_trapUOp,
+    output BPUpdate0 OUT_bpUpdate0,
 
     output reg OUT_mispredFlush
 );
@@ -125,6 +126,9 @@ always_ff@(posedge clk) begin
     
     OUT_trapUOp <= 'x;
     OUT_trapUOp.valid <= 0;
+
+    OUT_bpUpdate0 <= 'x;
+    OUT_bpUpdate0.valid <= 0;
     
     for (integer i = 0; i < WIDTH; i=i+1) begin
         OUT_comUOp[i] <= 'x;
@@ -227,6 +231,13 @@ always_ff@(posedge clk) begin
                     OUT_curFetchID <= deqEntries[i].fetchID;
                     
                     deqMask[id[1:0]] = 1;
+
+                    if (deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN) begin
+                        OUT_bpUpdate0.valid <= 1;
+                        OUT_bpUpdate0.branchTaken <= (deqEntries[i].flags == FLAGS_PRED_TAKEN);
+                        OUT_bpUpdate0.fetchID <= deqEntries[i].fetchID;
+                        OUT_bpUpdate0.fetchOffs <= deqEntries[i].fetchOffs;
+                    end
                                     
                     if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR))) begin
                         

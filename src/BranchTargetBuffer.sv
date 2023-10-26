@@ -13,7 +13,6 @@ module BranchTargetBuffer
     output reg OUT_branchIsCall,
     output reg OUT_branchCompr,
     output reg OUT_multipleBranches,
-    input wire IN_BPT_branchTaken,
     
     input BTUpdate IN_btUpdate
 );
@@ -21,7 +20,7 @@ module BranchTargetBuffer
 typedef struct packed
 {
     logic isJump;
-    logic isCall; // TODO unify fields
+    logic isCall;
     logic compr;
     logic valid;
     logic[30:0] dst;
@@ -29,14 +28,27 @@ typedef struct packed
     FetchOff_t offs;
 } BTBEntry;
 
-localparam LENGTH = `BTB_ENTRIES;/// `BTB_ASSOC;
+localparam LENGTH = `BTB_ENTRIES;
 
 BTBEntry entries[LENGTH-1:0];
 logic multiple[LENGTH-1:0];
 
-wire BTBEntry fetched = entries[IN_pc[$clog2(LENGTH)-1:0]];
+// Predict
+struct packed
+{
+    BTBEntry entry;
+    logic multiple;
+    logic[30:0] pc;
+} fetched;
+always_ff@(posedge clk) begin
+    if (IN_pcValid) begin
+        fetched.entry <= entries[IN_pc[$clog2(LENGTH)-1:0]];
+        fetched.multiple <= multiple[IN_pc[$clog2(LENGTH)-1:0]];
+        fetched.pc <= IN_pc;
+    end
+end
+// Do the tag check after the register such that a synchronous memory can be inferred.
 always_comb begin
-    
     OUT_branchFound = 0;
     OUT_multipleBranches = 'x;
     OUT_branchDst = 'x;
@@ -45,24 +57,22 @@ always_comb begin
     OUT_branchCompr = 0;
     OUT_branchSrcOffs = 'x;
     
-    if (IN_pcValid && fetched.valid && fetched.src == IN_pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
+    if (fetched.entry.valid && fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
         OUT_branchFound = 1;
-        OUT_multipleBranches = multiple[IN_pc[$clog2(LENGTH)-1:0]];
-        OUT_branchDst = fetched.dst;
-        OUT_branchIsJump = fetched.isJump;
-        OUT_branchIsCall = fetched.isCall;
-        OUT_branchCompr = fetched.compr;
-        OUT_branchSrcOffs = fetched.offs;
+        OUT_multipleBranches = fetched.multiple;
+        OUT_branchDst = fetched.entry.dst;
+        OUT_branchIsJump = fetched.entry.isJump;
+        OUT_branchIsCall = fetched.entry.isCall;
+        OUT_branchCompr = fetched.entry.compr;
+        OUT_branchSrcOffs = fetched.entry.offs;
     end
 end
 
+// Update
 always_ff@(posedge clk) begin
     
     if (rst) begin
-        //`ifdef SYNC_RESET
-        //for (integer i = 0; i < LENGTH; i=i+1)
-        //    entries[i].valid <= 0;
-        //`endif
+
     end
     else begin
         if (IN_btUpdate.valid) begin

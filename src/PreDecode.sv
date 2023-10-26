@@ -7,7 +7,6 @@ module PreDecode
 (
     input wire clk,
     input wire rst,
-    input wire ifetchValid,
     input wire outEn,
     input wire mispred,
     
@@ -28,7 +27,6 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic[NUM_INSTRS_IN-1:0][15:0] instr;
 } PDEntry;
@@ -96,12 +94,6 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].fetchStartOffs <= buffer[bufIndexOut].firstValid;
                         OUT_instrs[i].fetchPredOffs <= buffer[bufIndexOut].predPos;
                         
-                        if (subIndexOut > buffer[bufIndexOut].predPos)
-                            // predTaken is zero as this is a post-branch instruction in the same fetch package
-                            OUT_instrs[i].history <= {buffer[bufIndexOut].history[$bits(BHist_t)-2:0], 1'b0 /*buffer[bufIndexOut].predTaken*/};
-                        else
-                            OUT_instrs[i].history <= buffer[bufIndexOut].history;
-                        
                         
                         if (subIndexOut == buffer[bufIndexOut].lastValid) begin
                             bufIndexOut = bufIndexOut + 1;
@@ -126,11 +118,6 @@ always_ff@(posedge clk) begin
                         OUT_instrs[i].rIdx <= buffer[bufIndexOut].rIdx;
                         OUT_instrs[i].is16bit <= 1;
                         
-                        if (subIndexOut > buffer[bufIndexOut].predPos)
-                            OUT_instrs[i].history <= {buffer[bufIndexOut].history[$bits(BHist_t)-2:0], 1'b0 /*buffer[bufIndexOut].predTaken*/};
-                        else
-                            OUT_instrs[i].history <= buffer[bufIndexOut].history;
-                        
                         
                         if (subIndexOut == cur.lastValid) begin
                             bufIndexOut = bufIndexOut + 1;
@@ -146,7 +133,7 @@ always_ff@(posedge clk) begin
             end
         end
         
-        if (ifetchValid && IN_instrs.valid) begin
+        if (!OUT_full && IN_instrs.valid) begin
 
             buffer[bufIndexIn].pc <= IN_instrs.pc;
             buffer[bufIndexIn].fetchID <= IN_instrs.fetchID;
@@ -157,7 +144,6 @@ always_ff@(posedge clk) begin
             buffer[bufIndexIn].predTaken <= IN_instrs.predTaken;
             buffer[bufIndexIn].instr <= IN_instrs.instrs;
             buffer[bufIndexIn].predTarget <= IN_instrs.predTarget;
-            buffer[bufIndexIn].history <= IN_instrs.history;
             buffer[bufIndexIn].rIdx <= IN_instrs.rIdx;
             
             if (bufIndexIn == bufIndexOut) 

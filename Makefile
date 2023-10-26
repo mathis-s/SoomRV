@@ -1,6 +1,6 @@
 VERILATOR_FLAGS = \
 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
-	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME --x-assign unique --x-initial unique -O3 -sv \
+	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE --x-assign unique --x-initial unique -O3 -sv \
 	-CFLAGS "-march=native" \
 	-LDFLAGS "-ldl" \
 	-MAKEFLAGS -j $(nproc)
@@ -65,6 +65,7 @@ SRC_FILES = \
 	src/CacheWriteInterface.sv \
 	src/CacheReadInterface.sv \
 	src/FIFO.sv \
+	src/RegFileRTL.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

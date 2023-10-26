@@ -239,6 +239,8 @@ always_comb begin
     decBranch_c = 'x;
     decBranch_c.wfi = 0;
     decBranch_c.taken = 0;
+    decBranch_c.retAct = RET_NONE;
+    decBranch_c.histAct = HIST_NONE;
 
     validMask = 4'b1111;
     
@@ -1469,15 +1471,14 @@ always_comb begin
                     IN_instrs[i].predInvalid) begin
                     
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
 
                     if (isCall && !isReturn)
-                        decBranch_c.rIdx = IN_instrs[i].rIdx + 1;
+                        decBranch_c.retAct = RET_PUSH;
                     else if (!isCall && isReturn)
-                        decBranch_c.rIdx = IN_instrs[i].rIdx - 1;
+                        decBranch_c.retAct = RET_POP;
                     else
-                        decBranch_c.rIdx = IN_instrs[i].rIdx;
+                        decBranch_c.retAct = RET_NONE;
                 
                     // Delete matching return prediction entries
                     // TODO: Only clean if this actually was an invalid return pred
@@ -1540,11 +1541,9 @@ always_comb begin
                 // Handle non-predicted taken jumps
                 if (isJump) begin
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
                     decBranch_c.dst = branchTarget;
-                    decBranch_c.rIdx = IN_instrs[i].rIdx;
-                    
+
                     // Register branch target
                     btUpdate_c.valid = 1;
                     btUpdate_c.clean = 0;
@@ -1568,13 +1567,14 @@ always_comb begin
                     retUpd_c.idx = IN_instrs[i].rIdx;
                     retUpd_c.addr = uop.compressed ? {IN_instrs[i].pc} : ({IN_instrs[i].pc} + 1);
 
-                    decBranch_c.rIdx = IN_instrs[i].rIdx + 1;
+                    decBranch_c.retAct = RET_PUSH;
                     
+                    // We need to make sure that all rets after the call use the correct return address.
+                    // A ret may have been fetched already (for short functions), so flush the fetch pipeline.
                     if (isIndirBranch) begin
                         decBranch_c.taken = 1;
-                        decBranch_c.history = IN_instrs[i].history;
                         decBranch_c.fetchID = IN_instrs[i].fetchID;
-                        decBranch_c.dst = retUpd_c.addr;
+                        decBranch_c.dst = retUpd_c.addr + 1;
                     end
                 end
                 // Update return stack for non-predicted rets
@@ -1588,9 +1588,8 @@ always_comb begin
                     retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
                     
                     decBranch_c.taken = 1;
-                    decBranch_c.history = IN_instrs[i].history;
                     decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.rIdx = IN_instrs[i].rIdx - 1;
+                    decBranch_c.retAct = RET_POP;
                     decBranch_c.dst = lateReturnAddr;
                 end
             end
@@ -1600,9 +1599,7 @@ always_comb begin
             if (isWFI) begin
                 decBranch_c.taken = 1;
                 decBranch_c.wfi = 1;
-                decBranch_c.history = IN_instrs[i].history;
                 decBranch_c.fetchID = IN_instrs[i].fetchID;
-                decBranch_c.rIdx = IN_instrs[i].rIdx;
                 decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
             end
         end

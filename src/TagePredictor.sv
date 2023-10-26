@@ -10,8 +10,10 @@ module TagePredictor
     input wire clk,
     input wire rst,
     
+    input wire IN_predValid,
     input wire[30:0] IN_predAddr,
     input BHist_t IN_predHistory,
+
     output TageID_t OUT_predTageID,
     output reg OUT_altPred,
     output reg OUT_predTaken,
@@ -35,11 +37,14 @@ BranchPredictionTable basePredictor
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_readValid(IN_predValid),
     .IN_readAddr(IN_predAddr[`BP_BASEP_ID_LEN-1:0]),
     .OUT_taken(predictions[0]),
     
     .IN_writeEn(IN_writeValid),
     .IN_writeAddr(IN_writeAddr[`BP_BASEP_ID_LEN-1:0]),
+    .IN_writeInit(0), // base predictor does not use explicit allocation
     .IN_writeTaken(IN_writeTaken)
 );
 // Base Predictor is always valid
@@ -113,7 +118,7 @@ always_comb begin
 end
 
 generate 
-    for (genvar ii = 1; ii < NUM_STAGES; ii=ii+1) begin
+    for (genvar i = 1; i < NUM_STAGES; i=i+1) begin
         
         TageTable#(.SIZE(TABLE_SIZE), .TAG_SIZE(TAG_SIZE)) tage
         (
@@ -121,36 +126,34 @@ generate
             .rst(rst),
 
             // Lookup/Prediction
-            .IN_readAddr(predHashes[ii-1]),
-            .IN_readTag(predTags[ii-1]),
-            .OUT_readValid(valid[ii]),
-            .OUT_readTaken(predictions[ii]),
+            .IN_readValid(IN_predValid),
+            .IN_readAddr(predHashes[i-1]),
+            .IN_readTag(predTags[i-1]),
+            .OUT_readValid(valid[i]),
+            .OUT_readTaken(predictions[i]),
             
             // General info of current update
             .IN_writeValid(IN_writeValid),
-            .IN_writeAddr(writeHashes[ii-1]),
-            .IN_writeTag(writeTags[ii-1]),
+            .IN_writeAddr(writeHashes[i-1]),
+            .IN_writeTag(writeTags[i-1]),
             .IN_writeTaken(IN_writeTaken),
             
             // Update existing entries
-            .IN_writeUpdate(ii == IN_writeTageID),
+            .IN_writeUpdate(i == IN_writeTageID),
             .IN_writeUseful(IN_writePred != IN_writeAltPred),
             .IN_writeCorrect(IN_writePred == IN_writeTaken),
                         
             // New entry allocation
-            .OUT_allocAvail(avail[ii]),
-            .IN_doAlloc(doAlloc[ii]),
-            .IN_allocFailed(allocFailed && ii > IN_writeTageID)
+            .OUT_allocAvail(avail[i]),
+            .IN_doAlloc(doAlloc[i]),
+            .IN_allocFailed(allocFailed && i > IN_writeTageID)
         );
     end
 endgenerate
 
-
 always_comb begin
-    
     OUT_altPred = predictions[0];
     OUT_predTaken = predictions[0];
-
     OUT_predTageID = 0;
     
     for (integer i = 0; i < NUM_STAGES; i=i+1) begin
@@ -160,6 +163,5 @@ always_comb begin
             OUT_predTaken = predictions[i];
         end
     end
-    
 end
 endmodule

@@ -9,9 +9,8 @@ module Core
     IF_MMIO.HOST IF_mmio,
     IF_CSR_MMIO.CSR IF_csr_mmio,
     
-    output wire[27:0] OUT_instrAddr,
-    output wire OUT_instrReadEnable,
-    input wire[127:0] IN_instrRaw,
+    IF_ICTable.HOST IF_ict,
+    IF_ICache.HOST IF_icache,
         
     output MemController_Req OUT_memc[2:0],
     input MemController_Res IN_memc
@@ -31,7 +30,7 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire ifetchEn = !PD_full && !TH_disableIFetch;
+wire ifetchEn = !TH_disableIFetch;
 
 wire[30:0] BP_lateRetAddr;
 
@@ -56,11 +55,11 @@ IFetch ifetch
     .IN_en(ifetchEn),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
+    .IN_MEM_busy(MEMSUB_busy),
     
-    .OUT_instrReadEnable(OUT_instrReadEnable),
-    .OUT_instrAddr(OUT_instrAddr),
-    .IN_instrRaw(IN_instrRaw),
-    
+    .IF_ict(IF_ict),
+    .IF_icache(IF_icache),
+
     .IN_branches(branchProvs),
     .IN_mispredFlush(mispredFlush),
     .IN_ROB_curFetchID(ROB_curFetchID),
@@ -75,11 +74,13 @@ IFetch ifetch
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
     .IN_btUpdates(BP_btUpdates),
-    .IN_bpUpdate(TH_bpUpdate),
+    .IN_bpUpdate0(ROB_bpUpdate0),
+    .IN_bpUpdate1(TH_bpUpdate1),
     
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
     
+    .IN_ready(!PD_full),
     .OUT_instrs(IF_instrs),
     .OUT_lateRetAddr(BP_lateRetAddr),
     
@@ -100,7 +101,6 @@ PreDecode preDec
 (
     .clk(clk),
     .rst(rst),
-    .ifetchValid(ifetchEn),
     .outEn(!RN_stall && frontendEn),
 
     .OUT_full(PD_full),
@@ -751,6 +751,7 @@ FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
 wire[3:0] ROB_validRetire /*verilator public*/;
 wire[3:0] ROB_retireBranch;
+BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 ROB rob
 (
@@ -771,7 +772,10 @@ ROB rob
     .OUT_PERFC_validRetire(ROB_validRetire),
     .OUT_PERFC_retireBranch(ROB_retireBranch),
     .OUT_curFetchID(ROB_curFetchID),
+    
     .OUT_trapUOp(ROB_trapUOp),
+    .OUT_bpUpdate0(ROB_bpUpdate0),
+
     .OUT_mispredFlush(mispredFlush)
 );
 
@@ -781,7 +785,7 @@ wire TH_flushTLB;
 wire TH_startFence;
 wire TH_disableIFetch;
 wire TH_clearICache;
-BPUpdate TH_bpUpdate;
+BPUpdate1 TH_bpUpdate1;
 TrapInfoUpdate TH_trapInfo;
 TrapHandler trapHandler
 (
@@ -793,7 +797,7 @@ TrapHandler trapHandler
     .IN_pcReadData(PC_readData[4]),
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(TH_trapInfo),
-    .OUT_bpUpdate(TH_bpUpdate),
+    .OUT_bpUpdate1(TH_bpUpdate1),
     .OUT_branch(branchProvs[3]),
     
     .IN_MEM_busy(MEMSUB_busy),

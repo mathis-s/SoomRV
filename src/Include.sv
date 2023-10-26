@@ -137,7 +137,6 @@ typedef enum logic[2:0]
 
 typedef enum logic[5:0]
 {
-    // These don't
     // For these, the upper 3 opcode bits are 'b101
     //FPU_FMVXW,
     //FPU_FMVWX,
@@ -351,7 +350,11 @@ typedef struct packed
     logic[30:0] dst;
     FetchOff_t offs;
     logic compr;
+    logic isCall;
     logic isJump;
+    logic isRet;
+    logic multiple;
+    logic taken;
     logic valid;
 } PredBranch;
 
@@ -359,9 +362,6 @@ typedef struct packed
 {
     logic predicted;
     logic taken;
-    TageID_t tageID;
-    logic altPred;
-    RetStackIdx_t rIdx;
     logic isJump;
 } BranchPredInfo;
 
@@ -379,23 +379,26 @@ typedef struct packed
     logic valid;
 } BTUpdate;
 
-typedef struct packed
+typedef enum logic[1:0]
 {
-    logic[30:0] src;
-    logic[30:0] dst;
-    logic valid;
-} IndirBranchInfo;
+    RET_NONE, RET_PUSH, RET_POP
+} RetStackAction;
+
+typedef enum logic[1:0]
+{
+    HIST_NONE, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
+} HistoryAction;
 
 typedef struct packed
 {
+    RetStackAction retAct;
+    HistoryAction histAct;
     logic[31:0] dstPC;
     SqN sqN;
     SqN storeSqN;
     SqN loadSqN;
     logic flush;
     FetchID_t fetchID;
-    BHist_t history;
-    RetStackIdx_t rIdx;
     logic taken;
 } BranchProv;
 
@@ -412,10 +415,10 @@ typedef struct packed
 
 typedef struct packed
 {
+    RetStackAction retAct;
+    HistoryAction histAct;
     logic[30:0] dst;
     logic[4:0] fetchID;
-    BHist_t history;
-    RetStackIdx_t rIdx;
     logic wfi;
     logic taken;
 } DecodeBranchProv;
@@ -425,8 +428,21 @@ typedef struct packed
     logic[30:0] pc;
     FetchOff_t branchPos;
     BranchPredInfo bpi;
-    BHist_t hist;
 } PCFileEntry;
+
+typedef struct packed
+{
+    logic[31:0] pc;
+    FetchID_t fetchID;
+    IFetchFault fetchFault;
+    FetchOff_t lastValid;
+    FetchOff_t predPos;
+    BranchPredInfo bpi;
+    logic[30:0] predTarget;
+    RetStackIdx_t rIdx;
+
+    logic valid;
+} IFetchOp;
 
 typedef struct packed
 {
@@ -438,7 +454,6 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic[7:0][15:0] instrs;
     
@@ -453,7 +468,6 @@ typedef struct packed
     FetchOff_t fetchPredOffs;
     logic[30:0] predTarget;
     logic targetIsRetAddr;
-    BHist_t history;
     RetStackIdx_t rIdx;
     logic predTaken;
     logic predInvalid;
@@ -536,7 +550,6 @@ typedef struct packed
     SqN sqN;
     FetchID_t fetchID;
     BranchPredInfo bpi;
-    BHist_t history;
     SqN storeSqN;
     SqN loadSqN;
     FuncUnit fu;
@@ -577,8 +590,6 @@ typedef struct packed
     SqN storeSqN;
     SqN loadSqN;
     FetchID_t fetchID;
-    BHist_t history;
-    RetStackIdx_t rIdx;
     logic doNotCommit;
     AGU_Exception exception;
     logic compressed;
@@ -714,13 +725,17 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[30:0] pc;
-    logic compressed;
-    BranchPredInfo bpi;
-    BHist_t history;
+    FetchOff_t fetchOffs;
+    FetchID_t fetchID;
     logic branchTaken;
     logic valid;
-} BPUpdate;
+} BPUpdate0;
+
+typedef struct packed
+{
+    logic[30:0] pc;
+    logic valid;
+} BPUpdate1;
 
 typedef struct packed
 {
@@ -947,5 +962,48 @@ interface IF_MMIO();
     (
         input we, waddr, wdata, wmask, re, raddr, rsize,
         output rdata, rbusy, wbusy
+    );
+endinterface
+
+interface IF_ICTable();
+    
+    logic we;
+    logic[11:0] waddr;
+    logic[$clog2(`CASSOC)-1:0] wassoc;
+    CTEntry wdata;
+    
+    logic re;
+    logic[11:0] raddr;
+    CTEntry[`CASSOC-1:0] rdata;
+    
+    modport HOST
+    (
+        output we, waddr, wassoc, wdata, re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input we, waddr, wassoc, wdata, re, raddr,
+        output rdata
+    );
+endinterface
+
+interface IF_ICache();
+    
+    logic re;
+    logic[11:0] raddr;
+    logic[`CASSOC-1:0][127:0] rdata;
+    
+    modport HOST
+    (
+        output re, raddr,
+        input rdata
+    );
+    
+    modport MEM
+    (
+        input re, raddr,
+        output rdata
     );
 endinterface
