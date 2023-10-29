@@ -133,7 +133,7 @@ always_comb begin
             (PORT_IDX != 0 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
             // check if we have capacity to enqueue this op now
-            if (!limit && !qIdx[$clog2(SIZE)] && !IN_branch.taken) begin
+            if (!limit && qIdx != SIZE && !IN_branch.taken) begin
                 
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];
