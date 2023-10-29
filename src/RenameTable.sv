@@ -35,18 +35,14 @@ module RenameTable
 
 localparam NUM_TAGS = (1 << (TAG_SIZE - 1));
 
-typedef struct packed
-{
-    logic[TAG_SIZE-1:0] comTag;
-    logic[TAG_SIZE-1:0] specTag;
-} RATEntry;
+logic[TAG_SIZE-1:0] comTag[NUM_REGS-1:0] /*verilator public*/;
+logic[TAG_SIZE-1:0] specTag[NUM_REGS-1:0] /*verilator public*/;
 
-RATEntry rat[NUM_REGS-1:0] /*verilator public*/;
 reg[NUM_TAGS-1:0] tagAvail /*verilator public*/;
 
 always_comb begin
     for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
-        OUT_lookupSpecTag[i] = rat[IN_lookupIDs[i]].specTag;
+        OUT_lookupSpecTag[i] = specTag[IN_lookupIDs[i]];
         OUT_lookupAvail[i] = tagAvail[OUT_lookupSpecTag[i][TAG_SIZE-2:0]] | OUT_lookupSpecTag[i][TAG_SIZE-1];
         
         // Results that are written back in the current cycle also need to be marked as available
@@ -64,7 +60,7 @@ always_comb begin
     end
     
     for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
-        OUT_commitPrevTags[i] = rat[IN_commitIDs[i]].comTag;
+        OUT_commitPrevTags[i] = comTag[IN_commitIDs[i]];
     end
 end
 
@@ -73,8 +69,8 @@ always_ff@(posedge clk) begin
     if (rst) begin
         // Registers initialized with 0
         for (integer i = 0; i < NUM_REGS; i=i+1) begin
-            rat[i].comTag <= 7'h40;
-            rat[i].specTag <= 7'h40;
+            comTag[i] <= 7'h40;
+            specTag[i] <= 7'h40;
         end
         tagAvail <= {NUM_TAGS{1'b1}};
     end
@@ -91,13 +87,13 @@ always_ff@(posedge clk) begin
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
                 // We can't keep such a history for every register though. As such, we flush the pipeline
                 // after a mispredict. After flush, all results are committed, and rename can continue again.
-                rat[i].specTag <= rat[i].comTag;
+                specTag[i] <= comTag[i];
             end
         end
         else begin
             for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
-                    rat[IN_issueIDs[i]].specTag <= IN_issueTags[i];
+                    specTag[IN_issueIDs[i]] <= IN_issueTags[i];
                     
                     if (!IN_issueTags[i][TAG_SIZE-1]) begin
                         tagAvail[IN_issueTags[i][TAG_SIZE-2:0]] <= 0;
@@ -111,13 +107,13 @@ always_ff@(posedge clk) begin
             if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
                 if (IN_mispredFlush) begin
                     if (!IN_mispred) begin
-                        rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
+                        specTag[IN_commitIDs[i]] <= IN_commitTags[i];
                     end
                 end
                 else begin
-                    rat[IN_commitIDs[i]].comTag <= IN_commitTags[i];
+                    comTag[IN_commitIDs[i]] <= IN_commitTags[i];
                     if (IN_mispred)
-                        rat[IN_commitIDs[i]].specTag <= IN_commitTags[i];
+                        specTag[IN_commitIDs[i]] <= IN_commitTags[i];
                 end
             end
         end
