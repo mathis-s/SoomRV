@@ -2,7 +2,7 @@ module PreDecode
 #(
     parameter NUM_INSTRS_IN=8,
     parameter NUM_INSTRS_OUT=`DEC_WIDTH,
-    parameter BUF_SIZE=4
+    parameter BUF_SIZE=`PD_BUF_SIZE
 )
 (
     input wire clk,
@@ -66,7 +66,7 @@ always_ff@(posedge clk) begin
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     
                     if (instr[1:0] == 2'b11 && 
-                        (((bufIndexOut + 2'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && 
+                        (((bufIndexOut + 1'b1) != bufIndexIn) || subIndexOut != cur.lastValid) && 
                         !invalidBranch &&
                         cur.fetchFault == IF_FAULT_NONE
                         ) begin

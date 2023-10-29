@@ -10,6 +10,7 @@
 
 // IFetch
 `define DEC_WIDTH 4
+`define PD_BUF_SIZE 4
 
 // Issue
 `define IQ_0_SIZE 8

@@ -317,7 +317,7 @@ always_ff@(posedge clk) begin
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
                 entries[id].flags <= IN_wbUOps[i].flags;
                 if (!entries[id].valid) begin
-                    $display("invalid wb op: sqn=%x", IN_wbUOps[i].sqN);
+                    //$display("invalid wb op: sqn=%x", IN_wbUOps[i].sqN);
                     assert(0);
                 end
                 //assert(entries[i].valid);

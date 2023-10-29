@@ -1,7 +1,7 @@
 module MemRTL
 #(
-    parameter WORD_SIZE=32,
-    parameter NUM_WORDS=1024,
+    parameter WORD_SIZE=32*4*2,
+    parameter NUM_WORDS=128,
     parameter WRITE_SIZE=8
 )
 (
@@ -19,6 +19,7 @@ module MemRTL
     output reg[WORD_SIZE-1:0] OUT_data1
 );
 
+(* ram_style = "block" *)
 reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0];
 
 reg ce_reg = 1;
