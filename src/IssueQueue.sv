@@ -1,6 +1,7 @@
 module IssueQueue
 #(
     parameter SIZE = 8,
+    parameter NUM_ENQUEUE=4,
     parameter PORT_IDX=0,
     parameter NUM_OPERANDS = 2,
     parameter NUM_UOPS = 4,
@@ -112,13 +113,18 @@ always_comb begin
     end
 end
 
-reg[NUM_UOPS-1:0] acceptIncoming;
+R_UOp enqCandidates[NUM_ENQUEUE-1:0];
 always_comb begin
-    reg[$clog2(SIZE):0] count = 0;
-    acceptIncoming = 0;
-    OUT_stall = '0;
+    logic[$clog2(NUM_ENQUEUE)-1:0] idx = 0;
+    logic[$clog2(SIZE):0] qIdx = insertIndex;
+    logic limit = 0;
+
+    for (integer i = 0; i < NUM_ENQUEUE; i=i+1)
+        enqCandidates[i] = R_UOp'{valid: 0, validIQ: 0, default: 'x};
 
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+        OUT_stall[i] = 0;
+        // check if this is a candidate to enqueue
         if (IN_uop[i].validIQ[PORT_IDX] &&
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
@@ -126,37 +132,50 @@ always_comb begin
             // Edge Case: INT port does not enqueue AMOSWAP (no int uop needed)
             (PORT_IDX != 0 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
-            count = count + 1;
-            OUT_stall[i] = (insertIndex > (SIZE[$clog2(SIZE):0] - count)) || IN_branch.taken;
-            acceptIncoming[i] = !OUT_stall[i];
+            // check if we have capacity to enqueue this op now
+            if (!limit && !qIdx[$clog2(SIZE)] && !IN_branch.taken) begin
+                
+                if (NUM_ENQUEUE == NUM_UOPS)
+                    enqCandidates[i] = IN_uop[i];
+                else begin
+                    enqCandidates[idx] = IN_uop[i];
+                    {limit, idx} = idx + 1;
+                end
+                
+                OUT_stall[i] = 0;
+                qIdx = qIdx + 1;
+            end
+            else OUT_stall[i] = 1;
         end
     end
 end
 
 always_ff@(posedge clk) begin
     
+    reg[ID_LEN:0] newInsertIndex = 'x;
+
     // Update availability
     for (integer i = 0; i < SIZE; i=i+1) begin
         queue[i].avail <= queue[i].avail | newAvail[i] | newAvail_dl[i];
     end
     reservedWBs <= {1'b0, reservedWBs[32:1]};
-    
+
     if (rst) begin
-        insertIndex = 0;
+        insertIndex <= 0;
         reservedWBs <= 0;
         OUT_uop <= 'x;
         OUT_uop.valid <= 0;
     end
     else if (IN_branch.taken) begin
         
-        reg[ID_LEN:0] newInsertIndex = 0;
+        newInsertIndex = 0;
         // Set insert index to first invalid entry
         for (integer i = 0; i < SIZE; i=i+1) begin
             if (i < insertIndex && $signed(queue[i].sqN - IN_branch.sqN) <= 0) begin
                 newInsertIndex = i[$clog2(SIZE):0] + 1;
             end
         end
-        insertIndex = newInsertIndex;
+        insertIndex <= newInsertIndex;
         if (!IN_stall || $signed(OUT_uop.sqN - IN_branch.sqN) > 0) begin
             OUT_uop <= 'x;
             OUT_uop.valid <= 0;
@@ -164,6 +183,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         reg issued = 0;
+        newInsertIndex = insertIndex;
         
         // Issue
         if (!IN_stall) begin
@@ -171,7 +191,7 @@ always_ff@(posedge clk) begin
             OUT_uop.valid <= 0;
             
             for (integer i = 0; i < SIZE; i=i+1) begin
-                if (i < insertIndex && !issued) begin
+                if (i < newInsertIndex && !issued) begin
                     if (&(queue[i].avail | newAvail[i]) &&
                         (queue[i].fu != FU1 || !IN_doNotIssueFU1) && 
                         (queue[i].fu != FU2 || !IN_doNotIssueFU2) && 
@@ -228,7 +248,7 @@ always_ff@(posedge clk) begin
                             queue[j] <= queue[j+1];
                             queue[j].avail <= queue[j+1].avail | newAvail[j+1] | newAvail_dl[j+1];
                         end
-                        insertIndex = insertIndex - 1;
+                        newInsertIndex = newInsertIndex - 1;
                         
                         // Reserve WB if this is a slow operation
                         if (queue[i].fu == FU1 && FU1_DLY > 0)
@@ -239,33 +259,33 @@ always_ff@(posedge clk) begin
         end
         
         // Enqueue
-        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            if (acceptIncoming[i]) begin
+        for (integer i = 0; i < NUM_ENQUEUE; i=i+1) begin
+            if (enqCandidates[i].validIQ[PORT_IDX]) begin
                 R_ST_UOp temp;
                 
                 temp.imm = 0;
-                temp.imm[REGULAR_IMM_BITS-1:0] = IN_uop[i].imm[REGULAR_IMM_BITS-1:0];
+                temp.imm[REGULAR_IMM_BITS-1:0] = enqCandidates[i].imm[REGULAR_IMM_BITS-1:0];
                 
-                temp.avail[0] = IN_uop[i].availA;
-                temp.tags[0] = IN_uop[i].tagA;
+                temp.avail[0] = enqCandidates[i].availA;
+                temp.tags[0] = enqCandidates[i].tagA;
                 
                 if (NUM_OPERANDS >= 2) begin
                     // verilator lint_off SELRANGE
-                    temp.avail[1] = IN_uop[i].availB;
-                    temp.tags[1] = IN_uop[i].tagB;
+                    temp.avail[1] = enqCandidates[i].availB;
+                    temp.tags[1] = enqCandidates[i].tagB;
                     // verilator lint_on SELRANGE
                 end
                 
-                temp.immB = IN_uop[i].immB;
-                temp.sqN = IN_uop[i].sqN;
-                temp.tagDst = IN_uop[i].tagDst;
-                temp.opcode = IN_uop[i].opcode;
-                temp.fetchID = IN_uop[i].fetchID;
-                temp.fetchOffs = IN_uop[i].fetchOffs;
-                temp.storeSqN = IN_uop[i].storeSqN;
-                temp.loadSqN = IN_uop[i].loadSqN;
-                temp.fu = IN_uop[i].fu;
-                temp.compressed = IN_uop[i].compressed;
+                temp.immB = enqCandidates[i].immB;
+                temp.sqN = enqCandidates[i].sqN;
+                temp.tagDst = enqCandidates[i].tagDst;
+                temp.opcode = enqCandidates[i].opcode;
+                temp.fetchID = enqCandidates[i].fetchID;
+                temp.fetchOffs = enqCandidates[i].fetchOffs;
+                temp.storeSqN = enqCandidates[i].storeSqN;
+                temp.loadSqN = enqCandidates[i].loadSqN;
+                temp.fu = enqCandidates[i].fu;
+                temp.compressed = enqCandidates[i].compressed;
                 
                 
                 // Check if the result for this op is being broadcasted in the current cycle
@@ -295,25 +315,26 @@ always_ff@(posedge clk) begin
                     end
                 
                 // Special handling for jalr
-                if (IN_uop[i].fu == FU_INT && (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)) begin
+                if (enqCandidates[i].fu == FU_INT && (enqCandidates[i].opcode == INT_V_JALR || enqCandidates[i].opcode == INT_V_JR)) begin
                     assert(IMM_BITS == 36);
                     
                     // Use {imm[0], tags[1]} to encode 8 bits of imm12
-                    temp.tags[1] = IN_uop[i].imm12[6:0];
-                    temp.imm[0] = IN_uop[i].imm12[7];
+                    temp.tags[1] = enqCandidates[i].imm12[6:0];
+                    temp.imm[0] = enqCandidates[i].imm12[7];
 
                     // rest goes into upper 4 bits of 36 (!) immediate bits
-                    temp.imm[35:32] = IN_uop[i].imm12[11:8];
+                    temp.imm[35:32] = enqCandidates[i].imm12[11:8];
 
                     // tags[1] is not used for register encoding, thus is always valid
                     temp.avail[1] = 1;
                 end
                 // verilator lint_on SELRANGE
                 
-                queue[insertIndex[ID_LEN-1:0]] <= temp;
-                insertIndex = insertIndex + 1;
+                queue[newInsertIndex[ID_LEN-1:0]] <= temp;
+                newInsertIndex = newInsertIndex + 1;
             end
         end
+        insertIndex <= newInsertIndex;
     end
 end
 

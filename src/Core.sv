@@ -185,7 +185,7 @@ assign stall[1] = 0;
 wire[3:0][`DEC_WIDTH-1:0] IQ_stalls;
 //wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
 //wire IQ0_full;
-IssueQueue#(`IQ_0_SIZE,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
+IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -213,7 +213,7 @@ IssueQueue#(`IQ_0_SIZE,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33)
     
     .OUT_uop(IS_uop[0])
 );
-IssueQueue#(`IQ_1_SIZE,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
+IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -241,7 +241,7 @@ IssueQueue#(`IQ_1_SIZE,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9
     
     .OUT_uop(IS_uop[1])
 );
-IssueQueue#(`IQ_2_SIZE,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
+IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -269,7 +269,7 @@ IssueQueue#(`IQ_2_SIZE,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq
     
     .OUT_uop(IS_uop[2])
 );
-IssueQueue#(`IQ_3_SIZE,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),

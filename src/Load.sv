@@ -138,7 +138,6 @@ always_ff@(posedge clk) begin
                     end
                 
                     if (!found) begin
-                        //outUOpReg[i].srcA <= IN_rfReadData[i];
                         operandIsReg[i][0] <= 1;
                     end
                 end
@@ -169,7 +168,6 @@ always_ff@(posedge clk) begin
                     end
                     
                     if (!found) begin
-                        //outUOpReg[i].srcB <= IN_rfReadData[i + NUM_UOPS];
                         operandIsReg[i][1] <= 1;
                     end
                 end
