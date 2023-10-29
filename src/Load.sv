@@ -51,55 +51,71 @@ end
 
 FuncUnit outFU[NUM_UOPS-1:0];
 
+EX_UOp outUOpReg[NUM_UOPS-1:0];
+reg[1:0] operandIsReg[NUM_UOPS-1:0];
+
+always_comb begin
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+
+        OUT_uop[i] = EX_UOp'{valid: 0, default: 'x};
+        if (outUOpReg[i].valid) begin
+            OUT_uop[i] = outUOpReg[i];
+            
+            // forward values from register file combinatorially
+            if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
+            if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
+        end
+
+    end
+end
+
 always_ff@(posedge clk) begin
     if (rst) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            OUT_uop[i] <= 'x;
-            OUT_uop[i].valid <= 0;
+            outUOpReg[i] <= 'x;
+            outUOpReg[i].valid <= 0;
         end
     end
     else begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             if (!IN_stall[i] && IN_uop[i].valid && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
                 
-                OUT_uop[i].imm <= IN_uop[i].imm;
+                outUOpReg[i].imm <= IN_uop[i].imm;
                 
                 // jalr uses a different encoding
                 if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT && 
                     (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)
                 ) begin
-                    OUT_uop[i].imm <= 'x;
-                    OUT_uop[i].imm[11:0] <= IN_uop[i].imm12;
+                    outUOpReg[i].imm <= 'x;
+                    outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
                 end
 
-                OUT_uop[i].sqN <= IN_uop[i].sqN;
-                OUT_uop[i].tagDst <= IN_uop[i].tagDst;
-                OUT_uop[i].opcode <= IN_uop[i].opcode;
+                outUOpReg[i].sqN <= IN_uop[i].sqN;
+                outUOpReg[i].tagDst <= IN_uop[i].tagDst;
+                outUOpReg[i].fetchID <= IN_uop[i].fetchID;
+                outUOpReg[i].loadSqN <= IN_uop[i].loadSqN;
+                outUOpReg[i].storeSqN <= IN_uop[i].storeSqN;
+                outUOpReg[i].compressed <= IN_uop[i].compressed;
+                outUOpReg[i].opcode <= IN_uop[i].opcode;
+                outUOpReg[i].fu <= IN_uop[i].fu;
+                outUOpReg[i].valid <= 1;
                 
-                OUT_uop[i].pc <= {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
-                OUT_uop[i].fetchStartOffs <= IN_pcReadData[i].pc[$bits(FetchOff_t)-1:0];
-                OUT_uop[i].fetchPredOffs <= IN_pcReadData[i].branchPos;
-                
-                OUT_uop[i].fetchID <= IN_uop[i].fetchID;
-                
-                OUT_uop[i].bpi <= IN_pcReadData[i].bpi;
+                outUOpReg[i].pc <= {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
+                outUOpReg[i].fetchStartOffs <= IN_pcReadData[i].pc[$bits(FetchOff_t)-1:0];
+                outUOpReg[i].fetchPredOffs <= IN_pcReadData[i].branchPos;
+                outUOpReg[i].bpi <= IN_pcReadData[i].bpi;
 
                 if (IN_uop[i].fetchOffs != IN_pcReadData[i].branchPos) begin
-                    OUT_uop[i].bpi.predicted <= 0;
-                    OUT_uop[i].bpi.taken <= 0;
-                    OUT_uop[i].bpi.isJump <= 0;
+                    outUOpReg[i].bpi.predicted <= 0;
+                    outUOpReg[i].bpi.taken <= 0;
+                    outUOpReg[i].bpi.isJump <= 0;
                 end
+
+                operandIsReg[i] <= 2'b00;
                 
-                OUT_uop[i].loadSqN <= IN_uop[i].loadSqN;
-                OUT_uop[i].storeSqN <= IN_uop[i].storeSqN;
-                OUT_uop[i].compressed <= IN_uop[i].compressed;
-                
-                OUT_uop[i].fu <= IN_uop[i].fu;
-                
-                OUT_uop[i].valid <= 1;
-                
+                outUOpReg[i].srcA <= 'x;
                 if (IN_uop[i].tagA[6]) begin
-                    OUT_uop[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
+                    outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
                 end
                 else begin 
                     reg found = 0;
@@ -108,7 +124,7 @@ always_ff@(posedge clk) begin
                     for (integer j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
                         if (IN_wbHasResult[j] && IN_uop[i].tagA == IN_wbUOp[j].tagDst) begin
-                            OUT_uop[i].srcA <= IN_wbUOp[j].result;
+                            outUOpReg[i].srcA <= IN_wbUOp[j].result;
                             found = 1;
                         end
                     end
@@ -116,28 +132,30 @@ always_ff@(posedge clk) begin
                     // Try to forward zero cycle (TODO: one hot too)
                     for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagA) begin
-                            OUT_uop[i].srcA <= IN_zcFwd[j].result;
+                            outUOpReg[i].srcA <= IN_zcFwd[j].result;
                             found = 1;
                         end
                     end
                 
                     if (!found) begin
-                        OUT_uop[i].srcA <= IN_rfReadData[i];
+                        //outUOpReg[i].srcA <= IN_rfReadData[i];
+                        operandIsReg[i][0] <= 1;
                     end
                 end
                 
+                outUOpReg[i].srcB <= 'x;
                 if (IN_uop[i].immB || i == 2 || i == 3) begin
-                    OUT_uop[i].srcB <= IN_uop[i].imm;
+                    outUOpReg[i].srcB <= IN_uop[i].imm;
                 end
                 else if (IN_uop[i].tagB[6]) begin
-                    OUT_uop[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
+                    outUOpReg[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
                 end
                 else begin
                     reg found = 0;
                     for (integer j = 0; j < NUM_WBS; j=j+1) begin
                         // TODO: one-hot
                         if (IN_wbHasResult[j] && IN_uop[i].tagB == IN_wbUOp[j].tagDst) begin
-                            OUT_uop[i].srcB <= IN_wbUOp[j].result;
+                            outUOpReg[i].srcB <= IN_wbUOp[j].result;
                             found = 1;
                         end
                     end
@@ -145,19 +163,25 @@ always_ff@(posedge clk) begin
                     // Try to forward zero cycle (TODO: one hot too)
                     for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
                         if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagB) begin
-                            OUT_uop[i].srcB <= IN_zcFwd[j].result;
+                            outUOpReg[i].srcB <= IN_zcFwd[j].result;
                             found = 1;
                         end
                     end
                     
                     if (!found) begin
-                        OUT_uop[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                        //outUOpReg[i].srcB <= IN_rfReadData[i + NUM_UOPS];
+                        operandIsReg[i][1] <= 1;
                     end
                 end
             end
-            else if (!IN_stall[i] || (OUT_uop[i].valid && IN_invalidate && $signed(OUT_uop[i].sqN - IN_invalidateSqN) > 0)) begin
-                OUT_uop[i] <= 'x;
-                OUT_uop[i].valid <= 0;
+            else if (!IN_stall[i] || (outUOpReg[i].valid && IN_invalidate && $signed(outUOpReg[i].sqN - IN_invalidateSqN) > 0)) begin
+                outUOpReg[i] <= 'x;
+                outUOpReg[i].valid <= 0;
+            end
+            else if (IN_stall[i]) begin
+                if (operandIsReg[i][0]) outUOpReg[i].srcA <= IN_rfReadData[i];
+                if (operandIsReg[i][1]) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
+                operandIsReg[i] <= 2'b00;
             end
         
         end 

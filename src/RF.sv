@@ -52,18 +52,17 @@ module RF
 
 reg[WIDTH-1:0] mem[SIZE-1:0] /*verilator public*/;
 
-always_comb begin
-    rdata0 = mem[raddr0];
-    rdata1 = mem[raddr1];
-    rdata2 = mem[raddr2];
-    rdata3 = mem[raddr3];
-    rdata4 = mem[raddr4];
-    rdata5 = mem[raddr5];
-    rdata6 = mem[raddr6];
-    rdata7 = mem[raddr7];
-end
-
 always_ff@(posedge clk) begin
+
+    rdata0 <= mem[raddr0];
+    rdata1 <= mem[raddr1];
+    rdata2 <= mem[raddr2];
+    rdata3 <= mem[raddr3];
+    rdata4 <= mem[raddr4];
+    rdata5 <= mem[raddr5];
+    rdata6 <= mem[raddr6];
+    rdata7 <= mem[raddr7];
+
     if (wen0) mem[waddr0] <= wdata0;
     if (wen1) mem[waddr1] <= wdata1;
     if (wen2) mem[waddr2] <= wdata2;

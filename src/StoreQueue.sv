@@ -286,10 +286,18 @@ always_comb begin
 end
 
 // Select entry for which to read store data from RF
-reg[$clog2(NUM_ENTRIES)-1:0] loadIndex;
-reg loadValid;
-reg loadIsAtomic;
-reg[31:0] atomicLoadData;
+typedef struct packed
+{
+    logic[31:0] atomicData;
+    logic atomic;
+    Tag tag;
+    logic[3:0] wmask;
+    logic[$clog2(NUM_ENTRIES)-1:0] index;
+    logic valid;
+} SQLoad;
+
+SQLoad load_c;
+SQLoad load_r;
 always_comb begin
     // Find candidates
     reg[NUM_ENTRIES-1:0] isLoadCandidate;
@@ -297,34 +305,49 @@ always_comb begin
         isLoadCandidate[i] =
             entries[i].valid && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
     end
+    if (load_r.valid) isLoadCandidate[load_r.index] = 0;
 
     // Priority encode beginning at base index
-    loadValid = 0;
-    loadIndex = 'x;
+    load_c = 'x;
+    load_c.valid = 0;
+
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!loadValid && 
+        if (!load_c.valid && 
             isLoadCandidate[idx]
         ) begin
-            loadValid = 1;
-            loadIndex = idx;
+            load_c.valid = 1;
+            load_c.index = idx;
+            load_c.atomic = 0;
         end
     end
 
     // If an atomic op result is incoming, load that instead
-    loadIsAtomic = 0;
-    atomicLoadData = 'x;
     if (IN_resultUOp[AMO_RES_PORT].valid && IN_resultUOp[AMO_RES_PORT].doNotCommit) begin
-        loadIsAtomic = 1;
-        loadValid = 1;
-        loadIndex = IN_resultUOp[AMO_RES_PORT].storeSqN[$clog2(NUM_ENTRIES)-1:0];
-        atomicLoadData = IN_resultUOp[AMO_RES_PORT].result;
+        load_c.atomic = 1;
+        load_c.valid = 1;
+        load_c.index = IN_resultUOp[AMO_RES_PORT].storeSqN[$clog2(NUM_ENTRIES)-1:0];
+        load_c.atomicData = IN_resultUOp[AMO_RES_PORT].result;
     end
-
+    
     OUT_RF_raddr = '0;
-    if (loadValid && !entries[loadIndex].data.m.tag[$bits(Tag)-1]) begin
-        OUT_RF_raddr = entries[loadIndex].data.m.tag[$bits(Tag)-2:0];
+    if (load_c.valid) begin
+        load_c.wmask = entries[load_c.index].wmask;
+        load_c.tag = entries[load_c.index].data.m.tag[$bits(Tag)-1:0];
+
+        if (!load_c.tag[$bits(Tag)-1]) begin
+            OUT_RF_raddr = load_c.tag[$bits(Tag)-2:0];
+        end
     end
+    
+    // Late override
+    if (IN_branch.taken && $signed(entries[load_c.index].sqN - IN_branch.sqN) > 0)
+        load_c = SQLoad'{valid: 0, default: 'x};
+        
+end
+always_ff@(posedge clk) begin
+    if (rst) load_r <= SQLoad'{valid: 0, default: 'x};
+    else load_r <= load_c;
 end
 
 // Find oldest not-yet-loaded entry 
@@ -357,16 +380,16 @@ always_comb begin
     reg[31:0] rawLoadData = 'x;
     loadData = 'x;
 
-    if (loadIsAtomic)
-        rawLoadData = atomicLoadData;
-    else if (entries[loadIndex].data.m.tag[$bits(Tag)-1])
-        rawLoadData = {{26{entries[loadIndex].data.m.tag[5]}}, entries[loadIndex].data.m.tag[5:0]};
+    if (load_r.atomic)
+        rawLoadData = load_r.atomicData;
+    else if (load_r.tag[$bits(Tag)-1])
+        rawLoadData = {{26{load_r.tag[5]}}, load_r.tag[5:0]};
     else
         rawLoadData = IN_RF_rdata;
     // since we're deconstructing it anyways,
     // we may want to store offset + size instead of wmask
 
-    case (entries[loadIndex].wmask)
+    case (load_r.wmask)
         default: loadData = rawLoadData;
         4'b0001: loadData[7:0] = rawLoadData[7:0];
         4'b0010: loadData[15:8] = rawLoadData[7:0];
@@ -534,10 +557,10 @@ always_ff@(posedge clk) begin
         end
 
         // Write Loaded Data
-        if (loadValid) begin
-            entries[loadIndex].avail <= 1;
-            entries[loadIndex].loaded <= 1;
-            entries[loadIndex].data <= loadData;
+        if (load_r.valid) begin
+            entries[load_r.index].avail <= 1;
+            entries[load_r.index].loaded <= 1;
+            entries[load_r.index].data <= loadData;
         end
 
         // Invalidate
