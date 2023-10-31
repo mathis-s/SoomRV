@@ -146,7 +146,7 @@ else always_comb begin
     CORE_DC_if.data = {`CWIDTH{IF_cache.wdata}};
 end
 
-logic[127:0] DC_dataOut;
+logic[`CWIDTH*32-1:0] DC_dataOut;
 // R port
 CacheIF[`CBANKS-1:0] readIFs;
 always_comb begin
