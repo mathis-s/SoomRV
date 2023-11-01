@@ -744,9 +744,9 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 6 + 7 + 7 + 3 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 224 - 12 - 32 - 32 - 32 - 32 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 182 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 182 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 182 - 32 - 32 - 32 - 3 - 3 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }
@@ -797,8 +797,8 @@ void LogInstructions()
                 bool isXRETinterrupt = false;
                 if (core->ROB_trapUOp & 1)
                 {
-                    int trapSQN = (core->ROB_trapUOp >> 15) & 127;
-                    int flags = (core->ROB_trapUOp >> 29) & 15;
+                    int trapSQN = (core->ROB_trapUOp >> (15+14)) & 127;
+                    int flags = (core->ROB_trapUOp >> (29+14)) & 15;
                     int rd = (core->ROB_trapUOp >> 10) & 31;
                     isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
                     isXRETinterrupt =

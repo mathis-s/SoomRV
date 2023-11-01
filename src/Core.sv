@@ -609,6 +609,7 @@ StoreQueue sq
     .IN_vmem(CSR_vmem),
     
     .IN_curSqN(ROB_curSqN),
+    .IN_comStSqN(ROB_comStoreSqN),
     
     .IN_branch(branch),
     

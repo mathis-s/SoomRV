@@ -251,8 +251,8 @@ always_ff@(posedge clk) begin
                     OUT_curFetchID <= deqEntries[i].fetchID;
 
                     if (!(deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
-                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= deqEntries[i].loadSqN;
-                        OUT_lastStoreSqN <= deqEntries[i].storeSqN;
+                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= deqEntries[i].loadSqN + 1;
+                        if (deqEntries[i].isSt) OUT_lastStoreSqN <= deqEntries[i].storeSqN + 1;
                     end
 
                     if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin

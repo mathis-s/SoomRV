@@ -45,7 +45,7 @@ typedef struct packed
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
-SqN baseIndex = IN_comLoadSqN + 1;
+SqN baseIndex = IN_comLoadSqN;
 SqN lastBaseIndex;
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 

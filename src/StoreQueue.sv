@@ -24,6 +24,7 @@ module StoreQueue
     input VirtMemState IN_vmem,
     
     input SqN IN_curSqN,
+    input SqN IN_comStSqN,
     
     input BranchProv IN_branch,
     
@@ -58,11 +59,34 @@ typedef struct packed
     logic atomicLd;
     logic atomic;
     logic addrAvail;
-    logic ready;
     logic loaded;
     logic avail;
     logic valid;
 } SQEntry;
+
+// Circular logic to find range of ready entries
+reg[NUM_ENTRIES-1:0] entryReady_r;
+always_ff@(posedge clk) entryReady_r <= entryReady_c;
+
+wire[NUM_ENTRIES-1:0] readyBeginOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
+wire[NUM_ENTRIES-1:0] readyEndOneHot = (1 << IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
+// verilator lint_off UNOPTFLAT
+reg[NUM_ENTRIES-1:0] entryReady_c;
+generate
+for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
+always_comb begin
+    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
+    
+    if (readyEndOneHot[i])
+        entryReady_c[i] = 0;
+    else if (readyBeginOneHot[i])
+        entryReady_c[i] = 1;
+    else
+        entryReady_c[i] = entryReady_c[prev];
+end
+endgenerate
+// verilator lint_on UNOPTFLAT
+
 
 SQEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
@@ -184,7 +208,7 @@ always_comb begin
     lookupConflictList[i] = 0;
     if (entries[i].valid && entries[i].addrAvail &&
         entries[i].addr == IN_uopLd.addr[31:2] && 
-        ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entries[i].ready) &&
+        ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
         
@@ -204,7 +228,7 @@ endgenerate
 wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
 assign OUT_done = 
-    (!entries[baseIndexI].valid || (!entries[baseIndexI].ready && !($signed(IN_curSqN - entries[baseIndexI].sqN) > 0))) && 
+    (!entries[baseIndexI].valid || (!entryReady_r[baseIndexI] && !($signed(IN_curSqN - entries[baseIndexI].sqN) > 0))) && 
     evictedIn == 0 &&
     !IN_stallSt;
 
@@ -476,11 +500,11 @@ always_ff@(posedge clk) begin
             OUT_uopSt.valid <= 0;
         
         // Set entries of committed instructions to ready
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if ($signed(IN_curSqN - entries[i].sqN) > 0) begin
-                entries[i].ready <= 1;
-            end
-        end
+        //for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        //    if ($signed(IN_curSqN - entries[i].sqN) > 0) begin
+        //        entries[i].ready <= 1;
+        //    end
+        //end
         
         // Delete entry from evicted if we get a positive store ack
         if (stAck_r.valid) begin
@@ -508,7 +532,7 @@ always_ff@(posedge clk) begin
             reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
             // Try storing new op
             if (entries[idx].valid && !IN_branch.taken && 
-                entries[idx].ready && nextEvictedIn < NUM_EVICTED &&
+                entryReady_r[idx] && nextEvictedIn < NUM_EVICTED &&
                 entries[idx].loaded && allowDequeue &&
                 entries[idx].addrAvail
             ) begin
@@ -568,7 +592,7 @@ always_ff@(posedge clk) begin
             reg[$clog2(NUM_ENTRIES):0] highestValidIdx = 0;
 
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ((IN_branch.flush || $signed(entries[i].sqN - IN_branch.sqN) > 0) && !entries[i].ready) begin
+                if ((IN_branch.flush || $signed(entries[i].sqN - IN_branch.sqN) > 0) && !entryReady_r[i]) begin
                     entries[i] <= 'x;
                     entries[i].valid <= 0;
                 end
@@ -612,7 +636,6 @@ always_ff@(posedge clk) begin
                 entries[index].valid <= 1;
                 entries[index].atomicLd <= 0;
                 entries[index].atomic <= 0;
-                entries[index].ready <= 0;
                 entries[index].loaded <= 0;
                 entries[index].sqN <= rnUOpSorted[i].sqN;
                 entries[index].addrAvail <= 0;
