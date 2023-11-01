@@ -104,8 +104,8 @@ always_ff@(posedge clk) begin
                 OUT_branch.sqN <= IN_trapInstr.sqN;
                 OUT_branch.flush <= 1;
                 
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
+                OUT_branch.storeSqN <= IN_trapInstr.storeSqN;
+                OUT_branch.loadSqN <= IN_trapInstr.loadSqN;
 
                 OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.histAct <= HIST_NONE;
@@ -161,8 +161,8 @@ always_ff@(posedge clk) begin
                 OUT_branch.flush <= 1;
 
                 // These don't matter, the entire pipeline will be flushed
-                OUT_branch.storeSqN <= 0;
-                OUT_branch.loadSqN <= 0;
+                OUT_branch.storeSqN <= IN_trapInstr.storeSqN;
+                OUT_branch.loadSqN <= IN_trapInstr.loadSqN;
 
                 OUT_branch.fetchID <= IN_trapInstr.fetchID;
                 OUT_branch.histAct <= HIST_NONE;

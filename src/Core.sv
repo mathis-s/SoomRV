@@ -557,7 +557,8 @@ LoadBuffer lb
 (
     .clk(clk),
     .rst(rst),
-    .commitSqN(ROB_curSqN),
+    .IN_comLoadSqN(ROB_comLoadSqN),
+    .IN_comSqN(ROB_curSqN),
     
     .IN_stall(LS_AGULD_uopStall),
     .IN_uopLd(AGU_LD_uop),
@@ -748,6 +749,8 @@ wire[3:0] ROB_validRetire /*verilator public*/;
 wire[3:0] ROB_retireBranch;
 BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
+SqN ROB_comLoadSqN;
+SqN ROB_comStoreSqN;
 ROB rob
 (
     .clk(clk),
@@ -762,6 +765,9 @@ ROB rob
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
+    .OUT_lastLoadSqN(ROB_comLoadSqN),
+    .OUT_lastStoreSqN(ROB_comStoreSqN),
+
     .OUT_comUOp(comUOps),
     .OUT_fpNewFlags(ROB_fpNewFlags),
     .OUT_PERFC_validRetire(ROB_validRetire),

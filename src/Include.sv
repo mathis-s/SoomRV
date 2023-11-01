@@ -716,6 +716,8 @@ typedef struct packed
     Flags flags;
     Tag tag;
     SqN sqN;
+    SqN loadSqN;
+    SqN storeSqN;
     RegNm rd;
     FetchOff_t fetchOffs;
     FetchID_t fetchID;

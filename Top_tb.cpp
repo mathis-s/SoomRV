@@ -505,7 +505,7 @@ uint32_t ReadRegister(uint32_t rid)
 
     uint8_t comTag = regTagOverride[rid];
     if (comTag == 0xff)
-        comTag = (core->rn->rt->rat[rid] >> 7) & 127;
+        comTag = (core->rn->rt->comTag[rid]);
 
     if (comTag & 64)
         return ((int32_t)(comTag & 63) << (32 - 6)) >> (32 - 6);
@@ -529,7 +529,8 @@ void WriteRegister(uint32_t rid, uint32_t val)
         if (core->rn->tb->tags[i] == 0)
         {
             core->rn->tb->tags[i] = 3;
-            core->rn->rt->rat[rid] = (i) | (i << 7);
+            core->rn->rt->comTag[rid] = (i);
+            core->rn->rt->specTag[rid] = (i);
             core->rn->rt->tagAvail |= (1 << i);
             core->rf->mem[i] = val;
             break;

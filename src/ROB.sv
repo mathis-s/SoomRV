@@ -8,7 +8,11 @@ typedef struct packed
     FetchID_t fetchID;
     logic isFP;
     logic compressed;
-    //logic valid;
+    
+    SqN storeSqN;
+    SqN loadSqN;
+    logic isLd;
+    logic isSt;
 } ROBEntry;
 
 module ROB
@@ -38,6 +42,9 @@ module ROB
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
+
+    output SqN OUT_lastLoadSqN,
+    output SqN OUT_lastStoreSqN,
 
     output CommitUOp OUT_comUOp[WIDTH-1:0],
     output reg[4:0] OUT_fpNewFlags,
@@ -161,6 +168,8 @@ always_ff@(posedge clk) begin
         OUT_curFetchID <= -1;
         stop <= 0;
         lastIndex <= 0;
+        OUT_lastLoadSqN <= 0;
+        OUT_lastStoreSqN <= 0;
     end
     else if (IN_branch.taken) begin
         if (IN_branch.flush) 
@@ -211,7 +220,6 @@ always_ff@(posedge clk) begin
             reg temp = 0;
             reg pred = 0;
             reg[ID_LEN-1:0] cnt = 0;
-            reg[WIDTH-1:0] deqMask = 0;
             
             for (integer i = 0; i < WIDTH; i=i+1) begin
             
@@ -241,8 +249,11 @@ always_ff@(posedge clk) begin
                         (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
-                    
-                    deqMask[id[1:0]] = 1;
+
+                    if (!(deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
+                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= deqEntries[i].loadSqN;
+                        OUT_lastStoreSqN <= deqEntries[i].storeSqN;
+                    end
 
                     if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
                         OUT_bpUpdate0.valid <= 1;
@@ -256,6 +267,8 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.flags <= deqFlags[i];
                         OUT_trapUOp.tag <= deqEntries[i].tag;
                         OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id};
+                        OUT_trapUOp.loadSqN <= deqEntries[i].loadSqN;
+                        OUT_trapUOp.storeSqN <= deqEntries[i].storeSqN;
                         OUT_trapUOp.rd <= deqEntries[i].rd;
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
@@ -315,6 +328,10 @@ always_ff@(posedge clk) begin
                 entry.fetchID = rnUOpSorted[i].fetchID;
                 entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
                 entry.fetchOffs = rnUOpSorted[i].fetchOffs;
+                entry.storeSqN = rnUOpSorted[i].storeSqN;
+                entry.loadSqN = rnUOpSorted[i].loadSqN;
+                entry.isLd = rnUOpSorted[i].fu == FU_LD || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isSt = rnUOpSorted[i].fu == FU_ST || rnUOpSorted[i].fu == FU_ATOMIC;
                 
                 case (id0)
                     0: gen[0].entries[id1] <= entry;

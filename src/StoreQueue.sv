@@ -341,7 +341,7 @@ always_comb begin
     end
     
     // Late override
-    if (IN_branch.taken && $signed(entries[load_c.index].sqN - IN_branch.sqN) > 0)
+    if (IN_branch.taken && ($signed(entries[load_c.index].sqN - IN_branch.sqN) > 0 || IN_branch.flush))
         load_c = SQLoad'{valid: 0, default: 'x};
         
 end
@@ -660,8 +660,6 @@ always_ff@(posedge clk) begin
         OUT_empty <= empty && !modified;
         if (OUT_empty && flushing) begin
             flushing <= 0;
-            if (flushing)
-                baseIndex = 1;
         end
         OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
