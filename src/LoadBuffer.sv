@@ -145,30 +145,33 @@ always_comb begin
 end
 
 // Circular Logic for range-based invalidation
+wire SqN invalSqN = IN_branch.taken ? IN_branch.loadSqN : lastBaseIndex;
+wire[NUM_ENTRIES-1:0] beginOneHot = (1 << invalSqN[$clog2(NUM_ENTRIES)-1:0]);
+wire[NUM_ENTRIES-1:0] endOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
 // verilator lint_off UNOPTFLAT
 reg[NUM_ENTRIES-1:0] invalMask;
 generate
 for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
 always_comb begin
     integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-
+    
     // We use range invalidation on mispredict to remove incorrectly speculated loads,
     // and on regular commit to remove correct and committed loads.
-    SqN invalSqN = IN_branch.taken ? IN_branch.loadSqN : lastBaseIndex;
-    
-    // invalidate from branch sqn (incl) to baseIndex (excl)
+
     if (IN_branch.taken) begin
-        if (invalSqN[$clog2(NUM_ENTRIES)-1:0] == i[$clog2(NUM_ENTRIES)-1:0])
+        // invalidate from branch load sqn (incl) to baseIndex (excl)
+        if (beginOneHot[i])
             invalMask[i] = 1;
-        else if (baseIndex[$clog2(NUM_ENTRIES)-1:0] == i[$clog2(NUM_ENTRIES)-1:0])
+        else if (endOneHot[i])
             invalMask[i] = 0;
         else
             invalMask[i] = invalMask[prev];
     end
     else begin
-        if (baseIndex[$clog2(NUM_ENTRIES)-1:0] == i[$clog2(NUM_ENTRIES)-1:0])
+        // invalidate from last baseIndex (incl) to baseIndex (excl)
+        if (endOneHot[i])
             invalMask[i] = 0;
-        else if (invalSqN[$clog2(NUM_ENTRIES)-1:0] == i[$clog2(NUM_ENTRIES)-1:0])
+        else if (beginOneHot[i])
             invalMask[i] = 1;
         else
             invalMask[i] = invalMask[prev];
