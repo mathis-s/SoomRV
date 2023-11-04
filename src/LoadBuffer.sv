@@ -210,7 +210,7 @@ always_ff@(posedge clk) begin
 
         if (IN_branch.taken) begin
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if (invalMask[i] || IN_branch.flush || ($signed(IN_branch.loadSqN - baseIndex) >= NUM_ENTRIES)) begin
+                if ((invalMask[i] && !($signed(IN_branch.loadSqN - baseIndex) >= NUM_ENTRIES)) || IN_branch.flush) begin
                     entries[i] <= 'x;
                     entries[i].valid <= 0;
                 end
