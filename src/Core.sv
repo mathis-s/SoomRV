@@ -213,7 +213,7 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,3
     
     .OUT_uop(IS_uop[0])
 );
-IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
+IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4-2) iq1
 (
     .clk(clk),
     .rst(rst),

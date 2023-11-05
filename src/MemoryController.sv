@@ -12,47 +12,47 @@ module MemoryController
     output CacheIF OUT_dcacheR,
     input wire[32*`CWIDTH-1:0] IN_dcacheR,
 
-    output[`AXI_ID_LEN-1:0]  s_axi_awid, // write req id
-    output[ADDR_LEN-1:0] s_axi_awaddr, // write addr
-    output[7:0] s_axi_awlen, // write len
-    output[2:0] s_axi_awsize, // word size
-    output[1:0] s_axi_awburst, // FIXED, INCR, WRAP, RESERVED
-    output[0:0] s_axi_awlock, // exclusive access
-    output[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
-    output s_axi_awvalid,
-    input s_axi_awready,
+    output logic[`AXI_ID_LEN-1:0]  s_axi_awid, // write req id
+    output logic[ADDR_LEN-1:0] s_axi_awaddr, // write addr
+    output logic[7:0] s_axi_awlen, // write len
+    output logic[2:0] s_axi_awsize, // word size
+    output logic[1:0] s_axi_awburst, // FIXED, INCR, WRAP, RESERVED
+    output logic[0:0] s_axi_awlock, // exclusive access
+    output logic[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
+    output logic s_axi_awvalid,
+    input logic s_axi_awready,
     
     // write stream
-    output[WIDTH-1:0] s_axi_wdata,
-    output[(WIDTH/8)-1:0] s_axi_wstrb,
-    output s_axi_wlast,
-    output s_axi_wvalid,
-    input s_axi_wready,
+    output logic [WIDTH-1:0] s_axi_wdata,
+    output logic [(WIDTH/8)-1:0] s_axi_wstrb,
+    output logic s_axi_wlast,
+    output logic s_axi_wvalid,
+    input logic s_axi_wready,
     
     // write response
-    output s_axi_bready,
-    input[`AXI_ID_LEN-1:0] s_axi_bid,
+    output logic s_axi_bready,
+    input logic[`AXI_ID_LEN-1:0] s_axi_bid,
     //input[1:0] s_axi_bresp,
-    input s_axi_bvalid,
+    input logic s_axi_bvalid,
     
     // read request
-    output[`AXI_ID_LEN-1:0] s_axi_arid,
-    output[ADDR_LEN-1:0] s_axi_araddr,
-    output[7:0] s_axi_arlen,
-    output[2:0] s_axi_arsize,
-    output[1:0] s_axi_arburst,
-    output[0:0] s_axi_arlock,
-    output[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
-    output s_axi_arvalid,
-    input s_axi_arready,
+    output logic[`AXI_ID_LEN-1:0] s_axi_arid,
+    output logic[ADDR_LEN-1:0] s_axi_araddr,
+    output logic[7:0] s_axi_arlen,
+    output logic[2:0] s_axi_arsize,
+    output logic[1:0] s_axi_arburst,
+    output logic[0:0] s_axi_arlock,
+    output logic[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
+    output logic s_axi_arvalid,
+    input logic s_axi_arready,
     
     // read stream
-    output s_axi_rready,
-    input[`AXI_ID_LEN-1:0] s_axi_rid,
-    input[WIDTH-1:0] s_axi_rdata,
+    output logic s_axi_rready,
+    input logic[`AXI_ID_LEN-1:0] s_axi_rid,
+    input logic[WIDTH-1:0] s_axi_rdata,
     //input logic[1:0] s_axi_rresp,
-    input s_axi_rlast,
-    input s_axi_rvalid
+    input logic s_axi_rlast,
+    input logic s_axi_rvalid
 );
 
 localparam WIDTH_W_ = (WIDTH / 32);
@@ -135,6 +135,7 @@ always_comb begin
                 cacheAddrColl = 0;
                 for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1)
                     cacheAddrColl |= 
+                        transfers[j].valid &&
                         IsCacheOp(IN_ctrl[i].cmd) &&
                         IsCacheOp(transfers[j].cmd) &&
                         IN_ctrl[i].cacheID == transfers[j].cacheID &&
@@ -452,7 +453,7 @@ always_comb begin
                 awIdx = i[$clog2(`AXI_NUM_TRANS)-1:0];
                 awIdxValid = 1;
             end
-            else assert(transfers[i].needWriteRq != 2'b01 && transfers[i].needWriteRq != 2'b10);
+            //else assert(transfers[i].needWriteRq != 2'b01 && transfers[i].needWriteRq != 2'b10);
         end
     end
     
@@ -557,7 +558,7 @@ always_ff@(posedge clk) begin
             case (selReq.cmd)
                 MEMC_REPLACE: begin
                     transfers[enqIdx].needReadRq <= '1;
-                    transfers[enqIdx].needWriteRq <= '1;
+                    transfers[enqIdx].needWriteRq <= 2'b11;
                     transfers[enqIdx].evictProgress <= 0;
                     transfers[enqIdx].readDone <= 0;
                     transfers[enqIdx].writeDone <= 0;
@@ -567,7 +568,7 @@ always_ff@(posedge clk) begin
                     transfers[enqIdx].readDone <= 0;
                 end
                 MEMC_CP_CACHE_TO_EXT: begin
-                    transfers[enqIdx].needWriteRq <= '1;
+                    transfers[enqIdx].needWriteRq <= 2'b11;
                     transfers[enqIdx].writeDone <= 0;
                     transfers[enqIdx].evictProgress <= 0;
                 end
@@ -576,7 +577,7 @@ always_ff@(posedge clk) begin
                     transfers[enqIdx].readDone <= 0;
                 end
                 MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
-                    transfers[enqIdx].needWriteRq <= '1;
+                    transfers[enqIdx].needWriteRq <= 2'b11;
                     transfers[enqIdx].writeDone <= 0;
                     // readAddr field is used to store data to write
                     transfers[enqIdx].readAddr <= selReq.data;

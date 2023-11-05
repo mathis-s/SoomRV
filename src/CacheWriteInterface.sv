@@ -64,13 +64,12 @@ always_comb begin
         OUT_CACHE_addr = cur_c.addr + $bits(cur_c.addr)'(cur_c.idx);
         OUT_CACHE_data = cur_c.data[cur_c.idx * CWIDTH +: CWIDTH];
         cur_c.idx = cur_c.idx + 1;
-    end
-    
-    if (cur_c.idx[$clog2(IWIDTH/CWIDTH)]) begin
-        writeLast = 1;
-        writeLastId = cur_c.id;
-        cur_c = 'x;
-        cur_c.valid = 0;
+        if (cur_c.idx[$clog2(IWIDTH/CWIDTH)]) begin
+            writeLast = 1;
+            writeLastId = cur_c.id;
+            cur_c = 'x;
+            cur_c.valid = 0;
+        end
     end
 end
 

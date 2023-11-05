@@ -148,6 +148,7 @@ end
 wire SqN invalSqN = IN_branch.taken ? IN_branch.loadSqN : lastBaseIndex;
 wire[NUM_ENTRIES-1:0] beginOneHot = (1 << invalSqN[$clog2(NUM_ENTRIES)-1:0]);
 wire[NUM_ENTRIES-1:0] endOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
+/*
 // verilator lint_off UNOPTFLAT
 reg[NUM_ENTRIES-1:0] invalMask;
 generate
@@ -179,6 +180,37 @@ always_comb begin
 end
 endgenerate
 // verilator lint_on UNOPTFLAT
+
+always_ff@(posedge clk) begin
+    if (invalMask2 != invalMask) begin
+        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], invalSqN[$clog2(NUM_ENTRIES)-1:0]);
+        $display("%b %b", invalMask, invalMask2);
+        assert(0);
+    end
+end
+*/
+
+reg[NUM_ENTRIES-1:0] invalMask;
+always_comb begin
+    reg active;
+    if (IN_branch.taken)
+        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] <= invalSqN[$clog2(NUM_ENTRIES)-1:0];
+    else
+        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] < invalSqN[$clog2(NUM_ENTRIES)-1:0];
+        
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        if (IN_branch.taken) begin
+            if (beginOneHot[i]) active = 1;
+            else if (endOneHot[i]) active = 0;
+        end
+        else begin
+            if (endOneHot[i]) active = 0;
+            else if (beginOneHot[i]) active = 1;
+        end
+        invalMask[i] = active;
+    end
+end
+
 
 always_ff@(posedge clk) begin
     

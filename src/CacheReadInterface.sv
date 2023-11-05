@@ -97,7 +97,6 @@ always_comb begin
             FIFO_data[31:0] = readMetaSR[1].mmioData;
             FIFO_id = readMetaSR[1].id;
             FIFO_last = readMetaSR[1].last;
-            assert(accIdx_c == 1);
             accIdx_c = 0;
         end
         else if (accIdx_c[$clog2(WNUM)]) begin

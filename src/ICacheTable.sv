@@ -273,7 +273,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) OUT_memc <= OUT_memc_c;
+always_ff@(posedge clk) OUT_memc <= rst ? MemController_Req'{cmd: MEMC_NONE, default: 'x} : OUT_memc_c;
 
 always_comb begin
     OUT_icacheMissFetchID = 'x;
@@ -386,6 +386,8 @@ always_ff@(posedge clk) begin
                 flushState <= FLUSH_ACTIVE;
                 if (fetch0.valid || fetch1.valid)
                     flushState <= FLUSH_QUEUED;
+                flushAssocIter <= 0;
+                flushAddrIter <= 0;
             end
             FLUSH_ACTIVE: begin
                 reg flushDone;
