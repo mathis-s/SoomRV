@@ -526,9 +526,10 @@ void WriteRegister(uint32_t rid, uint32_t val)
     int i = 0;
     while (true)
     {
-        if (core->rn->tb->tags[i] == 0)
+        if (core->rn->tb->free[i] == 1 && core->rn->tb->freeCom[i] == 1)
         {
-            core->rn->tb->tags[i] = 3;
+            core->rn->tb->free[i] = 0;
+            core->rn->tb->freeCom[i] = 0;
             core->rn->rt->comTag[rid] = (i);
             core->rn->rt->specTag[rid] = (i);
             core->rn->rt->tagAvail |= (1 << i);
