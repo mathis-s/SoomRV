@@ -185,9 +185,9 @@ always_comb begin
         s_axi_arid = arIdx;
 
         case (transfers[arIdx].cmd)
-            MEMC_WRITE_BYTE: s_axi_arsize = 0;
-            MEMC_WRITE_HALF: s_axi_arsize = 1;
-            MEMC_WRITE_WORD: s_axi_arsize = 2;
+            MEMC_READ_BYTE: s_axi_arsize = 0;
+            MEMC_READ_HALF: s_axi_arsize = 1;
+            MEMC_READ_WORD: s_axi_arsize = 2;
             default: s_axi_arsize = 3'($clog2(WIDTH/8));
         endcase
     end
