@@ -38,7 +38,7 @@ always_ff@(posedge clk) begin
             cnt <= 31;
             
             if (IN_uop.opcode == DIV_DIV) begin
-                invert <= IN_uop.srcA[31] ^ IN_uop.srcB[31];
+                invert <= (IN_uop.srcA[31] ^ IN_uop.srcB[31]) && (IN_uop.srcB != 0);
                 r <= {33'b0, (IN_uop.srcA[31] ? (-IN_uop.srcA) : IN_uop.srcA)};
                 d <= IN_uop.srcB[31] ? (-IN_uop.srcB) : IN_uop.srcB;
             end

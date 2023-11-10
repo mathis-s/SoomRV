@@ -292,6 +292,8 @@ always_ff@(posedge clk) begin
                             OUT_uop[j].availA <= 1;
                         if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)
                             OUT_uop[j].availB <= 1;
+                        if (OUT_uop[j].tagC == IN_wbUOp[i].tagDst)
+                            OUT_uop[j].availC <= 1;
                     end
                 end
             end
@@ -331,7 +333,7 @@ always_ff@(posedge clk) begin
             if (IN_uop[i].valid) begin
                 
                 OUT_uop[i].valid <= 1;
-                OUT_uop[i].validIQ <= '1;
+                OUT_uop[i].validIQ <= 4'b1111;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
@@ -355,13 +357,23 @@ always_ff@(posedge clk) begin
                 
                 OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;
-                // These are affected by previous instrs
+                
                 OUT_uop[i].tagA <= RAT_lookupSpecTag[2*i+0];
                 OUT_uop[i].tagB <= RAT_lookupSpecTag[2*i+1];
                 OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
                 OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
-                
                 OUT_uop[i].tagDst <= newTags[i];
+                
+                // Atomics need a total of three source tags (addr, reg operand, mem operand).
+                // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
+                if (IN_uop[i].fu == FU_ATOMIC) begin
+                    OUT_uop[i].tagC <= newTags[i];
+                    OUT_uop[i].availC <= 0;
+                end
+                else begin
+                    OUT_uop[i].tagC <= 7'h40;
+                    OUT_uop[i].availC <= 1;
+                end
             end
             else begin
                 OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};

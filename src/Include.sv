@@ -502,6 +502,8 @@ typedef struct packed
     logic availB;
     Tag tagB;
     logic immB;
+    logic availC;
+    Tag tagC; // used for atomics
     SqN sqN;
     Tag tagDst;
     RegNm rd;

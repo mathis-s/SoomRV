@@ -61,7 +61,7 @@ for (genvar g = 0; g < NUM_STAGES+1; g=g+1) begin : gen
             
             for (genvar j = 0; j < NUM_ISSUE; j=j+1) begin : gen2
                 
-                // manually build mux to avoid index arithmetic
+                // manually build mux to avoid non-const index arithmetic
                 wire[g-1:0] mux[j+1:0];
                 for (genvar k = 0; k <= j; k=k+1)
                     assign mux[k] = b[j - k];
