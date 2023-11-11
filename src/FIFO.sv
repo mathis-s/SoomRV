@@ -54,7 +54,7 @@ always_ff@(posedge clk) begin
         fullCond <= 0;
         indexIn <= 0;
         indexOut <= 0;
-        outDataReg <= 'x;
+        outDataReg <= '0;
         outValidReg <= 0;
     end
     else begin

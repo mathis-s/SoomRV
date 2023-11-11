@@ -125,7 +125,7 @@ endfunction
 MemController_Req selReq;
 always_comb begin
     reg cacheAddrColl = 'x;
-    OUT_stat.stall = '1;
+    OUT_stat.stall = {NUM_TFS_IN{1'b1}};
     selReq = 'x;
     selReq.cmd = MEMC_NONE;
 
@@ -150,20 +150,41 @@ always_comb begin
 end
 
 // AXI read control signals
+typedef struct packed
+{
+    logic[`AXI_ID_LEN-1:0] arid;
+    logic[ADDR_LEN-1:0] araddr;
+    logic[7:0] arlen;
+    logic[2:0] arsize;
+    logic[1:0] arburst;
+    logic[0:0] arlock;
+    logic[3:0] arcache;
+    logic arvalid;
+} AXI_AR;
+AXI_AR axiAR;
+logic arFIFO_outValid;
+logic arFIFO_ready;
+FIFO#($bits(AXI_AR), 2, 1, 1) arFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
+
+    .IN_valid(axiAR.arvalid),
+    .IN_data(axiAR),
+    .OUT_ready(arFIFO_ready),
+    
+    .OUT_valid(arFIFO_outValid),
+    .IN_ready(s_axi_arready),
+    .OUT_data({s_axi_arid, s_axi_araddr, s_axi_arlen, s_axi_arsize, s_axi_arburst, s_axi_arlock, s_axi_arcache, s_axi_arvalid})
+);
 reg[$clog2(`AXI_NUM_TRANS)-1:0] arIdx;
 reg arIdxValid;
-wire readReqSuccess = arIdxValid && s_axi_arready;
+wire readReqSuccess = axiAR.arvalid && arFIFO_ready;
 always_comb begin
     
-    // Default AXI read rq bus state
-    s_axi_arid = '0;
-    s_axi_araddr = '0;
-    s_axi_arlen = '0;
-    s_axi_arburst = '0;
-    s_axi_arlock = '0;
-    s_axi_arcache = '0;
-    s_axi_arvalid = '0;
-    s_axi_arsize = '0;
+    axiAR = 'x;
+    axiAR.arvalid = 0;
     
     // Find Op that requires read request
     arIdx = 'x;
@@ -178,17 +199,17 @@ always_comb begin
     // Reads only have to be requested on AXI. The MemoryWriteInterface
     // handles data as it comes in, no setup required.
     if (arIdxValid) begin
-        s_axi_arvalid = 1;
-        s_axi_arburst = WRAP;
-        s_axi_arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
-        s_axi_araddr = transfers[arIdx].readAddr;
-        s_axi_arid = arIdx;
+        axiAR.arvalid = 1;
+        axiAR.arburst = isMMIO[arIdx] ? FIXED : WRAP;
+        axiAR.arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
+        axiAR.araddr = transfers[arIdx].readAddr;
+        axiAR.arid = arIdx;
 
         case (transfers[arIdx].cmd)
-            MEMC_READ_BYTE: s_axi_arsize = 0;
-            MEMC_READ_HALF: s_axi_arsize = 1;
-            MEMC_READ_WORD: s_axi_arsize = 2;
-            default: s_axi_arsize = 3'($clog2(WIDTH/8));
+            MEMC_READ_BYTE: axiAR.arsize = 0;
+            MEMC_READ_HALF: axiAR.arsize = 1;
+            MEMC_READ_WORD: axiAR.arsize = 2;
+            default: axiAR.arsize = 3'($clog2(WIDTH/8));
         endcase
     end
 end
@@ -416,20 +437,41 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 4, `AXI_ID_LEN) dcacheR
 );
 
 // Begin Write Transactions
+typedef struct packed
+{
+    logic[`AXI_ID_LEN-1:0]  awid;
+    logic[ADDR_LEN-1:0] awaddr;
+    logic[7:0] awlen;
+    logic[2:0] awsize;
+    logic[1:0] awburst;
+    logic[0:0] awlock;
+    logic[3:0] awcache;
+    logic awvalid;
+} AXI_AW;
+AXI_AW axiAW;
+logic awFIFO_outValid;
+logic awFIFO_ready;
+FIFO#($bits(AXI_AW), 2, 1, 1) awFIFO
+(
+    .clk(clk),
+    .rst(rst),
+    .free(),
+
+    .IN_valid(axiAW.awvalid),
+    .IN_data(axiAW),
+    .OUT_ready(awFIFO_ready),
+    
+    .OUT_valid(awFIFO_outValid),
+    .IN_ready(s_axi_awready),
+    .OUT_data({s_axi_awid, s_axi_awaddr, s_axi_awlen, s_axi_awsize, s_axi_awburst, s_axi_awlock, s_axi_awcache, s_axi_awvalid})
+);
 logic[`AXI_ID_LEN-1:0] awIdx;
 logic awIdxValid;
 always_comb begin
     reg isExclusive = 0;
     
-    // Default AXI write rq bus state
-    s_axi_awaddr = '0;
-    s_axi_awlen = '0;
-    s_axi_awsize = '0;
-    s_axi_awburst = '0;
-    s_axi_awlock = '0;
-    s_axi_awcache = '0;
-    s_axi_awvalid = '0;
-    s_axi_awid = '0;
+    axiAW = 'x;
+    axiAW.awvalid = 0;
     
     DCR_reqAddr = 'x;
     DCR_reqLen = 'x;
@@ -437,9 +479,6 @@ always_comb begin
     DCR_reqMMIOData = 'x;
     DCR_reqMMIO = 0;
     DCR_reqValid = 0;
-    
-    // AxCACHE[1] = 1 for normal memory
-    // AxCACHE[1] = 0 for normal memory or MMIO
     
     // Find Op that requires write request
     awIdx = 'x;
@@ -459,17 +498,17 @@ always_comb begin
     
     // Request to AXI
     if (awIdxValid && transfers[awIdx].needWriteRq[1]) begin
-        s_axi_awvalid = 1;
-        s_axi_awburst = WRAP;
-        s_axi_awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - $clog2(WIDTH / 8))) - 1);
-        s_axi_awaddr = transfers[awIdx].writeAddr;
-        s_axi_awid = awIdx;
+        axiAW.awvalid = 1;
+        axiAW.awburst = isMMIO[awIdx] ? FIXED : WRAP;
+        axiAW.awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - $clog2(WIDTH / 8))) - 1);
+        axiAW.awaddr = transfers[awIdx].writeAddr;
+        axiAW.awid = awIdx;
         
         case (transfers[awIdx].cmd)
-            MEMC_WRITE_BYTE: s_axi_awsize = 0;
-            MEMC_WRITE_HALF: s_axi_awsize = 1;
-            MEMC_WRITE_WORD: s_axi_awsize = 2;
-            default: s_axi_awsize = 3'($clog2(WIDTH/8));
+            MEMC_WRITE_BYTE: axiAW.awsize = 0;
+            MEMC_WRITE_HALF: axiAW.awsize = 1;
+            MEMC_WRITE_WORD: axiAW.awsize = 2;
+            default: axiAW.awsize = 3'($clog2(WIDTH/8));
         endcase
     end
     
@@ -631,7 +670,7 @@ always_ff@(posedge clk) begin
         // Write Request
         if (awIdxValid) begin
             if (DCR_reqValid && DCR_reqReady) transfers[awIdx].needWriteRq[0] <= 0;
-            if (s_axi_awvalid && s_axi_awready) transfers[awIdx].needWriteRq[1] <= 0;
+            if (axiAW.awvalid && awFIFO_ready) transfers[awIdx].needWriteRq[1] <= 0;
         end
 
         // Write Data
