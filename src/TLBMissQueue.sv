@@ -8,7 +8,7 @@ module TLBMissQueue#(parameter SIZE=4)
     input PageWalk_Res IN_pw,
     input wire IN_pwActive,
     
-    output wire OUT_stall,
+    output reg OUT_stall,
     input wire IN_enqueue,
     input wire IN_uopReady,
     input AGU_UOp IN_uop,
