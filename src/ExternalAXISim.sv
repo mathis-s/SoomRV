@@ -101,22 +101,23 @@ logic[7:0] inputByte /*verilator public*/;
 logic readDataIdxValid;
 logic[ID_LEN-1:0] readDataIdx;
 always_comb begin
-    // could select index randomly to 
-    // simulate memory heterogeneity
     readDataIdxValid = 0;
     readDataIdx = 'x;
-    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+    // could select index randomly to 
+    // simulate memory heterogeneity
+    for (integer i = NUM_TFS - 1; i >= 0; i=i-1) begin
         if (reads[i].valid) begin
             readDataIdxValid = 1;
-            readDataIdx = i[ID_LEN-1:0];
+            readDataIdx = ID_LEN'(i);
         end
     end
 end
+
 always_ff@(posedge clk) begin
     if (rst) ;
     else if (!(s_axi_rvalid && !s_axi_rready)) begin
         s_axi_rid <= 'x;
-        s_axi_rdata <= 'x;
+        //s_axi_rdata <= 'x;
         s_axi_rlast <= 'x;
         s_axi_rvalid <= 0;
         if (readDataIdxValid) begin
@@ -134,6 +135,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 // MMIO
+                
                 case (addr)
                     `SERIAL_ADDR: begin
                         s_axi_rdata <= 'x;
@@ -207,7 +209,7 @@ reg writeIdxValid;
 always_comb begin
     writeIdx = 'x;
     writeIdxValid = 0;
-
+    
     for (integer i = NUM_TFS-1; i >= 0; i=i-1) begin
         if (fifoAWValid[i] && !writeDone[fifoAW[i[ID_LEN-1:0]]]) begin
             writeIdxValid = 1;
@@ -240,7 +242,7 @@ always_ff@(posedge clk) begin
             case (addr)
                 `SERIAL_ADDR: begin
                     if (buf_wstrb[0]) begin
-                        $write("%c", buf_wdata[7:0] & 8'd127);
+                        $write("%c", buf_wdata[7:0]);
                         $fflush(32'h80000001);
                     end
                 end
@@ -260,9 +262,9 @@ always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
     
     if (rst) ;
-    else if (s_axi_awready && s_axi_awvalid) begin
+    else if (buf_awready && buf_awvalid) begin
         fifoAWValid[fifoAWInsIdx] <= 1;
-        fifoAW[fifoAWInsIdx] <= s_axi_awid;
+        fifoAW[fifoAWInsIdx] <= buf_awid;
     end
     
     if (rst) ;
@@ -281,9 +283,9 @@ always_ff@(posedge clk) begin
             fifoAW[NUM_TFS-1] <= 'x;
             fifoAWValid[NUM_TFS-1] <= 0;
 
-            if (s_axi_awready && s_axi_awvalid) begin
+            if (buf_awready && buf_awvalid) begin
                 fifoAWValid[fifoAWInsIdx-1] <= 1;
-                fifoAW[fifoAWInsIdx-1] <= s_axi_awid;
+                fifoAW[fifoAWInsIdx-1] <= buf_awid;
             end
 
             tfs[1][idx] <= 'x;

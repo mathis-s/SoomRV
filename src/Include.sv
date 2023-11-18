@@ -590,13 +590,13 @@ typedef struct packed
     logic[31:0] pc;
     Tag tagDst;
     SqN sqN;
-    SqN storeSqN;
-    SqN loadSqN;
-    FetchID_t fetchID;
-    logic doNotCommit;
-    AGU_Exception exception;
-    logic compressed;
-    logic valid;
+    SqN storeSqN; // 7
+    SqN loadSqN; // 7
+    FetchID_t fetchID; // 5
+    logic doNotCommit; // 1
+    AGU_Exception exception; // 2
+    logic compressed; // 1
+    logic valid; // 1
 } AGU_UOp;
 
 typedef struct packed
@@ -1012,3 +1012,28 @@ interface IF_ICache();
         output rdata
     );
 endinterface
+
+typedef struct packed
+{
+    logic[31:0] stallPC;
+    
+    logic sqNStall;
+    logic stSqNStall;
+
+    logic rnStall;
+    logic memBusy;
+
+    logic sqBusy;
+    logic lsuBusy;
+    logic ldNack;
+    logic stNack;
+    
+} DebugInfo;
+
+typedef struct packed
+{
+    logic[3:0] transfValid;
+    logic[3:0] transfReadDone;
+    logic[3:0] transfWriteDone;
+    logic[3:0] transfIsMMIO;
+} DebugInfoMemC;

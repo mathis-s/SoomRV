@@ -19,7 +19,9 @@ module TrapHandler
     output reg OUT_flushTLB,
     output reg OUT_fence,
     output reg OUT_clearICache,
-    output wire OUT_disableIFetch
+    output wire OUT_disableIFetch,
+
+    output reg[31:0] OUT_dbgStallPC
 );
 
 reg memoryWait;
@@ -170,17 +172,18 @@ always_ff@(posedge clk) begin
                 OUT_branch.histAct <= HIST_NONE;
                 OUT_branch.retAct <= RET_NONE;
             end
-
-            // Branch Prediction Updates
+            else if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
+                OUT_bpUpdate1.valid <= 1;
+                OUT_bpUpdate1.pc <= IN_pcReadData.pc;
+            end
             else begin
-                if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
-                    OUT_bpUpdate1.valid <= 1;
-                    OUT_bpUpdate1.pc <= IN_pcReadData.pc;
-                end
+                // If the not-executed flag is still set, this is not a trap uop but a request to look up the PC
+                // of the instruction we're stalled on. This is only used for debugging.
+                assert(IN_trapInstr.flags == FLAGS_NX);
+                OUT_dbgStallPC <= {baseIndexPC, 1'b0};
             end
         end
     end
-
 end
 
 endmodule

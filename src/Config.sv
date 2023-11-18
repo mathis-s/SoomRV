@@ -68,3 +68,7 @@
 // This is useful for mapping to FPGA memories, which are reset
 // after programming anyways.
 `define SYNC_RESET
+//`define SQ_LINEAR
+
+// Enable floating point (zfinx) support
+//`define ENABLE_FP

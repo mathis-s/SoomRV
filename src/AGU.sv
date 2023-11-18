@@ -235,7 +235,7 @@ always_comb begin
     TMQ_dequeue = 0;
     
     // illegal instruction exceptions always pass through
-    if (aguUOp_c.valid && en && (!TMQ_stall || resUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
+    if (aguUOp_c.valid && en && (!TMQ_stall || (resUOp_c.valid && resUOp_c.flags == FLAGS_ILLEGAL_INSTR))) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end

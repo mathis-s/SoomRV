@@ -452,9 +452,11 @@ always_comb begin
     
     case (IN_uop.imm[11:0])
     
+`ifdef ENABLE_FP
         CSR_fflags: rdata = {27'b0, fflags};
         CSR_frm: rdata = {29'b0, frm};
         CSR_fcsr: rdata = {24'b0, frm, fflags};
+`endif
         
         CSR_time,
         CSR_timeh: begin
@@ -824,11 +826,11 @@ always_ff@(posedge clk) begin
                         endcase
                         
                         case (IN_uop.imm[11:0])
-                        
+`ifdef ENABLE_FP
                             CSR_fflags: fflags <= wdata[4:0];
                             CSR_frm: frm <= wdata[2:0];
                             CSR_fcsr: {frm, fflags} <= wdata[7:0];
-                            
+`endif
                             CSR_mstatus: begin
                                 MStatus_t temp = wdata;
                                 

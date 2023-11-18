@@ -52,7 +52,9 @@ module MemoryController
     input logic[WIDTH-1:0] s_axi_rdata,
     //input logic[1:0] s_axi_rresp,
     input logic s_axi_rlast,
-    input logic s_axi_rvalid
+    input logic s_axi_rvalid,
+
+    output DebugInfoMemC OUT_dbg
 );
 
 localparam WIDTH_W_ = (WIDTH / 32);
@@ -142,7 +144,7 @@ always_comb begin
                         IN_ctrl[i].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == transfers[j].cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2];
                 if (!cacheAddrColl) begin
                     selReq = IN_ctrl[i];
-                    OUT_stat.stall[i] = 1'b0;
+                    OUT_stat.stall = ~(1 << i);
                 end
             end
         end
@@ -164,7 +166,7 @@ typedef struct packed
 AXI_AR axiAR;
 logic arFIFO_outValid;
 logic arFIFO_ready;
-FIFO#($bits(AXI_AR), 2, 1, 1) arFIFO
+FIFO#($bits(AXI_AR), 4, 1, 1) arFIFO
 (
     .clk(clk),
     .rst(rst),
@@ -216,7 +218,6 @@ end
 
 // Output status to clients
 always_comb begin
-    OUT_stat = '0;
     OUT_stat.busy = 1; // make old clients stall
     
     // Cache Line Transfer Status
@@ -242,6 +243,16 @@ always_comb begin
     // MMIO
     OUT_stat.sglLdRes = sglLdRes;
     OUT_stat.sglStRes = sglStRes;
+end
+
+// Output Debug Info
+always_comb begin
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
+        OUT_dbg.transfValid[i] = transfers[i].valid;
+        OUT_dbg.transfReadDone[i] = transfers[i].progress[4];
+        OUT_dbg.transfWriteDone[i] = transfers[i].evictProgress[4];
+        OUT_dbg.transfIsMMIO[i] = isMMIO[i];
+    end
 end
 
 logic ICW_ready;
@@ -328,7 +339,7 @@ logic[WIDTH-1:0] buf_rdata;
 logic buf_rlast;
 logic buf_rvalid;
 logic buf_rready;
-FIFO#(R_LEN, 2, 1, 1) rFIFO
+FIFO#(R_LEN, 32, 1, 1) rFIFO
 (
     .clk(clk),
     .rst(rst),
@@ -357,7 +368,6 @@ always_comb begin
     DCW_data = 'x;
     DCW_id = 'x;
     
-    // todo: add fifo to remove comb path from valid to ready
     if (buf_rvalid) begin
         if (isMMIO[buf_rid]) begin
             buf_rready = 1;
@@ -407,7 +417,7 @@ logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
 
 logic DCR_cacheReadValid;
 logic[`AXI_ID_LEN-1:0] DCR_cacheReadId;
-CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 4, `AXI_ID_LEN) dcacheReadIF
+CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 32, `AXI_ID_LEN) dcacheReadIF
 (
     .clk(clk),
     .rst(rst),
@@ -451,7 +461,7 @@ typedef struct packed
 AXI_AW axiAW;
 logic awFIFO_outValid;
 logic awFIFO_ready;
-FIFO#($bits(AXI_AW), 2, 1, 1) awFIFO
+FIFO#($bits(AXI_AW), 4, 1, 1) awFIFO
 (
     .clk(clk),
     .rst(rst),

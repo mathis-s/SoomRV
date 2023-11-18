@@ -304,7 +304,18 @@ always_ff@(posedge clk) begin
 
                     cnt = cnt + 1;
                 end
-                else temp = 1;
+                else begin
+                    temp = 1;
+                    // If we are unable to commit anything in this cycle, we use the TrapHandler's PCFile
+                    // lookup to get the address of the instruction we're stalled on (for debugging/analysis). 
+                    if (i == 0 && (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex))) begin
+                        OUT_trapUOp.valid <= 1;
+                        OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
+                        OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
+                        OUT_trapUOp.compressed <= deqEntries[i].compressed;
+                        OUT_trapUOp.flags <= FLAGS_NX;
+                    end
+                end
                     
             end
             

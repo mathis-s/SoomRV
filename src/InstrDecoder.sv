@@ -969,6 +969,7 @@ always_comb begin
                             invalidEnc = 0;
                         end
                     end*/
+`ifdef ENABLE_FP
                     `OPC_FP: begin
                         // single precision
                         if (i32.fp.fmt == 2'b00) begin
@@ -1082,7 +1083,7 @@ always_comb begin
                             endcase
                         end
                     end
-                    
+`endif // ENABLE_FP
                     `OPC_ATOMIC: begin
                         if (instr.funct3 == 3'b010) begin
                             

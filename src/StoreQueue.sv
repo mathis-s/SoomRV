@@ -12,7 +12,7 @@ module StoreQueue
     input wire IN_stallSt,
     input wire IN_stallLd,
     output reg OUT_empty,
-    output reg OUT_done,
+    output wire OUT_done,
     
     input AGU_UOp IN_uopSt,
     input LD_UOp IN_uopLd,
@@ -341,11 +341,11 @@ endgenerate
 `endif
 
 wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
+wire[$clog2(NUM_ENTRIES)-1:0] comStSqNI = IN_comStSqN[$clog2(NUM_ENTRIES)-1:0];
 
 assign OUT_done = 
-    (!entryValid_c[baseIndexI] || (!entryReady_r[baseIndexI] && !($signed(IN_curSqN - entries[baseIndexI].sqN) > 0))) && 
-    evictedIn == 0 &&
-    !IN_stallSt;
+    baseIndex == IN_comStSqN &&
+    evictedIn == 0;
 
 // Do not re-order stores before stores at the same address; and do not re-order MMIO stores.
 reg allowDequeue;
