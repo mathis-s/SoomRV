@@ -256,6 +256,7 @@ end
 
 // Output early load op for VIPT
 always_comb begin
+    OUT_eldOp = 'x;
     OUT_eldOp.valid =
         !rst && issUOp_c.valid && (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0);
     
