@@ -1220,7 +1220,7 @@ int main(int argc, char** argv)
         main_time++; // Time passes...
     }
 
-    // LogPerf(core);
+    LogPerf(core);
 
     printf("%lu cycles\n", main_time / 2);
 

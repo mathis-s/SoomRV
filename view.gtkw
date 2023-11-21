@@ -1,19 +1,20 @@
 [*]
 [*] GTKWave Analyzer v3.3.117 (w)1999-2023 BSI
-[*] Sat Nov  4 13:33:42 2023
+[*] Tue Nov 14 23:57:37 2023
 [*]
 [dumpfile] "Top_tb.vcd"
-[dumpfile_mtime] "Sat Nov  4 13:32:33 2023"
-[dumpfile_size] 2229567
+[dumpfile_mtime] "Tue Nov 14 23:57:17 2023"
+[dumpfile_size] 5769046
 [savefile] "view.gtkw"
-[timestart] 915
+[timestart] 0
 [size] 3840 2118
 [pos] -1 -1
-*-2.376306 967 69993049 69992801 69993237 69993241 70005413 530 1370 21100119 334682 7563836 5524 5514 12525964 968 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-8.076306 1074 69993049 69992801 69993237 69993241 70005413 530 1370 21100119 334682 7563836 5524 5514 12525964 968 2684 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.extMem.
 [treeopen] TOP.Top.extMem.reads[0].
+[treeopen] TOP.Top.extMem.tfs[1][1].
 [treeopen] TOP.Top.soc.
 [treeopen] TOP.Top.soc.core.
 [treeopen] TOP.Top.soc.core.aguLD.aguUOp_c.
@@ -24,8 +25,6 @@
 [treeopen] TOP.Top.soc.core.aguLD.OUT_eldOp.
 [treeopen] TOP.Top.soc.core.aguLD.OUT_tlb.
 [treeopen] TOP.Top.soc.core.aguLD.OUT_uop.
-[treeopen] TOP.Top.soc.core.aguLD.tmq.queue[2].
-[treeopen] TOP.Top.soc.core.aguLD.tmq.queue[3].
 [treeopen] TOP.Top.soc.core.aguLD.TMQ_uop.
 [treeopen] TOP.Top.soc.core.aguST.
 [treeopen] TOP.Top.soc.core.aguST.IN_uop.
@@ -34,18 +33,15 @@
 [treeopen] TOP.Top.soc.core.aguST.OUT_uop.
 [treeopen] TOP.Top.soc.core.aguST.tmq.OUT_uop.
 [treeopen] TOP.Top.soc.core.aguST.tmq.queue[0].
-[treeopen] TOP.Top.soc.core.aguST.tmq.queue[2].
-[treeopen] TOP.Top.soc.core.aguST.tmq.queue[3].
 [treeopen] TOP.Top.soc.core.branch.
 [treeopen] TOP.Top.soc.core.branchProvs[2].
 [treeopen] TOP.Top.soc.core.branchProvs[3].
 [treeopen] TOP.Top.soc.core.csr.
+[treeopen] TOP.Top.soc.core.csr.IN_uop.
 [treeopen] TOP.Top.soc.core.DEC_decBranch.
 [treeopen] TOP.Top.soc.core.div.IN_uop.
 [treeopen] TOP.Top.soc.core.div.uop.
 [treeopen] TOP.Top.soc.core.dtlb.IN_pw.
-[treeopen] TOP.Top.soc.core.fdiv.IN_uop.
-[treeopen] TOP.Top.soc.core.fdiv.OUT_uop.
 [treeopen] TOP.Top.soc.core.ialu.IN_uop.
 [treeopen] TOP.Top.soc.core.ialu.OUT_branch.
 [treeopen] TOP.Top.soc.core.ialu.OUT_uop.
@@ -138,9 +134,6 @@
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[0].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].
 [treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.
-[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[2].ld.
-[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[3].
-[treeopen] TOP.Top.soc.core.lsu.loadMissQueue.queue[3].ld.
 [treeopen] TOP.Top.soc.core.lsu.miss[0].
 [treeopen] TOP.Top.soc.core.lsu.miss[1].
 [treeopen] TOP.Top.soc.core.lsu.OUT_memc.
@@ -208,6 +201,7 @@
 [treeopen] TOP.Top.soc.memc.
 [treeopen] TOP.Top.soc.memc.dcacheReadIF.
 [treeopen] TOP.Top.soc.memc.dcacheReadIF.cur.
+[treeopen] TOP.Top.soc.memc.dcacheReadIF.fifo.
 [treeopen] TOP.Top.soc.memc.icacheWriteIF.
 [treeopen] TOP.Top.soc.memc.IN_ctrl[0].
 [treeopen] TOP.Top.soc.memc.IN_ctrl[1].
@@ -220,6 +214,7 @@
 [treeopen] TOP.Top.soc.memc.transfers[1].
 [treeopen] TOP.Top.soc.memc.transfers[2].
 [treeopen] TOP.Top.soc.memc.transfers[3].
+[treeopen] TOP.Top.soc.OUT_dbg.
 [sst_width] 315
 [signals_width] 524
 [sst_expanded] 1
@@ -239,6 +234,24 @@ TOP.Top.soc.core.branch.retAct[1:0]
 -
 @28
 TOP.Top.soc.core.branchProvs[3].taken
+@200
+-
+@28
+TOP.Top.soc.OUT_dbg.sqNStall
+TOP.Top.soc.OUT_dbg.stSqNStall
+TOP.Top.soc.OUT_dbg.rnStall
+TOP.Top.soc.OUT_dbg.memBusy
+@22
+TOP.Top.soc.OUT_dbg.stallPC[31:0]
+@200
+-
+@28
+TOP.Top.soc.OUT_dbgMemC.transfValid[3:0]
+TOP.Top.soc.OUT_dbgMemC.transfWriteDone[3:0]
+@29
+TOP.Top.soc.OUT_dbgMemC.transfReadDone[3:0]
+@28
+TOP.Top.soc.OUT_dbgMemC.transfIsMMIO[3:0]
 @200
 -
 @28
@@ -286,6 +299,7 @@ TOP.Top.soc.core.TH_disableIFetch
 TOP.Top.soc.core.PD_full
 TOP.Top.soc.core.MEMSUB_busy
 @200
+-TB
 -BTB
 @28
 TOP.Top.soc.core.ifetch.bp.IN_mispr
@@ -442,6 +456,41 @@ TOP.Top.soc.memc.s_axi_wstrb[15:0]
 @28
 TOP.Top.soc.memc.s_axi_wready
 TOP.Top.soc.memc.s_axi_wvalid
+@200
+-
+@28
+TOP.Top.extMem.tfs[1][0].valid
+TOP.Top.extMem.tfs[1][1].valid
+TOP.Top.extMem.tfs[1][2].valid
+TOP.Top.extMem.tfs[1][3].valid
+@200
+-
+@28
+TOP.Top.extMem.buf_wlast
+@22
+TOP.Top.extMem.buf_wdata[127:0]
+TOP.Top.extMem.tfs[1][0].cur[7:0]
+TOP.Top.extMem.tfs[1][1].cur[7:0]
+TOP.Top.extMem.tfs[1][2].cur[7:0]
+TOP.Top.extMem.tfs[1][3].cur[7:0]
+@28
+TOP.Top.extMem.writeIdx[1:0]
+@200
+-
+@28
+TOP.Top.soc.memc.dcacheReadIF.cur.id[1:0]
+@22
+TOP.Top.soc.memc.dcacheReadIF.cur.addr[11:0]
+TOP.Top.soc.memc.dcacheReadIF.cur.progress[7:0]
+@28
+TOP.Top.soc.memc.dcacheReadIF.cur.valid
+TOP.Top.soc.memc.dcacheReadIF.IN_ready
+TOP.Top.soc.memc.dcacheReadIF.OUT_valid
+@200
+-
+@28
+TOP.Top.soc.memc.dcacheReadIF.fifo.IN_valid
+TOP.Top.soc.memc.dcacheReadIF.fifo.OUT_ready
 @200
 -MemC
 @28
@@ -698,9 +747,8 @@ TOP.Top.soc.genblk2[1].dcache.ce_reg
 TOP.Top.soc.genblk2[1].dcache.we_reg
 @22
 TOP.Top.soc.genblk2[1].dcache.data_reg[511:0]
-@201
--
 @200
+-
 -icache
 @22
 TOP.Top.soc.icache.wm_reg[3:0]
@@ -1263,34 +1311,23 @@ TOP.Top.soc.core.aguLD.pageWalkAccepted
 TOP.Top.soc.core.aguLD.pageWalkAddr[31:0]
 @200
 -
-@22
-TOP.Top.soc.core.aguLD.tmq.ready[3:0]
 @28
 TOP.Top.soc.core.aguLD.tmq.queue[0].valid
 TOP.Top.soc.core.aguLD.tmq.queue[1].valid
-TOP.Top.soc.core.aguLD.tmq.queue[2].valid
-TOP.Top.soc.core.aguLD.tmq.queue[3].valid
 @200
 -
-@28
-TOP.Top.soc.core.aguLD.tmq.ready[3:0]
 @22
 TOP.Top.soc.core.aguLD.tmq.queue[0].sqN[6:0]
 TOP.Top.soc.core.aguLD.tmq.queue[1].sqN[6:0]
-TOP.Top.soc.core.aguLD.tmq.queue[2].sqN[6:0]
-@28
-TOP.Top.soc.core.aguLD.tmq.queue[2].valid
-@22
-TOP.Top.soc.core.aguLD.tmq.queue[3].sqN[6:0]
 @200
 -
 @28
-TOP.Top.soc.core.aguLD.tmq.idxOut[1:0]
+#{idxOut[1:0]} TOP.Top.soc.core.aguLD.tmq.idxOut[0]
 TOP.Top.soc.core.aguLD.tmq.idxOutValid
 @200
 -
 @28
-TOP.Top.soc.core.aguLD.tmq.idxIn[1:0]
+#{idxIn[1:0]} TOP.Top.soc.core.aguLD.tmq.idxIn[0]
 TOP.Top.soc.core.aguLD.tmq.idxInValid
 TOP.Top.soc.core.aguLD.tmq.IN_enqueue
 TOP.Top.soc.core.aguLD.tmq.OUT_stall
@@ -1352,11 +1389,8 @@ TOP.Top.soc.core.aguST.pageWalkAddr[31:0]
 @200
 -
 @28
-TOP.Top.soc.core.aguST.tmq.ready[3:0]
 TOP.Top.soc.core.aguST.tmq.queue[0].valid
 TOP.Top.soc.core.aguST.tmq.queue[1].valid
-TOP.Top.soc.core.aguST.tmq.queue[2].valid
-TOP.Top.soc.core.aguST.tmq.queue[3].valid
 @200
 -
 @22
@@ -1620,13 +1654,9 @@ TOP.Top.soc.core.lsu.IF_ct.rdata[0][3].addr[19:0]
 @28
 TOP.Top.soc.core.lsu.loadMissQueue.queue[0].ready
 TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ready
-TOP.Top.soc.core.lsu.loadMissQueue.queue[2].ready
-TOP.Top.soc.core.lsu.loadMissQueue.queue[3].ready
 @22
 TOP.Top.soc.core.lsu.loadMissQueue.queue[0].ld.addr[31:0]
 TOP.Top.soc.core.lsu.loadMissQueue.queue[1].ld.addr[31:0]
-TOP.Top.soc.core.lsu.loadMissQueue.queue[2].ld.addr[31:0]
-TOP.Top.soc.core.lsu.loadMissQueue.queue[3].ld.addr[31:0]
 @200
 -
 -
@@ -2024,9 +2054,59 @@ TOP.Top.soc.core.trapHandler.OUT_trapInfo.cause[3:0]
 @28
 TOP.Top.soc.core.trapHandler.OUT_trapInfo.valid
 TOP.Top.soc.core.trapHandler.OUT_trapInfo.isInterrupt
+@200
+-AXI
 @22
 TOP.Top.soc.core.trapHandler.OUT_trapInfo.trapPC[31:0]
 TOP.Top.soc.core.trapHandler.OUT_pcReadAddr[4:0]
 TOP.Top.soc.core.trapHandler.IN_trapInstr.sqN[6:0]
+TOP.Top.extMem.s_axi_araddr[31:0]
+@28
+TOP.Top.extMem.s_axi_arburst[1:0]
+@22
+TOP.Top.extMem.s_axi_arcache[3:0]
+@28
+TOP.Top.extMem.s_axi_arid[1:0]
+@22
+TOP.Top.extMem.s_axi_arlen[7:0]
+@28
+TOP.Top.extMem.s_axi_arlock[0]
+TOP.Top.extMem.s_axi_arready
+TOP.Top.extMem.s_axi_arsize[2:0]
+TOP.Top.extMem.s_axi_arvalid
+@22
+TOP.Top.extMem.s_axi_awaddr[31:0]
+@28
+TOP.Top.extMem.s_axi_awburst[1:0]
+@22
+TOP.Top.extMem.s_axi_awcache[3:0]
+@28
+TOP.Top.extMem.s_axi_awid[1:0]
+@22
+TOP.Top.extMem.s_axi_awlen[7:0]
+@28
+TOP.Top.extMem.s_axi_awlock[0]
+TOP.Top.extMem.s_axi_awready
+TOP.Top.extMem.s_axi_awsize[2:0]
+TOP.Top.extMem.s_axi_awvalid
+TOP.Top.extMem.s_axi_bid[1:0]
+TOP.Top.extMem.s_axi_bready
+TOP.Top.extMem.s_axi_bvalid
+@22
+TOP.Top.extMem.s_axi_rdata[127:0]
+@28
+TOP.Top.extMem.s_axi_rid[1:0]
+TOP.Top.extMem.s_axi_rlast
+TOP.Top.extMem.s_axi_rready
+TOP.Top.extMem.s_axi_rvalid
+@22
+TOP.Top.extMem.s_axi_wdata[127:0]
+@28
+TOP.Top.extMem.s_axi_wlast
+TOP.Top.extMem.s_axi_wready
+@22
+TOP.Top.extMem.s_axi_wstrb[15:0]
+@28
+TOP.Top.extMem.s_axi_wvalid
 [pattern_trace] 1
 [pattern_trace] 0
