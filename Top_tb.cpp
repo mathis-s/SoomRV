@@ -435,8 +435,9 @@ class SpikeSimif : public simif_t
             write_reg(i, ReadRegister(i));
 
         auto csr = top->Top->soc->core->csr;
-        processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
-        processor->put_csr(CSR_FRM, csr->__PVT__frm);
+        // If ENABLE_FP is defined in Config.sv, these should be uncommented too
+        //processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
+        //processor->put_csr(CSR_FRM, csr->__PVT__frm);
 
         processor->put_csr(CSR_INSTRET, csr->minstret & 0xFFFFFFFF);
         processor->put_csr(CSR_INSTRETH, csr->minstret >> 32);
