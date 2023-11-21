@@ -66,6 +66,8 @@ typedef struct packed
 
 reg[NUM_ENTRIES-1:0] entryReady_r;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
+reg[NUM_ENTRIES-1:0] entryValid_r;
+always_ff@(posedge clk) entryValid_r <= rst ? 0 : entryValid_c;
 
 wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
 wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
@@ -164,21 +166,24 @@ end
 SQEntry entries[NUM_ENTRIES-1:0];
 SqN baseIndex;
 SqN lastIndex;
+//assign OUT_sqInfo = SQ_ComInfo'{valid: 0, default: 'x};
 
-always_comb begin
-    OUT_sqInfo = 'x;
-    OUT_sqInfo.valid = loadBaseIndexValid;
-    if (OUT_sqInfo.valid) begin
+always_ff@(posedge clk) begin
+    OUT_sqInfo <= 'x;
+    OUT_sqInfo.valid <= 0;
+    if (rst) ;
+    else if (loadBaseIndexValid) begin
+        OUT_sqInfo.valid <= 1;
         if (entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].atomic &&
             (!entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded ||
              !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].addrAvail)
         ) begin
             // For atomics, do not allow commit until other UOps are done and store
             // data is known
-            OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN - 1;
+            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN - 1;
         end
         else
-            OUT_sqInfo.maxComSqN = entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
+            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
     end
 end
 
@@ -442,7 +447,7 @@ always_comb begin
     reg[NUM_ENTRIES-1:0] isLoadCandidate;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         isLoadCandidate[i] =
-            entryValid_c[i] && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
+            entryValid_r[i] && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
     end
     if (load_r.valid) isLoadCandidate[load_r.index] = 0;
 

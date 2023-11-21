@@ -108,9 +108,11 @@ BypassLSU bypassLSU
     .IN_memc(IN_memc)
 );
 
-// stall only affects start of ld/st pipelines.
+// During a cache table write cycle, we cannot issue a store as
+// the cache table write port is the same as the store read port.
+// Loads work fine but require write forwaring in the cache table.
 wire[1:0] stall;
-assign stall[0] = cacheTableWrite || flushActive;
+assign stall[0] = flushActive;
 assign stall[1] = (OUT_stStall) || cacheTableWrite || flushActive;
 assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) && IN_uopSt.valid;
 
