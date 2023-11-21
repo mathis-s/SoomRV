@@ -203,7 +203,7 @@ logic TMQ_uopReady;
 
 logic TMQ_dequeue;
 AGU_UOp TMQ_uop;
-TLBMissQueue tmq
+TLBMissQueue#(`DTLB_MISS_QUEUE_SIZE) tmq
 (
     .clk(clk),
     .rst(rst),

@@ -563,7 +563,7 @@ reg LMQ_dequeue;
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
 wire LMQ_allowNewMisses = forwardMiss && !newMiss;
-LoadMissQueue#(4) loadMissQueue
+LoadMissQueue#(`LD_MISS_QUEUE_SIZE) loadMissQueue
 (
     .clk(clk),
     .rst(rst),

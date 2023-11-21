@@ -21,6 +21,15 @@
 // Memory
 `define SQ_SIZE 32
 `define LB_SIZE 16
+`define LD_MISS_QUEUE_SIZE 4
+
+`define ITLB_SIZE 8
+`define ITLB_ASSOC 4
+
+`define DTLB_SIZE 8
+`define DTLB_ASSOC 4
+`define DTLB_MISS_QUEUE_SIZE 4
+
 
 // ROB Size
 `define ROB_SIZE_EXP 6

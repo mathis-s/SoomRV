@@ -504,7 +504,7 @@ LoadSelector loadSelector
 
 TLB_Req TLB_rqs[1:0];
 TLB_Res TLB_res[1:0];
-TLB#(2) dtlb
+TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
 (
     .clk(clk),
     .rst(rst),

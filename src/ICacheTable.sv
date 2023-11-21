@@ -103,7 +103,7 @@ always_comb begin
 end
 TLB_Res TLB_res_c;
 TLB_Res TLB_res;
-TLB#(1, 8, 4, 1) itlb
+TLB#(1, `ITLB_SIZE, `ITLB_ASSOC, 1) itlb
 (
     .clk(clk),
     .rst(rst),
