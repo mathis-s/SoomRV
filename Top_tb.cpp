@@ -108,7 +108,7 @@ VTop* top; // Instantiation of model
 #ifdef TRACE
 VerilatedVcdC* tfp;
 #endif
-uint32_t pram[1 << 24];
+uint32_t pram[1 << 26];
 uint64_t main_time = 0;
 
 double sc_time_stamp()

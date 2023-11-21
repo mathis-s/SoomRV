@@ -68,9 +68,9 @@
 `define EXT_MMIO_START_ADDR 32'h1000_0000
 `define EXT_MMIO_END_ADDR   32'h1100_0000
 
-// 64 MiB main memory (TODO: make adjustable!) or MMIO
+// 256 MiB main memory (TODO: make adjustable!) or MMIO
 `define IS_LEGAL_ADDR(addr) \
-    (((addr) >= 32'h80000000 && (addr) < 32'h84000000) || \
+    (((addr) >= 32'h80000000 && (addr) < 32'h90000000) || \
     (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
 
 // Un-defining this disables synchronous reset for some memories.

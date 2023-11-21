@@ -56,7 +56,7 @@ module ExternalAXISim
 
 localparam NUM_TFS = 1<<ID_LEN;
 localparam BWIDTH = WIDTH / 8;
-localparam MADDR_LEN = 29 - $clog2(WIDTH / 8);
+localparam MADDR_LEN = 28 - $clog2(WIDTH / 8);
 localparam MEM_LEN = (1 << MADDR_LEN);
 
 reg[WIDTH-1:0] mem[MEM_LEN-1:0] /*verilator public*/;
