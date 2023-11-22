@@ -56,7 +56,7 @@ always_ff@(posedge clk) begin
                 if (IN_ready)
                     queue[i].ready <= 1;
                 
-                for (integer j = 0; j < 4; j=j+1) begin
+                for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
                     if (IN_memc.transfers[j].valid && 
                         IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == queue[i].ld.addr[31:`CLSIZE_E]
                     ) begin

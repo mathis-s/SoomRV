@@ -201,6 +201,7 @@ always_comb begin
 end
 
 reg waitForInterrupt /* verilator public */;
+reg[$clog2(`WFI_DELAY)-1:0] wfiCount;
 reg issuedInterrupt;
 
 always_ff@(posedge clk) begin
@@ -210,23 +211,29 @@ always_ff@(posedge clk) begin
         issuedInterrupt <= 0;
     end
     else begin
+        
+        if (waitForInterrupt) begin
+            reg[$clog2(`WFI_DELAY)-1:0] wfiCount_next;
+            reg wfiDone;
+            {wfiDone, wfiCount_next} = wfiCount - 1;
+            wfiCount <= wfiCount_next;
 
-        if (IN_interruptPending)
-            waitForInterrupt <= 0;
+            if (IN_interruptPending || wfiDone)
+                waitForInterrupt <= 0;
+        end
     
         if (OUT_branch.taken || IN_decBranch.taken || icacheMiss) begin
             if (OUT_branch.taken) begin
-                //pc <= OUT_branch.dstPC[31:1];
                 waitForInterrupt <= 0;
             end
             else if (IN_decBranch.taken) begin
-                //pc <= IN_decBranch.dst;
                 // We also use WFI to temporarily disable the frontend
                 // for ops that always flush the pipeline
                 waitForInterrupt <= IN_decBranch.wfi;
+                if (IN_decBranch.wfi)
+                    wfiCount <= $clog2(`WFI_DELAY)'(`WFI_DELAY - 1);
             end
             else if (icacheMiss) begin
-                //pc <= icacheMissPC[31:1];
             end
             issuedInterrupt <= 0;
         end

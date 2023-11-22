@@ -2,7 +2,7 @@
 module Multiply
 #
 (
-    parameter NUM_STAGES=4,
+    parameter NUM_STAGES=2,
     
     parameter BITS=(32/NUM_STAGES)
 )

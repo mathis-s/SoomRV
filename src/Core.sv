@@ -13,12 +13,24 @@ module Core
     IF_ICache.HOST IF_icache,
         
     output MemController_Req OUT_memc[2:0],
-    input MemController_Res IN_memc
+    input MemController_Res IN_memc,
+
+    output DebugInfo OUT_dbg
 );
 
 assign OUT_memc[0] = PC_MC_if;
 assign OUT_memc[1] = LSU_MC_if;
 assign OUT_memc[2] = BLSU_MC_if;
+
+assign OUT_dbg.stallPC = TH_stallPC;
+assign OUT_dbg.sqNStall = sqNStall;
+assign OUT_dbg.stSqNStall = stSqNStall;
+assign OUT_dbg.rnStall = RN_stall;
+assign OUT_dbg.memBusy = MEMSUB_busy;
+assign OUT_dbg.sqBusy = !SQ_empty || SQ_uop.valid;
+assign OUT_dbg.lsuBusy = AGU_LD_uop.valid || LSU_busy;
+assign OUT_dbg.ldNack = LSU_ldAck.valid && LSU_ldAck.fail;
+assign OUT_dbg.stNack = LSU_stAck.valid && LSU_stAck.fail;
 
 localparam NUM_WBS = 4;
 RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
@@ -134,9 +146,11 @@ InstrDecoder idec
     .OUT_uop(DE_uop)
 );
 
+wire sqNStall = ($signed((RN_nextSqN) - ROB_maxSqN) > -(`DEC_WIDTH));
+wire stSqNStall = ($signed((RN_nextStoreSqN) - SQ_maxStoreSqN) > -(`DEC_WIDTH - 1));
 wire frontendEn /*verilator public*/ = 
-    ($signed((RN_nextSqN) - ROB_maxSqN) <= -(`DEC_WIDTH)) &&
-    ($signed((RN_nextStoreSqN) - SQ_maxStoreSqN) <= -(`DEC_WIDTH - 1)) &&
+    !sqNStall &&
+    !stSqNStall &&
     !branch.taken &&
     en &&
     !SQ_flush;
@@ -213,7 +227,7 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,3
     
     .OUT_uop(IS_uop[0])
 );
-IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4) iq1
+IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4-2) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -391,6 +405,7 @@ Divide div
 
 );
 
+`ifdef ENABLE_FP
 RES_UOp FPU_uop;
 FPU fpu
 (
@@ -404,6 +419,7 @@ FPU fpu
     .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FPU_uop)
 );
+`endif
 
 TValProv TVS_tvalProvs[1:0];
 TValState TVS_tvalState;
@@ -449,8 +465,11 @@ CSR csr
     
     .OUT_uop(CSR_uop)
 );
-
+`ifdef ENABLE_FP
 assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
+`else
+assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : DIV_uop);
+`endif
 
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall;
@@ -485,7 +504,7 @@ LoadSelector loadSelector
 
 TLB_Req TLB_rqs[1:0];
 TLB_Res TLB_res[1:0];
-TLB#(2) dtlb
+TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
 (
     .clk(clk),
     .rst(rst),
@@ -557,7 +576,8 @@ LoadBuffer lb
 (
     .clk(clk),
     .rst(rst),
-    .commitSqN(ROB_curSqN),
+    .IN_comLoadSqN(ROB_comLoadSqN),
+    .IN_comSqN(ROB_curSqN),
     
     .IN_stall(LS_AGULD_uopStall),
     .IN_uopLd(AGU_LD_uop),
@@ -608,6 +628,7 @@ StoreQueue sq
     .IN_vmem(CSR_vmem),
     
     .IN_curSqN(ROB_curSqN),
+    .IN_comStSqN(ROB_comStoreSqN),
     
     .IN_branch(branch),
     
@@ -707,6 +728,7 @@ Multiply mul
     .IN_uop(LD_uop[1]),
     .OUT_uop(MUL_uop)
 );
+`ifdef ENABLE_FP
 RES_UOp FMUL_uop;
 FMul fmul
 (
@@ -738,8 +760,12 @@ FDiv fdiv
     .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FDIV_uop)
 );
-
 assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_uop.valid ? FMUL_uop : FDIV_uop));
+`else
+wire FDIV_busy = 1;
+wire FDIV_doNotIssue = 1;
+assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
+`endif
 
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
@@ -748,6 +774,8 @@ wire[3:0] ROB_validRetire /*verilator public*/;
 wire[3:0] ROB_retireBranch;
 BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
+SqN ROB_comLoadSqN;
+SqN ROB_comStoreSqN;
 ROB rob
 (
     .clk(clk),
@@ -762,6 +790,9 @@ ROB rob
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
+    .OUT_lastLoadSqN(ROB_comLoadSqN),
+    .OUT_lastStoreSqN(ROB_comStoreSqN),
+
     .OUT_comUOp(comUOps),
     .OUT_fpNewFlags(ROB_fpNewFlags),
     .OUT_PERFC_validRetire(ROB_validRetire),
@@ -782,6 +813,7 @@ wire TH_disableIFetch;
 wire TH_clearICache;
 BPUpdate1 TH_bpUpdate1;
 TrapInfoUpdate TH_trapInfo;
+wire[31:0] TH_stallPC;
 TrapHandler trapHandler
 (
     .clk(clk),
@@ -800,7 +832,8 @@ TrapHandler trapHandler
     .OUT_flushTLB(TH_flushTLB),
     .OUT_fence(TH_startFence),
     .OUT_clearICache(TH_clearICache),
-    .OUT_disableIFetch(TH_disableIFetch)
+    .OUT_disableIFetch(TH_disableIFetch),
+    .OUT_dbgStallPC(TH_stallPC)
 );
 
 endmodule

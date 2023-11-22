@@ -1,7 +1,6 @@
   
 typedef struct packed 
 {
-    Flags flags;
     Tag tag;
     logic sqN_msb;
     RegNm rd; // also used to differentiate between decode-time exceptions (these have no dst anyways)
@@ -9,7 +8,11 @@ typedef struct packed
     FetchID_t fetchID;
     logic isFP;
     logic compressed;
-    logic valid;
+    
+    SqN storeSqN;
+    SqN loadSqN;
+    logic isLd;
+    logic isSt;
 } ROBEntry;
 
 module ROB
@@ -40,6 +43,9 @@ module ROB
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
 
+    output SqN OUT_lastLoadSqN,
+    output SqN OUT_lastStoreSqN,
+
     output CommitUOp OUT_comUOp[WIDTH-1:0],
     output reg[4:0] OUT_fpNewFlags,
     output FetchID_t OUT_curFetchID,
@@ -68,28 +74,35 @@ always_comb begin
     end
 end
 
-ROBEntry entries[LENGTH-1:0];
+// "entries" is written to sequentially by rename
+// "flags" is written to out-of-order as ops execute
+
+generate 
+for (genvar i = 0; i < `DEC_WIDTH; i=i+1) begin : gen
+    (* ram_style = "distributed" *)
+    ROBEntry entries[LENGTH/`DEC_WIDTH-1:0];
+end 
+endgenerate
+
+Flags flags[LENGTH-1:0];
 SqN baseIndex;
+SqN lastIndex;
 
 assign OUT_maxSqN = baseIndex + LENGTH - 1;
 assign OUT_curSqN = baseIndex;
 
-reg stop;
-
-reg misprReplay;
-reg misprReplayEnd;
-SqN misprReplayIter;
-SqN misprReplayEndSqN;
 
 // All commits/reads from the ROB are sequential.
 // This should convince synthesis of that too.
 ROBEntry deqEntries[WIDTH-1:0];
+Flags deqFlags[WIDTH-1:0];
+
+reg[ID_LEN-1:0] deqAddrs[WIDTH-1:0];
+reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
+ROBEntry deqPorts[WIDTH-1:0];
+Flags deqFlagPorts[WIDTH-1:0];
 always_comb begin
-    reg[ID_LEN-1:0] deqBase = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
-    
-    reg[ID_LEN-1:0] deqAddrs[WIDTH-1:0];
-    reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
-    ROBEntry deqPorts[WIDTH-1:0];
+    reg[ID_LEN-1:0] deqBase = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];    
     
     // Generate the sequence of SqNs which could be committed in this cycle
     for (integer i = 0; i < WIDTH; i=i+1)
@@ -102,20 +115,35 @@ always_comb begin
     // Sort the sequence by least significant bits
     for (integer i = 0; i < WIDTH; i=i+1)
         deqAddrsSorted[deqAddrs[i][1:0]] = deqAddrs[i][ID_LEN-1:$clog2(WIDTH)];
-    
-    // With the sorted sequence we can convince synth that this is in fact a sequential access
-    for (integer i = 0; i < WIDTH; i=i+1)
-        deqPorts[i] = entries[{deqAddrsSorted[i], i[1:0]}];
-
-    // Re-order the accesses into the initial order
-    for (integer i = 0; i < WIDTH; i=i+1)
-        deqEntries[i] = deqPorts[deqAddrs[i][1:0]];
 end
+// With the sorted sequence we can convince synth that this is in fact a sequential access
+always_comb begin
+    for (integer i = 0; i < WIDTH; i=i+1)
+        deqFlagPorts[i] = flags[{deqAddrsSorted[i], i[1:0]}];
+end
+generate 
+    for (genvar i = 0; i < WIDTH; i=i+1)
+        always_comb deqPorts[i] = gen[i].entries[{deqAddrsSorted[i]}];
+endgenerate
+always_comb begin
+    // Re-order the accesses into the initial order
+    for (integer i = 0; i < WIDTH; i=i+1) begin
+        deqEntries[i] = deqPorts[deqAddrs[i][1:0]];
+        deqFlags[i] = deqFlagPorts[deqAddrs[i][1:0]];
+    end
+end
+
 
 always_comb begin
     for (integer i = 0; i < WIDTH; i=i+1) 
         OUT_PERFC_retireBranch[i] = OUT_PERFC_validRetire[i] && OUT_comUOp[i].isBranch;
 end
+
+reg stop;
+reg misprReplay;
+reg misprReplayEnd;
+SqN misprReplayIter;
+SqN misprReplayEndSqN;
 
 always_ff@(posedge clk) begin
 
@@ -135,26 +163,22 @@ always_ff@(posedge clk) begin
     
     if (rst) begin
         baseIndex <= 0;
-        for (integer i = 0; i < LENGTH; i=i+1) begin
-            entries[i].valid <= 0;
-        end
         misprReplay <= 0;
         OUT_mispredFlush <= 0;
         OUT_curFetchID <= -1;
         stop <= 0;
+        lastIndex <= 0;
+        OUT_lastLoadSqN <= 0;
+        OUT_lastStoreSqN <= 0;
     end
     else if (IN_branch.taken) begin
-        for (integer i = 0; i < LENGTH; i=i+1) begin
-            if ($signed(({entries[i].sqN_msb, i[ID_LEN-1:0]}) - IN_branch.sqN) > 0) begin
-                entries[i].valid <= 0;
-            end
-        end
         if (IN_branch.flush) 
             OUT_curFetchID <= IN_branch.fetchID;
         misprReplay <= 1;
         misprReplayEndSqN <= IN_branch.sqN;
         misprReplayIter <= baseIndex;
         misprReplayEnd <= 0;
+        lastIndex <= IN_branch.sqN + 1;
         OUT_mispredFlush <= 0;
     end
     
@@ -176,12 +200,11 @@ always_ff@(posedge clk) begin
                         
                         reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
                         
-                        assert(deqEntries[i].valid);
                         OUT_comUOp[i].valid <= 1;
                         OUT_comUOp[i].sqN <= 'x;//{deqEntries[i].sqN_msb, id[5:0]};
-                        OUT_comUOp[i].rd <= (deqEntries[i].flags == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
+                        OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                        OUT_comUOp[i].compressed <= (deqEntries[i].flags != FLAGS_NX);
+                        OUT_comUOp[i].compressed <= (deqFlags[i] != FLAGS_NX);
                         for (integer j = 0; j < WIDTH_WB; j=j+1)
                             if (IN_wbUOps[j].valid && IN_wbUOps[j].tagDst == deqEntries[i].tag && !IN_wbUOps[j].tagDst[$bits(Tag)-1])
                                 OUT_comUOp[i].compressed <= 1;
@@ -197,66 +220,70 @@ always_ff@(posedge clk) begin
             reg temp = 0;
             reg pred = 0;
             reg[ID_LEN-1:0] cnt = 0;
-            reg[WIDTH-1:0] deqMask = 0;
             
             for (integer i = 0; i < WIDTH; i=i+1) begin
             
                 reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
                 
                 if (!temp && 
-                    deqEntries[i].valid &&
-                    deqEntries[i].flags != FLAGS_NX &&
-                    (!pred || (deqEntries[i].flags == FLAGS_NONE)) &&
+                    (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex)) &&
+                    deqFlags[i] != FLAGS_NX &&
+                    (!pred || (deqFlags[i] == FLAGS_NONE)) &&
                     (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0)
                 ) begin
                 
                     OUT_comUOp[i].rd <= deqEntries[i].rd;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id};
-                    OUT_comUOp[i].isBranch <= deqEntries[i].flags == FLAGS_BRANCH || 
-                        deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN;
+                    OUT_comUOp[i].isBranch <= deqFlags[i] == FLAGS_BRANCH || 
+                        deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN;
                         
                     OUT_comUOp[i].compressed <= deqEntries[i].compressed;
                     OUT_comUOp[i].valid <= 1;
                     
                     // Synchronous exceptions do not increment minstret, but mret/sret do.
                     OUT_PERFC_validRetire[i] <= 
-                        (deqEntries[i].flags <= FLAGS_ORDERING) || 
-                        (deqEntries[i].flags == FLAGS_XRET) ||
-                        (deqEntries[i].isFP && deqEntries[i].flags != FLAGS_ILLEGAL_INSTR) ||
-                        (deqEntries[i].flags == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
+                        (deqFlags[i] <= FLAGS_ORDERING) || 
+                        (deqFlags[i] == FLAGS_XRET) ||
+                        (deqEntries[i].isFP && deqFlags[i] != FLAGS_ILLEGAL_INSTR) ||
+                        (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
-                    
-                    deqMask[id[1:0]] = 1;
 
-                    if (deqEntries[i].flags == FLAGS_PRED_TAKEN || deqEntries[i].flags == FLAGS_PRED_NTAKEN) begin
+                    if (!(deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
+                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= deqEntries[i].loadSqN + 1;
+                        if (deqEntries[i].isSt) OUT_lastStoreSqN <= deqEntries[i].storeSqN + 1;
+                    end
+
+                    if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
                         OUT_bpUpdate0.valid <= 1;
-                        OUT_bpUpdate0.branchTaken <= (deqEntries[i].flags == FLAGS_PRED_TAKEN);
+                        OUT_bpUpdate0.branchTaken <= (deqFlags[i] == FLAGS_PRED_TAKEN);
                         OUT_bpUpdate0.fetchID <= deqEntries[i].fetchID;
                         OUT_bpUpdate0.fetchOffs <= deqEntries[i].fetchOffs;
                     end
                                     
-                    if ((deqEntries[i].flags >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqEntries[i].flags == FLAGS_ILLEGAL_INSTR))) begin
+                    if ((deqFlags[i] >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
                         
-                        OUT_trapUOp.flags <= deqEntries[i].flags;
+                        OUT_trapUOp.flags <= deqFlags[i];
                         OUT_trapUOp.tag <= deqEntries[i].tag;
                         OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id};
+                        OUT_trapUOp.loadSqN <= deqEntries[i].loadSqN;
+                        OUT_trapUOp.storeSqN <= deqEntries[i].storeSqN;
                         OUT_trapUOp.rd <= deqEntries[i].rd;
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
                         OUT_trapUOp.valid <= 1;
                         
-                        if (deqEntries[i].flags >= FLAGS_PRED_TAKEN)
+                        if (deqFlags[i] >= FLAGS_PRED_TAKEN)
                             pred = 1;
                         
-                        if (deqEntries[i].flags >= FLAGS_FENCE) begin
+                        if (deqFlags[i] >= FLAGS_FENCE) begin
                             // Redirect result of exception to x0
                             // The exception causes an invalidation to committed state,
                             // so changing these is fine (does not leave us with inconsistent RAT/TB)
-                            if ((deqEntries[i].flags >= FLAGS_ILLEGAL_INSTR &&
-                                deqEntries[i].flags <= FLAGS_ST_PF)) begin
+                            if ((deqFlags[i] >= FLAGS_ILLEGAL_INSTR &&
+                                deqFlags[i] <= FLAGS_ST_PF)) begin
                                 OUT_comUOp[i].rd <= 0;
                                 OUT_comUOp[i].tagDst <= 7'h40;
                             end
@@ -265,20 +292,30 @@ always_ff@(posedge clk) begin
                             temp = 1;
                         end
                     end
-                    else if (deqEntries[i].isFP && deqEntries[i].flags >= Flags'(FLAGS_FP_NX) && deqEntries[i].flags <= Flags'(FLAGS_FP_NV)) begin
-                        OUT_fpNewFlags[deqEntries[i].flags[2:0] - 3'(FLAGS_FP_NX)] <= 1;
+                    else if (deqEntries[i].isFP && deqFlags[i] >= Flags'(FLAGS_FP_NX) && deqFlags[i] <= Flags'(FLAGS_FP_NV)) begin
+                        OUT_fpNewFlags[deqFlags[i][2:0] - 3'(FLAGS_FP_NX)] <= 1;
                         
                         // Underflow and overflow imply inexact
-                        if (deqEntries[i].flags == Flags'(FLAGS_FP_UF) || deqEntries[i].flags == Flags'(FLAGS_FP_OF)) begin
+                        if (deqFlags[i] == Flags'(FLAGS_FP_UF) || deqFlags[i] == Flags'(FLAGS_FP_OF)) begin
                             OUT_fpNewFlags[3'(FLAGS_FP_NX)] <= 1;
                         end
                     end
                     
-                    entries[id].valid <= 0;
 
                     cnt = cnt + 1;
                 end
-                else temp = 1;
+                else begin
+                    temp = 1;
+                    // If we are unable to commit anything in this cycle, we use the TrapHandler's PCFile
+                    // lookup to get the address of the instruction we're stalled on (for debugging/analysis). 
+                    if (i == 0 && (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex))) begin
+                        OUT_trapUOp.valid <= 1;
+                        OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
+                        OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
+                        OUT_trapUOp.compressed <= deqEntries[i].compressed;
+                        OUT_trapUOp.flags <= FLAGS_NX;
+                    end
+                end
                     
             end
             
@@ -290,37 +327,49 @@ always_ff@(posedge clk) begin
             if (rnUOpSorted[i].valid && (!IN_branch.taken)) begin
                 
                 reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
+                reg[$clog2(LENGTH/WIDTH_RN)-1:0] id1 = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)]};
+                reg[$clog2(WIDTH_RN)-1:0] id0 = {i[$clog2(`DEC_WIDTH)-1:0]};
+
+                ROBEntry entry = 'x;
                 
-                entries[id].valid <= 1;
-                entries[id].tag <= rnUOpSorted[i].tagDst;
-                entries[id].rd <= rnUOpSorted[i].rd;
-                entries[id].sqN_msb <= rnUOpSorted[i].sqN[ID_LEN];
-                entries[id].compressed <= rnUOpSorted[i].compressed;
-                entries[id].fetchID <= rnUOpSorted[i].fetchID;
-                entries[id].isFP <= rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
+                entry.tag = rnUOpSorted[i].tagDst;
+                entry.rd = rnUOpSorted[i].rd;
+                entry.sqN_msb = rnUOpSorted[i].sqN[ID_LEN];
+                entry.compressed = rnUOpSorted[i].compressed;
+                entry.fetchID = rnUOpSorted[i].fetchID;
+                entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
+                entry.fetchOffs = rnUOpSorted[i].fetchOffs;
+                entry.storeSqN = rnUOpSorted[i].storeSqN;
+                entry.loadSqN = rnUOpSorted[i].loadSqN;
+                entry.isLd = rnUOpSorted[i].fu == FU_LD || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isSt = rnUOpSorted[i].fu == FU_ST || rnUOpSorted[i].fu == FU_ATOMIC;
+                
+                case (id0)
+                    0: gen[0].entries[id1] <= entry;
+                    1: gen[1].entries[id1] <= entry;
+                    2: gen[2].entries[id1] <= entry;
+                    3: gen[3].entries[id1] <= entry;
+                endcase
                 
                 if (rnUOpSorted[i].fu == FU_RN)
-                    entries[id].flags <= FLAGS_NONE;
+                    flags[id] <= FLAGS_NONE;
                 else if (rnUOpSorted[i].fu == FU_TRAP)
-                    entries[id].flags <= FLAGS_TRAP;
+                    flags[id] <= FLAGS_TRAP;
                 else
-                    entries[id].flags <= FLAGS_NX;
-                    
-                entries[id].fetchOffs <= rnUOpSorted[i].fetchOffs;
+                    flags[id] <= FLAGS_NX;
             end
         end
+        
+        for (integer i = 0; i < WIDTH_RN; i=i+1)
+            if (IN_uop[i].valid && !IN_branch.taken)
+                lastIndex <= IN_uop[i].sqN + 1;
         
         // Mark committed ops as valid and set flags
         for (integer i = 0; i < WIDTH_WB; i=i+1) begin
             if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_wbUOps[i].doNotCommit) begin
                 
                 reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
-                entries[id].flags <= IN_wbUOps[i].flags;
-                if (!entries[id].valid) begin
-                    //$display("invalid wb op: sqn=%x", IN_wbUOps[i].sqN);
-                    assert(0);
-                end
-                //assert(entries[i].valid);
+                flags[id] <= IN_wbUOps[i].flags;
                 assert(IN_wbUOps[i].flags != FLAGS_NX);
             end
         end

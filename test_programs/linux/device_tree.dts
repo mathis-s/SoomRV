@@ -12,13 +12,13 @@
 
 	memory@80000000 {
 		device_type = "memory";
-		reg = <0x00 0x80000000 0x00 0x4000000>;
+		reg = <0x00 0x80000000 0x00 0x10000000>;
 	};
 
 	cpus {
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
-		timebase-frequency = <20833333>;
+		timebase-frequency = <41666666>;
 
 		cpu@0 {
 			phandle = <0x01>;
@@ -30,13 +30,13 @@
 			riscv,priv-major = <1>;
 			riscv,priv-minor = <12>;
 			mmu-type = "riscv,sv32";
-			clock-frequency = <20833333>;
+			clock-frequency = <41666666>;
 
-			interrupt-controller {
+			cpu0intc: interrupt-controller {
 				#interrupt-cells = <0x01>;
 				interrupt-controller;
 				compatible = "riscv,cpu-intc";
-				phandle = <0x02>;
+				phandle = <2>;
 			};
 		};
 
@@ -58,33 +58,35 @@
 		ranges;
 
 		uart@10000000 {
-			clock-frequency = <20833333>;
+			clock-frequency = <41666666>;
 			reg = <0x00 0x10000000 0x00 0x100>;
-			compatible = "ns16850";
+			compatible = "ns16550a";
+            //interrupt-parent = <&cpu0intc>;
+            //interrupts = <5>;
+		};
+
+        soc_syscon: syscon@11100000 {
+			phandle = <0x04>;
+			reg = <0x00 0x11100000 0x00 0x1000>;
+			compatible = "syscon";
 		};
 
 		poweroff {
 			value = <0x5555>;
 			offset = <0x00>;
-			regmap = <0x04>;
+			regmap = <&soc_syscon>;
 			compatible = "syscon-poweroff";
 		};
 
 		reboot {
 			value = <0x7777>;
 			offset = <0x00>;
-			regmap = <0x04>;
+			regmap = <&soc_syscon>;
 			compatible = "syscon-reboot";
 		};
 
-		syscon@11100000 {
-			phandle = <0x04>;
-			reg = <0x00 0x11100000 0x00 0x1000>;
-			compatible = "syscon";
-		};
-
 		clint@11000000 {
-			interrupts-extended = <0x02 0x03 0x02 0x07>;
+			interrupts-extended = <&cpu0intc 3>,  <&cpu0intc 7>;
 			reg = <0x00 0x11000000 0x00 0x10000>;
 			compatible = "sifive,clint0\0riscv,clint0";
 		};

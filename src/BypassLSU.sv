@@ -6,11 +6,11 @@ module BypassLSU
     input BranchProv IN_branch,
     
     input wire IN_uopLdEn,
-    output wire OUT_ldStall,
+    output reg OUT_ldStall,
     input LD_UOp IN_uopLd,
 
     input wire IN_uopStEn,
-    output wire OUT_stStall,
+    output reg OUT_stStall,
     input ST_UOp IN_uopSt,
 
     input wire IN_ldStall,

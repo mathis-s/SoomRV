@@ -121,7 +121,10 @@ SoC soc
     .s_axi_rid(s_axi_rid),
     .s_axi_rdata(s_axi_rdata),
     .s_axi_rlast(s_axi_rlast),
-    .s_axi_rvalid(s_axi_rvalid)
+    .s_axi_rvalid(s_axi_rvalid),
+
+    .OUT_dbg(),
+    .OUT_dbgMemC()
 );
 
 endmodule

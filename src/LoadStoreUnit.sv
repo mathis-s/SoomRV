@@ -108,9 +108,11 @@ BypassLSU bypassLSU
     .IN_memc(IN_memc)
 );
 
-// stall only affects start of ld/st pipelines.
+// During a cache table write cycle, we cannot issue a store as
+// the cache table write port is the same as the store read port.
+// Loads work fine but require write forwaring in the cache table.
 wire[1:0] stall;
-assign stall[0] = cacheTableWrite || flushActive;
+assign stall[0] = flushActive;
 assign stall[1] = (OUT_stStall) || cacheTableWrite || flushActive;
 assign OUT_stStall = (isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) && IN_uopSt.valid;
 
@@ -555,8 +557,7 @@ end
 // Cache Transfer State Machine
 enum logic[3:0]
 {
-    IDLE, EVICT_RQ, EVICT_ACTIVE, LOAD_RQ, LOAD_ACTIVE, REPLACE_RQ, REPLACE_ACTIVE,
-    FLUSH, FLUSH_RQ, FLUSH_ACTIVE, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
+    IDLE, FLUSH, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
 } state;
 
 reg LMQ_dequeue;
@@ -564,7 +565,7 @@ reg LMQ_dequeue;
 wire loadIsRegularMiss = miss[0].valid && miss[0].mtype != SQ_CONFLICT && miss[0].mtype != IO_BUSY;
 wire LMQ_full;
 wire LMQ_allowNewMisses = forwardMiss && !newMiss;
-LoadMissQueue#(4) loadMissQueue
+LoadMissQueue#(`LD_MISS_QUEUE_SIZE) loadMissQueue
 (
     .clk(clk),
     .rst(rst),
@@ -585,6 +586,7 @@ LoadMissQueue#(4) loadMissQueue
 
 always_comb begin
     OUT_ldAck = 'x;
+    OUT_ldAck.valid = 0;
     // We have to decide whether to place a missing load into the quick-to-react
     // load miss queue or back in the (slow) load buffer. If the LMQ is full, LB
     // is always chosen as fallback. Otherwise, regular misses are placed
@@ -740,7 +742,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         state <= IDLE;
         replaceAssoc <= 0;
-        flushQueued <= 0;
+        flushQueued <= 1;
         LSU_memc <= 'x;
         LSU_memc.cmd <= MEMC_NONE;
     end

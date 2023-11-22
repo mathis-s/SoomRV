@@ -11,6 +11,7 @@
 // IFetch
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
+`define WFI_DELAY 1024
 
 // Issue
 `define IQ_0_SIZE 8
@@ -21,6 +22,15 @@
 // Memory
 `define SQ_SIZE 32
 `define LB_SIZE 16
+`define LD_MISS_QUEUE_SIZE 4
+
+`define ITLB_SIZE 8
+`define ITLB_ASSOC 4
+
+`define DTLB_SIZE 8
+`define DTLB_ASSOC 4
+`define DTLB_MISS_QUEUE_SIZE 4
+
 
 // ROB Size
 `define ROB_SIZE_EXP 6
@@ -59,12 +69,16 @@
 `define EXT_MMIO_START_ADDR 32'h1000_0000
 `define EXT_MMIO_END_ADDR   32'h1100_0000
 
-// 64 MiB main memory (TODO: make adjustable!) or MMIO
+// 256 MiB main memory (TODO: make adjustable!) or MMIO
 `define IS_LEGAL_ADDR(addr) \
-    (((addr) >= 32'h80000000 && (addr) < 32'h84000000) || \
+    (((addr) >= 32'h80000000 && (addr) < 32'h90000000) || \
     (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
 
 // Un-defining this disables synchronous reset for some memories.
 // This is useful for mapping to FPGA memories, which are reset
 // after programming anyways.
 `define SYNC_RESET
+//`define SQ_LINEAR
+
+// Enable floating point (zfinx) support
+//`define ENABLE_FP

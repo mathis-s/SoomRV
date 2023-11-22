@@ -30,7 +30,11 @@ typedef struct packed
 
 localparam LENGTH = `BTB_ENTRIES;
 
+
+(* ram_style = "block" *)
 BTBEntry entries[LENGTH-1:0];
+
+(* ram_style = "block" *)
 logic multiple[LENGTH-1:0];
 
 // Predict
@@ -68,11 +72,18 @@ always_comb begin
     end
 end
 
+typedef struct packed
+{
+    logic[$clog2(LENGTH)-1:0] idx;
+    logic valid;
+} SetMultiple;
+SetMultiple setMult;
+
 // Update
 always_ff@(posedge clk) begin
     
     if (rst) begin
-
+        setMult <= SetMultiple'{valid: 0, default: 'x};
     end
     else begin
         if (IN_btUpdate.valid) begin
@@ -86,7 +97,12 @@ always_ff@(posedge clk) begin
                 if (IN_btUpdate.multiple) begin
                     // Special handling for multiple branches in the same fetch package:
                     // For previous branch, set "multiple" to end fetch package after not-taken prediction.
-                    multiple[idx] <= 1;
+                    
+                    // To avoid two writes to multiple in a single cycle, we cache the write instead of performing it right away.
+                    //multiple[idx] <= 1;
+                    setMult.valid <= 1;
+                    setMult.idx <= idx;
+
                     // Write target of following branch into entry after previous branch.
                     idx[$bits(FetchOff_t)-1:0] = IN_btUpdate.multipleOffs;
                 end
@@ -100,6 +116,10 @@ always_ff@(posedge clk) begin
                 entries[idx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
                 multiple[idx] <= 0;
             end
+        end
+        else if (setMult.valid) begin
+            multiple[setMult.idx] <= 1;
+            setMult <= SetMultiple'{valid: 0, default: 'x};
         end
     end
 end

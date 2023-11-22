@@ -22,7 +22,9 @@ $(BUILDROOT_DIR)/kernel.config:
 $(BUILDROOT_DIR)/busybox.config:
 	cp $(BUSYBOX_CFG) $@
 
+.PHONY: $(BUILDROOT_DIR)/output/images/Image
 $(BUILDROOT_DIR)/output/images/Image: $(BUILDROOT_DIR) $(BUILDROOT_DIR)/.config $(BUILDROOT_DIR)/kernel.config $(BUILDROOT_DIR)/busybox.config
+	cp -r $(wildcard extra/*) buildroot/output/target/
 	make -C buildroot
 
 # The buildroot-generated fw_payload.bin seems to chop off the end of the kernel image sometimes,

@@ -203,7 +203,7 @@ logic TMQ_uopReady;
 
 logic TMQ_dequeue;
 AGU_UOp TMQ_uop;
-TLBMissQueue tmq
+TLBMissQueue#(`DTLB_MISS_QUEUE_SIZE) tmq
 (
     .clk(clk),
     .rst(rst),
@@ -235,7 +235,7 @@ always_comb begin
     TMQ_dequeue = 0;
     
     // illegal instruction exceptions always pass through
-    if (aguUOp_c.valid && en && (!TMQ_stall || resUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
+    if (aguUOp_c.valid && en && (!TMQ_stall || (resUOp_c.valid && resUOp_c.flags == FLAGS_ILLEGAL_INSTR))) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end
@@ -256,6 +256,7 @@ end
 
 // Output early load op for VIPT
 always_comb begin
+    OUT_eldOp = 'x;
     OUT_eldOp.valid =
         !rst && issUOp_c.valid && (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0);
     

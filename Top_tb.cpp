@@ -18,7 +18,7 @@
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
-#include "VTop_RenameTable__N8.h"
+#include "VTop_RenameTable.h"
 #include "VTop_BranchPredictor__N3.h"
 #include "VTop_ReturnStack.h"
 #include "VTop_SoC.h"
@@ -108,7 +108,7 @@ VTop* top; // Instantiation of model
 #ifdef TRACE
 VerilatedVcdC* tfp;
 #endif
-uint32_t pram[1 << 24];
+uint32_t pram[1 << 26];
 uint64_t main_time = 0;
 
 double sc_time_stamp()
@@ -435,8 +435,9 @@ class SpikeSimif : public simif_t
             write_reg(i, ReadRegister(i));
 
         auto csr = top->Top->soc->core->csr;
-        processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
-        processor->put_csr(CSR_FRM, csr->__PVT__frm);
+        // If ENABLE_FP is defined in Config.sv, these should be uncommented too
+        //processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
+        //processor->put_csr(CSR_FRM, csr->__PVT__frm);
 
         processor->put_csr(CSR_INSTRET, csr->minstret & 0xFFFFFFFF);
         processor->put_csr(CSR_INSTRETH, csr->minstret >> 32);
@@ -505,7 +506,7 @@ uint32_t ReadRegister(uint32_t rid)
 
     uint8_t comTag = regTagOverride[rid];
     if (comTag == 0xff)
-        comTag = (core->rn->rt->rat[rid] >> 7) & 127;
+        comTag = (core->rn->rt->comTag[rid]);
 
     if (comTag & 64)
         return ((int32_t)(comTag & 63) << (32 - 6)) >> (32 - 6);
@@ -526,10 +527,12 @@ void WriteRegister(uint32_t rid, uint32_t val)
     int i = 0;
     while (true)
     {
-        if (core->rn->tb->tags[i] == 0)
+        if (core->rn->tb->free[i] == 1 && core->rn->tb->freeCom[i] == 1)
         {
-            core->rn->tb->tags[i] = 3;
-            core->rn->rt->rat[rid] = (i) | (i << 7);
+            core->rn->tb->free[i] = 0;
+            core->rn->tb->freeCom[i] = 0;
+            core->rn->rt->comTag[rid] = (i);
+            core->rn->rt->specTag[rid] = (i);
             core->rn->rt->tagAvail |= (1 << i);
             core->rf->mem[i] = val;
             break;
@@ -743,9 +746,9 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 6 + 7 + 7 + 3 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 230 - 12 - 32 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 224 - 12 - 32 - 32 - 32 - 32 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 182 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 182 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 182 - 32 - 32 - 32 - 3 - 3 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }
@@ -796,8 +799,8 @@ void LogInstructions()
                 bool isXRETinterrupt = false;
                 if (core->ROB_trapUOp & 1)
                 {
-                    int trapSQN = (core->ROB_trapUOp >> 15) & 127;
-                    int flags = (core->ROB_trapUOp >> 29) & 15;
+                    int trapSQN = (core->ROB_trapUOp >> (15+14)) & 127;
+                    int flags = (core->ROB_trapUOp >> (29+14)) & 15;
                     int rd = (core->ROB_trapUOp >> 10) & 31;
                     isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
                     isXRETinterrupt =
@@ -1218,7 +1221,7 @@ int main(int argc, char** argv)
         main_time++; // Time passes...
     }
 
-    // LogPerf(core);
+    LogPerf(core);
 
     printf("%lu cycles\n", main_time / 2);
 

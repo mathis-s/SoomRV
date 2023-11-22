@@ -46,7 +46,10 @@ module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
     input[`AXI_ID_LEN-1:0] s_axi_rid,
     input[WIDTH-1:0] s_axi_rdata,
     input s_axi_rlast,
-    input s_axi_rvalid
+    input s_axi_rvalid,
+
+    output DebugInfo OUT_dbg,
+    output DebugInfoMemC OUT_dbgMemC
 );
 
 ICacheIF MC_IC_wr;
@@ -100,7 +103,9 @@ MemoryController memc
     .s_axi_rid(s_axi_rid),
     .s_axi_rdata(s_axi_rdata),
     .s_axi_rlast(s_axi_rlast),
-    .s_axi_rvalid(s_axi_rvalid)
+    .s_axi_rvalid(s_axi_rvalid),
+
+    .OUT_dbg(OUT_dbgMemC)
 );
 
 IF_Cache IF_cache();
@@ -126,7 +131,9 @@ Core core
     .IF_ict(IF_ict),
     
     .OUT_memc(MemC_ctrl),
-    .IN_memc(MemC_stat)
+    .IN_memc(MemC_stat),
+
+    .OUT_dbg(OUT_dbg)
 );
 
 CacheIF CORE_DC_if;
@@ -146,7 +153,7 @@ else always_comb begin
     CORE_DC_if.data = {`CWIDTH{IF_cache.wdata}};
 end
 
-logic[127:0] DC_dataOut;
+logic[`CWIDTH*32-1:0] DC_dataOut;
 // R port
 CacheIF[`CBANKS-1:0] readIFs;
 always_comb begin

@@ -32,6 +32,7 @@ always_comb begin
     inc = '0;
     for (integer i = 0; i < NUM_RQ; i=i+1) begin
         reg[$clog2(LEN)-1:0] idx = IN_rqs[i].vpn[$clog2(LEN)-1:0];
+        OUT_res[i] = 'x;
         OUT_res[i].pageFault = 0;
         OUT_res[i].accessFault = 0;
         OUT_res[i].hit = 0;

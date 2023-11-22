@@ -56,7 +56,7 @@ module ExternalAXISim
 
 localparam NUM_TFS = 1<<ID_LEN;
 localparam BWIDTH = WIDTH / 8;
-localparam MADDR_LEN = 29 - $clog2(WIDTH / 8);
+localparam MADDR_LEN = 28 - $clog2(WIDTH / 8);
 localparam MEM_LEN = (1 << MADDR_LEN);
 
 reg[WIDTH-1:0] mem[MEM_LEN-1:0] /*verilator public*/;
@@ -88,6 +88,10 @@ endfunction
 Transfer[NUM_TFS-1:0] tfs[1:0];
 wire Transfer[NUM_TFS-1:0] reads = tfs[0];
 wire Transfer[NUM_TFS-1:0] writes = tfs[1];
+initial begin
+    tfs[0] = '0;
+    tfs[1] = '0;
+end
 
 // RTL sim input
 logic inputAvail /*verilator public*/ = 0;
@@ -97,21 +101,23 @@ logic[7:0] inputByte /*verilator public*/;
 logic readDataIdxValid;
 logic[ID_LEN-1:0] readDataIdx;
 always_comb begin
-    // could select index randomly to 
-    // simulate memory heterogeneity
     readDataIdxValid = 0;
     readDataIdx = 'x;
-    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+    // could select index randomly to 
+    // simulate memory heterogeneity
+    for (integer i = NUM_TFS - 1; i >= 0; i=i-1) begin
         if (reads[i].valid) begin
             readDataIdxValid = 1;
-            readDataIdx = i[ID_LEN-1:0];
+            readDataIdx = ID_LEN'(i);
         end
     end
 end
+
 always_ff@(posedge clk) begin
-    if (!(s_axi_rvalid && !s_axi_rready)) begin
+    if (rst) ;
+    else if (!(s_axi_rvalid && !s_axi_rready)) begin
         s_axi_rid <= 'x;
-        s_axi_rdata <= 'x;
+        //s_axi_rdata <= 'x;
         s_axi_rlast <= 'x;
         s_axi_rvalid <= 0;
         if (readDataIdxValid) begin
@@ -129,6 +135,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 // MMIO
+                
                 case (addr)
                     `SERIAL_ADDR: begin
                         s_axi_rdata <= 'x;
@@ -154,6 +161,12 @@ end
 // Write Idx FIFO
 reg[ID_LEN-1:0] fifoAW[NUM_TFS-1:0];
 reg fifoAWValid[NUM_TFS-1:0]; // insert idx as unary
+initial begin
+    for (integer i = 0; i < NUM_TFS; i=i+1) begin
+        fifoAW[i] = '0;
+        fifoAWValid[i] = '0;
+    end
+end
 
 logic[ID_LEN-1:0] fifoAWInsIdx;
 logic fifoAWInsIdxValid;
@@ -196,7 +209,7 @@ reg writeIdxValid;
 always_comb begin
     writeIdx = 'x;
     writeIdxValid = 0;
-
+    
     for (integer i = NUM_TFS-1; i >= 0; i=i-1) begin
         if (fifoAWValid[i] && !writeDone[fifoAW[i[ID_LEN-1:0]]]) begin
             writeIdxValid = 1;
@@ -207,8 +220,8 @@ end
 assign buf_wready = writeIdxValid;
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = writeIdx;
-
-    if (buf_wready && buf_wvalid) begin
+    if (rst) ;
+    else if (buf_wready && buf_wvalid) begin
         Transfer w = writes[idx];
         reg last = w.cur == w.len;
         reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
@@ -229,7 +242,7 @@ always_ff@(posedge clk) begin
             case (addr)
                 `SERIAL_ADDR: begin
                     if (buf_wstrb[0]) begin
-                        $write("%c", buf_wdata[7:0] & 8'd127);
+                        $write("%c", buf_wdata[7:0]);
                         $fflush(32'h80000001);
                     end
                 end
@@ -247,13 +260,15 @@ end
 // Write Ack Output
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
-
-    if (s_axi_awready && s_axi_awvalid) begin
+    
+    if (rst) ;
+    else if (buf_awready && buf_awvalid) begin
         fifoAWValid[fifoAWInsIdx] <= 1;
-        fifoAW[fifoAWInsIdx] <= s_axi_awid;
+        fifoAW[fifoAWInsIdx] <= buf_awid;
     end
-
-    if (!(s_axi_bvalid && !s_axi_bready)) begin
+    
+    if (rst) ;
+    else if (!(s_axi_bvalid && !s_axi_bready)) begin
         s_axi_bid <= 'x;
         s_axi_bvalid <= 0;
         if (fifoAWValid[0] && writes[idx].valid && writeDone[idx]) begin
@@ -268,9 +283,9 @@ always_ff@(posedge clk) begin
             fifoAW[NUM_TFS-1] <= 'x;
             fifoAWValid[NUM_TFS-1] <= 0;
 
-            if (s_axi_awready && s_axi_awvalid) begin
+            if (buf_awready && buf_awvalid) begin
                 fifoAWValid[fifoAWInsIdx-1] <= 1;
-                fifoAW[fifoAWInsIdx-1] <= s_axi_awid;
+                fifoAW[fifoAWInsIdx-1] <= buf_awid;
             end
 
             tfs[1][idx] <= 'x;
@@ -342,20 +357,23 @@ assign buf_arready = !tfs[0][buf_arid].valid && buf_arvalid;
 assign buf_awready = !tfs[1][buf_awid].valid && buf_awvalid;
 
 always_ff@(posedge clk) begin
-    if (buf_arready) begin
-        tfs[0][buf_arid].valid <= 1;
-        tfs[0][buf_arid].addr <= buf_araddr;
-        tfs[0][buf_arid].btype <= BurstType'(buf_arburst);
-        tfs[0][buf_arid].len <= buf_arlen;
-        tfs[0][buf_arid].cur <= 0;
-    end
-    if (buf_awready) begin
-        tfs[1][buf_awid].valid <= 1;
-        tfs[1][buf_awid].addr <= buf_awaddr;
-        tfs[1][buf_awid].btype <= BurstType'(buf_awburst);
-        tfs[1][buf_awid].len <= buf_awlen;
-        tfs[1][buf_awid].cur <= 0;
-        writeDone[buf_awid] <= 0;
+    if (rst) ;
+    else begin
+        if (buf_arready) begin
+            tfs[0][buf_arid].valid <= 1;
+            tfs[0][buf_arid].addr <= buf_araddr;
+            tfs[0][buf_arid].btype <= BurstType'(buf_arburst);
+            tfs[0][buf_arid].len <= buf_arlen;
+            tfs[0][buf_arid].cur <= 0;
+        end
+        if (buf_awready) begin
+            tfs[1][buf_awid].valid <= 1;
+            tfs[1][buf_awid].addr <= buf_awaddr;
+            tfs[1][buf_awid].btype <= BurstType'(buf_awburst);
+            tfs[1][buf_awid].len <= buf_awlen;
+            tfs[1][buf_awid].cur <= 0;
+            writeDone[buf_awid] <= 0;
+        end
     end
 end
 endmodule

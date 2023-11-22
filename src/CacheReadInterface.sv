@@ -1,5 +1,5 @@
 module CacheReadInterface
-#(parameter ADDR_BITS=10, parameter LEN_BITS=8, parameter IWIDTH=128, parameter CWIDTH=32, parameter BUF_LEN=4, parameter ID_LEN = 2)
+#(parameter ADDR_BITS=10, parameter LEN_BITS=8, parameter IWIDTH=128, parameter CWIDTH=32, parameter BUF_LEN=32, parameter ID_LEN = 2)
 (
     input wire clk,
     input wire rst,
@@ -97,7 +97,6 @@ always_comb begin
             FIFO_data[31:0] = readMetaSR[1].mmioData;
             FIFO_id = readMetaSR[1].id;
             FIFO_last = readMetaSR[1].last;
-            assert(accIdx_c == 1);
             accIdx_c = 0;
         end
         else if (accIdx_c[$clog2(WNUM)]) begin
@@ -126,7 +125,7 @@ end
 
 logic allowNewRead;
 always_comb begin
-    logic[$clog2(BUF_LEN):0] inFlight = $clog2(BUF_LEN)'(readMetaSR[1].valid) + $clog2(BUF_LEN)'(readMetaSR[1].valid);
+    logic[$clog2(BUF_LEN):0] inFlight = $clog2(BUF_LEN)'(readMetaSR[1].valid) + $clog2(BUF_LEN)'(readMetaSR[0].valid);
     allowNewRead = ((FIFO_free * WNUM) > inFlight);
 end
 

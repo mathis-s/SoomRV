@@ -29,8 +29,7 @@ always_comb begin
     
     for (integer i = 0; i < 3; i=i+1) begin
         if (IN_branches[i].taken && 
-            (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0) &&
-            (!IN_mispredFlush || $signed(IN_branches[i].sqN - mispredFlushSqN) < 0)) begin
+            (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0)) begin
             OUT_branch.taken = 1;
             OUT_branch.dstPC = IN_branches[i].dstPC;
             OUT_branch.sqN = IN_branches[i].sqN;

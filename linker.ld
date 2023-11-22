@@ -6,5 +6,5 @@ MEMORY
 SECTIONS
 {
     .text : { *(.text*) } > ram
-    .data : ALIGN(4) { *(.rodata*); *(.data*); *(.sdata*); *(.srodata*) } > ram
+    .data : ALIGN(4) { *(.bss*); *(.rodata*); *(.data*); *(.sdata*); *(.srodata*) } > ram
 } 

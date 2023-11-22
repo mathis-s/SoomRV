@@ -7,7 +7,8 @@ module LoadBuffer
     input wire clk,
     input wire rst,
     
-    input SqN commitSqN,
+    input SqN IN_comLoadSqN,
+    input SqN IN_comSqN,
     
     input wire IN_stall,
     input AGU_UOp IN_uopLd,
@@ -44,8 +45,8 @@ typedef struct packed
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
-SqN baseIndex;
-SqN indexIn;
+SqN baseIndex = IN_comLoadSqN;
+SqN lastBaseIndex;
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
 LD_UOp lateLoadUOp;
@@ -135,7 +136,7 @@ always_comb begin
 
     // In-order late issue (MMIO)
     if (entries[deqIndex].valid && !entries[deqIndex].issued &&
-        (!entries[deqIndex].nonSpec || (commitSqN == entries[deqIndex].sqN && IN_SQ_done))
+        (!entries[deqIndex].nonSpec || (IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
     ) begin
         // Overwrite. This load is in-order, so it always has top priority.
         issueIdxValid = 1;
@@ -143,19 +144,88 @@ always_comb begin
     end
 end
 
+// Circular Logic for range-based invalidation
+wire SqN invalSqN = IN_branch.taken ? IN_branch.loadSqN : lastBaseIndex;
+wire[NUM_ENTRIES-1:0] beginOneHot = (1 << invalSqN[$clog2(NUM_ENTRIES)-1:0]);
+wire[NUM_ENTRIES-1:0] endOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
+/*
+// verilator lint_off UNOPTFLAT
+reg[NUM_ENTRIES-1:0] invalMask;
+generate
+for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
+always_comb begin
+    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
+    
+    // We use range invalidation on mispredict to remove incorrectly speculated loads,
+    // and on regular commit to remove correct and committed loads.
+    
+    if (IN_branch.taken) begin
+        // invalidate from branch load sqn (incl) to baseIndex (excl)
+        if (beginOneHot[i])
+            invalMask[i] = 1;
+        else if (endOneHot[i])
+            invalMask[i] = 0;
+        else
+            invalMask[i] = invalMask[prev];
+    end
+    else begin
+        // invalidate from last baseIndex (incl) to baseIndex (excl)
+        if (endOneHot[i])
+            invalMask[i] = 0;
+        else if (beginOneHot[i])
+            invalMask[i] = 1;
+        else
+            invalMask[i] = invalMask[prev];
+    end
+end
+endgenerate
+// verilator lint_on UNOPTFLAT
+
+always_ff@(posedge clk) begin
+    if (invalMask2 != invalMask) begin
+        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], invalSqN[$clog2(NUM_ENTRIES)-1:0]);
+        $display("%b %b", invalMask, invalMask2);
+        assert(0);
+    end
+end
+*/
+
+reg[NUM_ENTRIES-1:0] invalMask;
+always_comb begin
+    reg active;
+    if (IN_branch.taken)
+        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] <= invalSqN[$clog2(NUM_ENTRIES)-1:0];
+    else
+        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] < invalSqN[$clog2(NUM_ENTRIES)-1:0];
+        
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        if (IN_branch.taken) begin
+            if (beginOneHot[i]) active = 1;
+            else if (endOneHot[i]) active = 0;
+        end
+        else begin
+            if (endOneHot[i]) active = 0;
+            else if (beginOneHot[i]) active = 1;
+        end
+        invalMask[i] = active;
+    end
+end
+
+
 always_ff@(posedge clk) begin
     
     OUT_branch <= 'x;
     OUT_branch.taken <= 0;
+    lastBaseIndex <= baseIndex;
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i].valid <= 0;
         end
-        baseIndex = 0;
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         lateLoadUOp <= 'x;
         lateLoadUOp.valid <= 0;
+        lastBaseIndex <= 0;
     end
     else begin
         if (!IN_stall) begin
@@ -172,16 +242,13 @@ always_ff@(posedge clk) begin
 
         if (IN_branch.taken) begin
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ($signed(entries[i].sqN - IN_branch.sqN) > 0) begin
+                if ((invalMask[i] && !($signed(IN_branch.loadSqN - baseIndex) >= NUM_ENTRIES)) || IN_branch.flush) begin
                     entries[i] <= 'x;
                     entries[i].valid <= 0;
                 end
             end
-            
-            if (IN_branch.flush)
-                baseIndex = IN_branch.loadSqN;
 
-            if ($signed(lateLoadUOp.sqN - IN_branch.sqN) > 0) begin
+            if ($signed(lateLoadUOp.sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
                 lateLoadUOp <= 'x;
                 lateLoadUOp.valid <= 0;
             end
@@ -206,20 +273,10 @@ always_ff@(posedge clk) begin
                 lateLoadUOp.isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
                 lateLoadUOp.valid <= 1;
             end
-            
-            // Delete entries that have been committed. To keep pace with ROB commit speed, 
-            // we have to be able to delete 4 entries per cycle. The alternative to this
-            // would be marking entries as "committed", and ignoring their SqN then.
-            // TODO: Analyze, what's better after synthesis?
-            else begin
-                reg temp = 1;
-                for (integer i = 0; i < 4; i=i+1) begin
-                    reg[$clog2(NUM_ENTRIES)-1:0] index = deqIndex + i[$clog2(NUM_ENTRIES)-1:0];
-                    if (temp && entries[index].valid && entries[index].issued && $signed(commitSqN - entries[index].sqN) > 0) begin
-                        entries[index].valid <= 0;
-                        baseIndex = baseIndex + 1;
-                    end
-                    else temp = 0;
+            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+                if (invalMask[i]) begin
+                    entries[i] <= 'x;
+                    entries[i].valid <= 0;
                 end
             end
         end

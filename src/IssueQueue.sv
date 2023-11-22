@@ -275,46 +275,48 @@ always_ff@(posedge clk) begin
                     temp.tags[1] = enqCandidates[i].tagB;
                     // verilator lint_on SELRANGE
                 end
-                
+                temp.tagDst = enqCandidates[i].tagDst;
+                temp.fu = enqCandidates[i].fu;
                 temp.immB = enqCandidates[i].immB;
                 temp.sqN = enqCandidates[i].sqN;
-                temp.tagDst = enqCandidates[i].tagDst;
                 temp.opcode = enqCandidates[i].opcode;
                 temp.fetchID = enqCandidates[i].fetchID;
                 temp.fetchOffs = enqCandidates[i].fetchOffs;
                 temp.storeSqN = enqCandidates[i].storeSqN;
                 temp.loadSqN = enqCandidates[i].loadSqN;
-                temp.fu = enqCandidates[i].fu;
                 temp.compressed = enqCandidates[i].compressed;
+
+                // verilator lint_off SELRANGE
+                // Ports 0, 2, 3 are used for atomics
+                if (PORT_IDX == 0 || PORT_IDX == 2 || PORT_IDX == 3) begin
+                    if (temp.fu == FU_ATOMIC) begin
+                        temp.fu = FuncUnit'(FU0);
+                        // No changes for LD uop
+                        // INT port uses value loaded by LD uop as operand
+                        if (PORT_IDX == 0) begin
+                            temp.avail[0] = enqCandidates[i].availC;
+                            temp.tags[0] = enqCandidates[i].tagC;
+                            temp.tagDst = 7'h40;
+                        end
+                        // STORE port
+                        if (PORT_IDX == 3) begin
+                            temp.tagDst = 7'h40;
+                        end
+                    end
+                end
+                // verilator lint_on SELRANGE
                 
                 
                 // Check if the result for this op is being broadcasted in the current cycle
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                     if (IN_resultValid[j]) begin
                         for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                            if (k < 2 && temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
+                            if (temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                     end
                 end
                 
-                // verilator lint_off SELRANGE
-                // Ports 0, 2, 3 are used for atomics
-                if (PORT_IDX == 0 || PORT_IDX == 2 || PORT_IDX == 3)
-                    if (temp.fu == FU_ATOMIC) begin
-                        temp.fu = FuncUnit'(FU0);
-                        // INT port
-                        if (PORT_IDX == 0) begin
-                            temp.tags[0] = temp.tagDst;
-                            temp.avail[0] = 0;
-                            temp.tagDst = 7'h40;
-                        end
-
-                        // STORE port
-                        if (PORT_IDX == 3) begin
-                            temp.tagDst = 7'h40;
-                        end
-                    end
-                
                 // Special handling for jalr
+                // verilator lint_off SELRANGE
                 if (enqCandidates[i].fu == FU_INT && (enqCandidates[i].opcode == INT_V_JALR || enqCandidates[i].opcode == INT_V_JR)) begin
                     assert(IMM_BITS == 36);
                     
