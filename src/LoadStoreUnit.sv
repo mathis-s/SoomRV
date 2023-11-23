@@ -353,7 +353,7 @@ always_comb begin
         ) begin
             // Use forwarded store data if available
             if (!(isExtMMIO || isIntMMIO)) begin
-                for (integer i = 0; i < `CASSOC; i=i+1) begin
+                for (integer i = 0; i < 4; i=i+1) begin
                     if (IN_stFwd.mask[i]) readData[i*8+:8] = IN_stFwd.data[i*8+:8];
                 end
             end
