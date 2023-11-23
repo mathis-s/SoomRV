@@ -24,6 +24,7 @@ $(BUILDROOT_DIR)/busybox.config:
 
 .PHONY: $(BUILDROOT_DIR)/output/images/Image
 $(BUILDROOT_DIR)/output/images/Image: $(BUILDROOT_DIR) $(BUILDROOT_DIR)/.config $(BUILDROOT_DIR)/kernel.config $(BUILDROOT_DIR)/busybox.config
+	mkdir -p buildroot/output/target/
 	cp -r $(wildcard extra/*) buildroot/output/target/
 	make -C buildroot
 
