@@ -754,16 +754,16 @@ void LogInstructions()
     }
 
     // Memory Access
-    for (auto& uop : {core->AGU_LD_uop, core->AGU_ST_uop})
+    /*for (auto& uop : {core->AGU_LD_uop, core->AGU_ST_uop})
         if (uop[0] & 1)
         {
             uint32_t sqn = ExtractField(uop, 156 - 32 * 2 - 4 - 1 - 2 - 1 - 32 - 7 - 7, 7);
             state.insts[sqn].memAddr = ExtractField(uop, 156 - 32 - 32, 32);
             state.insts[sqn].memData = 0; // ExtractField(uop, 156 - 32 * 2, 32);
-        }
+        }*/
 
     // Result
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < 6; i++)
     {
         uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
         bool isAtomic = state.insts[sqn].fu == 9;

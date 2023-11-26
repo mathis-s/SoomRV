@@ -22,7 +22,7 @@ module ROB
     parameter ID_LEN = `ROB_SIZE_EXP,
     parameter WIDTH_RN = `DEC_WIDTH,
     parameter WIDTH = 4,
-    parameter WIDTH_WB = 4
+    parameter WIDTH_WB = 6
 )
 (
     input wire clk,
@@ -341,8 +341,8 @@ always_ff@(posedge clk) begin
                 entry.fetchOffs = rnUOpSorted[i].fetchOffs;
                 entry.storeSqN = rnUOpSorted[i].storeSqN;
                 entry.loadSqN = rnUOpSorted[i].loadSqN;
-                entry.isLd = rnUOpSorted[i].fu == FU_LD || rnUOpSorted[i].fu == FU_ATOMIC;
-                entry.isSt = rnUOpSorted[i].fu == FU_ST || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SB) || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SB) || rnUOpSorted[i].fu == FU_ATOMIC;
                 
                 case (id0)
                     0: gen[0].entries[id1] <= entry;

@@ -24,12 +24,10 @@ module AGU
     output RES_UOp OUT_uop
 );
 
-localparam STORE_AGU = !LOAD_AGU;
-
-function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user);
+function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user, logic isLoad);
     logic r;
-    r = (LOAD_AGU  && !(pte_rwx[2] || (pte_rwx[0] && IN_vmem.makeExecReadable))) ||
-        (STORE_AGU && !pte_rwx[1]) ||
+    r = (isLoad  && !(pte_rwx[2] || (pte_rwx[0] && IN_vmem.makeExecReadable))) ||
+        (!isLoad && !pte_rwx[1]) ||
         (IN_vmem.priv == PRIV_USER && !pte_user) ||
         (IN_vmem.priv == PRIV_SUPERVISOR && pte_user && !IN_vmem.supervUserMemory);
     return r;
@@ -68,7 +66,7 @@ always_comb begin
     aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && en;
     
-    if (LOAD_AGU) begin
+    if (IN_uop.opcode < LSU_SB) begin // is load
         aguUOp_c.isLoad = 1;
         aguUOp_c.doNotCommit = 0;
         
@@ -100,7 +98,7 @@ always_comb begin
             default: ;
         endcase
     end
-    else begin // StoreAGU
+    else begin // is store
         aguUOp_c.isLoad = 0;
         aguUOp_c.doNotCommit = 0;
         
@@ -258,7 +256,7 @@ end
 always_comb begin
     OUT_eldOp = 'x;
     OUT_eldOp.valid =
-        !rst && issUOp_c.valid && (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0);
+        !rst && issUOp_c.valid && issUOp_c.isLoad && (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0);
     
     if (OUT_eldOp.valid)
         OUT_eldOp.addr = issUOp_c.addr[11:0];
@@ -284,23 +282,22 @@ always_comb begin
     
     // Cache Management Ops are encoded with wmask 0 and
     // are ordering
-    if (STORE_AGU && issUOp_c.wmask == 0)
+    if (!issUOp_c.isLoad && issUOp_c.wmask == 0)
         exceptFlags = FLAGS_ORDERING;
     
-    //
     if (IN_vmem.sv32en && IN_tlb.hit && 
-        (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user))
+        (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad))
     ) begin
         except = AGU_PAGE_FAULT;
-        if (STORE_AGU) exceptFlags = FLAGS_ST_PF;
+        if (!issUOp_c.isLoad) exceptFlags = FLAGS_ST_PF;
     end
     else if ((!`IS_LEGAL_ADDR(phyAddr) || IN_tlb.accessFault) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
         except = AGU_ACCESS_FAULT;
-        if (STORE_AGU) exceptFlags = FLAGS_ST_AF;
+        if (!issUOp_c.isLoad) exceptFlags = FLAGS_ST_AF;
     end
 
     // Misalign has higher priority than access fault
-    if (LOAD_AGU) begin
+    if (issUOp_c.isLoad) begin
         case (issUOp_c.size)
             0: ;
             1: begin

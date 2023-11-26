@@ -486,7 +486,7 @@ always_comb begin
                         uop.immB = 1;
                         uop.rd = instr.rd;
 
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         case (instr.funct3)
                             0: uop.opcode = LSU_LB;
                             1: uop.opcode = LSU_LH;
@@ -505,7 +505,7 @@ always_comb begin
                         uop.immB = 0;
                         uop.rd = 0;
 
-                        uop.fu = FU_ST;
+                        uop.fu = FU_AGU;
                         if (IN_enCustom && 0) begin
                             invalidEnc = 0;
                             
@@ -596,21 +596,21 @@ always_comb begin
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_INVAL;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                         end
                         // cbo.clean -> runs as store op
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_CLEAN;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                         end
                         // cbo.flush -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_FLUSH;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                         end
                     end
@@ -874,7 +874,7 @@ always_comb begin
                             
                             invalidEnc = 0;
                             
-                            uop.fu = FU_LD;
+                            uop.fu = FU_AGU;
                             case (instr.funct3)
                                 0: uop.opcode = LSU_LB_RR;
                                 1: uop.opcode = LSU_LH_RR;
@@ -889,7 +889,7 @@ always_comb begin
                     
                     /*`OPC_FLW: begin
                         if (i32.flw.width == 3'b010) begin
-                            uop.fu = FU_LD;
+                            uop.fu = FU_AGU;
                             uop.opcode = LSU_FLW;
                             uop.rs1 = i32.flw.rs1;
                             uop.rd = i32.flw.rd;
@@ -900,7 +900,7 @@ always_comb begin
                     end
                     `OPC_FSW: begin
                         if (i32.fsw.width == 3'b010) begin
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.opcode = LSU_FSW;
                             uop.rs1 = i32.fsw.rs1;
                             uop.rs2 = i32.fsw.rs2;
@@ -1096,13 +1096,13 @@ always_comb begin
                                 5'b00010: begin // lr.w
                                     if (instr.rs2 == 5'b0) begin
                                         uop.opcode = LSU_LR_W;
-                                        uop.fu = FU_LD;
+                                        uop.fu = FU_AGU;
                                         invalidEnc = 0;
                                     end
                                 end
                                 5'b00011: begin // sc.w
                                     uop.opcode = LSU_SC_W;
-                                    uop.fu = FU_ST;
+                                    uop.fu = FU_AGU;
                                     invalidEnc = 0;
                                 end
                                 5'b00001: begin // amoswap.w
@@ -1157,7 +1157,7 @@ always_comb begin
                     // c.lw
                     if (i16.cl.funct3 == 3'b010) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         uop.imm = {25'b0, i16.cl.imm[0], i16.cl.imm2, i16.cl.imm[1], 2'b00};
                         uop.rs1 = {2'b01, i16.cl.rs1};
                         uop.rd = {2'b01, i16.cl.rd};
@@ -1166,7 +1166,7 @@ always_comb begin
                     // c.sw
                     else if (i16.cs.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_ST;
+                        uop.fu = FU_AGU;
                         uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
                         uop.rs1 = {2'b01, i16.cs.rd_rs1};
                         uop.rs2 = {2'b01, i16.cs.rs2};
@@ -1376,7 +1376,7 @@ always_comb begin
                     // c.lwsp
                     if (i16.ci.funct3 == 3'b010 && !(i16.ci.rd_rs1 == 0)) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         uop.imm = {24'b0, i16.ci.imm[1:0], i16.ci.imm2, i16.ci.imm[4:2], 2'b00};
                         uop.rs1 = 2; // sp
                         uop.rd = i16.ci.rd_rs1;
@@ -1385,7 +1385,7 @@ always_comb begin
                     // c.swsp
                     else if (i16.css.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_ST;
+                        uop.fu = FU_AGU;
                         uop.imm = {24'b0, i16.css.imm[1:0], i16.css.imm[5:2], 2'b00};
                         uop.rs1 = 2; // sp
                         uop.rs2 = i16.css.rs2;

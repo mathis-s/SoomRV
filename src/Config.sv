@@ -82,3 +82,5 @@
 
 // Enable floating point (zfinx) support
 //`define ENABLE_FP
+
+`define NUM_AGUS 2

@@ -28,12 +28,12 @@ assign OUT_dbg.stSqNStall = stSqNStall;
 assign OUT_dbg.rnStall = RN_stall;
 assign OUT_dbg.memBusy = MEMSUB_busy;
 assign OUT_dbg.sqBusy = !SQ_empty || SQ_uop.valid;
-assign OUT_dbg.lsuBusy = AGU_LD_uop.valid || LSU_busy;
-assign OUT_dbg.ldNack = LSU_ldAck.valid && LSU_ldAck.fail;
-assign OUT_dbg.stNack = LSU_stAck.valid && LSU_stAck.fail;
+assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
+assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
+assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
 localparam NUM_WBS = 4;
-RES_UOp wbUOp[NUM_WBS-1:0] /*verilator public*/;
+RES_UOp wbUOp[5:0] /*verilator public*/;
 reg wbHasResult[NUM_WBS-1:0];
 always_comb begin
     for (integer i = 0; i < 4; i=i+1)
@@ -174,7 +174,7 @@ Rename rn
     .IN_comUOp(comUOps),
 
     .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp),
+    .IN_wbUOp(wbUOp[3:0]),
 
     .IN_branchTaken(branch.taken),
     .IN_branchFlush(branch.flush),
@@ -213,7 +213,7 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,3
     .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp),
+    .IN_resultUOp(wbUOp[3:0]),
     .IN_loadForwardValid(LSU_loadFwdValid),
     .IN_loadForwardTag(LSU_loadFwdTag),
     
@@ -241,7 +241,7 @@ IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1
     .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp),
+    .IN_resultUOp(wbUOp[3:0]),
     .IN_loadForwardValid(LSU_loadFwdValid),
     .IN_loadForwardTag(LSU_loadFwdTag),
     
@@ -255,7 +255,7 @@ IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1
     
     .OUT_uop(IS_uop[1])
 );
-IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) iq2
+IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
@@ -269,7 +269,7 @@ IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) 
     .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp),
+    .IN_resultUOp(wbUOp[3:0]),
     .IN_loadForwardValid(LSU_loadFwdValid),
     .IN_loadForwardTag(LSU_loadFwdTag),  
 
@@ -283,7 +283,7 @@ IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_LD,FU_LD,FU_LD,FU_ATOMIC,0,0,0) 
     
     .OUT_uop(IS_uop[2])
 );
-IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),
@@ -297,7 +297,7 @@ IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_ST,FU_ST,FU_ST,FU_ATOMIC,0,0,0) 
     .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp),
+    .IN_resultUOp(wbUOp[3:0]),
     .IN_loadForwardValid(LSU_loadFwdValid),
     .IN_loadForwardTag(LSU_loadFwdTag),
     
@@ -346,7 +346,7 @@ Load ld
     .IN_uop(IS_uop),
     
     .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp),
+    .IN_wbUOp(wbUOp[3:0]),
     
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
@@ -472,8 +472,9 @@ assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : DIV_uop
 `endif
 
 PageWalk_Res PW_res;
-wire CC_PW_LD_stall;
-PW_LD_UOp PW_LD_uop;
+wire CC_PW_LD_stall[1:0];
+PW_LD_UOp PW_LD_uop[`NUM_AGUS-1:0];
+assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
 PageWalker pageWalker
 (
     .clk(clk),
@@ -482,14 +483,14 @@ PageWalker pageWalker
     .IN_rqs('{LDAGU_PW_rq, STAGU_PW_rq, PC_PW_rq}),
     .OUT_res(PW_res),
 
-    .IN_ldStall(CC_PW_LD_stall),
-    .OUT_ldUOp(PW_LD_uop),
-    .IN_ldAck(LSU_ldAck),
+    .IN_ldStall(CC_PW_LD_stall[0]),
+    .OUT_ldUOp(PW_LD_uop[0]),
+    .IN_ldAck(LSU_ldAck[0]),
     .IN_ldResUOp(wbUOp[2])
 );
 
-wire LS_AGULD_uopStall;
-LD_UOp LS_uopLd;
+wire LS_AGULD_uopStall[`NUM_AGUS-1:0];
+LD_UOp LS_uopLd[`NUM_AGUS-1:0];
 LoadSelector loadSelector
 (
     .IN_aguLd(LB_uopLd),
@@ -514,15 +515,17 @@ TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
     .OUT_res(TLB_res)
 );
 
-AGU_UOp AGU_LD_uop /* verilator public */;
-ELD_UOp AGU_eLdUOp;
+
+AGU_UOp AGU_uop[1:0];
+ELD_UOp AGU_eLdUOp[1:0];
+
 PageWalk_Req LDAGU_PW_rq;
 AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
-    .en(LD_uop[2].fu == FU_LD || LD_uop[2].fu == FU_ATOMIC),
-    .IN_stall(LSU_ldAGUStall),
+    .en(1),
+    .IN_stall(LSU_ldAGUStall[0]),
     .OUT_stall(stall[2]),
     
     .IN_branch(branch),
@@ -536,9 +539,9 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
     .IN_tlb(TLB_res[1]),
 
     .IN_uop(LD_uop[2]),
-    .OUT_aguOp(AGU_LD_uop),
-    .OUT_eldOp(AGU_eLdUOp),
-    .OUT_uop()
+    .OUT_aguOp(AGU_uop[0]),
+    .OUT_eldOp(AGU_eLdUOp[0]),
+    .OUT_uop(wbUOp[4])
 );
 
 AGU_UOp AGU_ST_uop /* verilator public */;
@@ -547,8 +550,8 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
 (
     .clk(clk),
     .rst(rst),
-    .en(LD_uop[3].fu == FU_ST || LD_uop[3].fu == FU_ATOMIC),
-    .IN_stall(1'b0),
+    .en(1),
+    .IN_stall(LSU_ldAGUStall[1]),
     .OUT_stall(stall[3]),
     
     .IN_branch(branch),
@@ -562,15 +565,15 @@ AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
     .IN_tlb(TLB_res[0]),
 
     .IN_uop(LD_uop[3]),
-    .OUT_aguOp(AGU_ST_uop),
-    .OUT_eldOp(),
-    .OUT_uop(wbUOp[3])
+    .OUT_aguOp(AGU_uop[1]),
+    .OUT_eldOp(AGU_eLdUOp[1]),
+    .OUT_uop(wbUOp[5])
 );
 
 
 SqN LB_maxLoadSqN;
-LD_UOp LB_uopLd;
-LD_UOp LB_aguUOpLd;
+LD_UOp LB_uopLd[1:0];
+LD_UOp LB_aguUOpLd[1:0];
 
 LoadBuffer lb
 (
@@ -580,8 +583,7 @@ LoadBuffer lb
     .IN_comSqN(ROB_curSqN),
     
     .IN_stall(LS_AGULD_uopStall),
-    .IN_uopLd(AGU_LD_uop),
-    .IN_uopSt(AGU_ST_uop),
+    .IN_uop(AGU_uop),
     
     .IN_ldAck(LSU_ldAck),
     .IN_SQ_done(SQ_done),
@@ -601,7 +603,7 @@ wire[31:0] CSR_dataOut;
 wire SQ_empty;
 wire SQ_done;
 ST_UOp SQ_uop;
-StFwdResult SQ_fwd;
+StFwdResult SQ_fwd[1:0];
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
 SQ_ComInfo SQ_info;
@@ -614,15 +616,14 @@ StoreQueue sq
     .clk(clk),
     .rst(rst),
     .IN_stallSt(CC_storeStall),
-    .IN_stallLd(CC_loadStall),
     .OUT_empty(SQ_empty),
     .OUT_done(SQ_done),
     
-    .IN_uopSt(AGU_ST_uop),
+    .IN_uopSt(AGU_uop),
     .IN_uopLd(CC_SQ_uopLd),
     
     .IN_rnUOp(RN_uop),
-    .IN_resultUOp(wbUOp[2:0]),
+    .IN_resultUOp(wbUOp[3:0]),
     .OUT_RF_raddr(SQ_RF_raddr),
     .IN_RF_rdata(RF_SQ_rdata),
     .IN_vmem(CSR_vmem),
@@ -644,11 +645,11 @@ StoreQueue sq
 
 wire LSU_loadFwdValid = 0;
 Tag LSU_loadFwdTag = 'x;
-wire CC_loadStall;
+wire CC_loadStall[1:0];
 wire CC_storeStall;
-wire LSU_ldAGUStall;
-LD_UOp CC_SQ_uopLd;
-LD_Ack LSU_ldAck;
+wire LSU_ldAGUStall[1:0];
+LD_UOp CC_SQ_uopLd[1:0];
+LD_Ack LSU_ldAck[1:0];
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
@@ -688,7 +689,7 @@ LoadStoreUnit lsu
     .OUT_BLSU_memc(BLSU_MC_if),
     .IN_memc(IN_memc),
 
-    .OUT_uopLd(wbUOp[2])
+    .OUT_uopLd(wbUOp[3:2])
 );
 
 RES_UOp INT1_uop;
@@ -805,7 +806,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || AGU_LD_uop.valid || LSU_busy;
+wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || LSU_busy; // todo: fix
 
 wire TH_flushTLB;
 wire TH_startFence;

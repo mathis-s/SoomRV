@@ -2,7 +2,7 @@ module StoreQueue
 #(
     parameter NUM_ENTRIES=`SQ_SIZE,
     parameter NUM_EVICTED=4,
-    parameter RESULT_BUS_COUNT=3,
+    parameter RESULT_BUS_COUNT=4,
     parameter WIDTH_RN = `DEC_WIDTH,
     parameter AMO_RES_PORT=0
 )
@@ -10,12 +10,11 @@ module StoreQueue
     input wire clk,
     input wire rst,
     input wire IN_stallSt,
-    input wire IN_stallLd,
     output reg OUT_empty,
     output wire OUT_done,
     
-    input AGU_UOp IN_uopSt,
-    input LD_UOp IN_uopLd,
+    input AGU_UOp IN_uopSt[`NUM_AGUS-1:0],
+    input LD_UOp IN_uopLd[`NUM_AGUS-1:0],
     
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
@@ -29,7 +28,7 @@ module StoreQueue
     input BranchProv IN_branch,
     
     output ST_UOp OUT_uopSt,
-    output StFwdResult OUT_fwd,
+    output StFwdResult OUT_fwd[1:0],
     
     input ST_Ack IN_stAck,
     
@@ -72,64 +71,6 @@ always_ff@(posedge clk) entryValid_r <= rst ? 0 : entryValid_c;
 wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
 wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
 wire[NUM_ENTRIES-1:0] lastIndexOneHot = (1 << lastIndex[$clog2(NUM_ENTRIES)-1:0]);
-/*
-// verilator lint_off UNOPTFLAT
-// Circular logic to find range of ready entries
-reg[NUM_ENTRIES-1:0] entryReady_c;
-generate
-for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
-always_comb begin
-    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-    
-    if (SqN'(baseIndex + SqN'(NUM_ENTRIES)) == IN_comStSqN)
-        entryReady_c[i] = 1;
-    else begin
-        if (comStSqNOneHot[i])
-            entryReady_c[i] = 0;
-        else if (baseIndexOneHot[i])
-            entryReady_c[i] = 1;
-        else
-            entryReady_c[i] = entryReady_c[prev];
-    end
-end
-endgenerate
-
-// Circular logic to find range of valid (but not ready) entries
-reg[NUM_ENTRIES-1:0] entryValid_c;
-generate
-for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
-always_comb begin
-    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-    
-    if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex)
-        entryValid_c[i] = 1;
-    else begin
-        if (lastIndexOneHot[prev])
-            entryValid_c[i] = 0;
-        else if (baseIndexOneHot[i])
-            entryValid_c[i] = 1;
-        else
-            entryValid_c[i] = entryValid_c[prev];
-    end
-end
-endgenerate
-// verilator lint_on UNOPTFLAT
-always_ff@(posedge clk) begin
-    if (entryReady_c2 != entryReady_c) begin
-        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
-        $display("%b %b", entryReady_c, entryReady_c2);
-        assert(0);
-    end
-end
-
-always_ff@(posedge clk) begin
-    if (entryValid_c2 != entryValid_c) begin
-        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], lastIndex[$clog2(NUM_ENTRIES)-1:0]);
-        $display("%b %b", entryValid_c, entryValid_c2);
-        assert(0);
-    end
-end
-*/
 
 reg[NUM_ENTRIES-1:0] entryReady_c;
 always_comb begin
@@ -221,35 +162,37 @@ end
 
 reg[$clog2(NUM_EVICTED):0] evictedIn;
 
-reg[3:0] readMask;
+reg[3:0] readMask[`NUM_AGUS-1:0];
 always_comb begin
-    case (IN_uopLd.size)
-        0: readMask = (4'b1 << IN_uopLd.addr[1:0]);
-        1: readMask = ((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
-        default: readMask = 4'b1111;
-    endcase
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        case (IN_uopLd[i].size)
+            0: readMask[i] = (4'b1 << IN_uopLd[i].addr[1:0]);
+            1: readMask[i] = ((IN_uopLd[i].addr[1:0] == 2) ? 4'b1100 : 4'b0011);
+            default: readMask[i] = 4'b1111;
+        endcase
 end
 
-reg[3:0] lookupMask;
-reg[31:0] lookupData;
-reg lookupConflict;
+reg[3:0] lookupMask[`NUM_AGUS-1:0];
+reg[31:0] lookupData[`NUM_AGUS-1:0];
+reg lookupConflict[`NUM_AGUS-1:0];
 // Store queue lookup
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
-    lookupMask = ~readMask;
-    lookupData = 32'bx;
-    lookupConflict = 0;
+    lookupMask[h] = ~readMask[h];
+    lookupData[h] = 32'bx;
+    lookupConflict[h] = 0;
     
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
         if (evicted[i].valid &&
-            evicted[i].s.addr == IN_uopLd.addr[31:2] && 
+            evicted[i].s.addr == IN_uopLd[h].addr[31:2] && 
             !`IS_MMIO_PMA_W(evicted[i].s.addr)
         ) begin
             for (integer j = 0; j < 4; j=j+1)
                 if (evicted[i].s.wmask[j])
-                    lookupData[j*8 +: 8] = evicted[i].s.data[j*8 +: 8];
-            lookupMask = lookupMask | evicted[i].s.wmask;
+                    lookupData[h][j*8 +: 8] = evicted[i].s.data[j*8 +: 8];
+            lookupMask[h] = lookupMask[h] | evicted[i].s.wmask;
         end
     end
 
@@ -271,8 +214,8 @@ always_comb begin
 
                 if (active &&
                     entries[i].addrAvail &&
-                    entries[i].addr == IN_uopLd.addr[31:2] && 
-                    ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entryReady_r[i]) &&
+                    entries[i].addr == IN_uopLd[h].addr[31:2] && 
+                    ($signed(entries[i].sqN - IN_uopLd[h].sqN) < 0 || entryReady_r[i]) &&
                     !`IS_MMIO_PMA_W(entries[i].addr)
                 ) begin
                     
@@ -280,21 +223,21 @@ always_comb begin
                         
                         for (integer j = 0; j < 4; j=j+1)
                             if (entries[i].wmask[j]) begin
-                                lookupData[j*8 +: 8] = entries[i].data[j*8 +: 8];
-                                lookupMask[j] = 1;
+                                lookupData[h][j*8 +: 8] = entries[i].data[j*8 +: 8];
+                                lookupMask[h][j] = 1;
                             end
                     end
-                    else if ((entries[i].wmask & readMask) != 0) lookupConflict = 1;
+                    else if ((entries[i].wmask & readMask[h]) != 0) lookupConflict[h] = 1;
                 end
             end
     end
 `else
     for (integer i = 0; i < 4; i=i+1)
-        if (lookupMaskIter[outputIdx][i])
-            lookupData[i*8 +: 8] = lookupDataIter[outputIdx][i*8 +: 8];
+        if (lookupMaskIter[h][outputIdx][i])
+            lookupData[h][i*8 +: 8] = lookupDataIter[h][outputIdx][i*8 +: 8];
 
-    lookupMask = lookupMask | lookupMaskIter[outputIdx];    
-    lookupConflict = |lookupConflictList;
+    lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];    
+    lookupConflict[h] = |lookupConflictList[h];
 `endif
 end
 
@@ -303,31 +246,32 @@ end
 // Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
 // If tooling does not support this, it might be necessary to make the SQ a shift register again
 // or chose one of the less efficient methods of iteration.
-logic[31:0] lookupDataIter[NUM_ENTRIES-1:0];
-logic[3:0]  lookupMaskIter[NUM_ENTRIES-1:0];
-logic[NUM_ENTRIES-1:0] lookupConflictList;
+logic[31:0] lookupDataIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[3:0]  lookupMaskIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[NUM_ENTRIES-1:0] lookupConflictList[`NUM_AGUS-1:0];
 wire[$clog2(NUM_ENTRIES)-1:0] outputIdx = baseIndex[$clog2(NUM_ENTRIES)-1:0] - 1;
 generate
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
 always_comb begin
 
     integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
     // break in circular feedback
     if (i == baseIndex[$clog2(NUM_ENTRIES)-1:0]) begin
-        lookupMaskIter[i] = 0;
-        lookupDataIter[i] = 0;
+        lookupMaskIter[h][i] = 0;
+        lookupDataIter[h][i] = 0;
     end
     // continue circular feedback
     else begin
-        lookupMaskIter[i] = lookupMaskIter[prev];
-        lookupDataIter[i] = lookupDataIter[prev];
+        lookupMaskIter[h][i] = lookupMaskIter[h][prev];
+        lookupDataIter[h][i] = lookupDataIter[h][prev];
     end
 
     // actual forwarding
-    lookupConflictList[i] = 0;
+    lookupConflictList[h][i] = 0;
     if ((entryValid_c[i]) && entries[i].addrAvail &&
-        entries[i].addr == IN_uopLd.addr[31:2] && 
-        ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entryReady_r[i]) &&
+        entries[i].addr == IN_uopLd[h].addr[31:2] && 
+        ($signed(entries[i].sqN - IN_uopLd[h].sqN) < 0 || entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
         
@@ -335,11 +279,11 @@ always_comb begin
             
             for (integer j = 0; j < 4; j=j+1)
                 if (entries[i].wmask[j]) begin
-                    lookupDataIter[i][j*8 +: 8] = entries[i].data[j*8 +: 8];
-                    lookupMaskIter[i][j] = 1;
+                    lookupDataIter[h][i][j*8 +: 8] = entries[i].data[j*8 +: 8];
+                    lookupMaskIter[h][i][j] = 1;
                 end
         end
-        else if ((entries[i].wmask & readMask) != 0) lookupConflictList[i] = 1;
+        else if ((entries[i].wmask & readMask[h]) != 0) lookupConflictList[h][i] = 1;
     end
 end
 endgenerate
@@ -578,7 +522,7 @@ always_comb begin
         for (integer j = 0; j < `DEC_WIDTH; j=j+1) begin
             // This could be one-hot...
             if (IN_rnUOp[j].valid && IN_rnUOp[j].storeSqN[$clog2(`DEC_WIDTH)-1:0] == i[$clog2(`DEC_WIDTH)-1:0] &&
-                (IN_rnUOp[j].fu == FU_ST || IN_rnUOp[j].fu == FU_ATOMIC)
+                ((IN_rnUOp[j].fu == FU_AGU && IN_rnUOp[j].opcode >= LSU_SB) || IN_rnUOp[j].fu == FU_ATOMIC)
             ) begin
                 rnUOpSorted[i] = IN_rnUOp[j];
             end
@@ -590,9 +534,11 @@ end
 reg flushing;
 assign OUT_flush = flushing;
 always_ff@(posedge clk) begin
-
-    OUT_fwd <= 'x;
-    OUT_fwd.valid <= 0;
+    
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        OUT_fwd[i] <= 'x;
+        OUT_fwd[i].valid <= 0;
+    end
 
     if (rst) begin
         
@@ -709,19 +655,22 @@ always_ff@(posedge clk) begin
         end
     
         // Set Address
-        if (IN_uopSt.valid && 
-            (!IN_branch.taken || ($signed(IN_uopSt.sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
-        ) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
-            assert(IN_uopSt.storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
-            assert(entryValid_c[index]);
-            assert(!entries[index].addrAvail);
-            if (IN_uopSt.exception == AGU_NO_EXCEPTION) begin
-                entries[index].addr <= IN_uopSt.addr[31:2];
-                entries[index].wmask <= IN_uopSt.wmask;
-                entries[index].addrAvail <= 1;
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            // TODO: indexed insert
+            if (IN_uopSt[i].valid && !IN_uopSt[i].isLoad &&
+                (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
+            ) begin
+                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];
+                assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
+                assert(entryValid_c[index]);
+                assert(!entries[index].addrAvail);
+                if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
+                    entries[index].addr <= IN_uopSt[i].addr[31:2];
+                    entries[index].wmask <= IN_uopSt[i].wmask;
+                    entries[index].addrAvail <= 1;
+                end
+                modified = 1;
             end
-            modified = 1;
         end
 
         // Enqueue
@@ -761,7 +710,7 @@ always_ff@(posedge clk) begin
                     end
                     
                     // Cache Block Ops special handling
-                    if (rnUOpSorted[i].fu == FU_ST) begin
+                    if (rnUOpSorted[i].fu == FU_AGU) begin
                         case (rnUOpSorted[i].opcode)
                             LSU_CBO_CLEAN: begin
                                 entries[index].data <= {30'bx, 2'd0};
@@ -782,7 +731,7 @@ always_ff@(posedge clk) begin
                     modified = 1;
                 end
             for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-                if (IN_rnUOp[i].valid && (IN_rnUOp[i].fu == FU_ST || IN_rnUOp[i].fu == FU_ATOMIC))
+                if (IN_rnUOp[i].valid && ((IN_rnUOp[i].fu == FU_AGU && IN_rnUOp[i].opcode >= LSU_SB) || IN_rnUOp[i].fu == FU_ATOMIC))
                     lastIndex <= IN_rnUOp[i].storeSqN;
             end
         end
@@ -793,12 +742,13 @@ always_ff@(posedge clk) begin
         end
         OUT_maxStoreSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
-        if (IN_uopLd.valid) begin
-            OUT_fwd.valid <= 1;
-            OUT_fwd.data <= lookupData;
-            OUT_fwd.mask <= lookupMask;
-            OUT_fwd.conflict <= lookupConflict;
-        end
+        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+            if (IN_uopLd[i].valid) begin
+                OUT_fwd[i].valid <= 1;
+                OUT_fwd[i].data <= lookupData[i];
+                OUT_fwd[i].mask <= lookupMask[i];
+                OUT_fwd[i].conflict <= lookupConflict[i];
+            end
 
         evictedIn <= nextEvictedIn;
         baseIndex <= nextBaseIndex;

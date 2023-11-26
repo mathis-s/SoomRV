@@ -99,7 +99,7 @@ always_comb begin
         if (IN_mispredFlush && IN_uop[i].valid)
             OUT_stall = 1;
         
-        isSc[i] = IN_uop[i].fu == FU_ST && IN_uop[i].opcode == LSU_SC_W;
+        isSc[i] = IN_uop[i].fu == FU_AGU && IN_uop[i].opcode == LSU_SC_W;
         
         // Only need new tag if instruction writes to a register.
         // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
@@ -126,7 +126,7 @@ always_comb begin
         scSuccessful[i] = 0;
         if (RAT_issueValid[i]) begin
             // Reserve if LR
-            if (IN_uop[i].fu == FU_LD && IN_uop[i].opcode == LSU_LR_W) begin
+            if (IN_uop[i].fu == FU_AGU && IN_uop[i].opcode == LSU_LR_W) begin
                 nextLrScRsv.sqN = RAT_issueSqNs[i];
                 nextLrScRsv.valid = 1;
             end
@@ -136,7 +136,7 @@ always_comb begin
                 nextLrScRsv.valid = 0;
             end
             // All other stores, cmo or amo ops clear reservation
-            else if (IN_uop[i].fu == FU_ST || IN_uop[i].fu == FU_ATOMIC) begin
+            else if ((IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SB) || IN_uop[i].fu == FU_ATOMIC) begin
                 nextLrScRsv.valid = 0;
             end
         end
@@ -344,9 +344,13 @@ always_ff@(posedge clk) begin
                         FU_DIV, FU_FPU:  intOrder = 1;
                         FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
                         
-                        FU_ST: counterStoreSqN = counterStoreSqN + 1;
-                        FU_LD: counterLoadSqN = counterLoadSqN + 1;
-                        
+                        FU_AGU: begin
+                            if (IN_uop[i].opcode < LSU_SB)
+                                counterLoadSqN = counterLoadSqN + 1;
+                            else
+                                counterStoreSqN = counterStoreSqN + 1;
+                        end
+                                
                         FU_ATOMIC: begin
                             counterStoreSqN = counterStoreSqN + 1;
                             counterLoadSqN = counterLoadSqN + 1;

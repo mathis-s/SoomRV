@@ -33,6 +33,7 @@ SRC_FILES = \
 	src/BranchSelector.sv \
 	src/PreDecode.sv \
 	src/MemRTL.sv \
+	src/MemRTL2W.sv \
 	src/Top.sv \
 	src/MemoryController.sv \
 	src/RenameTable.sv \

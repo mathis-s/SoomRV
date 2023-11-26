@@ -88,18 +88,8 @@ typedef enum logic[5:0]
     LSU_LW, 
     LSU_LBU,
     LSU_LHU,
-    
-    LSU_LR_W
-    //LSU_LB_RR, 
-    //LSU_LH_RR, 
-    //LSU_LW_RR, 
-    //LSU_LBU_RR,
-    //LSU_LHU_RR
-    
-} OPCode_LSU;
+    LSU_LR_W,
 
-typedef enum logic[5:0]
-{
     LSU_SB,
     LSU_SH,
     LSU_SW,
@@ -113,10 +103,9 @@ typedef enum logic[5:0]
     LSU_SB_I,
     LSU_SH_I,
     LSU_SW_I,
-    
     LSU_SC_W
     
-} OPCode_ST;
+} OPCode_AGU;
 
 typedef enum logic[2:0]
 {
@@ -233,7 +222,7 @@ typedef enum logic[5:0]
     
 } OPCode_FU_TRAP;
 
-typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 
 typedef enum logic[3:0] 
 {
@@ -875,30 +864,26 @@ endinterface
 
 interface IF_Cache();
     
-    logic we;
-    logic[11:0] waddr;
-    logic[$clog2(`CASSOC)-1:0] wassoc;
-    logic[31:0] wdata;
-    logic[3:0] wmask;
-    
-    logic re;
-    logic[11:0] raddr;
-    logic[`CASSOC-1:0][31:0] rdata;
-    
-    logic rbusy;
-    logic[$clog2(`CBANKS)-1:0] rbusyBank;
-    logic wbusy;
+    logic[`NUM_AGUS-1:0] re;
+    logic[`NUM_AGUS-1:0] we;
+    logic[`NUM_AGUS-1:0][11:0] addr;
+    logic[`NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
+    logic[`NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
+    logic[`NUM_AGUS-1:0][31:0] wdata;
+    logic[`NUM_AGUS-1:0][3:0] wmask;
+    logic[`NUM_AGUS-1:0] busy;
+    logic[`NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
     
     modport HOST
     (
-        output we, waddr, wassoc, wdata, wmask, re, raddr,
-        input rdata, rbusy, rbusyBank, wbusy
+        output we, wassoc, wdata, wmask, re, addr,
+        input rdata, busy, rbusyBank
     );
     
     modport MEM
     (
-        input we, waddr, wassoc, wdata, wmask, re, raddr,
-        output rdata, rbusy, rbusyBank, wbusy
+        input we, wassoc, wdata, wmask, re, addr,
+        output rdata, busy, rbusyBank
     );
 endinterface
 

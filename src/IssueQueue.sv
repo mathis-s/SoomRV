@@ -7,10 +7,10 @@ module IssueQueue
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
     parameter IMM_BITS=32,
-    parameter FU0 = FU_ST,
-    parameter FU1 = FU_ST,
-    parameter FU2 = FU_ST,
-    parameter FU3 = FU_ST,
+    parameter FU0 = FU_AGU,
+    parameter FU1 = FU_AGU,
+    parameter FU2 = FU_AGU,
+    parameter FU3 = FU_AGU,
     parameter FU0_SPLIT=0,
     parameter FU0_ORDER=0,
     parameter FU1_DLY=0
@@ -126,6 +126,10 @@ always_comb begin
         OUT_stall[i] = 0;
         // check if this is a candidate to enqueue
         if (IN_uop[i].validIQ[PORT_IDX] &&
+            
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SB) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SB) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
+
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
                     (PORT_IDX == 0 && IN_uop[i].fu == FU_ATOMIC)) &&
@@ -202,12 +206,12 @@ always_ff@(posedge clk) begin
                             queue[i].fu != FU_CSR || (i == 0 && queue[i].sqN == IN_commitSqN)) &&
                         
                         // Only issue stores that fit into store queue
-                        //((FU0 != FU_ST && FU1 != FU_ST && FU2 != FU_ST && FU3 != FU_ST) || 
-                        //    queue[i].fu != FU_ST || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
+                        //((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
+                        //    queue[i].fu != FU_AGU || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
                         
                         // Only issue loads that fit into load order buffer
-                        ((FU0 != FU_LD && FU1 != FU_LD && FU2 != FU_LD && FU3 != FU_LD) || 
-                            queue[i].fu != FU_LD || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
+                        ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
+                            queue[i].fu != FU_AGU || queue[i].opcode >= LSU_SB || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
                         
                         issued = 1;
                         OUT_uop.valid <= 1;
