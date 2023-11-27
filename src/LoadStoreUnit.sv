@@ -167,7 +167,7 @@ always_comb begin
             // do not issue load
         end
         else if (i == 1 && stOps[1].valid) begin
-            // port is being used by store
+            // port is being used by store during store's write cycle
         end
         else if (LMQ_ld[i].valid && 
             (!IN_branch.taken || LMQ_ld[i].external || $signed(LMQ_ld[i].sqN - IN_branch.sqN) <= 0) &&
@@ -337,13 +337,96 @@ always_comb begin
 
         // only one of these is valid
         LD_UOp ld = ldOps[i][1].valid ? ldOps[i][1] : BLSU_uopLd;
-        ST_UOp st = stOps[1];
+        ST_UOp st = (i == 1) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
         assert(!(ld.valid && st.valid));
 
         curLd[i] = ld;
         
         if (rst) ; // todo: really needed?
-        
+        else if (st.valid) begin
+            reg cacheHit = 0;
+            reg doCacheLoad = 1;
+            reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
+            reg noEvict = !IF_ct.rdata[i][assocCnt].valid;
+
+            // check for hit in cache table
+            for (integer j = 0; j < `CASSOC; j=j+1) begin
+                if (IF_ct.rdata[i][j].valid && IF_ct.rdata[i][j].addr == st.addr[31:12]) begin
+                    assert(!cacheHit); // multiple hits are invalid
+                    doCacheLoad = 0;
+                    cacheHit = 1;
+                    cacheHitAssoc = j[$clog2(`CASSOC)-1:0];
+                end
+            end
+
+            // check if address is already being transferred
+            begin
+                reg transferExists;
+                reg allowPassThru;
+                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr);
+                if (transferExists) begin
+                    doCacheLoad = 0; // this is only needed for one cycle
+                    cacheHit &= allowPassThru;
+                end
+            end
+
+            // check for conflict with currently issued MemC_Cmd
+            if (cacheHit && 
+                LSU_memc.cmd != MEMC_NONE && 
+                LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}
+            ) begin
+                cacheHit = 0;
+                doCacheLoad = 0;
+                cacheHitAssoc = 'x;
+            end
+            
+            if (stConflictMiss[1]) begin
+                miss[1].valid = 1;
+                miss[1].writeAddr = 'x;
+                miss[1].missAddr = 'x;
+                miss[1].assoc = 'x;
+                miss[1].mtype = CONFLICT;
+            end
+            else if (st.isMMIO) begin
+                // nothing to do for MMIO
+            end
+            else if (st.wmask == 0) begin
+                // Management Ops
+                if (cacheHit) begin
+                    miss[1].valid = 1;
+                    miss[1].writeAddr = st.addr;
+                    miss[1].missAddr = st.addr;
+                    miss[1].assoc = cacheHitAssoc;
+                    case (st.data[1:0])
+                        0: miss[1].mtype = MGMT_CLEAN;
+                        1: miss[1].mtype = MGMT_INVAL;
+                        2: miss[1].mtype = MGMT_FLUSH;
+                        default: assert(0);
+                    endcase
+                end
+            end
+            else begin
+                // Unlike loads, we can only run stores
+                // now that we're sure they hit cache.
+                if (cacheHit) begin
+                    IF_cache.we[i] = 0;
+                    IF_cache.re[i] = 0;
+                    IF_cache.addr[i] = st.addr[11:0];
+                    IF_cache.wassoc[i] = cacheHitAssoc;
+                    IF_cache.wdata[i] = st.data;
+                    IF_cache.wmask[i] = st.wmask;
+                    setDirty = 1;
+                    setDirtyIdx = {cacheHitAssoc, st.addr[11:`CLSIZE_E]};
+                end
+                else begin
+                    miss[1].valid = 1;
+                    miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
+                    miss[1].writeAddr = {IF_ct.rdata[i][assocCnt].addr, st.addr[11:0]};
+                    miss[1].missAddr = st.addr;
+                    miss[1].assoc = assocCnt;
+                end
+            end
+        end
         else if (ld.valid) begin
             reg isExtMMIO = !ld.valid;
             reg isIntMMIO = ld.valid && ld.isMMIO;
@@ -440,203 +523,8 @@ always_comb begin
                 miss[i].assoc = assocCnt;
             end
         end
-        else if (st.valid) begin
-            reg cacheHit = 0;
-            reg doCacheLoad = 1;
-            reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
-            reg noEvict = !IF_ct.rdata[i][assocCnt].valid;
-
-            // check for hit in cache table
-            for (integer j = 0; j < `CASSOC; j=j+1) begin
-                if (IF_ct.rdata[i][j].valid && IF_ct.rdata[i][j].addr == st.addr[31:12]) begin
-                    assert(!cacheHit); // multiple hits are invalid
-                    doCacheLoad = 0;
-                    cacheHit = 1;
-                    cacheHitAssoc = j[$clog2(`CASSOC)-1:0];
-                end
-            end
-
-            // check if address is already being transferred
-            begin
-                reg transferExists;
-                reg allowPassThru;
-                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr);
-                if (transferExists) begin
-                    doCacheLoad = 0; // this is only needed for one cycle
-                    cacheHit &= allowPassThru;
-                end
-            end
-
-            // check for conflict with currently issued MemC_Cmd
-            if (cacheHit && 
-                LSU_memc.cmd != MEMC_NONE && 
-                LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}
-            ) begin
-                cacheHit = 0;
-                doCacheLoad = 0;
-                cacheHitAssoc = 'x;
-            end
-            
-            if (stConflictMiss[1]) begin
-                miss[1].valid = 1;
-                miss[1].writeAddr = 'x;
-                miss[1].missAddr = 'x;
-                miss[1].assoc = 'x;
-                miss[1].mtype = CONFLICT;
-            end
-            else if (st.isMMIO) begin
-                // nothing to do for MMIO
-            end
-            else if (st.wmask == 0) begin
-                // Management Ops
-                if (cacheHit) begin
-                    miss[1].valid = 1;
-                    miss[1].writeAddr = st.addr;
-                    miss[1].missAddr = st.addr;
-                    miss[1].assoc = cacheHitAssoc;
-                    case (st.data[1:0])
-                        0: miss[1].mtype = MGMT_CLEAN;
-                        1: miss[1].mtype = MGMT_INVAL;
-                        2: miss[1].mtype = MGMT_FLUSH;
-                        default: assert(0);
-                    endcase
-                end
-            end
-            else begin
-                // Unlike loads, we can only run stores
-                // now that we're sure they hit cache.
-                if (cacheHit) begin
-                    IF_cache.we[0] = 0;
-                    IF_cache.re[0] = 0;
-                    IF_cache.addr[0] = st.addr[11:0];
-                    IF_cache.wassoc[0] = cacheHitAssoc;
-                    IF_cache.wdata[0] = st.data;
-                    IF_cache.wmask[0] = st.wmask;
-                    setDirty = 1;
-                    setDirtyIdx = {cacheHitAssoc, st.addr[11:`CLSIZE_E]};
-                end
-                else begin
-                    miss[1].valid = 1;
-                    miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                    miss[1].writeAddr = {IF_ct.rdata[i][assocCnt].addr, st.addr[11:0]};
-                    miss[1].missAddr = st.addr;
-                    miss[1].assoc = assocCnt;
-                end
-            end
-        end
     end
 end
-
-// Load Result Output
-/*
-always_comb begin
-    // Load output is combination of ldOps[1] (the op that accessed cache 2 cycles ago)
-    // and the loaded result (or an internal/external MMIO load).
-    LD_UOp ld = ldOps[1].valid ? ldOps[1] : BLSU_uopLd;
-    reg isExtMMIO = !ldOps[1].valid;
-    reg isIntMMIO = ldOps[1].valid && ldOps[1].isMMIO;
-    reg noEvict = !IF_ct.rdata[0][assocCnt].valid;
-    reg doCacheLoad = 1;
-
-    curLd = ld;
-    
-    OUT_uopLd = 'x;
-    OUT_uopLd.valid = 0;
-    miss[0] = 'x;
-    miss[0].valid = 0;
-
-    if (ld.valid && !rst) begin
-        reg cacheHit = 0;
-        reg[31:0] readData = 'x;
-
-        if (isExtMMIO) begin
-            readData = BLSU_ldResult;
-        end
-        else if (isIntMMIO) begin
-            readData = IF_mmio.rdata;
-        end
-        else begin
-            for (integer i = 0; i < `CASSOC; i=i+1) begin
-                if (IF_ct.rdata[0][i].valid && IF_ct.rdata[0][i].addr == ld.addr[31:12]) begin
-                    assert(!cacheHit); // multiple hits are invalid
-                    cacheHit = 1;
-                    doCacheLoad = 0;
-                    readData = IF_cache.rdata[i];
-                end
-            end
-            
-            // check if address is already being transferred
-            begin
-                reg transferExists;
-                reg allowPassThru;
-                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, ld.addr);
-                if (transferExists) begin
-                    doCacheLoad = 0;
-                    cacheHit &= allowPassThru;
-                end
-            end
-            
-            // don't care if cache is hit if this is a complete forward
-            if (!(isExtMMIO || isIntMMIO) && IN_stFwd.mask == 4'b1111) begin
-                cacheHit = 1;
-                doCacheLoad = 0;
-            end
-        end
-
-        if ((cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO) && 
-            (!loadWasExtIOBusy || isExtMMIO) &&
-            (ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || !IN_stFwd.conflict)
-        ) begin
-            // Use forwarded store data if available
-            if (!(isExtMMIO || isIntMMIO)) begin
-                for (integer i = 0; i < 4; i=i+1) begin
-                    if (IN_stFwd.mask[i]) readData[i*8+:8] = IN_stFwd.data[i*8+:8];
-                end
-            end
-            
-            OUT_uopLd[i].valid = 1;
-            OUT_uopLd[i].storeSqN = 'x;
-            OUT_uopLd[i].tagDst = ld.tagDst;
-            OUT_uopLd[i].sqN = ld.sqN;
-            OUT_uopLd[i].doNotCommit = ld.doNotCommit;
-            //OUT_uopLd.external = ld.external;
-            
-            case (ld.exception)
-                AGU_NO_EXCEPTION: OUT_uopLd[i].flags = FLAGS_NONE;
-                AGU_ADDR_MISALIGN: OUT_uopLd[i].flags = FLAGS_LD_MA;
-                AGU_ACCESS_FAULT: OUT_uopLd[i].flags = FLAGS_LD_AF;
-                AGU_PAGE_FAULT: OUT_uopLd[i].flags = FLAGS_LD_PF;
-            endcase
-
-            case (ld.size)
-                0: OUT_uopLd[i].result = 
-                    {{24{ld.signExtend ? readData[8*(ld.addr[1:0])+7] : 1'b0}},
-                    readData[8*(ld.addr[1:0])+:8]};
-
-                1: OUT_uopLd[i].result = 
-                    {{16{ld.signExtend ? readData[16*(ld.addr[1])+15] : 1'b0}},
-                    readData[16*(ld.addr[1])+:16]};
-
-                2: OUT_uopLd[i].result = readData;
-                default: assert(0);
-            endcase
-        end
-        else begin
-            miss[0].valid = 1;
-            if (IN_stFwd.conflict)
-                miss[0].mtype = SQ_CONFLICT;
-            else if (loadWasExtIOBusy)
-                miss[0].mtype = IO_BUSY;
-            else if (doCacheLoad)
-                miss[0].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
-            else
-                miss[0].mtype = TRANS_IN_PROG;
-            miss[0].writeAddr = {IF_ct.rdata[0][assocCnt].addr, ld.addr[11:0]};
-            miss[0].missAddr = ld.addr;
-            miss[0].assoc = assocCnt;
-        end
-    end
-end*/
 
 // Store Pipeline
 reg[1:0] stConflictMiss;
@@ -674,111 +562,6 @@ always_ff@(posedge clk) begin
     end
 end
 
-// Store
-
-/*always_comb begin
-    ST_UOp st = stOps[1];
-    reg cacheHit = 0;
-    reg doCacheLoad = 1;
-    reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
-    reg noEvict = !IF_ct.rdata[1][assocCnt].valid;
-
-    IF_cache.addr[1] = 'x;
-    IF_cache.wassoc[1] = 'x;
-    IF_cache.wdata[1] = 'x;
-    IF_cache.wmask[1] = 'x;
-    IF_cache.we[1] = 1;
-    IF_cache.re[1] = 1;
-
-    miss[1] = 'x;
-    miss[1].valid = 0;
-
-    setDirty = 0;
-    setDirtyIdx = 'x;
-
-    if (st.valid && !rst) begin
-        
-        // check for hit in cache table
-        for (integer i = 0; i < `CASSOC; i=i+1) begin
-            if (IF_ct.rdata[1][i].valid && IF_ct.rdata[1][i].addr == st.addr[31:12]) begin
-                assert(!cacheHit); // multiple hits are invalid
-                doCacheLoad = 0;
-                cacheHit = 1;
-                cacheHitAssoc = i[$clog2(`CASSOC)-1:0];
-            end
-        end
-
-        // check if address is already being transferred
-        begin
-            reg transferExists;
-            reg allowPassThru;
-            {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr);
-            if (transferExists) begin
-                doCacheLoad = 0; // this is only needed for one cycle
-                cacheHit &= allowPassThru;
-            end
-        end
-
-
-        // check for conflict with currently issued MemC_Cmd
-        if (cacheHit && 
-            LSU_memc.cmd != MEMC_NONE && 
-            LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[11:`CLSIZE_E]}
-        ) begin
-            cacheHit = 0;
-            doCacheLoad = 0;
-            cacheHitAssoc = 'x;
-        end
-        
-        if (stConflictMiss[1]) begin
-            miss[1].valid = 1;
-            miss[1].writeAddr = 'x;
-            miss[1].missAddr = 'x;
-            miss[1].assoc = 'x;
-            miss[1].mtype = CONFLICT;
-        end
-        else if (st.isMMIO) begin
-            // nothing to do for MMIO
-        end
-        else if (st.wmask == 0) begin
-            // Management Ops
-            if (cacheHit) begin
-                miss[1].valid = 1;
-                miss[1].writeAddr = st.addr;
-                miss[1].missAddr = st.addr;
-                miss[1].assoc = cacheHitAssoc;
-                case (st.data[1:0])
-                    0: miss[1].mtype = MGMT_CLEAN;
-                    1: miss[1].mtype = MGMT_INVAL;
-                    2: miss[1].mtype = MGMT_FLUSH;
-                    default: assert(0);
-                endcase
-            end
-        end
-        else begin
-            // Unlike loads, we can only run stores
-            // now that we're sure they hit cache.
-            if (cacheHit) begin
-                IF_cache.we[0] = 0;
-                IF_cache.re[0] = 0;
-                IF_cache.addr[0] = st.addr[11:0];
-                IF_cache.wassoc[0] = cacheHitAssoc;
-                IF_cache.wdata[0] = st.data;
-                IF_cache.wmask[0] = st.wmask;
-                setDirty = 1;
-                setDirtyIdx = {cacheHitAssoc, st.addr[11:`CLSIZE_E]};
-            end
-            else begin
-                miss[1].valid = 1;
-                miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                miss[1].writeAddr = {IF_ct.rdata[1][assocCnt].addr, st.addr[11:0]};
-                miss[1].missAddr = st.addr;
-                miss[1].assoc = assocCnt;
-            end
-        end
-    end
-end*/
-
 // Store Conflict Misses
 always_comb begin
     stConflictMiss_c[0] = (redoStore &&
@@ -801,7 +584,7 @@ enum logic[3:0]
 reg LMQ_dequeue[1:0];
 
 for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
-    wire loadIsRegularMiss = curLd[i].valid && miss[i].valid && !stOps[1].valid && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != IO_BUSY;
+    wire loadIsRegularMiss = curLd[i].valid && miss[i].valid && (!stOps[1].valid || i != 1) && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != IO_BUSY;
     wire LMQ_full;
     wire LMQ_allowNewMisses = forwardMiss && !newMiss;
     LoadMissQueue#(`LD_MISS_QUEUE_SIZE) loadMissQueue
