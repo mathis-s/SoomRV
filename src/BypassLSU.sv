@@ -38,8 +38,8 @@ enum logic[2:0]
 } state;
 
 always_comb begin
-    OUT_stStall = (IN_uopSt.valid && IN_uopStEn && state != IDLE);
-    OUT_ldStall = IN_uopLd.valid && IN_uopLdEn && (state != IDLE || (IN_uopSt.valid && !OUT_stStall));
+    OUT_stStall = (state != IDLE);
+    OUT_ldStall = (state != IDLE || (IN_uopSt.valid && !OUT_stStall));
 
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
