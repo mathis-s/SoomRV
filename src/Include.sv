@@ -576,6 +576,7 @@ typedef struct packed
     logic signExtend;
     logic[1:0] size;
     logic isLoad;
+    logic earlyLoadFailed;
     logic[31:0] pc;
     Tag tagDst;
     SqN sqN;

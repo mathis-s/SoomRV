@@ -48,7 +48,7 @@ SqN baseIndex = IN_comLoadSqN;
 SqN lastBaseIndex;
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
-LD_UOp lateLoadUOp;
+LD_UOp lateLoadUOp[`NUM_AGUS-1:0];
 reg issueLateLoad[`NUM_AGUS-1:0];
 reg delayLoad[`NUM_AGUS-1:0];
 reg nonSpeculative[`NUM_AGUS-1:0];
@@ -61,7 +61,7 @@ always_comb begin
         
         issueLateLoad[h] = 0;
         nonSpeculative[h] = IN_uop[h].valid && `IS_MMIO_PMA(IN_uop[h].addr) && IN_uop[h].exception == AGU_NO_EXCEPTION;
-        delayLoad[h] = nonSpeculative[h];
+        delayLoad[h] = nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
         
         // If it needs forwarding from current cycle's store, we also delay the load.
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
@@ -93,7 +93,7 @@ always_comb begin
             OUT_uopAGULd[h].valid = IN_uop[h].valid; 
         end
         
-        if (h == 0) OUT_uopLd[h] = lateLoadUOp;
+        OUT_uopLd[h] = lateLoadUOp[h];
     end
 end
 
@@ -187,16 +187,23 @@ always_ff@(posedge clk) begin
             entries[i].valid <= 0;
         end
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
-        lateLoadUOp <= 'x;
-        lateLoadUOp.valid <= 0;
+        
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            lateLoadUOp[i] <= 'x;
+            lateLoadUOp[i].valid <= 0;
+        end
+
         lastBaseIndex <= 0;
     end
     else begin
-        if (!IN_stall[0]) begin
-            // fixme: currently late loads only on port 0 
-            lateLoadUOp <= 'x;
-            lateLoadUOp.valid <= 0;
-        end
+        
+        reg[`NUM_AGUS-1:0] lateLoadPassthru = 0;
+        
+        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+            if (!IN_stall[i]) begin
+                lateLoadUOp[i] <= 'x;
+                lateLoadUOp[i].valid <= 0;
+            end
         
         // Process negative load acks
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
@@ -213,32 +220,53 @@ always_ff@(posedge clk) begin
                     entries[i].valid <= 0;
                 end
             end
-
-            if ($signed(lateLoadUOp.sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
-                lateLoadUOp <= 'x;
-                lateLoadUOp.valid <= 0;
-            end
+            
+            for (integer i = 0; i < `NUM_AGUS; i=i+1)
+                if ($signed(lateLoadUOp[i].sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
+                    lateLoadUOp[i] <= 'x;
+                    lateLoadUOp[i].valid <= 0;
+                end
         end
         else begin
-            // Issue Late Loads
-            // We do not have the same problem as below with multiple commits here, 
-            // as the ROB can't commit beyond the load we issue with this,
-            // and will need more than a cycle after this runs to commit anything again.
-            if (!lateLoadUOp.valid && issueIdxValid) begin
-                entries[issueIdx].issued <= 1;
+            // Issue Late Loads          
+            for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
 
-                lateLoadUOp.addr <= entries[issueIdx].addr;
-                lateLoadUOp.signExtend <= entries[issueIdx].signExtend;
-                lateLoadUOp.size <= entries[issueIdx].size;
-                lateLoadUOp.loadSqN <= {entries[issueIdx].highLdSqN, issueIdx};
-                lateLoadUOp.tagDst <= entries[issueIdx].tagDst;
-                lateLoadUOp.sqN <= entries[issueIdx].sqN;
-                lateLoadUOp.doNotCommit <= entries[issueIdx].doNotCommit;
-                lateLoadUOp.external <= 0;
-                lateLoadUOp.exception <= AGU_NO_EXCEPTION;
-                lateLoadUOp.isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
-                lateLoadUOp.valid <= 1;
+                if (!lateLoadUOp[i].valid || !IN_stall[i]) begin
+
+                    // Issue non-speculative or cache missed loads, currently only on port 0.
+                    if (i == 0 && issueIdxValid) begin
+                        entries[issueIdx].issued <= 1;
+                        lateLoadUOp[0].addr <= entries[issueIdx].addr;
+                        lateLoadUOp[0].signExtend <= entries[issueIdx].signExtend;
+                        lateLoadUOp[0].size <= entries[issueIdx].size;
+                        lateLoadUOp[0].loadSqN <= {entries[issueIdx].highLdSqN, issueIdx};
+                        lateLoadUOp[0].tagDst <= entries[issueIdx].tagDst;
+                        lateLoadUOp[0].sqN <= entries[issueIdx].sqN;
+                        lateLoadUOp[0].doNotCommit <= entries[issueIdx].doNotCommit;
+                        lateLoadUOp[0].external <= 0;
+                        lateLoadUOp[0].exception <= AGU_NO_EXCEPTION;
+                        lateLoadUOp[0].isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
+                        lateLoadUOp[0].valid <= 1;
+                    end
+                    // Try to pass through ops for which early lookup failed
+                    else if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i]) begin
+                        lateLoadUOp[i].addr <= IN_uop[i].addr;
+                        lateLoadUOp[i].signExtend <= IN_uop[i].signExtend;
+                        lateLoadUOp[i].size <= IN_uop[i].size;
+                        lateLoadUOp[i].loadSqN <= IN_uop[i].loadSqN;
+                        lateLoadUOp[i].tagDst <= IN_uop[i].tagDst;
+                        lateLoadUOp[i].sqN <= IN_uop[i].sqN;
+                        lateLoadUOp[i].doNotCommit <= IN_uop[i].doNotCommit;
+                        lateLoadUOp[i].external <= 0;
+                        lateLoadUOp[i].exception <= IN_uop[i].exception;
+                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(IN_uop[i].addr);
+                        lateLoadUOp[i].valid <= 1;
+
+                        lateLoadPassthru[i] = 1;
+                    end
+                end
             end
+
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if (invalMask[i]) begin
                     entries[i] <= 'x;
@@ -259,7 +287,7 @@ always_ff@(posedge clk) begin
                 entries[index].size <= IN_uop[i].size;
                 entries[index].doNotCommit <= IN_uop[i].doNotCommit;
                 entries[index].highLdSqN <= IN_uop[i].loadSqN[$bits(SqN)-1:$clog2(NUM_ENTRIES)];
-                entries[index].issued <= !delayLoad[i];
+                entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
                 entries[index].nonSpec <= nonSpeculative[i];
                 entries[index].valid <= 1;
             end

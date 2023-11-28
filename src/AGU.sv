@@ -33,12 +33,10 @@ function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user, logic isLoad);
     return r;
 endfunction
 
-wire inStallMasked = IN_stall;
-
 reg pageWalkActive;
 reg pageWalkAccepted;
 reg eldIsPageWalkOp;
-assign OUT_stall = inStallMasked || TMQ_stall;
+assign OUT_stall = TMQ_stall;
 
 
 wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
@@ -239,7 +237,7 @@ always_comb begin
     end
     else if (TMQ_uop.valid) begin
         
-        TMQ_dequeue = !inStallMasked;
+        TMQ_dequeue = 1;
 
         issUOp_c = TMQ_uop;
 
@@ -270,7 +268,7 @@ always_comb begin
     OUT_tlb.valid = 
         (IN_vmem.sv32en) &&
         !(rst) && 
-        (!inStallMasked && issUOp_c.valid);
+        (issUOp_c.valid);
     
     OUT_tlb.vpn = issUOp_c.addr[31:12];
 end
@@ -339,7 +337,7 @@ always_comb begin
     TMQ_enqueue = 0;
     TMQ_uopReady = 'x;
 
-    if (!rst && issUOp_c.valid && !IN_stall &&
+    if (!rst && issUOp_c.valid &&
         (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0) &&
         (IN_vmem.sv32en && except == AGU_NO_EXCEPTION && !IN_tlb.hit)
     ) begin
@@ -385,41 +383,40 @@ always_ff@(posedge clk) begin
         end
 
         // Pipeline
-        if (!inStallMasked) begin
-            if (issUOp_c.valid &&
-                (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0)
-            ) begin
-                
-                reg doIssue = 1;
-                if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
-                    if (tlbMiss) begin
-                        if (!pageWalkActive) begin
-                            pageWalkActive <= 1;
-                            pageWalkAccepted <= 0;
-                            pageWalkAddr <= issUOp_c.addr;
-                        end
-                        doIssue = 0;
+        if (issUOp_c.valid &&
+            (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0)
+        ) begin
+            
+            reg doIssue = 1;
+            if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+                if (tlbMiss) begin
+                    if (!pageWalkActive) begin
+                        pageWalkActive <= 1;
+                        pageWalkAccepted <= 0;
+                        pageWalkAddr <= issUOp_c.addr;
                     end
-
-                    if (except != AGU_NO_EXCEPTION) begin
-                        OUT_tvalProv.valid <= 1;
-                        OUT_tvalProv.sqN <= issUOp_c.sqN;
-                        OUT_tvalProv.tval <= issUOp_c.addr;
-                    end
+                    doIssue = 0;
                 end
 
-                if (doIssue) begin
-                    
-                    OUT_uop <= issResUOp_c;
-                    if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
-                        OUT_aguOp <= issUOp_c;
-                        
-                        OUT_aguOp.exception <= except;
-                        OUT_uop.flags <= exceptFlags;
+                if (except != AGU_NO_EXCEPTION) begin
+                    OUT_tvalProv.valid <= 1;
+                    OUT_tvalProv.sqN <= issUOp_c.sqN;
+                    OUT_tvalProv.tval <= issUOp_c.addr;
+                end
+            end
 
-                        if (IN_vmem.sv32en) begin
-                            OUT_aguOp.addr <= phyAddr;
-                        end
+            if (doIssue) begin
+                
+                OUT_uop <= issResUOp_c;
+                if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+                    OUT_aguOp <= issUOp_c;
+                    OUT_aguOp.earlyLoadFailed <= IN_stall;
+                    
+                    OUT_aguOp.exception <= except;
+                    OUT_uop.flags <= exceptFlags;
+
+                    if (IN_vmem.sv32en) begin
+                        OUT_aguOp.addr <= phyAddr;
                     end
                 end
             end
