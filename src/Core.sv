@@ -520,7 +520,7 @@ AGU_UOp AGU_uop[1:0];
 ELD_UOp AGU_eLdUOp[1:0];
 
 PageWalk_Req LDAGU_PW_rq;
-AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
+AGU#(.AGU_IDX(0), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
@@ -546,7 +546,7 @@ AGU#(.LOAD_AGU(1), .RQ_ID(2)) aguLD
 
 AGU_UOp AGU_ST_uop /* verilator public */;
 PageWalk_Req STAGU_PW_rq;
-AGU#(.LOAD_AGU(0), .RQ_ID(1)) aguST
+AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
 (
     .clk(clk),
     .rst(rst),

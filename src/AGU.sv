@@ -1,5 +1,5 @@
 module AGU
-#(parameter LOAD_AGU=1, parameter RQ_ID=2)
+#(parameter AGU_IDX=1, parameter RQ_ID=2)
 (
     input wire clk,
     input wire rst,
@@ -66,7 +66,7 @@ always_comb begin
     aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && en;
     
-    if (IN_uop.opcode < LSU_SB) begin // is load
+    if (IN_uop.opcode < LSU_SB || (IN_uop.opcode >= ATOMIC_AMOSWAP_W && AGU_IDX == 0)) begin // is load
         aguUOp_c.isLoad = 1;
         aguUOp_c.doNotCommit = 0;
         
@@ -242,13 +242,16 @@ always_comb begin
         TMQ_dequeue = !inStallMasked;
 
         issUOp_c = TMQ_uop;
-        issResUOp_c.valid = TMQ_uop.valid;
-        issResUOp_c.doNotCommit = TMQ_uop.doNotCommit;
-        issResUOp_c.flags = FLAGS_NONE;
-        issResUOp_c.sqN = TMQ_uop.sqN;
-        issResUOp_c.tagDst = TMQ_uop.tagDst;
-        issResUOp_c.storeSqN = TMQ_uop.storeSqN;
-        issResUOp_c.result = 'x;
+
+        if (!TMQ_uop.isLoad) begin
+            issResUOp_c.valid = TMQ_uop.valid;
+            issResUOp_c.doNotCommit = TMQ_uop.doNotCommit;
+            issResUOp_c.flags = FLAGS_NONE;
+            issResUOp_c.sqN = TMQ_uop.sqN;
+            issResUOp_c.tagDst = TMQ_uop.tagDst;
+            issResUOp_c.storeSqN = TMQ_uop.storeSqN;
+            issResUOp_c.result = 'x;
+        end
     end
 end
 

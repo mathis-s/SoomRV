@@ -111,7 +111,22 @@ BypassLSU bypassLSU
 // During a cache table write cycle, we cannot issue a store as
 // the cache table write port is the same as the store read port.
 // Loads work fine but require write forwaring in the cache table.
-assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) || uopLd[1].valid) && IN_uopSt.valid;
+assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) || !uopStPortValid) && IN_uopSt.valid;
+
+reg[$clog2(`NUM_AGUS)-1:0] uopStPort;
+reg uopStPortValid;
+reg[$clog2(`NUM_AGUS)-1:0] startIdx;
+always_comb begin
+    uopStPort = 'x;
+    uopStPortValid = 0;
+
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        if (!uopLd[i[$clog2(`NUM_AGUS)-1:0] + startIdx].valid) begin
+            uopStPort = i[$clog2(`NUM_AGUS)-1:0] + startIdx;
+            uopStPortValid = 1;
+        end
+end
+always_ff@(posedge clk) startIdx <= startIdx + 1;
 
 LD_UOp LMQ_ld[`NUM_AGUS-1:0];
 LD_UOp uopLd[`NUM_AGUS-1:0];
@@ -124,16 +139,16 @@ assign uopSt = IN_uopSt;
 
 // Both load and store read from cache table
 always_comb begin
+    
     IF_ct.re[0] = uopLd[0].valid && !uopLd[0].isMMIO && uopLd[0].exception == AGU_NO_EXCEPTION;
     IF_ct.raddr[0] = uopLd[0].addr[11:0];
     
-    if (uopLd[1].valid && !uopLd[1].isMMIO && uopLd[1].exception == AGU_NO_EXCEPTION) begin
-        IF_ct.re[1] = 1;
-        IF_ct.raddr[1] = uopLd[1].addr[11:0];
-    end
-    else begin
-        IF_ct.re[1] = uopSt.valid && !uopSt.isMMIO && !(isCacheBypassStUOp || OUT_stStall) && !ignoreSt;
-        IF_ct.raddr[1] = uopSt.addr[11:0];
+    IF_ct.re[1] = uopLd[1].valid && !uopLd[1].isMMIO && uopLd[1].exception == AGU_NO_EXCEPTION;
+    IF_ct.raddr[1] = uopLd[1].addr[11:0];
+    
+    if (uopStPortValid) begin
+        IF_ct.re[uopStPort] = uopSt.valid && !uopSt.isMMIO && !(isCacheBypassStUOp || OUT_stStall) && !ignoreSt;
+        IF_ct.raddr[uopStPort] = uopSt.addr[11:0];
     end
     
     // During a flush, we read from the cache table at the flush iterator
@@ -163,7 +178,7 @@ always_comb begin
         if (flushActive) begin
             // do not issue load
         end
-        else if (i == 1 && stOps[1].valid) begin
+        else if (i[$clog2(`NUM_AGUS)-1:0] == stOpPort[1] && stOps[1].valid) begin
             // port is being used by store during store's write cycle
         end
         else if (i == 1 && cacheTableWrite) begin
@@ -255,6 +270,7 @@ end
 // delay lines, waiting for cache response
 LD_UOp ldOps[`NUM_AGUS-1:0][1:0];
 ST_UOp stOps[1:0];
+reg[$clog2(`NUM_AGUS)-1:0] stOpPort[1:0];
 
 reg loadWasExtIOBusy[`NUM_AGUS-1:0];
 
@@ -340,7 +356,7 @@ always_comb begin
 
         // only one of these is valid
         LD_UOp ld = ldOps[i][1];
-        ST_UOp st = (i == 1) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
+        ST_UOp st = (i[$clog2(`NUM_AGUS)-1:0] == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
         assert(!(ld.valid && st.valid));
         
         if (!ld.valid && !st.valid && !blsuLoadHandled)
@@ -387,11 +403,11 @@ always_comb begin
             end
             
             if (stConflictMiss[1]) begin
-                miss[1].valid = 1;
-                miss[1].writeAddr = 'x;
-                miss[1].missAddr = 'x;
-                miss[1].assoc = 'x;
-                miss[1].mtype = CONFLICT;
+                miss[i].valid = 1;
+                miss[i].writeAddr = 'x;
+                miss[i].missAddr = 'x;
+                miss[i].assoc = 'x;
+                miss[i].mtype = CONFLICT;
             end
             else if (st.isMMIO) begin
                 // nothing to do for MMIO
@@ -399,14 +415,14 @@ always_comb begin
             else if (st.wmask == 0) begin
                 // Management Ops
                 if (cacheHit) begin
-                    miss[1].valid = 1;
-                    miss[1].writeAddr = st.addr;
-                    miss[1].missAddr = st.addr;
-                    miss[1].assoc = cacheHitAssoc;
+                    miss[i].valid = 1;
+                    miss[i].writeAddr = st.addr;
+                    miss[i].missAddr = st.addr;
+                    miss[i].assoc = cacheHitAssoc;
                     case (st.data[1:0])
-                        0: miss[1].mtype = MGMT_CLEAN;
-                        1: miss[1].mtype = MGMT_INVAL;
-                        2: miss[1].mtype = MGMT_FLUSH;
+                        0: miss[i].mtype = MGMT_CLEAN;
+                        1: miss[i].mtype = MGMT_INVAL;
+                        2: miss[i].mtype = MGMT_FLUSH;
                         default: assert(0);
                     endcase
                 end
@@ -425,11 +441,11 @@ always_comb begin
                     setDirtyIdx = {cacheHitAssoc, st.addr[11:`CLSIZE_E]};
                 end
                 else begin
-                    miss[1].valid = 1;
-                    miss[1].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                    miss[1].writeAddr = {IF_ct.rdata[i][assocCnt].addr, st.addr[11:0]};
-                    miss[1].missAddr = st.addr;
-                    miss[1].assoc = assocCnt;
+                    miss[i].valid = 1;
+                    miss[i].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
+                    miss[i].writeAddr = {IF_ct.rdata[i][assocCnt].addr, st.addr[11:0]};
+                    miss[i].missAddr = st.addr;
+                    miss[i].assoc = assocCnt;
                 end
             end
         end
@@ -557,11 +573,13 @@ always_ff@(posedge clk) begin
         // Progress the delay line
         if (uopSt.valid && !OUT_stStall) begin
             stOps[0] <= uopSt;
+            stOpPort[0] <= uopStPort;
             stConflictMiss[0] <= stConflictMiss_c[0] || stallStConflict;
         end
         
         if (stOps[0].valid) begin
             stOps[1] <= stOps[0];
+            stOpPort[1] <= stOpPort[0];
             stConflictMiss[1] <= stConflictMiss_c[1];
         end
     end
@@ -589,7 +607,7 @@ enum logic[3:0]
 reg LMQ_dequeue[1:0];
 
 for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
-    wire loadIsRegularMiss = curLd[i].valid && miss[i].valid && (!stOps[1].valid || i != 1) && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != IO_BUSY;
+    wire loadIsRegularMiss = curLd[i].valid && miss[i].valid && (!stOps[1].valid || stOpPort[1] != i) && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != IO_BUSY;
     wire LMQ_full;
     wire LMQ_allowNewMisses = forwardMiss && !newMiss;
     LoadMissQueue#(`LD_MISS_QUEUE_SIZE) loadMissQueue
@@ -617,7 +635,7 @@ for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
         // load miss queue or back in the (slow) load buffer. If the LMQ is full, LB
         // is always chosen as fallback. Otherwise, regular misses are placed
         // in the LMQ.
-        if (miss[i].valid && (!stOps[1].valid || i != 1)&&
+        if (miss[i].valid && (!stOps[1].valid || stOpPort[1] != i)&&
             (miss[i].mtype == SQ_CONFLICT ||
             miss[i].mtype == IO_BUSY ||
             (loadIsRegularMiss && LMQ_full))
@@ -631,9 +649,9 @@ for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
 end
 
 wire redoStore = stOps[1].valid &&
-    (miss[1].valid ?
-        (miss[1].mtype == REGULAR || miss[1].mtype == REGULAR_NO_EVICT || miss[1].mtype == IO_BUSY || miss[1].mtype == CONFLICT || miss[1].mtype == TRANS_IN_PROG) : 
-        (!stOps[1].isMMIO && IF_cache.busy[1]));
+    (miss[stOpPort[1]].valid ?
+        (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT || miss[stOpPort[1]].mtype == IO_BUSY || miss[stOpPort[1]].mtype == CONFLICT || miss[stOpPort[1]].mtype == TRANS_IN_PROG) : 
+        (!stOps[1].isMMIO && IF_cache.busy[stOpPort[1]]));
 
 assign OUT_stAck.addr = stOps[1].addr;
 assign OUT_stAck.data = stOps[1].data;
