@@ -15,7 +15,8 @@ module IntALU
     output BTUpdate OUT_btUpdate,
     
     output ZCForward OUT_zcFwd,
-
+    
+    output AMO_Data_UOp OUT_amoData,
     output RES_UOp OUT_uop
 );
 
@@ -162,6 +163,8 @@ always_ff@(posedge clk) begin
     OUT_uop.valid <= 0;
     OUT_branch.taken <= 0;
     OUT_btUpdate.valid <= 0;
+    OUT_amoData <= 'x;
+    OUT_amoData.valid <= 0;
 
     if (!rst) begin
         if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
@@ -243,11 +246,16 @@ always_ff@(posedge clk) begin
             end
 
             OUT_uop.result <= resC;
-            OUT_uop.storeSqN <= IN_uop.storeSqN;
             OUT_uop.tagDst <= IN_uop.tagDst;
+            OUT_uop.doNotCommit <= 0;
             OUT_uop.sqN <= IN_uop.sqN;
-            // atomics are committed by the store port, not the int port
-            OUT_uop.doNotCommit <= (IN_uop.opcode >= ATOMIC_AMOADD_W);
+
+            if (IN_uop.opcode >= ATOMIC_AMOADD_W) begin
+                OUT_amoData.valid <= 1;
+                OUT_amoData.result <= resC;
+                OUT_amoData.storeSqN <= IN_uop.storeSqN;
+                OUT_amoData.sqN <= IN_uop.sqN;
+            end
             
             if (isBranch && IN_uop.bpi.predicted)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;

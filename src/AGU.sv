@@ -24,10 +24,10 @@ module AGU
     output RES_UOp OUT_uop
 );
 
-function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user, logic isLoad);
+function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user, logic isLoad, logic isStore);
     logic r;
     r = (isLoad  && !(pte_rwx[2] || (pte_rwx[0] && IN_vmem.makeExecReadable))) ||
-        (!isLoad && !pte_rwx[1]) ||
+        (isStore && !pte_rwx[1]) ||
         (IN_vmem.priv == PRIV_USER && !pte_user) ||
         (IN_vmem.priv == PRIV_SUPERVISOR && pte_user && !IN_vmem.supervUserMemory);
     return r;
@@ -64,8 +64,9 @@ always_comb begin
     aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && en;
     
-    if (IN_uop.opcode < LSU_SB || (IN_uop.opcode >= ATOMIC_AMOSWAP_W && AGU_IDX == 0)) begin // is load
+    if (IN_uop.opcode < LSU_SB) begin // is load
         aguUOp_c.isLoad = 1;
+        aguUOp_c.isStore = 0;
         aguUOp_c.doNotCommit = 0;
         
         case (IN_uop.opcode)
@@ -77,11 +78,7 @@ always_comb begin
                 aguUOp_c.size = 1;
                 aguUOp_c.signExtend = 1;
             end
-            LSU_LR_W,
-            ATOMIC_AMOSWAP_W, ATOMIC_AMOADD_W, ATOMIC_AMOXOR_W, 
-            ATOMIC_AMOAND_W, ATOMIC_AMOOR_W, ATOMIC_AMOMIN_W, 
-            ATOMIC_AMOMAX_W, ATOMIC_AMOMINU_W, ATOMIC_AMOMAXU_W,
-            LSU_LW: begin
+            LSU_LR_W, LSU_LW: begin
                 aguUOp_c.size = 2;
                 aguUOp_c.signExtend = 0;
             end
@@ -98,9 +95,9 @@ always_comb begin
     end
     else begin // is store
         aguUOp_c.isLoad = 0;
+        aguUOp_c.isStore = 1;
         aguUOp_c.doNotCommit = 0;
         
-        resUOp_c.storeSqN = IN_uop.storeSqN;
         resUOp_c.tagDst = IN_uop.tagDst;
         resUOp_c.sqN = IN_uop.sqN;
         resUOp_c.result = addr;
@@ -185,7 +182,15 @@ always_comb begin
             ATOMIC_AMOMINU_W,
             ATOMIC_AMOMAXU_W: begin
                 resUOp_c.doNotCommit = 1;
-                aguUOp_c.doNotCommit = 1;
+                
+                // The integer uop commits atomics,
+                // except for amoswap where there isn't one.
+                if (IN_uop.opcode != ATOMIC_AMOSWAP_W)
+                    aguUOp_c.doNotCommit = 1;
+                
+                aguUOp_c.isLoad = 1;
+                aguUOp_c.size = 2;
+                aguUOp_c.signExtend = 0;
             end
             default: ;
         endcase
@@ -247,7 +252,6 @@ always_comb begin
             issResUOp_c.flags = FLAGS_NONE;
             issResUOp_c.sqN = TMQ_uop.sqN;
             issResUOp_c.tagDst = TMQ_uop.tagDst;
-            issResUOp_c.storeSqN = TMQ_uop.storeSqN;
             issResUOp_c.result = 'x;
         end
     end
@@ -283,35 +287,22 @@ always_comb begin
     
     // Cache Management Ops are encoded with wmask 0 and
     // are ordering
-    if (!issUOp_c.isLoad && issUOp_c.wmask == 0)
+    if (issUOp_c.isStore && issUOp_c.wmask == 0)
         exceptFlags = FLAGS_ORDERING;
     
     if (IN_vmem.sv32en && IN_tlb.hit && 
-        (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad))
+        (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad, issUOp_c.isStore))
     ) begin
         except = AGU_PAGE_FAULT;
-        if (!issUOp_c.isLoad) exceptFlags = FLAGS_ST_PF;
+        exceptFlags = FLAGS_ST_PF;
     end
     else if ((!`IS_LEGAL_ADDR(phyAddr) || IN_tlb.accessFault) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
         except = AGU_ACCESS_FAULT;
-        if (!issUOp_c.isLoad) exceptFlags = FLAGS_ST_AF;
+        exceptFlags = FLAGS_ST_AF;
     end
 
     // Misalign has higher priority than access fault
-    if (issUOp_c.isLoad) begin
-        case (issUOp_c.size)
-            0: ;
-            1: begin
-                if (phyAddr[0])
-                    except = AGU_ADDR_MISALIGN;
-            end
-            default: begin
-                if (phyAddr[0] || phyAddr[1])
-                    except = AGU_ADDR_MISALIGN;
-            end
-        endcase
-    end
-    else begin
+    if (issUOp_c.isStore) begin
         case (issUOp_c.size)
             0: ;
             1: begin
@@ -325,6 +316,19 @@ always_comb begin
                     except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_ST_MA;
                 end
+            end
+        endcase
+    end
+    else begin
+        case (issUOp_c.size)
+            0: ;
+            1: begin
+                if (phyAddr[0])
+                    except = AGU_ADDR_MISALIGN;
+            end
+            default: begin
+                if (phyAddr[0] || phyAddr[1])
+                    except = AGU_ADDR_MISALIGN;
             end
         endcase
     end

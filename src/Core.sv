@@ -366,6 +366,7 @@ Load ld
 
 wire INTALU_wbReq;
 RES_UOp INT0_uop;
+AMO_Data_UOp INT0_amoData;
 IntALU ialu
 (
     .clk(clk),
@@ -384,6 +385,7 @@ IntALU ialu
     
     .OUT_zcFwd(LD_zcFwd[0]),
     
+    .OUT_amoData(INT0_amoData),
     .OUT_uop(INT0_uop)
 );
 
@@ -624,6 +626,7 @@ StoreQueue sq
     
     .IN_rnUOp(RN_uop),
     .IN_resultUOp(wbUOp[3:0]),
+    .IN_amoData(INT0_amoData),
     .OUT_RF_raddr(SQ_RF_raddr),
     .IN_RF_rdata(RF_SQ_rdata),
     .IN_vmem(CSR_vmem),
@@ -711,6 +714,7 @@ IntALU ialu1
     
     .OUT_zcFwd(LD_zcFwd[1]),
     
+    .OUT_amoData(),
     .OUT_uop(INT1_uop)
 );
 

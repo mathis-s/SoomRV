@@ -505,7 +505,6 @@ always_comb begin
                 end
                 
                 OUT_uopLd[i].valid = 1;
-                OUT_uopLd[i].storeSqN = 'x;
                 OUT_uopLd[i].tagDst = ld.tagDst;
                 OUT_uopLd[i].sqN = ld.sqN;
                 OUT_uopLd[i].doNotCommit = ld.doNotCommit;

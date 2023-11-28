@@ -758,7 +758,6 @@ always_ff@(posedge clk) begin
         OUT_uop.valid <= 1;
         OUT_uop.doNotCommit <= 0;
         OUT_uop.flags <= FLAGS_NONE;
-        OUT_uop.storeSqN <= IN_uop.storeSqN;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.tagDst <= IN_uop.tagDst;
         

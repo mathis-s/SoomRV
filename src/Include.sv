@@ -552,13 +552,20 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] result;
-    SqN storeSqN; // this is only used for atomics, may be 'x otherwise
     Tag tagDst;
     SqN sqN;
     Flags flags;
     logic doNotCommit;
     logic valid;
 } RES_UOp;
+
+typedef struct packed
+{
+    logic[31:0] result;
+    SqN storeSqN;
+    SqN sqN;
+    logic valid;
+} AMO_Data_UOp;
 
 typedef enum logic[1:0] 
 {
@@ -575,6 +582,7 @@ typedef struct packed
     logic[3:0] wmask;
     logic signExtend;
     logic[1:0] size;
+    logic isStore; // both isLoad and isStore may be set (for atomics)
     logic isLoad;
     logic earlyLoadFailed;
     logic[31:0] pc;

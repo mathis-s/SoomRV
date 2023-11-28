@@ -129,6 +129,7 @@ always_comb begin
             
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SB) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SB) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0]) || PORT_IDX == 0) &&
 
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
                 IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 || 
@@ -211,7 +212,9 @@ always_ff@(posedge clk) begin
                         
                         // Only issue loads that fit into load order buffer
                         ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
-                            queue[i].fu != FU_AGU || queue[i].opcode >= LSU_SB || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)) begin
+                            (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) || (queue[i].opcode >= LSU_SB && queue[i].opcode < ATOMIC_AMOSWAP_W) || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)
+                        
+                        ) begin
                         
                         issued = 1;
                         OUT_uop.valid <= 1;
@@ -300,10 +303,6 @@ always_ff@(posedge clk) begin
                         if (PORT_IDX == 0) begin
                             temp.avail[0] = enqCandidates[i].availC;
                             temp.tags[0] = enqCandidates[i].tagC;
-                            temp.tagDst = 7'h40;
-                        end
-                        // STORE port
-                        if (PORT_IDX == 3) begin
                             temp.tagDst = 7'h40;
                         end
                     end

@@ -3,8 +3,7 @@ module StoreQueue
     parameter NUM_ENTRIES=`SQ_SIZE,
     parameter NUM_EVICTED=4,
     parameter RESULT_BUS_COUNT=4,
-    parameter WIDTH_RN = `DEC_WIDTH,
-    parameter AMO_RES_PORT=0
+    parameter WIDTH_RN = `DEC_WIDTH
 )
 (
     input wire clk,
@@ -18,6 +17,7 @@ module StoreQueue
     
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
+    input AMO_Data_UOp IN_amoData,
     output reg[$bits(Tag)-2:0] OUT_RF_raddr,
     input wire[31:0] IN_RF_rdata,
     input VirtMemState IN_vmem,
@@ -115,16 +115,7 @@ always_ff@(posedge clk) begin
     if (rst) ;
     else if (loadBaseIndexValid) begin
         OUT_sqInfo.valid <= 1;
-        if (entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].atomic &&
-            (!entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded ||
-             !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].addrAvail)
-        ) begin
-            // For atomics, do not allow commit until other UOps are done and store
-            // data is known
-            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN - 1;
-        end
-        else
-            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
+        OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
     end
 end
 
@@ -411,11 +402,11 @@ always_comb begin
     end
 
     // If an atomic op result is incoming, load that instead
-    if (IN_resultUOp[AMO_RES_PORT].valid && IN_resultUOp[AMO_RES_PORT].doNotCommit) begin
+    if (IN_amoData.valid) begin
         load_c.atomic = 1;
         load_c.valid = 1;
-        load_c.index = IN_resultUOp[AMO_RES_PORT].storeSqN[$clog2(NUM_ENTRIES)-1:0];
-        load_c.atomicData = IN_resultUOp[AMO_RES_PORT].result;
+        load_c.index = IN_amoData.storeSqN[$clog2(NUM_ENTRIES)-1:0];
+        load_c.atomicData = IN_amoData.result;
     end
     
     OUT_RF_raddr = '0;
@@ -657,7 +648,7 @@ always_ff@(posedge clk) begin
         // Set Address
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
             // TODO: indexed insert
-            if (IN_uopSt[i].valid && !IN_uopSt[i].isLoad &&
+            if (IN_uopSt[i].valid && IN_uopSt[i].isStore &&
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];

@@ -29,14 +29,14 @@ localparam TAG_SIZE = $bits(SqN) - $clog2(NUM_ENTRIES);
 
 typedef struct packed
 {
+    AGU_Exception exception;
     SqN sqN;
     Tag tagDst;
     logic[TAG_SIZE-1:0] highLdSqN;
     logic[1:0] size;
     logic[31:0] addr;
     logic signExtend;
-    logic doNotCommit; // could encode doNotCommit as size == 3
-    
+    logic doNotCommit;
     logic nonSpec;
     logic issued;
     logic valid;
@@ -66,8 +66,8 @@ always_comb begin
         // If it needs forwarding from current cycle's store, we also delay the load.
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
             if (i != h) begin
-                if (IN_uop[h].valid && $signed(IN_uop[i].loadSqN - IN_uop[h].loadSqN) <= 0 &&
-                    IN_uop[i].valid && !IN_uop[i].isLoad &&
+                if (IN_uop[h].valid && IN_uop[h].isLoad && $signed(IN_uop[i].loadSqN - IN_uop[h].loadSqN) <= 0 &&
+                    IN_uop[i].valid && IN_uop[i].isStore &&
                     (!IN_uop[i].doNotCommit || IN_uop[i].loadSqN != IN_uop[h].loadSqN) &&
                     IN_uop[h].exception == AGU_NO_EXCEPTION &&
                     IN_uop[h].addr[31:2] == IN_uop[i].addr[31:2] &&
@@ -198,6 +198,8 @@ always_ff@(posedge clk) begin
     else begin
         
         reg[`NUM_AGUS-1:0] lateLoadPassthru = 0;
+        reg prevStoreConflict = 0;
+        SqN prevStoreConflictSqN = 'x;
         
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
             if (!IN_stall[i]) begin
@@ -244,7 +246,7 @@ always_ff@(posedge clk) begin
                         lateLoadUOp[0].sqN <= entries[issueIdx].sqN;
                         lateLoadUOp[0].doNotCommit <= entries[issueIdx].doNotCommit;
                         lateLoadUOp[0].external <= 0;
-                        lateLoadUOp[0].exception <= AGU_NO_EXCEPTION;
+                        lateLoadUOp[0].exception <= entries[issueIdx].exception;
                         lateLoadUOp[0].isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
                         lateLoadUOp[0].valid <= 1;
                     end
@@ -280,6 +282,7 @@ always_ff@(posedge clk) begin
             if (IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
                 
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
+                entries[index].exception <= IN_uop[i].exception;
                 entries[index].sqN <= IN_uop[i].sqN;
                 entries[index].tagDst <= IN_uop[i].tagDst;
                 entries[index].signExtend <= IN_uop[i].signExtend;
@@ -293,20 +296,23 @@ always_ff@(posedge clk) begin
             end
         
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
-            if (IN_uop[i].valid && !IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
-                if (storeIsConflict[i]) begin
+            if (IN_uop[i].valid && IN_uop[i].isStore && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+                if (storeIsConflict[i] && (!prevStoreConflict || $signed(IN_uop[i].sqN - prevStoreConflictSqN) < 0)) begin
                     // We reset back to the op after the store when a load collision occurs, even though you only need to
                     // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
                     // in the buffer, we just use the store's snapshot.
                     OUT_branch.taken <= 1;
                     OUT_branch.dstPC <= IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
                     OUT_branch.sqN <= IN_uop[i].sqN;
-                    OUT_branch.loadSqN <= IN_uop[i].loadSqN + (IN_uop[i].doNotCommit ? 1 : 0);
+                    OUT_branch.loadSqN <= IN_uop[i].loadSqN + ((IN_uop[i].isLoad && IN_uop[i].isStore) ? 1 : 0);
                     OUT_branch.storeSqN <= IN_uop[i].storeSqN;
                     OUT_branch.fetchID <= IN_uop[i].fetchID;
                     OUT_branch.flush <= 0;
                     OUT_branch.histAct <= HIST_NONE;
                     OUT_branch.retAct <= RET_NONE;
+
+                    prevStoreConflict = 1;
+                    prevStoreConflictSqN = IN_uop[i].sqN;
                 end
             end
         
