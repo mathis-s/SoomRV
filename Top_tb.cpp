@@ -767,7 +767,7 @@ void LogInstructions()
     {
         uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
         // WB valid
-        if ((core->wbUOp[i] & 1))
+        if ((core->wbUOp[i] & 1) && !(core->wbUOp[i] & 2))
         {
             uint32_t result = (core->wbUOp[i] >> (6 + 7 + 7)) & 0xffff'ffff;
             state.insts[sqn].result = result;
