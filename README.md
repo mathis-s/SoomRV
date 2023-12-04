@@ -1,6 +1,8 @@
 # SoomRV
 ## Description
 SoomRV is a simple superscalar out-of-order RISC-V core. It can execute up to 4 instructions per cycle and is able to boot Linux.
+
+For running SoomRV on FPGA, have a look at the [SoomRV-Arty Repo](https://github.com/mathis-s/SoomRV-Arty).
 ## Basic Architecture
 <img src="https://user-images.githubusercontent.com/39701487/218574949-e18bcb51-5050-4f99-82a6-c8ea58c11a93.png" width="600" />
 
