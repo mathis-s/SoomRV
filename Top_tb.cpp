@@ -1,10 +1,10 @@
 // #define TRACE
-// #define KONATA
+#define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #ifdef TRACE
-#define DEBUG_TIME 0
+#define DEBUG_TIME -1
 #else
 #define DEBUG_TIME -1
 #endif
@@ -137,7 +137,7 @@ class SpikeSimif : public simif_t
         for (size_t i = 0; i < 32; i++)
             if ((uint32_t)processor->get_state()->XPR[i] != ReadRegister(i))
             {
-                // printf("mismatch x%zu\n", i);
+                printf("mismatch x%zu\n", i);
                 return false;
             }
         return true;
@@ -206,7 +206,7 @@ class SpikeSimif : public simif_t
 
         cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "M", DEFAULT_VARCH, false, endianness_little, 0,
                         {mem_cfg_t(0x80000000, 1 << 26)}, {0}, false, 0);
-        isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei", "MSU");
+        isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei_zcb", "MSU");
         processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stderr, std::cerr);
         harts[0] = processor.get();
 
@@ -330,8 +330,9 @@ class SpikeSimif : public simif_t
         for (auto read : mem_reads)
         {
             uint32_t phy = get_phy_addr(std::get<0>(read), LOAD);
+            //if (phy == 0x83ff5c00) printf("[%lu] load sqn = %x\n", main_time, inst.sqn);
             
-            //if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
+            if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
 
             
             phy &= ~3;
@@ -344,7 +345,9 @@ class SpikeSimif : public simif_t
         for (auto write : processor->get_state()->log_mem_write)
         {
             uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
-            //if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
+            //if (phy == 0x83ff5c00) printf("[%lu] store sqn = %x: %.8lx\n", main_time, inst.sqn, std::get<1>(write));
+
+            if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
 
         }
 
@@ -519,7 +522,7 @@ uint32_t ReadRegister(uint32_t rid)
 // physical register, it is not freed.
 void WriteRegister(uint32_t rid, uint32_t val)
 {
-#ifdef COSIM
+    #ifdef COSIM
     simif.write_reg(rid, val);
 #endif
     auto core = top->Top->soc->core;
@@ -527,10 +530,10 @@ void WriteRegister(uint32_t rid, uint32_t val)
     int i = 0;
     while (true)
     {
-        if (core->rn->tb->free[i] == 1 && core->rn->tb->freeCom[i] == 1)
+        if ((core->rn->tb->free & (1UL << i)) && (core->rn->tb->freeCom & (1UL << i)))
         {
-            core->rn->tb->free[i] = 0;
-            core->rn->tb->freeCom[i] = 0;
+            core->rn->tb->free &= ~(1UL << i);
+            core->rn->tb->freeCom &= ~(1UL << i);
             core->rn->rt->comTag[rid] = (i);
             core->rn->rt->specTag[rid] = (i);
             core->rn->rt->tagAvail |= (1 << i);
@@ -745,10 +748,10 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 6 + 7 + 7 + 3 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 182 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 182 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 182 - 32 - 32 - 32 - 3 - 3 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 1+1+4+7+7+2+5, 7);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 181 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 181 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 181 - 32 - 32 - 32 - 3 - 3 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }

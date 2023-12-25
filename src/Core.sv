@@ -4,6 +4,8 @@ module Core
     input wire rst,
     input wire en,
 
+    input wire IN_irq,
+
     IF_Cache.HOST IF_cache,
     IF_CTable.HOST IF_ct,
     IF_MMIO.HOST IF_mmio,
@@ -36,7 +38,7 @@ localparam NUM_WBS = 4;
 RES_UOp wbUOp[5:0] /*verilator public*/;
 reg wbHasResult[NUM_WBS-1:0];
 always_comb begin
-    for (integer i = 0; i < 4; i=i+1)
+    for (integer i = 0; i < NUM_WBS; i=i+1)
         wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[6];
 end
 
@@ -50,6 +52,23 @@ BranchProv branchProvs[3:0];
 BranchProv branch /*verilator public*/;
 wire mispredFlush /*verilator public*/;
 wire BS_PERFC_branchMispr;
+
+BranchSelector#(4) bsel
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_isUOps(IS_uop),
+    
+    .IN_branches(branchProvs),
+    .OUT_branch(branch),
+    
+    .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
+    
+    .IN_ROB_curSqN(ROB_curSqN),
+    .IN_RN_nextSqN(RN_nextSqN),
+    .IN_mispredFlush(mispredFlush)
+);
 
 IF_Instr IF_instrs;
 BTUpdate BP_btUpdates[2:0];
@@ -72,14 +91,10 @@ IFetch ifetch
     
     .IF_ict(IF_ict),
     .IF_icache(IF_icache),
-
-    .IN_branches(branchProvs),
+    
     .IN_mispredFlush(mispredFlush),
     .IN_ROB_curFetchID(ROB_curFetchID),
-    .IN_ROB_curSqN(ROB_curSqN),
-    .IN_RN_nextSqN(RN_nextSqN),
-    .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
-    .OUT_branch(branch),
+    .IN_branch(branch),
     
     .IN_retDecUpd(DEC_retUpd),
     .IN_decBranch(DEC_decBranch),
@@ -118,7 +133,7 @@ PreDecode preDec
 
     .OUT_full(PD_full),
     
-    .mispred(branch.taken || DEC_decBranch.taken),
+    .mispred(branch.taken),
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
@@ -152,7 +167,6 @@ wire frontendEn /*verilator public*/ =
     !sqNStall &&
     !stSqNStall &&
     !branch.taken &&
-    en &&
     !SQ_flush;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
@@ -199,7 +213,13 @@ assign stall[1] = 0;
 wire[3:0][`DEC_WIDTH-1:0] IQ_stalls;
 //wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
 //wire IQ0_full;
-IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,33) iq0
+IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,
+`ifdef ENABLE_INT_DIV
+    33
+`else 
+    0
+`endif
+) iq0
 (
     .clk(clk),
     .rst(rst),
@@ -227,7 +247,13 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,3
     
     .OUT_uop(IS_uop[0])
 );
-IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,9-4-2) iq1
+IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,
+`ifdef ENABLE_INT_MUL
+    9-4-2
+`else 
+    0
+`endif
+) iq1
 (
     .clk(clk),
     .rst(rst),
@@ -389,7 +415,7 @@ IntALU ialu
     .OUT_uop(INT0_uop)
 );
 
-
+`ifdef ENABLE_INT_DIV
 wire DIV_busy;
 RES_UOp DIV_uop;
 wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && LD_uop[0].fu == FU_DIV) || (IS_uop[0].valid && IS_uop[0].fu == FU_DIV);
@@ -404,8 +430,10 @@ Divide div
     .IN_branch(branch),
     .IN_uop(LD_uop[0]),
     .OUT_uop(DIV_uop)
-
 );
+`else
+wire DIV_doNotIssue = 1'b0;
+`endif
 
 `ifdef ENABLE_FP
 RES_UOp FPU_uop;
@@ -445,6 +473,9 @@ CSR csr
     .clk(clk),
     .rst(rst),
     .en(LD_uop[0].fu == FU_CSR),
+    
+    .IN_irq(IN_irq),
+
     .IN_uop(LD_uop[0]),
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
@@ -467,16 +498,31 @@ CSR csr
     
     .OUT_uop(CSR_uop)
 );
+
+always_comb begin
+    wbUOp[0] = 'x;
+    wbUOp[0].valid = 1'b0;
+
+    if (INT0_uop.valid)
+        wbUOp[0] = INT0_uop;
+    else if (CSR_uop.valid)
+        wbUOp[0] = CSR_uop;
+    //else if (AGU_resUOp.valid && aguUOpPort_r == 0)
+    //    wbUOp[0] = AGU_resUOp;
 `ifdef ENABLE_FP
-assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : (FPU_uop.valid ? FPU_uop : DIV_uop));
-`else
-assign wbUOp[0] = INT0_uop.valid ? INT0_uop : (CSR_uop.valid ? CSR_uop : DIV_uop);
+    else if (FPU_uop.valid)
+        wbUOp[0] = FPU_uop;
 `endif
+`ifdef ENABLE_INT_DIV
+    else if (DIV_uop.valid)
+        wbUOp[0] = DIV_uop;
+`endif
+    
+end
 
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[1:0];
 PW_LD_UOp PW_LD_uop[`NUM_AGUS-1:0];
-assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
 PageWalker pageWalker
 (
     .clk(clk),
@@ -518,17 +564,20 @@ TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
 );
 
 
-AGU_UOp AGU_uop[1:0];
-ELD_UOp AGU_eLdUOp[1:0];
+AGU_UOp AGU_uop[`NUM_AGUS-1:0];
+ELD_UOp AGU_eLdUOp[`NUM_AGUS-1:0];
 
 PageWalk_Req LDAGU_PW_rq;
+wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] LDAGU_TMQ_free;
 AGU#(.AGU_IDX(0), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
-    .en(1),
+    .en(1'b1),
     .IN_stall(LSU_ldAGUStall[0]),
     .OUT_stall(stall[2]),
+
+    .OUT_TMQ_free(LDAGU_TMQ_free),
     
     .IN_branch(branch),
     .IN_vmem(CSR_vmem),
@@ -548,13 +597,16 @@ AGU#(.AGU_IDX(0), .RQ_ID(2)) aguLD
 
 AGU_UOp AGU_ST_uop /* verilator public */;
 PageWalk_Req STAGU_PW_rq;
+wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] STAGU_TMQ_free;
 AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
 (
     .clk(clk),
     .rst(rst),
-    .en(1),
+    .en(1'b1),
     .IN_stall(LSU_ldAGUStall[1]),
     .OUT_stall(stall[3]),
+
+    .OUT_TMQ_free(STAGU_TMQ_free),
     
     .IN_branch(branch),
     .IN_vmem(CSR_vmem),
@@ -574,13 +626,15 @@ AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
 
 
 SqN LB_maxLoadSqN;
-LD_UOp LB_uopLd[1:0];
-LD_UOp LB_aguUOpLd[1:0];
+LD_UOp LB_uopLd[`NUM_AGUS-1:0];
+LD_UOp LB_aguUOpLd[`NUM_AGUS-1:0];
 
 LoadBuffer lb
 (
     .clk(clk),
     .rst(rst),
+    .IN_memc(IN_memc),
+    .IN_LSU_memc(LSU_MC_if),
     .IN_comLoadSqN(ROB_comLoadSqN),
     .IN_comSqN(ROB_curSqN),
     
@@ -605,7 +659,7 @@ wire[31:0] CSR_dataOut;
 wire SQ_empty;
 wire SQ_done;
 ST_UOp SQ_uop;
-StFwdResult SQ_fwd[1:0];
+StFwdResult SQ_fwd[`NUM_AGUS-1:0];
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
 SQ_ComInfo SQ_info;
@@ -648,11 +702,11 @@ StoreQueue sq
 
 wire LSU_loadFwdValid = 0;
 Tag LSU_loadFwdTag = 'x;
-wire CC_loadStall[1:0];
+wire CC_loadStall[`NUM_AGUS-1:0];
 wire CC_storeStall;
-wire LSU_ldAGUStall[1:0];
-LD_UOp CC_SQ_uopLd[1:0];
-LD_Ack LSU_ldAck[1:0];
+wire LSU_ldAGUStall[`NUM_AGUS-1:0];
+LD_UOp CC_SQ_uopLd[`NUM_AGUS-1:0];
+LD_Ack LSU_ldAck[`NUM_AGUS-1:0];
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
@@ -718,6 +772,7 @@ IntALU ialu1
     .OUT_uop(INT1_uop)
 );
 
+`ifdef ENABLE_INT_MUL
 RES_UOp MUL_uop;
 wire MUL_busy;
 wire MUL_doNotIssue = 0;
@@ -733,6 +788,8 @@ Multiply mul
     .IN_uop(LD_uop[1]),
     .OUT_uop(MUL_uop)
 );
+`endif
+
 `ifdef ENABLE_FP
 RES_UOp FMUL_uop;
 FMul fmul
@@ -765,18 +822,37 @@ FDiv fdiv
     .IN_fRoundMode(CSR_fRoundMode),
     .OUT_uop(FDIV_uop)
 );
-assign wbUOp[1] = INT1_uop.valid ? INT1_uop : (MUL_uop.valid ? MUL_uop : (FMUL_uop.valid ? FMUL_uop : FDIV_uop));
 `else
 wire FDIV_busy = 1;
 wire FDIV_doNotIssue = 1;
-assign wbUOp[1] = INT1_uop.valid ? INT1_uop : MUL_uop;
 `endif
+
+always_comb begin
+    wbUOp[1] = 'x;
+    wbUOp[1].valid = 1'b0;
+
+    if (INT1_uop.valid)
+        wbUOp[1] = INT1_uop;
+    //else if (AGU_resUOp.valid && aguUOpPort_r == 1)
+    //    wbUOp[1] = AGU_resUOp;
+
+    `ifdef ENABLE_INT_MUL
+    else if (MUL_uop.valid)
+        wbUOp[1] = MUL_uop;
+    `endif
+    `ifdef ENABLE_FP
+    else if (FMUL_uop.valid)
+        wbUOp[1] = FMUL_uop;
+    else if (FDIV_uop.valid)
+        wbUOp[1] = FDIV_uop;
+    `endif
+end
 
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
-wire[3:0] ROB_validRetire /*verilator public*/;
-wire[3:0] ROB_retireBranch;
+wire[`DEC_WIDTH-1:0] ROB_validRetire /*verilator public*/;
+wire[`DEC_WIDTH-1:0] ROB_retireBranch;
 BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 SqN ROB_comLoadSqN;
@@ -810,7 +886,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || LSU_busy; // todo: fix
+wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || LSU_busy || AGU_uop[0].valid || LB_uopLd[0].valid;
 
 wire TH_flushTLB;
 wire TH_startFence;

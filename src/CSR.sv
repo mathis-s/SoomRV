@@ -3,6 +3,8 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input wire clk,
     input wire rst,
     input wire en,
+
+    input wire IN_irq,
     
     input EX_UOp IN_uop,
     input BranchProv IN_branch,
@@ -10,8 +12,8 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     input wire[4:0] IN_fpNewFlags,
 
     // for perf counters
-    input wire[3:0] IN_commitValid,
-    input wire[3:0] IN_commitBranch,
+    input wire[`DEC_WIDTH-1:0] IN_commitValid,
+    input wire[`DEC_WIDTH-1:0] IN_commitBranch,
     input wire IN_branchMispr,
     input wire IN_mispredFlush,
     
@@ -256,7 +258,9 @@ typedef enum logic[11:0]
     CSR_mhpmevent28=12'h33C,
     CSR_mhpmevent29=12'h33D,
     CSR_mhpmevent30=12'h33E,
-    CSR_mhpmevent31=12'h33F
+    CSR_mhpmevent31=12'h33F,
+
+    CSR_magic=12'hCC0
 } CSRAddr;
 
 typedef enum logic[3:0]
@@ -347,6 +351,8 @@ reg[31:0] sscratch;
 reg[31:0] scause;
 reg[31:0] stval;
 
+reg misa_X; // enable/disable for custom instrs
+
 struct packed 
 {
     logic mode;
@@ -404,6 +410,7 @@ assign OUT_trapControl.interruptDelegate = interruptDelegate;
 assign OUT_fRoundMode = frm;
 
 assign OUT_dec.allowWFI = (priv == PRIV_MACHINE) || (priv == PRIV_SUPERVISOR && !mstatus.tw);
+assign OUT_dec.allowCustom = misa_X;
 
 always_comb begin
 
@@ -514,8 +521,8 @@ always_comb begin
             rdata = (IN_uop.imm[11:0] == CSR_hpmcounter5) ? mhpmcounter5[31:0] : mhpmcounter5[63:32];
         end
 
-        CSR_misa: rdata = 32'b01_0000_00100101000001000100000111;
-        CSR_marchid: rdata = 32'h50087501;
+        CSR_misa: rdata = 32'b01_0000_00000101000001000100000101 | {8'b0, misa_X, 23'b0};
+        CSR_marchid: rdata = 32'h50087502;
         CSR_mimpid: rdata = 32'h50087532;
         CSR_mstatus: rdata = mstatus;
         
@@ -593,6 +600,8 @@ always_comb begin
         CSR_mhpmevent3: rdata = 3;
         CSR_mhpmevent4: rdata = 4;
         CSR_mhpmevent5: rdata = 5;
+
+        CSR_magic: rdata = 32'h88980f;
         
         // read-only zero CSRs
         CSR_menvcfgh,
@@ -697,14 +706,14 @@ always_ff@(posedge clk) begin
         
         if (!mcountinhibit[2]) begin
             reg[2:0] temp = 0;
-            for (integer i = 0; i < 4; i=i+1)
+            for (integer i = 0; i < `DEC_WIDTH; i=i+1)
                 if (IN_commitValid[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
         
         if (!mcountinhibit[3]) begin
             reg[2:0] temp = 0;
-            for (integer i = 0; i < 4; i=i+1)
+            for (integer i = 0; i < `DEC_WIDTH; i=i+1)
                 if (IN_commitBranch[i]) temp = temp + 1;
             mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
         end
@@ -717,6 +726,7 @@ always_ff@(posedge clk) begin
         
         // MTIP
         mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
+        mip[11] <= IN_irq;
     end
     
     if (rst) begin
@@ -729,7 +739,8 @@ always_ff@(posedge clk) begin
         minstret <= 0;
         mcounteren <= 0;
         mcountinhibit <= 0;
-        mtvec <= 0;
+        mtvec.base <= 30'((`ENTRY_POINT) >> 2);
+        mtvec.mode <= 0;
         mepc <= 0;
         mcause <= 0;
         mtval <= 0;
@@ -743,7 +754,8 @@ always_ff@(posedge clk) begin
         sepc <= 0;
         scause <= 0;
         stval <= 0;
-        stvec <= 0;
+        stvec.base <= 30'((`ENTRY_POINT) >> 2);
+        stvec.mode <= 0;
         satp <= 0;
         senvcfg <= 0;
         
@@ -752,6 +764,8 @@ always_ff@(posedge clk) begin
         mhpmcounter5 <= 0;
         
         OUT_uop.valid <= 0;
+
+        misa_X <= 1;
     end
     else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
     
@@ -764,33 +778,32 @@ always_ff@(posedge clk) begin
         if (IN_uop.opcode == CSR_MRET || IN_uop.opcode == CSR_SRET) begin
             
             OUT_uop.flags <= FLAGS_XRET;
-            
-            if (IN_uop.opcode == CSR_SRET && mstatus.tsr == 1)
-                OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
                 
             if (IN_uop.opcode == CSR_MRET) begin
                 
                 if (priv < PRIV_MACHINE)
                     OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                else begin
+                    mstatus.mie <= mstatus.mpie;
+                    priv <= mstatus.mpp;
+                    mstatus.mpp <= PRIV_USER;
+                    if (mstatus.mpp != PRIV_MACHINE)
+                        mstatus.mprv <= 0;
                     
-                mstatus.mie <= mstatus.mpie;
-                priv <= mstatus.mpp;
-                mstatus.mpp <= PRIV_USER;
-                if (mstatus.mpp != PRIV_MACHINE)
-                    mstatus.mprv <= 0;
-                
-                retvec <= mepc[31:1];
+                    retvec <= mepc[31:1];
+                end
             end
             else begin
-                if (priv < PRIV_SUPERVISOR)
+                if (priv < PRIV_SUPERVISOR || (IN_uop.opcode == CSR_SRET && mstatus.tsr == 1))
                     OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-                
-                mstatus.sie <= mstatus.spie;
-                priv <= PrivLevel'({1'b0, mstatus.spp});
-                mstatus.spp <= 1'b0;
-                mstatus.mprv <= 0;
-                
-                retvec <= sepc[31:1];
+                else begin
+                    mstatus.sie <= mstatus.spie;
+                    priv <= PrivLevel'({1'b0, mstatus.spp});
+                    mstatus.spp <= 1'b0;
+                    mstatus.mprv <= 0;
+                    
+                    retvec <= sepc[31:1];
+                end
             end
             
         end
@@ -913,6 +926,10 @@ always_ff@(posedge clk) begin
                                 mcause[31] <= wdata[31];
                             end
                             CSR_mtval: mtval <= wdata;
+
+                            CSR_misa: begin
+                                misa_X <= wdata[23];
+                            end
                             
                             CSR_sstatus: begin
                                 MStatus_t temp = wdata;

@@ -1,51 +1,49 @@
 module RF
 #(
-    parameter NUM_READ = 6,
-    parameter NUM_WRITE = 3,
-    parameter SIZE=64,
+    parameter SIZE=`NUM_TAGS,
     parameter WIDTH=32
 )
 (
     input wire clk,
     
-    input wire[5:0] waddr0,
+    input wire[$clog2(SIZE)-1:0] waddr0,
     input wire[WIDTH-1:0] wdata0,
     input wire wen0,
     
-    input wire[5:0] waddr1,
+    input wire[$clog2(SIZE)-1:0] waddr1,
     input wire[WIDTH-1:0] wdata1,
     input wire wen1,
     
-    input wire[5:0] waddr2,
+    input wire[$clog2(SIZE)-1:0] waddr2,
     input wire[WIDTH-1:0] wdata2,
     input wire wen2,
     
-    input wire[5:0] waddr3,
+    input wire[$clog2(SIZE)-1:0] waddr3,
     input wire[WIDTH-1:0] wdata3,
     input wire wen3,
     
-    input wire[5:0] raddr0,
+    input wire[$clog2(SIZE)-1:0] raddr0,
     output reg[WIDTH-1:0] rdata0,
     
-    input wire[5:0] raddr1,
+    input wire[$clog2(SIZE)-1:0] raddr1,
     output reg[WIDTH-1:0] rdata1,
     
-    input wire[5:0] raddr2,
+    input wire[$clog2(SIZE)-1:0] raddr2,
     output reg[WIDTH-1:0] rdata2,
     
-    input wire[5:0] raddr3,
+    input wire[$clog2(SIZE)-1:0] raddr3,
     output reg[WIDTH-1:0] rdata3,
     
-    input wire[5:0] raddr4,
+    input wire[$clog2(SIZE)-1:0] raddr4,
     output reg[WIDTH-1:0] rdata4,
     
-    input wire[5:0] raddr5,
+    input wire[$clog2(SIZE)-1:0] raddr5,
     output reg[WIDTH-1:0] rdata5,
     
-    input wire[5:0] raddr6,
+    input wire[$clog2(SIZE)-1:0] raddr6,
     output reg[WIDTH-1:0] rdata6,
     
-    input wire[5:0] raddr7,
+    input wire[$clog2(SIZE)-1:0] raddr7,
     output reg[WIDTH-1:0] rdata7
 );
 

@@ -6,6 +6,8 @@ module AGU
     input wire en,
     input wire IN_stall,
     output wire OUT_stall,
+
+    output wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] OUT_TMQ_free,
     
     input BranchProv IN_branch,
     
@@ -36,10 +38,10 @@ endfunction
 reg pageWalkActive;
 reg pageWalkAccepted;
 reg eldIsPageWalkOp;
-assign OUT_stall = TMQ_stall;
+assign OUT_stall = 1'b0;
 
 
-wire[31:0] addr = IN_uop.srcA + ((IN_uop.opcode >= ATOMIC_AMOSWAP_W) ? 0 : {{20{IN_uop.imm[11]}}, IN_uop.imm[11:0]});
+wire[31:0] addr = IN_uop.srcA + (IN_uop.opcode >= LSU_SB_POSTINC ? 0 : IN_uop.srcB);
 
 // Address Calculation for incoming UOps
 AGU_UOp aguUOp_c;
@@ -98,17 +100,11 @@ always_comb begin
         aguUOp_c.isStore = 1;
         aguUOp_c.doNotCommit = 0;
         
-        resUOp_c.tagDst = IN_uop.tagDst;
+        resUOp_c.tagDst = 7'h40;
         resUOp_c.sqN = IN_uop.sqN;
-        resUOp_c.result = addr;
+        resUOp_c.result = 'x;
         resUOp_c.doNotCommit = 0;
         resUOp_c.valid = IN_uop.valid && en;
-        
-        // HACKY: Successful SC return value has already been handled
-        // in rename; thus outputting a result here again might cause problems, so redirect to zero register.
-        if (IN_uop.opcode == LSU_SC_W) begin
-            resUOp_c.tagDst = 7'h40;
-        end
         
         // default
         aguUOp_c.wmask = 4'b1111;
@@ -117,7 +113,10 @@ always_comb begin
         resUOp_c.flags = FLAGS_NONE;
         
         case (IN_uop.opcode)
-            LSU_SB, LSU_SB_I: begin
+            
+            LSU_SB_PREINC,
+            LSU_SB_POSTINC,
+            LSU_SB: begin
                 aguUOp_c.size = 0;
                 case (addr[1:0]) 
                     0: begin
@@ -134,8 +133,10 @@ always_comb begin
                     end 
                 endcase
             end
-
-            LSU_SH, LSU_SH_I: begin
+            
+            LSU_SH_PREINC,
+            LSU_SH_POSTINC,
+            LSU_SH: begin
                 aguUOp_c.size = 1;
                 case (addr[1]) 
                     0: begin
@@ -147,7 +148,14 @@ always_comb begin
                 endcase
             end
             
-            LSU_SC_W, LSU_SW, LSU_SW_I: begin
+            LSU_SC_W: begin
+                aguUOp_c.wmask = 4'b1111;
+                resUOp_c.tagDst = 7'h40;
+            end
+
+            LSU_SW_PREINC,
+            LSU_SW_POSTINC,
+            LSU_SW: begin
                 aguUOp_c.wmask = 4'b1111;
             end
             
@@ -182,6 +190,7 @@ always_comb begin
             ATOMIC_AMOMINU_W,
             ATOMIC_AMOMAXU_W: begin
                 resUOp_c.doNotCommit = 1;
+                resUOp_c.tagDst = 7'h40;
                 
                 // The integer uop commits atomics,
                 // except for amoswap where there isn't one.
@@ -197,24 +206,26 @@ always_comb begin
     end
 end
 
-logic TMQ_stall;
 logic TMQ_enqueue;
 AGU_UOp TMQ_enqueueUOp;
 logic TMQ_uopReady;
 
 logic TMQ_dequeue;
 AGU_UOp TMQ_uop;
+logic TMQ_ready;
 TLBMissQueue#(`DTLB_MISS_QUEUE_SIZE) tmq
 (
     .clk(clk),
     .rst(rst),
+
+    .OUT_free(OUT_TMQ_free),
+    .OUT_ready(TMQ_ready),
     
     .IN_branch(IN_branch),
     .IN_vmem(IN_vmem),
     .IN_pw(IN_pw),
     .IN_pwActive(pageWalkActive),
 
-    .OUT_stall(TMQ_stall),
     .IN_enqueue(TMQ_enqueue),
     .IN_uopReady(TMQ_uopReady),
     .IN_uop(issUOp_c),
@@ -235,8 +246,7 @@ always_comb begin
 
     TMQ_dequeue = 0;
     
-    // illegal instruction exceptions always pass through
-    if (aguUOp_c.valid && en && (!TMQ_stall || (resUOp_c.valid && resUOp_c.flags == FLAGS_ILLEGAL_INSTR))) begin
+    if (aguUOp_c.valid && en) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end
@@ -392,7 +402,7 @@ always_ff@(posedge clk) begin
         ) begin
             
             reg doIssue = 1;
-            if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+            if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
                 if (tlbMiss) begin
                     if (!pageWalkActive) begin
                         pageWalkActive <= 1;
@@ -412,7 +422,7 @@ always_ff@(posedge clk) begin
             if (doIssue) begin
                 
                 OUT_uop <= issResUOp_c;
-                if (issResUOp_c.flags != FLAGS_ILLEGAL_INSTR) begin
+                if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
                     OUT_aguOp <= issUOp_c;
                     OUT_aguOp.earlyLoadFailed <= IN_stall;
                     

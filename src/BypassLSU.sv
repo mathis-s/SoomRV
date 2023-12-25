@@ -44,7 +44,7 @@ always_comb begin
     OUT_uopLd = 'x;
     OUT_uopLd.valid = 0;
 
-    if (state == DONE_LD && !invalidateActiveLd) begin
+    if (state == DONE_LD && !invalidateActiveLd) begin // todo: invalidate check likely not required here (or just ff the output)
         OUT_uopLd = activeLd;
     end
 end

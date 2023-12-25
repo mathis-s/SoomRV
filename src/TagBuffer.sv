@@ -24,38 +24,41 @@ module TagBuffer
 );
 // half of tag space is for eliminating immediates
 localparam PTAG_LEN = $bits(Tag) - 1;
-localparam NUM_TAGS = 1 << ($bits(Tag) - 1);
+localparam NUM_TAGS = `NUM_TAGS;
 
-logic free[NUM_TAGS-1:0] /*verilator public*/;
-logic freeCom[NUM_TAGS-1:0] /*verilator public*/;
+logic[NUM_TAGS-1:0] free /*verilator public*/;
+logic[NUM_TAGS-1:0] freeCom /*verilator public*/;
 
 reg mispredWait;
 
 reg issueTagsValid[NUM_ISSUE-1:0];
 reg[5:0] issueTags[NUM_ISSUE-1:0];
 
+localparam NUM_TAGS_POW2 = 1 << $clog2(NUM_TAGS);
+wire[NUM_TAGS_POW2-1:0] freePadded = {{(NUM_TAGS_POW2-NUM_TAGS){1'b0}}, free};
+
 // Search Tree for getting index of NUM_ISSUE unused entries.
 // This essentially is the classic count-leading-zeros type
 // search tree, but instead of tracking one index, we track
 // NUM_ISSUE indices. 
-localparam NUM_STAGES = $clog2(NUM_TAGS); // excl base case
+localparam NUM_STAGES = $clog2(NUM_TAGS_POW2); // excl base case
 generate
 for (genvar g = 0; g < NUM_STAGES+1; g=g+1) begin : gen
-    logic[NUM_ISSUE-1:0][g:0] s[(NUM_TAGS>>g)-1:0];
+    logic[NUM_ISSUE-1:0][g:0] s[(NUM_TAGS_POW2>>g)-1:0];
 
     // Base
     if (g == 0) begin
         always_comb begin
-            for (integer i = 0; i < NUM_TAGS; i=i+1) begin
+            for (integer i = 0; i < NUM_TAGS_POW2; i=i+1) begin
                 for (integer j = 0; j < NUM_ISSUE; j=j+1)
                     s[i][j] = 1; // LSBit represents undefined
-                s[i][0] = !free[i];
+                s[i][0] = !freePadded[i];
             end
         end
     end
     // Step
     else begin
-        for (genvar i = 0; i < (NUM_TAGS>>g); i=i+1) begin
+        for (genvar i = 0; i < (NUM_TAGS_POW2>>g); i=i+1) begin
             wire[NUM_ISSUE-1:0][g-1:0] a = gen[g-1].s[2*i+0];
             wire[NUM_ISSUE-1:0][g-1:0] b = gen[g-1].s[2*i+1];
             
@@ -93,7 +96,7 @@ always_ff@(posedge clk) begin
     mispredWait <= 0;
 
     if (rst) begin
-        for (integer i = 0; i < 64; i=i+1) begin
+        for (integer i = 0; i < NUM_TAGS; i=i+1) begin
             free[i] <= 1'b1;
             freeCom[i] <= 1'b1;
         end
@@ -104,7 +107,7 @@ always_ff@(posedge clk) begin
         if (IN_mispr) begin
             // Issue
             mispredWait <= 1;
-            for (integer i = 0; i < 64; i=i+1) begin
+            for (integer i = 0; i < NUM_TAGS; i=i+1) begin
                 if (freeCom[i])
                     free[i] <= 1;
             end

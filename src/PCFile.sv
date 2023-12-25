@@ -1,7 +1,7 @@
 module PCFile
 #(
-    parameter WORD_SIZE=31,
-    parameter ADDR_SIZE=5
+    parameter WORD_SIZE=$bits(PCFileEntry),
+    parameter ADDR_SIZE=$bits(FetchID_t)
 )
 (
     input wire clk,

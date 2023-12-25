@@ -44,7 +44,7 @@ BranchPredictionTable basePredictor
     
     .IN_writeEn(IN_writeValid),
     .IN_writeAddr(IN_writeAddr[`BP_BASEP_ID_LEN-1:0]),
-    .IN_writeInit(0), // base predictor does not use explicit allocation
+    .IN_writeInit(1'b0), // base predictor does not use explicit allocation
     .IN_writeTaken(IN_writeTaken)
 );
 // Base Predictor is always valid
@@ -75,8 +75,8 @@ always_comb begin
             predHashes[i][j % HASH_SIZE] = predHashes[i][j % HASH_SIZE] ^ IN_predHistory[j];
             writeHashes[i][j % HASH_SIZE] = writeHashes[i][j % HASH_SIZE] ^ IN_writeHistory[j];
 
-            predTags[i][j % TAG_SIZE] = predTags[i][j % TAG_SIZE] ^ IN_predHistory[j] ^ IN_predHistory[j+1];
-            writeTags[i][j % TAG_SIZE] = writeTags[i][j % TAG_SIZE] ^ IN_writeHistory[j] ^ IN_writeHistory[j+1];
+            predTags[i][j % TAG_SIZE] = predTags[i][j % TAG_SIZE] ^ IN_predHistory[j] ^ IN_predHistory[(j+1) % $bits(BHist_t)];
+            writeTags[i][j % TAG_SIZE] = writeTags[i][j % TAG_SIZE] ^ IN_writeHistory[j] ^ IN_writeHistory[(j+1) % $bits(BHist_t)];
         end
     end
 end
@@ -108,7 +108,7 @@ always_comb begin
         for (integer i = 0; i < NUM_STAGES; i=i+1) begin
             if (i > IN_writeTageID && avail[i] && temp == 0 &&
                 // Allocate with 75% chance if other slots are available
-                (!followingAllocAvail[i] || random[2*i-2+:2] != 2'b00)) begin
+                (!followingAllocAvail[i] || random[(i%4)*2+:2] != 2'b00)) begin
                 temp = 1;
                 doAlloc[i] = 1;
             end

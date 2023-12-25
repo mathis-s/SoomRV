@@ -1,6 +1,6 @@
 module PreDecode
 #(
-    parameter NUM_INSTRS_IN=8,
+    parameter NUM_INSTRS_IN=(1<<(`FSIZE_E-1)),
     parameter NUM_INSTRS_OUT=`DEC_WIDTH,
     parameter BUF_SIZE=`PD_BUF_SIZE
 )
@@ -19,7 +19,7 @@ module PreDecode
 
 typedef struct packed
 {
-    logic[27:0] pc;
+    logic[31-`FSIZE_E:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;
     FetchOff_t firstValid;
@@ -58,10 +58,7 @@ always_ff@(posedge clk) begin
                     PDEntry cur = buffer[bufIndexOut];
                     reg[15:0] instr = cur.instr[subIndexOut];
                     
-                    // TRICKY: IFetch marks predicted branches in the second halfword (such that the branch is taken
-                    // only after the entire instruction has been fetched). If we find a predicted branch in the first
-                    // halfword of an instruction, there has been a branch source misspeculation.
-                    reg invalidBranch = (instr[1:0] == 2'b11) && buffer[bufIndexOut].predTaken && buffer[bufIndexOut].predPos == subIndexOut;
+                    reg invalidBranch = 0;
                     
                     assert(subIndexOut >= cur.firstValid && subIndexOut <= cur.lastValid);
                     

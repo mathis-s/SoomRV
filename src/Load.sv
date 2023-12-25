@@ -108,7 +108,6 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].fetchOffs != IN_pcReadData[i].branchPos) begin
                     outUOpReg[i].bpi.predicted <= 0;
                     outUOpReg[i].bpi.taken <= 0;
-                    outUOpReg[i].bpi.isJump <= 0;
                 end
 
                 operandIsReg[i] <= 2'b00;

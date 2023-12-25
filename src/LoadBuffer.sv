@@ -6,11 +6,14 @@ module LoadBuffer
 (
     input wire clk,
     input wire rst,
+
+    input MemController_Res IN_memc,
+    input MemController_Req IN_LSU_memc,
     
     input SqN IN_comLoadSqN,
     input SqN IN_comSqN,
     
-    input wire IN_stall[1:0],
+    input wire IN_stall[`NUM_AGUS-1:0],
     input AGU_UOp IN_uop[`NUM_AGUS-1:0],
     
     input LD_Ack IN_ldAck[`NUM_AGUS-1:0],
@@ -38,30 +41,45 @@ typedef struct packed
     logic signExtend;
     logic doNotCommit;
     logic nonSpec;
+    logic noReIssue;
     logic issued;
     logic valid;
 } LBEntry;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
-SqN baseIndex = IN_comLoadSqN;
+wire SqN baseIndex = IN_comLoadSqN;
 SqN lastBaseIndex;
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
 LD_UOp lateLoadUOp[`NUM_AGUS-1:0];
-reg issueLateLoad[`NUM_AGUS-1:0];
 reg delayLoad[`NUM_AGUS-1:0];
 reg nonSpeculative[`NUM_AGUS-1:0];
+reg doNotReIssue[`NUM_AGUS-1:0];
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         OUT_uopAGULd[h] = 'x;
         OUT_uopAGULd[h].valid = 0;
         OUT_uopLd[h] = 'x;
         OUT_uopLd[h].valid = 0;
+
+        doNotReIssue[h] = 0;
+        for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
+            if (IN_memc.transfers[i].valid && 
+                IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == IN_uop[h].addr[31:`CLSIZE_E] &&
+                IN_memc.transfers[i].progress < {1'b0, IN_uop[h].addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]}
+            ) begin
+                doNotReIssue[h] = 1;
+            end
+        if ((IN_LSU_memc.cmd == MEMC_REPLACE || IN_LSU_memc.cmd == MEMC_CP_EXT_TO_CACHE) &&
+            (IN_LSU_memc.readAddr[31:`CLSIZE_E] == IN_uop[h].addr[31:`CLSIZE_E])
+        ) begin
+            doNotReIssue[h] = 1;
+        end
+            
         
-        issueLateLoad[h] = 0;
         nonSpeculative[h] = IN_uop[h].valid && `IS_MMIO_PMA(IN_uop[h].addr) && IN_uop[h].exception == AGU_NO_EXCEPTION;
-        delayLoad[h] = nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
+        delayLoad[h] = doNotReIssue[h] || nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
         
         // If it needs forwarding from current cycle's store, we also delay the load.
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
@@ -80,6 +98,8 @@ always_comb begin
         end
         
         if (!delayLoad[h]) begin
+            OUT_uopAGULd[h].data = 'x; 
+            OUT_uopAGULd[h].dataValid = 0; 
             OUT_uopAGULd[h].addr = IN_uop[h].addr; 
             OUT_uopAGULd[h].signExtend = IN_uop[h].signExtend; 
             OUT_uopAGULd[h].size = IN_uop[h].size; 
@@ -97,18 +117,58 @@ always_comb begin
     end
 end
 
+
+logic[31:0] wAddrToMatch[`NUM_AGUS-1:0];
+typedef enum logic[1:0] 
+{
+    STORE,
+    LD_FWD,
+    LD_NACK
+} AddrCompareType;
+
+AddrCompareType addrCompT[`NUM_AGUS-1:0];
+
+always_comb begin
+    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+        wAddrToMatch[h] = 'x;
+        addrCompT[h] = STORE;
+
+        if (IN_uop[h].valid && IN_uop[h].isStore) begin
+            wAddrToMatch[h] = IN_uop[h].addr;
+        end
+        else if (IN_memc.ldDataFwd.valid) begin
+            addrCompT[h] = LD_FWD;
+            wAddrToMatch[h] = IN_memc.ldDataFwd.addr;
+        end
+        else if (IN_ldAck[h].valid) begin
+            addrCompT[h] = LD_NACK;
+            wAddrToMatch[h] = IN_ldAck[h].addr;
+        end
+    end
+end
+
+logic[NUM_ENTRIES-1:0] wAddrMatch[`NUM_AGUS-1:0];
+always_comb begin
+    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+            wAddrMatch[h][i] = (entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E] &&
+                                (addrCompT[h] == LD_NACK || entries[i].addr[`CLSIZE_E:2] == wAddrToMatch[h][`CLSIZE_E:2]));
+        end
+    end
+end
+
+
 // For every store, check if we previously speculatively loaded from the address written to
 // (if so, flush pipeline)
 logic storeIsConflict[`NUM_AGUS-1:0];
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         storeIsConflict[h] = 0;
-        // The order we check loads here does not matter, as we reset all the way back to the store on collision.
+        // The order we check loads here does not matter as we reset all the way back to the store on collision.
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (entries[i].valid && entries[i].issued &&
+            if (wAddrMatch[h][i] && entries[i].issued && IN_uop[h].isStore &&
                 $signed(IN_uop[h].loadSqN - {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) <= 0 &&
                 (!IN_uop[h].doNotCommit || IN_uop[h].loadSqN != {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) &&
-                entries[i].addr[31:2] == IN_uop[h].addr[31:2] &&
                     (IN_uop[h].size == 2 ||
                     (IN_uop[h].size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uop[h].addr[1])) ||
                     (IN_uop[h].size == 0 && (entries[i].size > 0 || entries[i].addr[1:0] == IN_uop[h].addr[1:0])))
@@ -121,30 +181,40 @@ end
 
 // Select late load to issue
 logic[$clog2(NUM_ENTRIES)-1:0] issueIdx;
+logic issueIdxIsLdFwd;
 logic issueIdxValid;
 always_comb begin
     logic[NUM_ENTRIES-1:0] issueCandidates = 0;
+
+    logic memcNotBusy = !IN_memc.transfers[0].valid;
+    
     issueIdx = 'x;
+    issueIdxIsLdFwd = 0;
     issueIdxValid = 0;
     
     // Out-of-order late issue (regular loads)
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         issueCandidates[i] =
-            entries[i].valid && !entries[i].issued && !entries[i].nonSpec;
+            entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec && 
+                (!entries[i].noReIssue || (addrCompT[1] == LD_FWD && wAddrMatch[0][i]) || memcNotBusy);
     end
+
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
-        if (issueCandidates[idx] && !issueIdxValid) begin
+        logic isLdDataFwd = (addrCompT[1] == LD_FWD) && wAddrMatch[0][idx];
+        if (issueCandidates[idx] && (!issueIdxValid || isLdDataFwd)) begin
+            issueIdxIsLdFwd = isLdDataFwd;
             issueIdxValid = 1;
             issueIdx = idx[$clog2(NUM_ENTRIES)-1:0];
         end
     end
 
     // In-order late issue (MMIO)
-    if (entries[deqIndex].valid && !entries[deqIndex].issued &&
-        (!entries[deqIndex].nonSpec || (IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
+    if (entries[deqIndex].valid && !entries[deqIndex].issued && entries[deqIndex].nonSpec &&
+        ((IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
     ) begin
         // Overwrite. This load is in-order, so it always has top priority.
+        issueIdxIsLdFwd = 0;
         issueIdxValid = 1;
         issueIdx = deqIndex;
     end
@@ -175,11 +245,38 @@ always_comb begin
     end
 end
 
+always_comb begin
+    
+    reg prevStoreConflict = 0;
+    SqN prevStoreConflictSqN = 'x;
+
+    OUT_branch = 'x;
+    OUT_branch.taken = 0;
+
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        if (IN_uop[i].valid && IN_uop[i].isStore && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+            if (storeIsConflict[i] && (!prevStoreConflict || $signed(IN_uop[i].sqN - prevStoreConflictSqN) < 0)) begin
+                // We reset back to the op after the store when a load collision occurs, even though you only need to
+                // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
+                // in the buffer, we just use the store's snapshot.
+                OUT_branch.taken = 1;
+                OUT_branch.dstPC = IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
+                OUT_branch.sqN = IN_uop[i].sqN;
+                OUT_branch.loadSqN = IN_uop[i].loadSqN + ((IN_uop[i].isLoad && IN_uop[i].isStore) ? 1 : 0);
+                OUT_branch.storeSqN = IN_uop[i].storeSqN;
+                OUT_branch.fetchID = IN_uop[i].fetchID;
+                OUT_branch.flush = 0;
+                OUT_branch.histAct = HIST_NONE;
+                OUT_branch.retAct = RET_NONE;
+
+                prevStoreConflict = 1;
+                prevStoreConflictSqN = IN_uop[i].sqN;
+            end
+        end
+end
 
 always_ff@(posedge clk) begin
     
-    OUT_branch <= 'x;
-    OUT_branch.taken <= 0;
     lastBaseIndex <= baseIndex;
 
     if (rst) begin
@@ -198,21 +295,34 @@ always_ff@(posedge clk) begin
     else begin
         
         reg[`NUM_AGUS-1:0] lateLoadPassthru = 0;
-        reg prevStoreConflict = 0;
-        SqN prevStoreConflictSqN = 'x;
         
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
             if (!IN_stall[i]) begin
                 lateLoadUOp[i] <= 'x;
                 lateLoadUOp[i].valid <= 0;
             end
+            else if (lateLoadUOp[i].valid && IN_memc.ldDataFwd.valid &&
+                     lateLoadUOp[i].addr[31:2] == IN_memc.ldDataFwd.addr[31:2]
+            ) begin
+                lateLoadUOp[i].dataValid <= 1;
+                lateLoadUOp[i].data <= IN_memc.ldDataFwd.data;
+            end
         
         // Process negative load acks
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+
+            if (addrCompT[i] == LD_NACK) begin
+                for (integer j = 0; j < NUM_ENTRIES; j=j+1) begin
+                    if (wAddrMatch[i][j]) entries[j].noReIssue <= 1;
+                end
+            end
+
             if (IN_ldAck[i].valid && IN_ldAck[i].fail && !IN_ldAck[i].external) begin
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
                 entries[index].issued <= 0;
+                entries[index].noReIssue <= IN_ldAck[i].doNotReIssue;
             end
+        end
         
 
         if (IN_branch.taken) begin
@@ -233,11 +343,17 @@ always_ff@(posedge clk) begin
             // Issue Late Loads          
             for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
 
-                if (!lateLoadUOp[i].valid || !IN_stall[i]) begin
+                if (!lateLoadUOp[i].valid || !IN_stall[i] || issueIdxIsLdFwd) begin
+
+                    if (IN_stall[i] && lateLoadUOp[i].valid)
+                        entries[lateLoadUOp[0].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
 
                     // Issue non-speculative or cache missed loads, currently only on port 0.
                     if (i == 0 && issueIdxValid) begin
                         entries[issueIdx].issued <= 1;
+                        lateLoadUOp[0].data <= IN_memc.ldDataFwd.data;
+                        lateLoadUOp[0].dataValid <= issueIdxIsLdFwd;
+
                         lateLoadUOp[0].addr <= entries[issueIdx].addr;
                         lateLoadUOp[0].signExtend <= entries[issueIdx].signExtend;
                         lateLoadUOp[0].size <= entries[issueIdx].size;
@@ -251,7 +367,10 @@ always_ff@(posedge clk) begin
                         lateLoadUOp[0].valid <= 1;
                     end
                     // Try to pass through ops for which early lookup failed
-                    else if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i]) begin
+                    else if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i] && !doNotReIssue[i]) begin
+                        lateLoadUOp[i].data <= 'x;
+                        lateLoadUOp[i].dataValid <= 0;
+
                         lateLoadUOp[i].addr <= IN_uop[i].addr;
                         lateLoadUOp[i].signExtend <= IN_uop[i].signExtend;
                         lateLoadUOp[i].size <= IN_uop[i].size;
@@ -291,34 +410,12 @@ always_ff@(posedge clk) begin
                 entries[index].doNotCommit <= IN_uop[i].doNotCommit;
                 entries[index].highLdSqN <= IN_uop[i].loadSqN[$bits(SqN)-1:$clog2(NUM_ENTRIES)];
                 entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
+                entries[index].noReIssue <= doNotReIssue[i];
                 entries[index].nonSpec <= nonSpeculative[i];
                 entries[index].valid <= 1;
             end
-        
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
-            if (IN_uop[i].valid && IN_uop[i].isStore && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
-                if (storeIsConflict[i] && (!prevStoreConflict || $signed(IN_uop[i].sqN - prevStoreConflictSqN) < 0)) begin
-                    // We reset back to the op after the store when a load collision occurs, even though you only need to
-                    // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
-                    // in the buffer, we just use the store's snapshot.
-                    OUT_branch.taken <= 1;
-                    OUT_branch.dstPC <= IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
-                    OUT_branch.sqN <= IN_uop[i].sqN;
-                    OUT_branch.loadSqN <= IN_uop[i].loadSqN + ((IN_uop[i].isLoad && IN_uop[i].isStore) ? 1 : 0);
-                    OUT_branch.storeSqN <= IN_uop[i].storeSqN;
-                    OUT_branch.fetchID <= IN_uop[i].fetchID;
-                    OUT_branch.flush <= 0;
-                    OUT_branch.histAct <= HIST_NONE;
-                    OUT_branch.retAct <= RET_NONE;
-
-                    prevStoreConflict = 1;
-                    prevStoreConflictSqN = IN_uop[i].sqN;
-                end
-            end
-        
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
     end
-
 end
 
 endmodule

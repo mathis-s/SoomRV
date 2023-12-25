@@ -58,7 +58,7 @@ always_comb begin
     OUT_CACHE_addr = 'x;
     OUT_CACHE_data = 'x;
     
-    if (cur_c.valid) begin
+    if (cur_c.valid && IN_CACHE_ready) begin
         OUT_CACHE_ce = 0;
         OUT_CACHE_we = 0;
         OUT_CACHE_addr = cur_c.addr + $bits(cur_c.addr)'(cur_c.idx);

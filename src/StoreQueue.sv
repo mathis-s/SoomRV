@@ -28,7 +28,7 @@ module StoreQueue
     input BranchProv IN_branch,
     
     output ST_UOp OUT_uopSt,
-    output StFwdResult OUT_fwd[1:0],
+    output StFwdResult OUT_fwd[`NUM_AGUS-1:0],
     
     input ST_Ack IN_stAck,
     
@@ -127,7 +127,7 @@ always_comb begin
             empty = 0;
     end
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid && !evicted[i].issued) // todo: strict
+        if (evicted[i].valid && !evicted[i].issued)
             empty = 0;
     end
     if (IN_stAck.valid && IN_stAck.fail) empty = 0;

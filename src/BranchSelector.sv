@@ -6,6 +6,8 @@ module BranchSelector
 (
     input wire clk,
     input wire rst,
+
+    input IS_UOp IN_isUOps[3:0],
     
     input BranchProv IN_branches[NUM_BRANCHES-1:0],
     output BranchProv OUT_branch,
@@ -17,58 +19,44 @@ module BranchSelector
     input wire IN_mispredFlush
 );
 
+logic OUT_PERFC_branchMispr_c;
+BranchProv branch_c;
+always_ff@(posedge clk) OUT_branch <= branch_c;
+always_ff@(posedge clk) OUT_PERFC_branchMispr <= OUT_PERFC_branchMispr_c;
 
-SqN mispredFlushSqN;
-reg disableMispredFlush;
-
-always_comb begin
-    OUT_branch = 'x;
-    OUT_branch.flush = 0;
-    OUT_branch.taken = 0;
-    OUT_PERFC_branchMispr = 0;
-    
-    for (integer i = 0; i < 3; i=i+1) begin
-        if (IN_branches[i].taken && 
-            (!OUT_branch.taken || $signed(IN_branches[i].sqN - OUT_branch.sqN) < 0)) begin
-            OUT_branch.taken = 1;
-            OUT_branch.dstPC = IN_branches[i].dstPC;
-            OUT_branch.sqN = IN_branches[i].sqN;
-            OUT_branch.loadSqN = IN_branches[i].loadSqN;
-            OUT_branch.storeSqN = IN_branches[i].storeSqN;
-            if (i == 3)
-                OUT_branch.flush = IN_branches[i].flush;
-            OUT_branch.fetchID = IN_branches[i].fetchID;
-
-            OUT_branch.histAct = IN_branches[i].histAct;
-            OUT_branch.retAct = IN_branches[i].retAct;
-            
-            if (i < 2 && !IN_mispredFlush) OUT_PERFC_branchMispr = 1;
-        end
-    end
-    
-    if (IN_branches[3].taken && 
-        (!IN_mispredFlush || $signed(IN_branches[3].sqN - mispredFlushSqN) < 0)) begin
-        OUT_branch.taken = 1;
-        OUT_branch.dstPC = IN_branches[3].dstPC;
-        OUT_branch.sqN = IN_branches[3].sqN;
-        OUT_branch.loadSqN = IN_branches[3].loadSqN;
-        OUT_branch.storeSqN = IN_branches[3].storeSqN;
-        OUT_branch.flush = IN_branches[3].flush;
-        OUT_branch.fetchID = IN_branches[3].fetchID;
-        OUT_branch.histAct = IN_branches[3].histAct;
-        OUT_branch.retAct = IN_branches[3].retAct;
-        OUT_PERFC_branchMispr = 0;
-    end
-end
+logic[0:0] priorityPort;
 
 always_ff@(posedge clk) begin
-    
-    if (rst) begin
-        mispredFlushSqN <= 0;
-        disableMispredFlush <= 0;
+    priorityPort <= $signed(IN_isUOps[1].sqN - IN_isUOps[0].sqN) > 0;
+end
+
+BranchProv intPortBranch;
+always_comb begin
+    if (IN_branches[0].taken && (!IN_branches[1].taken || priorityPort))
+        intPortBranch = IN_branches[0];
+    else
+        intPortBranch = IN_branches[1];
+end
+
+wire BranchProv[1:0] compBranches = {IN_branches[2], intPortBranch};
+
+always_comb begin
+
+    branch_c = 'x;
+    branch_c.flush = 0;
+    branch_c.taken = 0;
+    OUT_PERFC_branchMispr_c = 0;
+
+    if (compBranches[0].taken && (!compBranches[1].taken || ($signed(compBranches[0].sqN - compBranches[1].sqN) < 0))) begin
+        branch_c = compBranches[0];
+        OUT_PERFC_branchMispr_c = 1;
     end
-    else if (OUT_branch.taken) begin
-        mispredFlushSqN <= OUT_branch.sqN;
+    else
+        branch_c = compBranches[1];
+    
+    if (IN_branches[3].taken) begin
+        branch_c = IN_branches[3];
+        OUT_PERFC_branchMispr_c = 0;
     end
 end
 

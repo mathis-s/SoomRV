@@ -4,6 +4,8 @@ module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
     input wire rst,
     input wire en,
 
+    input wire IN_irq,
+
     output wire OUT_powerOff,
     output wire OUT_reboot,
     
@@ -121,6 +123,8 @@ Core core
     .clk(clk),
     .rst(rst),
     .en(en),
+    
+    .IN_irq(IN_irq),
     
     .IF_cache(IF_cache),
     .IF_ct(IF_ct),
@@ -307,6 +311,7 @@ MemRTL#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 128) icache
     .IN_addr1(IF_icache.raddr[11:4]),
     .OUT_data1(IF_icache.rdata)
 );
+assign IF_icache.busy = 0;
 
 MMIO mmio
 (

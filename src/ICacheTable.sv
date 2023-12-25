@@ -20,15 +20,27 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     input RetStackIdx_t IN_rIdx,
     input FetchOff_t IN_lastValid,
     
+    // bp file write (data to write is in BP,
+    // we only provide the address)
+    output logic OUT_bpFileWE,
+    output FetchID_t OUT_bpFileAddr,
+
     // pc file write
-    output FetchID_t OUT_fetchID,
     output logic OUT_pcFileWE,
+    output FetchID_t OUT_pcFileAddr,
     output PCFileEntry OUT_pcFileEntry,
     
     // miss
     output logic OUT_icacheMiss,
     output FetchID_t OUT_icacheMissFetchID,
     output logic[31:0] OUT_icacheMissPC,
+
+    // branch mispredict handling
+    output DecodeBranchProv OUT_decBranch,
+    output BTUpdate OUT_btUpdate,
+    output ReturnDecUpdate OUT_retUpdate,
+
+    input wire[30:0] IN_lateRetAddr,
 
     IF_ICache.HOST IF_icache,
     IF_ICTable.HOST IF_ict,
@@ -46,17 +58,52 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     input MemController_Res IN_memc
 );
 
-always_comb begin
-    OUT_pcFileWE = 0;
-    OUT_pcFileEntry = 'x;
-    if (fetch0.valid) begin
-        OUT_pcFileWE = 1;
-        OUT_pcFileEntry.pc = fetch0.pc[31:1];
-        OUT_pcFileEntry.branchPos = IN_predBranch.offs;
-        OUT_pcFileEntry.bpi.predicted = IN_predBranch.valid;
-        OUT_pcFileEntry.bpi.taken = IN_predBranch.taken;
-        OUT_pcFileEntry.bpi.isJump = IN_predBranch.isJump;
+logic BH_endOffsetValid;
+FetchOff_t BH_endOffset;
+
+logic BH_newPredTaken;
+FetchOff_t BH_newPredPos;
+BranchHandler branchHandler
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_lateRetAddr({IN_lateRetAddr, 1'b0}),
+
+    .IN_clear(IN_mispr),
+    .IN_accept(packet.valid),
+    .IN_op(fetch1),
+    .IN_instrs(IF_icache.rdata[assocHit]),
+
+    .OUT_decBranch(OUT_decBranch),
+    .OUT_btUpdate(OUT_btUpdate),
+    .OUT_retUpdate(OUT_retUpdate),
+    .OUT_endOffsValid(BH_endOffsetValid),
+    .OUT_endOffs(BH_endOffset),
+
+    .OUT_newPredTaken(BH_newPredTaken),
+    .OUT_newPredPos(BH_newPredPos)
+);
+
+
+
+always_ff@(posedge clk) begin
+    OUT_pcFileWE <= 0;
+    OUT_pcFileEntry <= 'x;
+    if (rst) ;
+    else if (fetch1.valid) begin
+        OUT_pcFileWE <= 1;
+        OUT_pcFileAddr <= fetch1.fetchID;
+        OUT_pcFileEntry.pc <= fetch1.pc[31:1];
+        OUT_pcFileEntry.branchPos <= packetRePred.predPos;
+        OUT_pcFileEntry.bpi.predicted <= fetch1.bpi.predicted;
+        OUT_pcFileEntry.bpi.taken <= packetRePred.predTaken;
     end
+end
+
+always_comb begin
+    OUT_bpFileWE = fetch0.valid;
+    OUT_bpFileAddr = fetchID;
 end
 
 always_comb begin
@@ -67,10 +114,13 @@ always_comb begin
     if ($signed(FIFO_free - $clog2(FIFO_SIZE)'(fetch0.valid) - $clog2(FIFO_SIZE)'(fetch1.valid) - 1) <= -1)
         OUT_stall = 1;
 
-    if (IN_ROB_curFetchID == (OUT_fetchID + FetchID_t'(fetch0.valid)))
+    if (IN_ROB_curFetchID == (fetchID + FetchID_t'(fetch0.valid)))
         OUT_stall = 1;
 
     if (flushState != FLUSH_IDLE)
+        OUT_stall = 1;
+
+    if (IF_icache.busy)
         OUT_stall = 1;
 
     // Could possibly check if cache line at PC is currently
@@ -89,9 +139,9 @@ always_comb begin
 
     if (IN_ifetchOp.valid && !OUT_stall) begin
         IF_icache.re = 1;
-        IF_icache.raddr = IN_ifetchOp.pc[11:0];
+        IF_icache.raddr = IN_ifetchOp.pc[`VIRT_IDX_LEN-1:0];
         IF_ict.re = 1;
-        IF_ict.raddr = IN_ifetchOp.pc[11:0];
+        IF_ict.raddr = IN_ifetchOp.pc[`VIRT_IDX_LEN-1:0];
     end
 end
 
@@ -167,7 +217,7 @@ always_comb begin
         // Check cache tags
         if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
             for (integer i = 0; i < `CASSOC; i=i+1) begin
-                if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == phyPC[31:12]) begin
+                if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == phyPC[31:`VIRT_IDX_LEN]) begin
                     assert(!cacheHit);
                     cacheHit = 1;
                     doCacheLoad = 0;
@@ -187,10 +237,10 @@ always_comb begin
         end
         
         if (packet.fetchFault != IF_FAULT_NONE) begin
-            packet.pc = fetch1.pc[31:4];
-            packet.firstValid = fetch1.pc[3:1];
-            packet.lastValid = fetch1.pc[3:1];
-            packet.predPos = 3'b111;
+            packet.pc = fetch1.pc[31:`FSIZE_E];
+            packet.firstValid = fetch1.pc[1+:$bits(FetchOff_t)];
+            packet.lastValid = fetch1.pc[1+:$bits(FetchOff_t)];
+            packet.predPos = {$bits(FetchOff_t){1'b1}};
             packet.predTaken = 0;
             packet.predTarget = 'x;
             packet.rIdx = fetch1.rIdx;
@@ -199,8 +249,8 @@ always_comb begin
             packet.valid = 1;
         end
         else if (!tlbMiss && cacheHit) begin
-            packet.pc = fetch1.pc[31:4];
-            packet.firstValid = fetch1.pc[3:1];
+            packet.pc = fetch1.pc[31:`FSIZE_E];
+            packet.firstValid = fetch1.pc[1+:$bits(FetchOff_t)];
             packet.lastValid = fetch1.lastValid;
             packet.predPos = fetch1.predPos;
             packet.predTaken = fetch1.bpi.taken;
@@ -208,6 +258,37 @@ always_comb begin
             packet.rIdx = fetch1.rIdx;
             packet.fetchID = fetch1.fetchID;
             packet.valid = 1;
+        end
+    end
+end
+
+// Apply post-BranchHandler corrected branch pred metadata
+// to the fetch package.
+IF_Instr packetRePred;
+always_comb begin
+    packetRePred = packet;
+    
+    if (packetRePred.fetchFault != IF_FAULT_NONE) ;
+    else begin
+        if (BH_endOffsetValid) begin
+            if (BH_endOffset == 0) begin
+                packetRePred = 'x;
+                packetRePred.valid = 0;
+            end
+            else begin
+                packetRePred.lastValid = BH_endOffset - 1;
+            end
+
+            if (packetRePred.firstValid > packetRePred.lastValid) begin
+                packetRePred = 'x;
+                packetRePred.valid = 0;
+            end
+        end
+
+        if (OUT_decBranch.taken) begin
+            packetRePred.predTarget = OUT_decBranch.dst;
+            packetRePred.predPos = BH_newPredPos;
+            packetRePred.predTaken = BH_newPredTaken;
         end
     end
 end
@@ -245,9 +326,11 @@ always_comb begin
     end
     else if (cacheMiss && doCacheLoad && !IN_mispr) begin
         OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
-        OUT_memc_c.cacheAddr = {assocCnt, phyPC[11:4], 2'b0};
-        OUT_memc_c.readAddr = {phyPC[31:4], 4'b0};
+        OUT_memc_c.cacheAddr = {assocCnt, phyPC[`VIRT_IDX_LEN-1:4], 2'b0};
+        OUT_memc_c.readAddr = {phyPC[31:4], 4'b0}; // todo: adjust alignment based on AXI width
         OUT_memc_c.cacheID = 1;
+        OUT_memc_c.data = 0;
+        OUT_memc_c.mask = 0;
         handlingMiss = 1;
     end
 end
@@ -266,9 +349,9 @@ always_comb begin
     end
     else if (handlingMiss) begin
         IF_ict.wdata.valid = 1;
-        IF_ict.wdata.addr = phyPC[31:12];
+        IF_ict.wdata.addr = phyPC[31:`VIRT_IDX_LEN];
         IF_ict.wassoc = assocCnt;
-        IF_ict.waddr = phyPC[11:0];
+        IF_ict.waddr = phyPC[`VIRT_IDX_LEN-1:0];
         IF_ict.we = 1;
     end
 end
@@ -296,8 +379,8 @@ FIFO#($bits(IF_Instr), FIFO_SIZE, 1, 1) outFIFO
     .rst(rst || IN_mispr),
     .free(FIFO_free),
 
-    .IN_valid(packet.valid),
-    .IN_data(packet),
+    .IN_valid(packetRePred.valid),
+    .IN_data(packetRePred),
     .OUT_ready(FIFO_ready),
 
     .OUT_valid(FIFO_outValid),
@@ -310,13 +393,13 @@ always_comb begin
     if (FIFO_outValid)
         OUT_instrs = FIFO_out;
 end
+
 always_ff@(posedge clk) begin
-    if (!(rst || IN_mispr) && packet.valid)
+    if (!(rst || IN_mispr) && packetRePred.valid)
         assert(FIFO_ready);
 end
 
 FetchID_t fetchID /* verilator public */;
-assign OUT_fetchID = fetchID;
 
 // pipeline
 FetchID_t fetchID_c;
@@ -345,6 +428,9 @@ always_ff@(posedge clk) begin
     else if (IN_mispr) begin
         fetchID <= IN_misprFetchID + 1;
     end
+    else if (OUT_decBranch.taken) begin
+        fetchID <= OUT_decBranch.fetchID + 1;
+    end
     else begin
         if (cacheMiss || tlbMiss) begin
             // miss, flush pipeline
@@ -358,10 +444,10 @@ always_ff@(posedge clk) begin
                 fetch1 <= fetch0;
                 fetch1.fetchID <= fetchID;
                 fetch1.lastValid <= IN_lastValid;
-                fetch1.predPos <= IN_predBranch.valid ? IN_predBranch.offs : 3'b111;
+                fetch1.predPos <= IN_predBranch.valid ? IN_predBranch.offs : {$bits(FetchOff_t){1'b1}};
+                fetch1.predDirOnly <= IN_predBranch.dirOnly;
                 fetch1.bpi.predicted <= IN_predBranch.valid;
                 fetch1.bpi.taken <= IN_predBranch.taken;
-                fetch1.bpi.isJump <= IN_predBranch.isJump;
                 fetch1.predTarget <= IN_predBranch.dst;
                 fetch1.rIdx <= IN_rIdx;
 

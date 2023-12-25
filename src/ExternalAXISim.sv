@@ -4,7 +4,7 @@
 `define SERIAL_ADDR 32'h1000_0000
 
 module ExternalAXISim
-#(parameter ID_LEN=`AXI_ID_LEN, parameter WIDTH=128, parameter ADDR_LEN=32)
+#(parameter ID_LEN=`AXI_ID_LEN, parameter WIDTH=`AXI_WIDTH, parameter ADDR_LEN=32)
 (
     input wire clk,
     input wire rst,

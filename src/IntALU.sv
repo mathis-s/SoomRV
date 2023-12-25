@@ -61,6 +61,12 @@ wire[31:0] pcPlus4 = IN_uop.pc + 4;
 always_comb begin
     case (IN_uop.opcode)
         INT_AUIPC: resC = IN_uop.pc + imm;
+        LSU_SB_PREINC,
+        LSU_SH_PREINC,
+        LSU_SW_PREINC,
+        LSU_SB_POSTINC,
+        LSU_SH_POSTINC,
+        LSU_SW_POSTINC,
         ATOMIC_AMOADD_W, INT_ADD: resC = srcA + srcB;
         ATOMIC_AMOXOR_W, INT_XOR: resC = srcA ^ srcB;
         ATOMIC_AMOOR_W, INT_OR: resC = srcA | srcB;
@@ -95,9 +101,11 @@ always_comb begin
         INT_CPOP: resC = {26'b0, resPopCnt};
         INT_ORC_B: resC = {{{4'd8}{|srcA[31:24]}}, {{4'd8}{|srcA[23:16]}}, {{4'd8}{|srcA[15:8]}}, {{4'd8}{|srcA[7:0]}}};
         INT_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
+`ifdef ENABLE_FP
         INT_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
         INT_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
         INT_FSGNJX_S: resC = {srcA[31] ^ srcB[31], srcA[30:0]};
+`endif
         default: resC = 32'bx;
     endcase
     
@@ -155,117 +163,131 @@ end
 
 wire[31:0] finalHalfwPC = IN_uop.compressed ? IN_uop.pc : pcPlus2;
 
+
+BranchProv branch_c;
+BTUpdate btUpdate_c;
+
+always_ff@(posedge clk) OUT_btUpdate <= btUpdate_c;
+assign OUT_branch = branch_c;
+
+always_comb begin
+    
+    branch_c = 'x;
+    branch_c.taken = 0;
+    btUpdate_c = 'x;
+    btUpdate_c.valid = 0;
+
+    if (rst) ;
+    else if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+        branch_c.sqN = IN_uop.sqN;
+        branch_c.loadSqN = IN_uop.loadSqN;
+        branch_c.storeSqN = IN_uop.storeSqN;
+        
+        btUpdate_c.valid = 0;
+        branch_c.taken = 0;
+        branch_c.flush = 0;
+        
+        branch_c.fetchID = IN_uop.fetchID;
+        branch_c.histAct = HIST_NONE;
+        branch_c.retAct = RET_NONE;
+        
+        if (isBranch) begin
+            // Send branch target to BTB if unknown.
+            if (branchTaken && !IN_uop.bpi.predicted) begin
+                // Uncompressed branches are predicted only when their second halfword is fetched
+                btUpdate_c.src = finalHalfwPC;
+                btUpdate_c.fetchStartOffs = IN_uop.fetchStartOffs;
+                btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
+                btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
+                btUpdate_c.isJump = 0;
+                btUpdate_c.isCall = 0;
+                btUpdate_c.compressed = IN_uop.compressed;
+                btUpdate_c.clean = 0;
+                btUpdate_c.valid = 1;
+            end
+            if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL) begin
+                if (branchTaken) begin
+                    branch_c.dstPC = (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                    btUpdate_c.dst = (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
+                end
+                else if (IN_uop.compressed) begin
+                    branch_c.dstPC = pcPlus2;
+                    btUpdate_c.dst = pcPlus2;
+                end
+                else begin
+                    branch_c.dstPC = pcPlus4;
+                    btUpdate_c.dst = pcPlus4;
+                end
+                branch_c.taken = 1;
+                
+                // if predicted but wrong, correct existing history bit
+                if (IN_uop.bpi.predicted)
+                    branch_c.histAct = branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
+                // else append to history
+                else begin
+                    assert(branchTaken);
+                    branch_c.histAct = HIST_APPEND_1;
+                end
+            end
+        end
+        // Check speculated return address
+        else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
+            if (!indBranchCorrect) begin
+                branch_c.dstPC = indBranchDst;
+                branch_c.taken = 1;
+                
+                if (IN_uop.opcode == INT_V_RET)
+                    branch_c.retAct = RET_POP;
+                if (IN_uop.opcode == INT_V_JALR)
+                    branch_c.retAct = RET_PUSH;
+                
+                if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
+                    btUpdate_c.src = finalHalfwPC;
+                    btUpdate_c.fetchStartOffs = IN_uop.fetchStartOffs;
+                    btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
+                    btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
+                    btUpdate_c.dst = indBranchDst;
+                    btUpdate_c.isJump = 1;
+                    btUpdate_c.isCall = (IN_uop.opcode == INT_V_JALR);
+                    btUpdate_c.compressed = IN_uop.compressed;
+                    btUpdate_c.clean = 0;
+                    btUpdate_c.valid = 1;
+                end
+            end
+        end
+    end
+end
+
+
 always_ff@(posedge clk) begin
     
     OUT_uop <= 'x;
-    OUT_branch <= 'x;
-    OUT_btUpdate <= 'x;
     OUT_uop.valid <= 0;
-    OUT_branch.taken <= 0;
-    OUT_btUpdate.valid <= 0;
     OUT_amoData <= 'x;
     OUT_amoData.valid <= 0;
 
-    if (!rst) begin
-        if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
-            OUT_branch.sqN <= IN_uop.sqN;
-            OUT_branch.loadSqN <= IN_uop.loadSqN;
-            OUT_branch.storeSqN <= IN_uop.storeSqN;
-            
-            OUT_btUpdate.valid <= 0;
-            OUT_branch.taken <= 0;
-            OUT_branch.flush <= 0;
-            
-            OUT_branch.fetchID <= IN_uop.fetchID;
-            OUT_branch.histAct <= HIST_NONE;
-            OUT_branch.retAct <= RET_NONE;
-            
-            if (isBranch) begin
-                // Send branch target to BTB if unknown.
-                if (branchTaken && !IN_uop.bpi.predicted) begin
-                    // Uncompressed branches are predicted only when their second halfword is fetched
-                    OUT_btUpdate.src <= finalHalfwPC;
-                    OUT_btUpdate.fetchStartOffs <= IN_uop.fetchStartOffs;
-                    OUT_btUpdate.multiple <= (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
-                    OUT_btUpdate.multipleOffs <= IN_uop.fetchPredOffs + 1;
-                    OUT_btUpdate.isJump <= 0;
-                    OUT_btUpdate.isCall <= 0;
-                    OUT_btUpdate.compressed <= IN_uop.compressed;
-                    OUT_btUpdate.clean <= 0;
-                    OUT_btUpdate.valid <= 1;
-                end
-                if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL) begin
-                    if (branchTaken) begin
-                        OUT_branch.dstPC <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                        OUT_btUpdate.dst <= (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                    end
-                    else if (IN_uop.compressed) begin
-                        OUT_branch.dstPC <= pcPlus2;
-                        OUT_btUpdate.dst <= pcPlus2;
-                    end
-                    else begin
-                        OUT_branch.dstPC <= pcPlus4;
-                        OUT_btUpdate.dst <= pcPlus4;
-                    end
-                    OUT_branch.taken <= 1;
-                    
-                    // if predicted but wrong, correct existing history bit
-                    if (IN_uop.bpi.predicted)
-                        OUT_branch.histAct <= branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
-                    // else append to history
-                    else begin
-                        assert(branchTaken);
-                        OUT_branch.histAct <= HIST_APPEND_1;
-                    end
-                end
-            end
-            // Check speculated return address
-            else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
-                if (!indBranchCorrect) begin
-                    OUT_branch.dstPC <= indBranchDst;
-                    OUT_branch.taken <= 1;
-                    
-                    if (IN_uop.opcode == INT_V_RET)
-                        OUT_branch.retAct <= RET_POP;
-                    if (IN_uop.opcode == INT_V_JALR)
-                        OUT_branch.retAct <= RET_PUSH;
-                    
-                    if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
-                        OUT_btUpdate.src <= finalHalfwPC;
-                        OUT_btUpdate.fetchStartOffs <= IN_uop.fetchStartOffs;
-                        OUT_btUpdate.multiple <= (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
-                        OUT_btUpdate.multipleOffs <= IN_uop.fetchPredOffs + 1;
-                        OUT_btUpdate.dst <= indBranchDst;
-                        OUT_btUpdate.isJump <= 1;
-                        OUT_btUpdate.isCall <= (IN_uop.opcode == INT_V_JALR);
-                        OUT_btUpdate.compressed <= IN_uop.compressed;
-                        OUT_btUpdate.clean <= 0;
-                        OUT_btUpdate.valid <= 1;
-                    end
-                end
-            end
+    if (rst) ;
+    else if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+        OUT_uop.result <= resC;
+        OUT_uop.tagDst <= IN_uop.tagDst;
+        OUT_uop.doNotCommit <= IN_uop.fu == FU_AGU;
+        OUT_uop.sqN <= IN_uop.sqN;
 
-            OUT_uop.result <= resC;
-            OUT_uop.tagDst <= IN_uop.tagDst;
-            OUT_uop.doNotCommit <= 0;
-            OUT_uop.sqN <= IN_uop.sqN;
-
-            if (IN_uop.opcode >= ATOMIC_AMOADD_W) begin
-                OUT_amoData.valid <= 1;
-                OUT_amoData.result <= resC;
-                OUT_amoData.storeSqN <= IN_uop.storeSqN;
-                OUT_amoData.sqN <= IN_uop.sqN;
-            end
-            
-            if (isBranch && IN_uop.bpi.predicted)
-                OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
-            else if (isBranch)
-                OUT_uop.flags <= FLAGS_BRANCH;
-            else
-                OUT_uop.flags <= flags;
-            
-            OUT_uop.valid <= 1;
+        if (IN_uop.opcode >= ATOMIC_AMOADD_W) begin
+            OUT_amoData.valid <= 1;
+            OUT_amoData.result <= resC;
+            OUT_amoData.storeSqN <= IN_uop.storeSqN;
+            OUT_amoData.sqN <= IN_uop.sqN;
         end
+        
+        if (isBranch)
+            OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
+        else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR)
+            OUT_uop.flags <= FLAGS_BRANCH;
+        else
+            OUT_uop.flags <= flags;
+        
+        OUT_uop.valid <= 1;
     end
 end
 endmodule

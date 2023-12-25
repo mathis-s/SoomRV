@@ -24,7 +24,7 @@ module IssueQueue
     input wire IN_stall,
     input wire IN_doNotIssueFU1,
     input wire IN_doNotIssueFU2,
-    
+
     input R_UOp IN_uop[NUM_UOPS-1:0],
     input wire IN_uopOrdering[NUM_UOPS-1:0],
     
@@ -38,7 +38,7 @@ module IssueQueue
     
     // All ops that are being issued (including OUT_uop)
     // For operand forwarding
-    input IS_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
+    input IS_UOp IN_issueUOps[NUM_UOPS-1:0],
     
     input SqN IN_maxStoreSqN,
     input SqN IN_maxLoadSqN,
@@ -219,7 +219,7 @@ always_ff@(posedge clk) begin
                         issued = 1;
                         OUT_uop.valid <= 1;
                         
-                        OUT_uop.imm <= {{(IMM_EXT){1'b0}}, queue[i].imm[REGULAR_IMM_BITS-1:0]};
+                        OUT_uop.imm <= {{(IMM_EXT){queue[i].imm[REGULAR_IMM_BITS-1]}}, queue[i].imm[REGULAR_IMM_BITS-1:0]};
                         
                         OUT_uop.tagA <= queue[i].tags[0];
                         

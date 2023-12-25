@@ -106,10 +106,10 @@ always_comb begin
 
     OUT_predBr = '0;
     OUT_predBr.dst = OUT_curRetAddr;
-    OUT_predBr.offs = 3'b111;
+    OUT_predBr.offs = {$bits(FetchOff_t){1'b1}};
 
     OUT_pc = pcReg; // current cycle's PC
-    OUT_lastOffs = 3'b111; // last valid offset for last cycle's PC
+    OUT_lastOffs = {$bits(FetchOff_t){1'b1}};; // last valid offset for last cycle's PC
     
     if (ignorePred) begin
         // ignore
@@ -123,9 +123,9 @@ always_comb begin
             OUT_pc = OUT_predBr.dst;
             OUT_lastOffs = OUT_predBr.offs;
         end
-        if (OUT_predBr.multiple && OUT_predBr.offs != 3'b111) begin
+        if (OUT_predBr.multiple && OUT_predBr.offs != {$bits(FetchOff_t){1'b1}}) begin
             OUT_lastOffs = OUT_predBr.offs;
-            OUT_pc = {pcRegNoInc[30:3], OUT_predBr.offs + 1'b1};
+            OUT_pc = {pcRegNoInc[30:$bits(FetchOff_t)], OUT_predBr.offs + 1'b1};
         end
     end
     else if (RET_br.valid) begin
@@ -133,11 +133,19 @@ always_comb begin
         OUT_pc = OUT_predBr.dst;
         OUT_lastOffs = OUT_predBr.offs;
     end
+    else if (TAGE_taken) begin
+        // No target found, but we still output the taken
+        // direction prediction.
+        OUT_predBr.valid = 1;
+        OUT_predBr.dirOnly = 1;
+        OUT_predBr.taken = 1;
+    end
 end
 
 PredBranch BTB_br;
 assign BTB_br.taken = 'x;
 assign BTB_br.isRet = 0;
+assign BTB_br.dirOnly = 0;
 
 wire BTB_multipleBranches;
 BranchTargetBuffer btb
@@ -282,7 +290,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (IN_pcValid) begin
-            pcReg <= {OUT_pc[30:3] + 1'b1, 3'b0};
+            pcReg <= {OUT_pc[30:$bits(FetchOff_t)] + 1'b1, $bits(FetchOff_t)'(1'b0)};
             pcRegNoInc <= OUT_pc;
             ignorePred <= 0;
         end

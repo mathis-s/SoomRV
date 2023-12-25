@@ -3,12 +3,14 @@ module TLBMissQueue#(parameter SIZE=4)
     input wire clk,
     input wire rst,
 
+    output reg[$clog2(SIZE):0] OUT_free,
+    output wire OUT_ready,
+
     input BranchProv IN_branch,
     input VirtMemState IN_vmem,
     input PageWalk_Res IN_pw,
     input wire IN_pwActive,
     
-    output reg OUT_stall,
     input wire IN_enqueue,
     input wire IN_uopReady,
     input AGU_UOp IN_uop,
@@ -27,14 +29,24 @@ reg idxInValid;
 always_comb begin
     idxInValid = 0;
     idxIn = 'x;
-    OUT_stall = 1;
     for (integer i = 0; i < SIZE; i=i+1) begin
         if (!queue[i].valid) begin
             idxIn = i[ID_LEN-1:0];
-            if (idxInValid) OUT_stall = 0;
             idxInValid = 1;
         end
     end
+end
+
+assign OUT_ready = idxInValid;
+
+always_comb begin
+
+    reg[1:0] stage0[1:0];
+    stage0[0] = (!queue[0].valid) + (!queue[1].valid);
+    stage0[1] = (!queue[2].valid) + (!queue[3].valid);
+
+    OUT_free = stage0[0] + stage0[1] - $clog2(SIZE)'(IN_enqueue && IN_uop.valid);
+    if (OUT_free != 0) OUT_free = OUT_free - $clog2(SIZE)'(OUT_uop.valid);
 end
 
 // Index out
@@ -55,14 +67,12 @@ end
 
 always_ff@(posedge clk) begin
     if (rst) begin
-`ifdef SYNC_RESET
         for (integer i = 0; i < SIZE; i=i+1) begin
             queue[i] <= 'x;
             queue[i].valid <= 0;
         end
         OUT_uop <= 'x;
         OUT_uop.valid <= 0;
-`endif
     end
     else begin
 

@@ -9,6 +9,7 @@
 `define TAGE_CLEAR_INTERVAL 20
 
 // IFetch
+`define FSIZE_E 4
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
@@ -51,36 +52,39 @@
 `define MTIME_ADDR 32'h1100_bff8
 `define MTIMECMP_ADDR 32'h1100_4000
 
-`define CACHE_SIZE_E 14
-`define CLSIZE_E 6
+`define VIRT_IDX_LEN 12 // at most 12
 `define CASSOC 4
+`define CACHE_SIZE_E (`VIRT_IDX_LEN + $clog2(`CASSOC))
+`define CLSIZE_E 6
 
 `define CBANKS 4
 `define CWIDTH 4
 
 `define AXI_NUM_TRANS 4
+`define AXI_WIDTH 128
 `define AXI_ID_LEN $clog2(`AXI_NUM_TRANS)
 
-// External MMIO
-// - IS_MMIO_PMA must be true for this range.
-// - The upper three bits are not passed on to
-//   the external memory controller.
 `define ENABLE_EXT_MMIO 1
 `define EXT_MMIO_START_ADDR 32'h1000_0000
 `define EXT_MMIO_END_ADDR   32'h1100_0000
 
-// 256 MiB main memory (TODO: make adjustable!) or MMIO
-`define IS_LEGAL_ADDR(addr) \
-    (((addr) >= 32'h80000000 && (addr) < 32'h90000000) || \
-    (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000 && (addr) < 32'h12000000))
+`define IS_MEM_PMA(addr) \
+    ((addr) >= 32'h80000000 && (addr) < 32'h90000000)
 
-// Un-defining this disables synchronous reset for some memories.
-// This is useful for mapping to FPGA memories, which are reset
-// after programming anyways.
-`define SYNC_RESET
+// 256 MiB main memory or MMIO
+`define IS_LEGAL_ADDR(addr) \
+    (`IS_MEM_PMA(addr) || \
+    (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000))
+
+
 //`define SQ_LINEAR
 
 // Enable floating point (zfinx) support
 //`define ENABLE_FP
 
 `define NUM_AGUS 2
+`define NUM_TAGS 64
+
+`define ENABLE_INT_DIV
+`define ENABLE_INT_MUL
+`define ENABLE_ZCB
