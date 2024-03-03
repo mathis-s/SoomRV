@@ -16,12 +16,12 @@ always_comb begin
         OUT_pwLdStall[i] = 0;
         OUT_aguLdStall[i] = 0;
 
-        if (IN_pwLd[i].valid) begin
-            OUT_pwLdStall[i] = IN_aguLd[i].valid || IN_ldUOpStall[i];
+        if (IN_aguLd[i].valid) begin
+            OUT_aguLdStall[i] = IN_pwLd[i].valid || IN_ldUOpStall[i];
         end
 
-        if (IN_aguLd[i].valid) begin
-            OUT_aguLdStall[i] = IN_ldUOpStall[i];
+        if (IN_pwLd[i].valid) begin
+            OUT_pwLdStall[i] = IN_ldUOpStall[i];
         end
     end
 end
@@ -30,6 +30,10 @@ always_comb begin
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
         OUT_ldUOp[i] = 'x;
         OUT_ldUOp[i].valid = 0;
+
+        if (IN_aguLd[i].valid) begin
+            OUT_ldUOp[i] = IN_aguLd[i];
+        end
 
         if (IN_pwLd[i].valid) begin
             OUT_ldUOp[i].data = 'x;
@@ -45,10 +49,6 @@ always_comb begin
             OUT_ldUOp[i].exception = AGU_NO_EXCEPTION;
             OUT_ldUOp[i].isMMIO = 0;
             OUT_ldUOp[i].valid = IN_pwLd[i].valid;
-        end
-
-        if (IN_aguLd[i].valid) begin
-            OUT_ldUOp[i] = IN_aguLd[i];
         end
     end
 end
