@@ -629,6 +629,8 @@ SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd[`NUM_AGUS-1:0];
 LD_UOp LB_aguUOpLd[`NUM_AGUS-1:0];
 
+wire LB_maxComLdSqNValid;
+SqN LB_maxComLdSqN;
 LoadBuffer lb
 (
     .clk(clk),
@@ -650,7 +652,10 @@ LoadBuffer lb
     .IN_branch(branch),
     .OUT_branch(branchProvs[2]),
     
-    .OUT_maxLoadSqN(LB_maxLoadSqN)
+    .OUT_maxLoadSqN(LB_maxLoadSqN),
+    
+    .OUT_maxComLdSqNValid(LB_maxComLdSqNValid),
+    .OUT_maxComLdSqN(LB_maxComLdSqN)
 );
 
 wire CSR_we;
@@ -868,6 +873,9 @@ ROB rob
 
     .IN_branch(branch),
     .IN_sqInfo(SQ_info),
+
+    .IN_maxComLdSqNValid(LB_maxComLdSqNValid),
+    .IN_maxComLdSqN(LB_maxComLdSqN),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),

@@ -76,8 +76,6 @@ R_ST_UOp queue[SIZE-1:0];
 reg[$clog2(SIZE):0] insertIndex;
 reg[32:0] reservedWBs;
 
-//assign OUT_full = insertIndex > (SIZE-NUM_UOPS);
-
 reg[NUM_OPERANDS-1:0] newAvail[SIZE-1:0];
 reg[NUM_OPERANDS-1:0] newAvail_dl[SIZE-1:0];
 
@@ -127,8 +125,8 @@ always_comb begin
         // check if this is a candidate to enqueue
         if (IN_uop[i].validIQ[PORT_IDX] &&
             
-            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SB) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
-            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SB) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0]) || PORT_IDX == 0) &&
 
             ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) || 
@@ -206,15 +204,16 @@ always_ff@(posedge clk) begin
                         ((FU0 != FU_CSR && FU1 != FU_CSR && FU2 != FU_CSR && FU3 != FU_CSR) ||
                             queue[i].fu != FU_CSR || (i == 0 && queue[i].sqN == IN_commitSqN)) &&
                         
-                        // Only issue stores that fit into store queue
-                        //((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
-                        //    queue[i].fu != FU_AGU || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
-                        
                         // Only issue loads that fit into load order buffer
                         ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
-                            (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) || (queue[i].opcode >= LSU_SB && queue[i].opcode < ATOMIC_AMOSWAP_W) || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0)
-                        
-                        ) begin
+                            (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) || 
+                            (queue[i].opcode >= LSU_SC_W && queue[i].opcode < ATOMIC_AMOSWAP_W) || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0) &&
+
+                        // Issue SCs in order (currently we don't have a recovery mechanism for reservations)
+                        ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) ||
+                            queue[i].fu != FU_AGU || queue[i].opcode != LSU_SC_W || 
+                                (i == 0 && queue[i].sqN == IN_commitSqN))
+                    ) begin
                         
                         issued = 1;
                         OUT_uop.valid <= 1;

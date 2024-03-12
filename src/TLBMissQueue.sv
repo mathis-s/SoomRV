@@ -45,7 +45,7 @@ always_comb begin
     stage0[0] = (!queue[0].valid) + (!queue[1].valid);
     stage0[1] = (!queue[2].valid) + (!queue[3].valid);
 
-    OUT_free = stage0[0] + stage0[1] - $clog2(SIZE)'(IN_enqueue && IN_uop.valid);
+    OUT_free = stage0[0] + stage0[1];// - $clog2(SIZE)'(IN_enqueue && IN_uop.valid);
     if (OUT_free != 0) OUT_free = OUT_free - $clog2(SIZE)'(OUT_uop.valid);
 end
 

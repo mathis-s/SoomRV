@@ -92,10 +92,10 @@ typedef enum logic[5:0]
     LSU_LHU,
     LSU_LR_W,
 
+    LSU_SC_W,
     LSU_SB,
     LSU_SH,
     LSU_SW,
-    LSU_SC_W,
     
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
@@ -597,6 +597,7 @@ typedef struct packed
     logic[1:0] size;
     logic isStore; // both isLoad and isStore may be set (for atomics)
     logic isLoad;
+    logic isLrSc;
     logic earlyLoadFailed;
     logic[31:0] pc;
     Tag tagDst;

@@ -38,7 +38,7 @@ endfunction
 reg pageWalkActive;
 reg pageWalkAccepted;
 reg eldIsPageWalkOp;
-assign OUT_stall = 1'b0;
+assign OUT_stall = (OUT_TMQ_free == 0);
 
 
 wire[31:0] addr = IN_uop.srcA + (IN_uop.opcode >= LSU_SB_POSTINC ? 0 : IN_uop.srcB);
@@ -62,11 +62,12 @@ always_comb begin
     aguUOp_c.storeSqN = IN_uop.storeSqN;
     aguUOp_c.loadSqN = IN_uop.loadSqN;
     aguUOp_c.fetchID = IN_uop.fetchID;
+    aguUOp_c.isLrSc = 0;
     aguUOp_c.compressed = IN_uop.compressed;
     aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && en;
     
-    if (IN_uop.opcode < LSU_SB) begin // is load
+    if (IN_uop.opcode < LSU_SC_W) begin // is load
         aguUOp_c.isLoad = 1;
         aguUOp_c.isStore = 0;
         aguUOp_c.doNotCommit = 0;
@@ -80,7 +81,12 @@ always_comb begin
                 aguUOp_c.size = 1;
                 aguUOp_c.signExtend = 1;
             end
-            LSU_LR_W, LSU_LW: begin
+            LSU_LR_W: begin
+                aguUOp_c.isLrSc = 1;
+                aguUOp_c.size = 2;
+                aguUOp_c.signExtend = 0;
+            end
+            LSU_LW: begin
                 aguUOp_c.size = 2;
                 aguUOp_c.signExtend = 0;
             end
@@ -149,6 +155,7 @@ always_comb begin
             end
             
             LSU_SC_W: begin
+                aguUOp_c.isLrSc = 1;
                 aguUOp_c.wmask = 4'b1111;
                 resUOp_c.tagDst = 7'h40;
             end
@@ -207,7 +214,6 @@ always_comb begin
 end
 
 logic TMQ_enqueue;
-AGU_UOp TMQ_enqueueUOp;
 logic TMQ_uopReady;
 
 logic TMQ_dequeue;
@@ -246,7 +252,7 @@ always_comb begin
 
     TMQ_dequeue = 0;
     
-    if (aguUOp_c.valid && en) begin
+    if (aguUOp_c.valid && en && !OUT_stall) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end

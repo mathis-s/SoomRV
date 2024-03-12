@@ -80,19 +80,12 @@ SqN nextCounterSqN;
 
 reg isSc[3:0];
 reg scSuccessful[3:0];
-LrScRsv lrScRsv;
-LrScRsv nextLrScRsv;
 
 always_comb begin
-
-    OUT_stall = |portStall;
-
-    nextCounterSqN = counterSqN;
-    nextLrScRsv = lrScRsv;
     
-    if ($signed(lrScRsv.sqN - counterSqN) >= 0)
-        nextLrScRsv.valid = 0;
-        
+    OUT_stall = |portStall;
+    nextCounterSqN = counterSqN;
+
     // Stall
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
 
@@ -100,6 +93,7 @@ always_comb begin
             OUT_stall = 1;
         
         isSc[i] = IN_uop[i].fu == FU_AGU && IN_uop[i].opcode == LSU_SC_W;
+        scSuccessful[i] = !(i == 0 && failSc);
         
         // Only need new tag if instruction writes to a register.
         // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
@@ -121,25 +115,6 @@ always_comb begin
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branchTaken && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
-        
-        // LR/SC Handling
-        scSuccessful[i] = 0;
-        if (RAT_issueValid[i]) begin
-            // Reserve if LR
-            if (IN_uop[i].fu == FU_AGU && IN_uop[i].opcode == LSU_LR_W) begin
-                nextLrScRsv.sqN = RAT_issueSqNs[i];
-                nextLrScRsv.valid = 1;
-            end
-            // Use reservation if SC
-            else if (isSc[i]) begin
-                scSuccessful[i] = nextLrScRsv.valid;
-                nextLrScRsv.valid = 0;
-            end
-            // All other stores, cmo or amo ops clear reservation
-            else if ((IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SB) || IN_uop[i].fu == FU_ATOMIC) begin
-                nextLrScRsv.valid = 0;
-            end
-        end
             
         TB_issueValid[i] = RAT_issueValid[i] && TB_tagNeeded[i];
         
@@ -155,7 +130,6 @@ always_comb begin
     // Commit
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
         RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].rd != 0));
-            //&& (!IN_branchTaken || $signed(IN_comUOp[i].sqN - IN_branchSqN) <= 0));
         TB_commitValid[i] = IN_comUOp[i].valid;
         
         RAT_commitIDs[i] = IN_comUOp[i].rd;
@@ -199,6 +173,7 @@ rt
     .IN_wbTag(RAT_wbTags)
 );
 
+reg failSc;
 reg[5:0] TB_tags[WIDTH_ISSUE-1:0];
 reg[6:0] newTags[WIDTH_ISSUE-1:0];
 reg TB_tagsValid[WIDTH_ISSUE-1:0];
@@ -256,7 +231,7 @@ always_ff@(posedge clk) begin
         OUT_nextLoadSqN <= counterLoadSqN;
         OUT_nextStoreSqN <= counterStoreSqN + 1;
         intOrder = 0;
-        lrScRsv.valid <= 0;
+        failSc <= 0;
     
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
@@ -270,6 +245,7 @@ always_ff@(posedge clk) begin
         
         counterLoadSqN = IN_branchLoadSqN;
         counterStoreSqN = IN_branchStoreSqN;
+        failSc <= 1; // todo
         
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if ($signed(OUT_uop[i].sqN - IN_branchSqN) > 0) begin
@@ -302,7 +278,7 @@ always_ff@(posedge clk) begin
 
     if (rst) ;
     else if (!IN_branchTaken && frontEn && !OUT_stall) begin
-
+        
         // Look up tags and availability of operands for new instructions
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i].imm <= IN_uop[i].imm;
@@ -331,6 +307,8 @@ always_ff@(posedge clk) begin
         // Set seqnum/tags for next instruction(s)
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if (IN_uop[i].valid) begin
+
+                failSc <= 0;
                 
                 OUT_uop[i].valid <= 1;
                 OUT_uop[i].validIQ <= 4'b1111;
@@ -345,7 +323,7 @@ always_ff@(posedge clk) begin
                         FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
                         
                         FU_AGU: begin
-                            if (IN_uop[i].opcode < LSU_SB)
+                            if (IN_uop[i].opcode < LSU_SC_W)
                                 counterLoadSqN = counterLoadSqN + 1;
                             else
                                 counterStoreSqN = counterStoreSqN + 1;
@@ -384,7 +362,6 @@ always_ff@(posedge clk) begin
             end
         end
         counterSqN <= nextCounterSqN;
-        lrScRsv <= nextLrScRsv;
     end
     else begin
         // R_UOp carries two seperate valid signals. "valid" is the plain signal

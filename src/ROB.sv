@@ -40,6 +40,9 @@ module ROB
     input BranchProv IN_branch,
     input SQ_ComInfo IN_sqInfo,
 
+    input wire IN_maxComLdSqNValid,
+    input SqN IN_maxComLdSqN,
+
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
 
@@ -229,7 +232,8 @@ always_ff@(posedge clk) begin
                     (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex)) &&
                     deqFlags[i] != FLAGS_NX &&
                     (!pred || (deqFlags[i] == FLAGS_NONE)) &&
-                    (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0)
+                    (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0) &&
+                    (!IN_maxComLdSqNValid || $signed(deqEntries[i].loadSqN - IN_maxComLdSqN) < 0)
                 ) begin
                 
                     OUT_comUOp[i].rd <= deqEntries[i].rd;
@@ -341,8 +345,8 @@ always_ff@(posedge clk) begin
                 entry.fetchOffs = rnUOpSorted[i].fetchOffs;
                 entry.storeSqN = rnUOpSorted[i].storeSqN;
                 entry.loadSqN = rnUOpSorted[i].loadSqN;
-                entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SB) || rnUOpSorted[i].fu == FU_ATOMIC;
-                entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SB) || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
                 
                 case (id0)
                     0: gen[0].entries[id1] <= entry;

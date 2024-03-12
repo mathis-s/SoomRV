@@ -513,7 +513,7 @@ always_comb begin
         for (integer j = 0; j < `DEC_WIDTH; j=j+1) begin
             // This could be one-hot...
             if (IN_rnUOp[j].valid && IN_rnUOp[j].storeSqN[$clog2(`DEC_WIDTH)-1:0] == i[$clog2(`DEC_WIDTH)-1:0] &&
-                ((IN_rnUOp[j].fu == FU_AGU && IN_rnUOp[j].opcode >= LSU_SB) || IN_rnUOp[j].fu == FU_ATOMIC)
+                ((IN_rnUOp[j].fu == FU_AGU && IN_rnUOp[j].opcode >= LSU_SC_W) || IN_rnUOp[j].fu == FU_ATOMIC)
             ) begin
                 rnUOpSorted[i] = IN_rnUOp[j];
             end
@@ -722,7 +722,7 @@ always_ff@(posedge clk) begin
                     modified = 1;
                 end
             for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-                if (IN_rnUOp[i].valid && ((IN_rnUOp[i].fu == FU_AGU && IN_rnUOp[i].opcode >= LSU_SB) || IN_rnUOp[i].fu == FU_ATOMIC))
+                if (IN_rnUOp[i].valid && ((IN_rnUOp[i].fu == FU_AGU && IN_rnUOp[i].opcode >= LSU_SC_W) || IN_rnUOp[i].fu == FU_ATOMIC))
                     lastIndex <= IN_rnUOp[i].storeSqN;
             end
         end
