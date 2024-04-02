@@ -273,7 +273,7 @@ always_comb begin
             (curBr.btype == IJUMP || curBr.btype == ICALL || curBr.btype == RETURN/* || curBr.btype == RETICALL*/);
     
         if (decBranch_c.taken) ;
-        else if (i > IN_op.lastValid) ;
+        else if (i > IN_op.lastValid || i < IN_op.pc[1+:$bits(FetchOff_t)]) ;
         else if (IN_op.bpi.predicted && IN_op.bpi.taken && !IN_op.predDirOnly && IN_op.predPos == FetchOff_t'(i)) begin
             // A taken prediction was made by the BP, check if correct.
 
@@ -373,7 +373,7 @@ always_comb begin
                 retUpd_c.addr = IN_op.pc[31:1];
             end
         end
-        // Handle non-predicted taken jumps
+        // Handle non-predicted taken jumps or taken-only predicted branches
         else if (curBr.valid) begin
             FetchOff_t actualOffs = curBr.fhPC[1+:$bits(FetchOff_t)];
             reg dirOnlyBranch = (curBr.btype == BRANCH && IN_op.bpi.taken && IN_op.predDirOnly);

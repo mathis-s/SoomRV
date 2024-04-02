@@ -64,7 +64,11 @@ always_comb begin
     OUT_branchCompr = 0;
     OUT_branchSrcOffs = 'x;
     
-    if (fetched.entry.valid && fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
+    if (fetched.entry.valid && 
+        fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE] &&
+        // ignore predictions in the same line but before the current PC
+        fetched.entry.offs >= fetched.pc[0+:$bits(FetchOff_t)]
+    ) begin
         OUT_branchFound = 1;
         OUT_multipleBranches = fetched.multiple;
         OUT_branchDst = fetched.entry.dst;
@@ -117,6 +121,9 @@ always_ff@(posedge clk) begin
                 entries[idx].dst <= IN_btUpdate.dst[31:1];
                 entries[idx].src <= IN_btUpdate.src[$clog2(LENGTH)+1 +: `BTB_TAG_SIZE];
                 entries[idx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
+
+                assert((IN_btUpdate.src[1+:$bits(FetchOff_t)]) >= idx[0+:$bits(FetchOff_t)]);
+
                 multiple[idx] <= 0;
             end
             else useful[idx] <= useful[idx] - 1;

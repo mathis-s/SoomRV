@@ -271,7 +271,7 @@ always_comb begin
     lookupHistory = history;
     if (recovery.valid)
         lookupHistory = recHistory;
-    else if (OUT_predBr.valid && !OUT_predBr.isJump && !ignorePred)
+    else if (OUT_predBr.valid && !OUT_predBr.isJump && !OUT_predBr.dirOnly && !ignorePred)
         lookupHistory = {lookupHistory[$bits(BHist_t)-2:0], OUT_predBr.taken};
 end
 
