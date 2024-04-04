@@ -206,10 +206,6 @@ module InstrDecoder
     input wire[30:0] IN_lateRetAddr,
     
     input wire IN_enCustom,
-    
-    output DecodeBranchProv OUT_decBranch,
-    output ReturnDecUpdate OUT_retUpd,
-    output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -221,29 +217,10 @@ Instr32 instr;
 Instr16 i16;
 I32 i32;
 
-DecodeBranchProv decBranch_c;
-BTUpdate btUpdate_c;
-ReturnDecUpdate retUpd_c;
-
 D_UOp uopsComb[NUM_UOPS-1:0];
-reg[3:0] validMask;
 
 always_comb begin
-    
-    btUpdate_c = 'x;
-    btUpdate_c.valid = 0;
 
-    retUpd_c = 'x;
-    retUpd_c.valid = 0;
-    
-    decBranch_c = 'x;
-    decBranch_c.wfi = 0;
-    decBranch_c.taken = 0;
-    decBranch_c.retAct = RET_NONE;
-    decBranch_c.histAct = HIST_NONE;
-
-    validMask = 4'b1111;
-    
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         
         instr = IN_instrs[i].instr;
@@ -253,7 +230,7 @@ always_comb begin
         uop = 0;
         invalidEnc = 1;
         //uop.pc = {IN_instrs[i].pc, 1'b0};
-        uop.valid = IN_instrs[i].valid && en && !decBranch_c.taken;
+        uop.valid = IN_instrs[i].valid && en;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[$bits(FetchOff_t)-1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
@@ -272,7 +249,7 @@ always_comb begin
             default:      uop.imm = 0;
         endcase
         
-        if (IN_instrs[i].valid && en && !decBranch_c.taken) begin
+        if (IN_instrs[i].valid && en) begin
             
             reg isBranch = 0;
             reg isIndirBranch = 0;
@@ -1576,145 +1553,6 @@ always_comb begin
                     end
                 end
             end
-            
-            // Handle branch target mispredictions
-            /*if (IN_instrs[i].predTaken) begin
-                if (!(isBranch || isIndirBranch) || 
-                    (IN_instrs[i].predTarget != branchTarget && !isIndirBranch) || 
-                    IN_instrs[i].predInvalid) begin
-                    
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-
-                    if (isCall && !isReturn)
-                        decBranch_c.retAct = RET_PUSH;
-                    else if (!isCall && isReturn)
-                        decBranch_c.retAct = RET_POP;
-                    else
-                        decBranch_c.retAct = RET_NONE;
-                
-                    // Delete matching return prediction entries
-                    // TODO: Only clean if this actually was an invalid return pred
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 1;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 0;
-                    retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
-                    if (!IN_instrs[i].predInvalid)
-                        retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
-                    else
-                        retUpd_c.addr = IN_instrs[i].pc;
-                    
-                    
-                    // Branch back to following instruction if this is not a branch at all,
-                    // or branch to correct destination if this is a branch.
-                    if (IN_instrs[i].predInvalid) begin
-                        decBranch_c.dst = IN_instrs[i].pc;
-                        invalidEnc = 1;
-                        uop.valid = 0;
-                        
-                        // Delete matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 1;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
-                    end
-                    else if (isBranch) begin
-                        decBranch_c.dst = branchTarget;
-                        // Correct matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 0;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.isCall = isCall;
-                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.dst = {branchTarget, 1'b0};
-                        btUpdate_c.compressed = uop.compressed;
-                        btUpdate_c.isJump = isJump;
-                        
-                    end
-                    else begin
-                        decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
-
-                        // Delete matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 1;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                    end
-                end
-            end
-            else begin
-                // Handle non-predicted taken jumps
-                if (isJump) begin
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.dst = branchTarget;
-
-                    // Register branch target
-                    btUpdate_c.valid = 1;
-                    btUpdate_c.clean = 0;
-                    btUpdate_c.isCall = isCall;
-                    btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                    btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                    btUpdate_c.dst = {branchTarget, 1'b0};
-                    btUpdate_c.compressed = uop.compressed;
-                    btUpdate_c.isJump = isJump;
-                    btUpdate_c.multiple = uop.fetchOffs > IN_instrs[i].fetchPredOffs;
-                    btUpdate_c.multipleOffs = IN_instrs[i].fetchPredOffs + 1;
-                end
-                
-                // Update return stack
-                if (isCall) begin
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 0;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 0;
-                    retUpd_c.isCall = 1;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
-                    retUpd_c.addr = uop.compressed ? {IN_instrs[i].pc} : ({IN_instrs[i].pc} + 1);
-
-                    decBranch_c.retAct = RET_PUSH;
-                    
-                    // We need to make sure that all rets after the call use the correct return address.
-                    // A ret may have been fetched already (for short functions), so flush the fetch pipeline.
-                    if (isIndirBranch) begin
-                        decBranch_c.taken = 1;
-                        decBranch_c.fetchID = IN_instrs[i].fetchID;
-                        decBranch_c.dst = retUpd_c.addr + 1;
-                    end
-                end
-                // Update return stack for non-predicted rets
-                else if (isReturn) begin
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 0;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 1;
-                    retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx - 1;
-                    retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
-                    
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.retAct = RET_POP;
-                    decBranch_c.dst = lateReturnAddr;
-                end
-            end
-            
-            // Wait For Interrupt jumps to the instruction after itself
-            // and disables the frontend until interrupt.
-            if (isWFI) begin
-                decBranch_c.taken = 1;
-                decBranch_c.wfi = 1;
-                decBranch_c.fetchID = IN_instrs[i].fetchID;
-                decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
-            end*/
         end
         
         if (invalidEnc) begin
@@ -1725,18 +1563,7 @@ always_comb begin
     end
 end
 
-//assign OUT_retUpd = retUpd_c;
-
-always_ff@(posedge clk) begin
-    
-    OUT_btUpdate <= 'x;
-    OUT_btUpdate.valid <= 0;
-
-    OUT_decBranch <= 'x;
-    OUT_decBranch.taken <= 0;
-
-    OUT_retUpd <= 'x;
-    OUT_retUpd.valid <= 0;    
+always_ff@(posedge clk) begin   
 
     if (rst || IN_invalidate) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
@@ -1745,20 +1572,8 @@ always_ff@(posedge clk) begin
         end
     end
     else if (en) begin
-        if (OUT_decBranch.taken) begin
-            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                OUT_uop[i] <= 'x;
-                OUT_uop[i].valid <= 0;
-            end
-        end
-        else begin
-            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                OUT_uop[i] <= uopsComb[i];
-                if (!validMask[i]) OUT_uop[i].valid <= 0;
-            end
-            OUT_btUpdate <= btUpdate_c;
-            OUT_decBranch <= decBranch_c;
-            OUT_retUpd <= retUpd_c;
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+            OUT_uop[i] <= uopsComb[i];
         end
     end
 end

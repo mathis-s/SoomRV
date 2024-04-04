@@ -2,7 +2,7 @@ module IFetch
 #(
     parameter NUM_UOPS=3,
     parameter NUM_BLOCKS=8,
-    parameter NUM_BP_UPD=3
+    parameter NUM_BP_UPD=2
 )
 (
     input wire clk,
@@ -18,9 +18,6 @@ module IFetch
     input wire IN_mispredFlush,
     input FetchID_t IN_ROB_curFetchID,
     input BranchProv IN_branch,
-    
-    input ReturnDecUpdate IN_retDecUpd,
-    input DecodeBranchProv IN_decBranch,
     
     input wire IN_clearICache,
     input wire IN_flushTLB,
@@ -53,7 +50,7 @@ PredBranch predBr /*verilator public*/;
 wire BP_stall;
 wire[30:0] BP_curRetAddr;
 RetStackIdx_t BP_rIdx;
-BranchPredictor#(.NUM_IN(NUM_BP_UPD)) bp
+BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 (
     .clk(clk),
     .rst(rst),

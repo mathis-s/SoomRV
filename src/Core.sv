@@ -71,7 +71,7 @@ BranchSelector#(4) bsel
 );
 
 IF_Instr IF_instrs;
-BTUpdate BP_btUpdates[2:0];
+BTUpdate BP_btUpdates[1:0];
 
 FetchID_t PC_readAddress[4:0];
 PCFileEntry PC_readData[4:0];
@@ -95,9 +95,6 @@ IFetch ifetch
     .IN_mispredFlush(mispredFlush),
     .IN_ROB_curFetchID(ROB_curFetchID),
     .IN_branch(branch),
-    
-    .IN_retDecUpd(DEC_retUpd),
-    .IN_decBranch(DEC_decBranch),
     
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
@@ -139,8 +136,6 @@ PreDecode preDec
 );
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
-DecodeBranchProv DEC_decBranch /*verilator public*/;
-ReturnDecUpdate DEC_retUpd;
 InstrDecoder idec
 (
     .clk(clk),
@@ -153,10 +148,6 @@ InstrDecoder idec
     .IN_lateRetAddr(BP_lateRetAddr),
     
     .IN_enCustom(1'b1),
-    
-    .OUT_decBranch(DEC_decBranch),
-    .OUT_retUpd(DEC_retUpd),
-    .OUT_btUpdate(BP_btUpdates[2]),
     
     .OUT_uop(DE_uop)
 );
