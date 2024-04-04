@@ -70,8 +70,8 @@ typedef struct packed
 {
     // On store cache misses, we allow fusing a single
     // store into the cache line read
-    logic[31:0] storeData;
-    logic[3:0] storeMask;
+    logic[`AXI_WIDTH-1:0] storeData;
+    logic[(`AXI_WIDTH/8)-1:0] storeMask;
     
 
     logic[`CLSIZE_E-2:0] evictProgress;
@@ -395,9 +395,10 @@ always_comb begin
                 DCW_id = buf_rid;
 
                 if (transfers[buf_rid].addrCounter == 0) begin
-                    for (integer i = 0; i < 4; i=i+1)
-                        if (transfers[buf_rid].storeMask[i])
-                            DCW_data[i*8+:8] = transfers[buf_rid].storeData[8*i+:8];
+                    for (integer i = 0; i < (`AXI_WIDTH/8); i=i+1)
+                        if (transfers[buf_rid].storeMask[i]) begin
+                            DCW_data[i*8+:8] = transfers[buf_rid].storeData[i*8+:8];
+                        end
                 end
             end
 
@@ -548,7 +549,7 @@ always_comb begin
         DCR_reqLen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 2)) - 1);
         DCR_reqAddr = isMMIO[awIdx] ? 'x : transfers[awIdx].cacheAddr;
         DCR_reqMMIO = isMMIO[awIdx];
-        DCR_reqMMIOData = isMMIO[awIdx] ? transfers[awIdx].storeData : 'x;
+        DCR_reqMMIOData = isMMIO[awIdx] ? transfers[awIdx].storeData[31:0] : 'x;
     end
 end
 
@@ -615,19 +616,23 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].readDone <= 1;
             transfers[enqIdx].writeDone <= 1;
 
-            transfers[enqIdx].storeData <= selReq.data;
-            transfers[enqIdx].storeMask <= selReq.mask;
-
             if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_CACHE_TO_EXT || selReq.cmd == MEMC_CP_EXT_TO_CACHE) begin
                 // cache-line oriented ops use aligned addresses
                 transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
+                
+                // shift words by offset lost due to alignment
+                transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data) << {selReq.readAddr[2+:$clog2($clog2(`AXI_WIDTH/8))], 5'b0};
+                transfers[enqIdx].storeMask <= (`AXI_WIDTH/8)'(selReq.mask) << {selReq.readAddr[2+:$clog2($clog2(`AXI_WIDTH/8))], 2'b0};
             end
             else begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr;
                 transfers[enqIdx].readAddr <= selReq.readAddr;
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
+                
+                transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data);
+                transfers[enqIdx].storeMask <= '1; // unused
             end
 
             case (selReq.cmd)

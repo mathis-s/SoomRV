@@ -63,7 +63,7 @@ typedef struct packed
 
 } SQEntry;
 
-reg[NUM_ENTRIES-1:0] entryReady_r;
+reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
 reg[NUM_ENTRIES-1:0] entryValid_r;
 always_ff@(posedge clk) entryValid_r <= rst ? 0 : entryValid_c;
@@ -104,10 +104,9 @@ always_comb begin
     end
 end
 
-SQEntry entries[NUM_ENTRIES-1:0];
-SqN baseIndex;
+SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
+SqN baseIndex /* verilator public */;
 SqN lastIndex;
-//assign OUT_sqInfo = SQ_ComInfo'{valid: 0, default: 'x};
 
 always_ff@(posedge clk) begin
     OUT_sqInfo <= 'x;
@@ -140,7 +139,7 @@ typedef struct packed
     logic issued;
     logic valid;
 } EQEntry;
-EQEntry evicted[NUM_EVICTED-1:0];
+EQEntry evicted[NUM_EVICTED-1:0] /* verilator public */;
 
 ST_Ack stAck_r;
 always_ff@(posedge clk) begin

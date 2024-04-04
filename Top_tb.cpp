@@ -20,7 +20,10 @@
 #include "VTop_Rename.h"
 #include "VTop_RenameTable.h"
 #include "VTop_BranchPredictor__N3.h"
+#include "VTop_MemRTL__W54_N40_WB15.h"
+#include "VTop_StoreQueue.h"
 #include "VTop_ReturnStack.h"
+#include "VTop_IF_Cache.h"
 #include "VTop_SoC.h"
 #include "VTop_TagBuffer.h"
 #include "VTop_Top.h"
@@ -345,10 +348,13 @@ class SpikeSimif : public simif_t
         for (auto write : processor->get_state()->log_mem_write)
         {
             uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
-            //if (phy == 0x83ff5c00) printf("[%lu] store sqn = %x: %.8lx\n", main_time, inst.sqn, std::get<1>(write));
-
-            if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
-
+            if (phy >= 0x80000000)
+                inFlightStores.push_back((Store){
+                    .addr = phy,
+                    .data = (uint32_t)std::get<1>(write),
+                    .size = std::get<2>(write),
+                    .time = main_time
+                });
         }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
@@ -594,6 +600,119 @@ void Exit(int code)
     exit(code);
 }
 
+// Check writes to cache, 
+// (reverse) translate the address via CT lookup,
+// delete in-flight store entry on match
+struct CacheWrite
+{
+    bool we;
+    uint32_t addr;
+    uint8_t wassoc;
+    uint32_t wdata;
+    uint8_t wmask;
+};
+
+std::array<CacheWrite, 2> GetCurrentWrites()
+{
+    std::array<CacheWrite, 2> ports;
+    auto ifCache = top->Top->soc->__PVT__IF_cache;
+    for (int i = 0; i < 2; i++)
+    {
+        ports[i].we = !((ifCache->__PVT__we >> i) & 1);
+        ports[i].addr = (ifCache->__PVT__addr >> i*12) & 4095;
+        ports[i].wassoc = (ifCache->__PVT__wassoc >> i*2) & 3;
+        ports[i].wdata = (ifCache->__PVT__wdata >> i*32) & 0xffffffff;
+        ports[i].wmask = (ifCache->__PVT__wmask >> i*4) & 15;
+    }
+    // translate
+    auto ict = top->Top->soc->dctable->mem;
+    for (auto& port : ports)
+    {
+        if (!port.we) continue;
+        int idx = port.addr / 64; // 64 byte cache lines
+        uint32_t entry = ExtractField(ict[idx], 21 * port.wassoc, 21);
+        if (!(entry & 1))
+        {
+            fprintf(stderr, "[%lu] invalid cache write\n", main_time);
+            Exit(1);
+        }
+        port.addr = ((entry >> 1) << 12) | (port.addr & -4);
+        //printf("[%.8x] = %x\n", port.addr, port.wdata);
+    }
+    return ports;
+}
+
+    
+// every store that hasn't yet been written to cache must be in the StoreQueue
+void CheckStoreConsistency()
+{
+    std::array<bool, 32> entryUsedSQ = {};
+    std::array<bool, 4> entryUsedEQ = {};
+    auto writes = GetCurrentWrites();
+
+    auto core = top->Top->soc->core;
+    for (auto it = inFlightStores.begin(); it != inFlightStores.end();)
+    {
+        Store& store = *it;
+        uint8_t storeMask = ((1 << store.size) - 1) << (store.addr & 3);
+
+        // check if we can find store in SQ entries or SQ evicted
+        
+        bool isEvicted = 0;
+
+        // SQ evicted
+        for (int i = 0; i < 4; i++)
+        {
+            if (!entryUsedEQ[i] && (core->sq->evicted[i][0] & 1))
+            {
+                uint32_t addr = ExtractField(core->sq->evicted[i], 4+16, 30) << 2;
+                uint8_t mask = ExtractField(core->sq->evicted[i], 4+12, 4);
+                if (addr == (store.addr & -4) && mask == storeMask)
+                {
+                    entryUsedEQ[i] = 1;
+                    isEvicted = 1;
+                    goto found_entry;
+                }
+            }
+        }
+        // SQ entries
+        for (int i = 0; i < 32; i++)
+        {
+            int idx = (i + core->sq->baseIndex) % 32;
+            if (!entryUsedSQ[idx] && (core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 4))
+            {
+                uint32_t addr = ExtractField(core->sq->entries[idx], 16, 30) << 2;
+                uint8_t mask = ExtractField(core->sq->entries[idx], 12, 4);
+                if (addr == (store.addr & -4) && mask == storeMask)
+                {
+                    entryUsedSQ[idx] = 1;
+                    goto found_entry;
+                }
+            }
+        }
+
+        fprintf(stderr, "[%lu] cannot find store in SQ/EQ: MEM%d[%.8x] = %x (commit time %lu)\n", main_time, store.size*8, store.addr, store.data, store.time);
+        Exit(1);
+        found_entry:
+
+        // check if store is being executed
+        auto writeIt = std::find_if(writes.begin(), writes.end(), [&](CacheWrite const& w) {
+            return w.we && (w.addr & -4) == (store.addr & -4) && w.wmask == storeMask;
+        });
+        if (writeIt != writes.end())
+        {
+            writeIt->we = 0;
+            if (!isEvicted) { fprintf(stderr, "[%lu] inconsistent cache write\n", main_time); Exit(1); }
+            if (main_time > DEBUG_TIME)
+                fprintf(stderr, "[%lu] MEM%d[%.8x] = %x (commit time %lu)\n", main_time, store.size*8, store.addr, store.data, store.time);
+            it = inFlightStores.erase(it);
+            continue;
+        }
+        it++;
+    }
+    
+}
+
 void LogFlush(Inst& inst);
 
 void LogCommit(Inst& inst)
@@ -626,7 +745,7 @@ void LogCommit(Inst& inst)
         uint32_t startPC = simif.get_pc();
         if (int err = simif.cosim_instr(inst))
         {
-            fprintf(stdout, "ERROR %u\n", -err);
+            fprintf(stdout, "ERROR %u (sqN=%.2x)\n", -err, inst.sqn);
             DumpState(stdout, inst.pc, inst.inst);
 
             fprintf(stdout, "\nSHOULD BE\n");
@@ -726,10 +845,11 @@ void LogCycle()
 uint32_t mostRecentPC;
 void LogInstructions()
 {
+    CheckStoreConsistency();
+
     auto core = top->Top->soc->core;
 
     bool brTaken = core->branch & 1;
-    bool decBrTaken = core->DEC_decBranch & 1;
     int brSqN = (core->branch >> (1 + 5 + 1  + 7 + 7)) & 127;
 
     // Issue
@@ -883,7 +1003,7 @@ void LogInstructions()
         if (!core->RN_stall && core->frontendEn)
         {
             for (size_t i = 0; i < 4; i++)
-                if ((core->PD_instrs[i].at(0) & 1) && !decBrTaken)
+                if ((core->PD_instrs[i].at(0) & 1))
                 {
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
