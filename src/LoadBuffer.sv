@@ -349,6 +349,7 @@ always_comb begin
                 OUT_branch.flush = 0;
                 OUT_branch.histAct = HIST_NONE;
                 OUT_branch.retAct = RET_NONE;
+                OUT_branch.isSCFail = 0;
                 
                 // For failed SCs we also roll back the SC itself. The SC is then re-run as `li rd, 1`.
                 // This saves as from needing a real register file write port for stores. Instead, all
@@ -357,6 +358,7 @@ always_comb begin
                     OUT_branch.dstPC = IN_uop[i].pc;
                     OUT_branch.sqN = IN_uop[i].sqN - 1;
                     OUT_branch.storeSqN = IN_uop[i].storeSqN - 1;
+                    OUT_branch.isSCFail = 1;
                 end
 
                 prevStoreConflict = 1;

@@ -181,11 +181,7 @@ Rename rn
     .IN_wbHasResult(wbHasResult),
     .IN_wbUOp(wbUOp[3:0]),
 
-    .IN_branchTaken(branch.taken),
-    .IN_branchFlush(branch.flush),
-    .IN_branchSqN(branch.sqN),
-    .IN_branchLoadSqN(branch.loadSqN),
-    .IN_branchStoreSqN(branch.storeSqN),
+    .IN_branch(branch),
     .IN_mispredFlush(mispredFlush),
 
     .OUT_uop(RN_uop),

@@ -23,11 +23,7 @@ module Rename
     input RES_UOp IN_wbUOp[WIDTH_WR-1:0],
 
     // Taken branch
-    input wire IN_branchTaken,
-    input wire IN_branchFlush,
-    input SqN IN_branchSqN,
-    input SqN IN_branchLoadSqN,
-    input SqN IN_branchStoreSqN,
+    input BranchProv IN_branch,
     input wire IN_mispredFlush,
     
     output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
@@ -113,7 +109,7 @@ always_comb begin
         
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
-        RAT_issueValid[i] = !rst && !IN_branchTaken && frontEn && !OUT_stall && IN_uop[i].valid;
+        RAT_issueValid[i] = !rst && !IN_branch.taken && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
             
         TB_issueValid[i] = RAT_issueValid[i] && TB_tagNeeded[i];
@@ -151,7 +147,7 @@ rt
 (
     .clk(clk),
     .rst(rst),
-    .IN_mispred(IN_branchTaken),
+    .IN_mispred(IN_branch.taken),
     .IN_mispredFlush(IN_mispredFlush),
     
     .IN_lookupIDs(RAT_lookupIDs),
@@ -189,7 +185,7 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
 (
     .clk(clk),
     .rst(rst),
-    .IN_mispr(IN_branchTaken),
+    .IN_mispr(IN_branch.taken),
     .IN_mispredFlush(IN_mispredFlush),
     
     .IN_issueValid(TB_issueValid),
@@ -239,16 +235,16 @@ always_ff@(posedge clk) begin
             OUT_uop[i].validIQ <= 0;
         end
     end
-    else if (IN_branchTaken) begin
+    else if (IN_branch.taken) begin
         
-        counterSqN <= IN_branchSqN + 1;
+        counterSqN <= IN_branch.sqN + 1;
         
-        counterLoadSqN = IN_branchLoadSqN;
-        counterStoreSqN = IN_branchStoreSqN;
-        failSc <= 1; // todo
+        counterLoadSqN = IN_branch.loadSqN;
+        counterStoreSqN = IN_branch.storeSqN;
+        failSc <= IN_branch.isSCFail;
         
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            if ($signed(OUT_uop[i].sqN - IN_branchSqN) > 0) begin
+            if ($signed(OUT_uop[i].sqN - IN_branch.sqN) > 0) begin
                 OUT_uop[i] <= 'x;
                 OUT_uop[i].valid <= 0;
                 OUT_uop[i].validIQ <= 0;
@@ -277,7 +273,7 @@ always_ff@(posedge clk) begin
     end
 
     if (rst) ;
-    else if (!IN_branchTaken && frontEn && !OUT_stall) begin
+    else if (!IN_branch.taken && frontEn && !OUT_stall) begin
         
         // Look up tags and availability of operands for new instructions
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin

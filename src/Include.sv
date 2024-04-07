@@ -392,6 +392,7 @@ typedef enum logic[1:0]
 
 typedef struct packed
 {
+    logic isSCFail;
     RetStackAction retAct;
     HistoryAction histAct;
     logic[31:0] dstPC;

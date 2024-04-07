@@ -90,6 +90,14 @@ struct FetchPacket
     uint32_t returnAddr[4];
 };
 
+struct Store
+{
+    uint32_t addr;
+    uint32_t data;
+    uint8_t size;
+    uint64_t time;
+};
+
 struct
 {
     uint32_t lastComSqN;
@@ -106,6 +114,7 @@ struct
 } state;
 int curCycInstRet = 0;
 std::array<uint8_t, 32> regTagOverride;
+std::vector<Store> inFlightStores;
 
 VTop* top; // Instantiation of model
 #ifdef TRACE
@@ -849,8 +858,8 @@ void LogInstructions()
 
     auto core = top->Top->soc->core;
 
-    bool brTaken = core->branch & 1;
-    int brSqN = (core->branch >> (1 + 5 + 1  + 7 + 7)) & 127;
+    bool brTaken = core->branch[0] & 1;
+    int brSqN = ExtractField(core->branch, 1 + 5 + 1  + 7 + 7, 8);
 
     // Issue
     for (size_t i = 0; i < 4; i++)
