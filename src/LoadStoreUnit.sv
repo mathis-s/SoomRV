@@ -634,7 +634,7 @@ for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
                 OUT_ldAck[i].doNotReIssue = 1;
             end
             else if (miss[i].mtype == REGULAR || miss[i].mtype == REGULAR_NO_EVICT) begin
-                OUT_ldAck[i].doNotReIssue = forwardMiss && !missEvictConflict[i];
+                OUT_ldAck[i].doNotReIssue = forwardMiss[i] && !missEvictConflict[i];
             end
         end
     end
@@ -651,12 +651,12 @@ wire redoStore = stOps[1].valid &&
          ((miss[stOpPort[1]].mtype == MGMT_CLEAN || 
            miss[stOpPort[1]].mtype == MGMT_FLUSH || 
            miss[stOpPort[1]].mtype == MGMT_INVAL) && 
-          (!forwardMiss || missEvictConflict[stOpPort[1]]))
+          (!forwardMiss[stOpPort[1]] || missEvictConflict[stOpPort[1]]))
     ) : 
         (!stOps[1].isMMIO && IF_cache.busy[stOpPort[1]]));
 
 // todo
-wire fuseStoreMiss = 0;//!missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT) && forwardMiss && miss[stOpPort[1]].valid;
+wire fuseStoreMiss = !missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT) && forwardMiss[stOpPort[1]] && miss[stOpPort[1]].valid;
 
 assign OUT_stAck.addr = stOps[1].addr;
 assign OUT_stAck.data = stOps[1].data;
@@ -721,8 +721,7 @@ end
 // Cache Table Writes
 reg cacheTableWrite;
 reg newMiss;
-always_comb begin
-    reg temp = 0;
+always_comb begin;
     cacheTableWrite = 0;
     IF_ct.we = 0;
     IF_ct.waddr = 'x;
@@ -732,9 +731,7 @@ always_comb begin
     
     if (!rst && state == IDLE) begin
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-            if (forwardMiss && !missEvictConflict[i] && miss[i].valid && !temp &&
-                miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
-                temp = 1;
+            if (forwardMiss[i]) begin
                 newMiss = 1;
                 // Immediately write the new cache table entry (about to be loaded)
                 // on a miss. We still need to intercept and pass through or stop
@@ -804,10 +801,28 @@ reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 
 reg[$clog2(`CASSOC)-1:0] assocCnt;
 
-wire forwardMiss = LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1];
+wire canOutputMiss = (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]);
+reg[`NUM_AGUS-1:0] forwardMiss;
+always_comb begin
+    reg temp = 0;
+    forwardMiss = '0;
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        if (!temp &&
+            canOutputMiss &&
+            miss[i].valid && !missEvictConflict[i] &&
+            miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT &&
+            miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG
+        ) begin
+            temp = 1;
+            forwardMiss[i] = 1;
+        end
+    end
+end
+
+
 always_ff@(posedge clk) begin
     
-    if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
+    if (canOutputMiss) begin
         LSU_memc <= 'x;
         LSU_memc.cmd <= MEMC_NONE;
     end
@@ -826,16 +841,12 @@ always_ff@(posedge clk) begin
 
         case (state)
             IDLE: begin
-                reg temp = 0;
                 for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
 
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;
 
-                    if (forwardMiss && !missEvictConflict[i] && miss[i].valid && !temp &&
-                        miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT && miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG) begin
-
-                        temp = 1;
+                    if (forwardMiss[i]) begin
                         assocCnt <= assocCnt + 1;
                         
                         // if not dirty, do not copy back to main memory
@@ -887,14 +898,12 @@ always_ff@(posedge clk) begin
                     end
                 end
 
-                if (!temp) begin
-                    if (flushQueued && flushReady) begin
-                        state <= FLUSH_WAIT;
-                        flushQueued <= 0;
-                        flushIdx <= 0;
-                        flushAssocIdx <= 0;
-                        flushDone <= 0;
-                    end
+                if (!(|forwardMiss) && flushQueued && flushReady) begin
+                    state <= FLUSH_WAIT;
+                    flushQueued <= 0;
+                    flushIdx <= 0;
+                    flushAssocIdx <= 0;
+                    flushDone <= 0;
                 end
             end
             

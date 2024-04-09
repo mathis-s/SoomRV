@@ -326,13 +326,13 @@ typedef struct packed
 
 typedef struct packed
 {
-    MemC_Cmd cmd;
     logic[3:0] mask;
     logic[31:0] data;
     logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
     CacheID_t cacheID;
+    MemC_Cmd cmd;
 } MemController_Req;
 
 typedef struct packed

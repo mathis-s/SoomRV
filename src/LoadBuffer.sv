@@ -207,44 +207,54 @@ always_comb begin
     end
 end
 
-// Select late load to issue
-logic[$clog2(NUM_ENTRIES)-1:0] issueIdx;
-logic issueIdxIsLdFwd;
-logic issueIdxValid;
-always_comb begin
-    logic[NUM_ENTRIES-1:0] issueCandidates = 0;
+typedef struct packed
+{
+    logic[$clog2(NUM_ENTRIES)-1:0] idx;
+    logic isLdFwd;
+    logic valid;
+} LateIssue;
 
+LateIssue issue[`NUM_AGUS-1:0];
+always_comb begin
     logic memcNotBusy = !IN_memc.transfers[0].valid;
     
-    issueIdx = 'x;
-    issueIdxIsLdFwd = 0;
-    issueIdxValid = 0;
-    
-    // Out-of-order late issue (regular loads)
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        issueCandidates[i] =
-            entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec && 
-                (!entries[i].noReIssue || (addrCompT[1] == LD_FWD && wAddrMatch[0][i]) || memcNotBusy);
-    end
+   for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+        
+        logic[NUM_ENTRIES-1:0] issueCandidates = 0;
 
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
-        logic isLdDataFwd = (addrCompT[1] == LD_FWD) && wAddrMatch[0][idx];
-        if (issueCandidates[idx] && (!issueIdxValid || isLdDataFwd)) begin
-            issueIdxIsLdFwd = isLdDataFwd;
-            issueIdxValid = 1;
-            issueIdx = idx[$clog2(NUM_ENTRIES)-1:0];
+        issue[h] = LateIssue'{valid: 0, default: 'x};
+        // Out-of-order late issue (regular loads)
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+            issueCandidates[i] =
+                entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec && 
+                    (!entries[i].noReIssue || (addrCompT[1] == LD_FWD && wAddrMatch[0][i]) || memcNotBusy);
         end
-    end
 
-    // In-order late issue (MMIO)
-    if (entries[deqIndex].valid && !entries[deqIndex].issued && entries[deqIndex].nonSpec &&
-        ((IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
-    ) begin
-        // Overwrite. This load is in-order, so it always has top priority.
-        issueIdxIsLdFwd = 0;
-        issueIdxValid = 1;
-        issueIdx = deqIndex;
+        for (integer i = 0; i < h; i=i+1) begin
+            if (issue[i].valid)
+                issueCandidates[issue[i].idx] = 0;
+        end
+
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+            logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
+            logic isLdDataFwd = (addrCompT[1] == LD_FWD) && wAddrMatch[0][idx];
+            if (issueCandidates[idx] && (!issue[h].valid || isLdDataFwd)) begin
+                issue[h].isLdFwd = isLdDataFwd;
+                issue[h].valid = 1;
+                issue[h].idx = idx[$clog2(NUM_ENTRIES)-1:0];
+            end
+        end
+
+        // In-order late issue (MMIO)
+        if (h == 0 &&
+            entries[deqIndex].valid && !entries[deqIndex].issued && entries[deqIndex].nonSpec &&
+            ((IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
+        ) begin
+            // Overwrite. This load is in-order, so it always has top priority.
+            issue[h].isLdFwd = 0;
+            issue[h].valid = 1;
+            issue[h].idx = deqIndex;
+        end
     end
 end
 
@@ -273,18 +283,6 @@ always_comb begin
         invalMask[i] = active;
     end
 end
-
-
-// Find sqN of last load before which all other loads were (speculatively) executed
-//always_comb begin
-//    OUT_excdLoadSqN = 'x;
-//    // todo: optimize
-//    for (integer i = NUM_ENTRIES-1; i >= 0; i=i-1) begin
-//        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-//        if (!entries[idx].valid)
-//            OUT_excdLoadSqN = {entries[idx].highLdSqN, idx};
-//    end
-//end
 
 // Find most recent load reservation
 reg[$clog2(NUM_ENTRIES)-1:0] loadRsvIdx;
@@ -464,28 +462,27 @@ always_ff@(posedge clk) begin
             // Issue Late Loads          
             for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
 
-                if (!lateLoadUOp[i].valid || !IN_stall[i] || issueIdxIsLdFwd) begin
+                if (!lateLoadUOp[i].valid || !IN_stall[i] || issue[i].isLdFwd) begin
 
                     if (IN_stall[i] && lateLoadUOp[i].valid)
-                        entries[lateLoadUOp[0].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
+                        entries[lateLoadUOp[i].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
 
                     // Issue non-speculative or cache missed loads, currently only on port 0.
-                    if (i == 0 && issueIdxValid) begin
-                        entries[issueIdx].issued <= 1;
-                        lateLoadUOp[0].data <= IN_memc.ldDataFwd.data;
-                        lateLoadUOp[0].dataValid <= issueIdxIsLdFwd;
-
-                        lateLoadUOp[0].addr <= entries[issueIdx].addr;
-                        lateLoadUOp[0].signExtend <= entries[issueIdx].signExtend;
-                        lateLoadUOp[0].size <= entries[issueIdx].size;
-                        lateLoadUOp[0].loadSqN <= {entries[issueIdx].highLdSqN, issueIdx};
-                        lateLoadUOp[0].tagDst <= entries[issueIdx].tagDst;
-                        lateLoadUOp[0].sqN <= entries[issueIdx].sqN;
-                        lateLoadUOp[0].doNotCommit <= entries[issueIdx].doNotCommit;
-                        lateLoadUOp[0].external <= 0;
-                        lateLoadUOp[0].exception <= entries[issueIdx].exception;
-                        lateLoadUOp[0].isMMIO <= `IS_MMIO_PMA(entries[issueIdx].addr);
-                        lateLoadUOp[0].valid <= 1;
+                    if (issue[i].valid) begin
+                        entries[issue[i].idx].issued <= 1;
+                        lateLoadUOp[i].data <= IN_memc.ldDataFwd.data;
+                        lateLoadUOp[i].dataValid <= issue[i].isLdFwd;
+                        lateLoadUOp[i].addr <= entries[issue[i].idx].addr;
+                        lateLoadUOp[i].signExtend <= entries[issue[i].idx].signExtend;
+                        lateLoadUOp[i].size <= entries[issue[i].idx].size;
+                        lateLoadUOp[i].loadSqN <= {entries[issue[i].idx].highLdSqN, issue[i].idx};
+                        lateLoadUOp[i].tagDst <= entries[issue[i].idx].tagDst;
+                        lateLoadUOp[i].sqN <= entries[issue[i].idx].sqN;
+                        lateLoadUOp[i].doNotCommit <= entries[issue[i].idx].doNotCommit;
+                        lateLoadUOp[i].external <= 0;
+                        lateLoadUOp[i].exception <= entries[issue[i].idx].exception;
+                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(entries[issue[i].idx].addr);
+                        lateLoadUOp[i].valid <= 1;
                     end
                     else begin
                         
@@ -548,14 +545,6 @@ always_ff@(posedge clk) begin
                 entries[index].valid <= 1;
             end
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
-        
-        //for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-        //    if (IN_uop[i].valid && IN_uop[i].isStore && IN_uop[i].isLrSc) begin
-        //        for (integer j = 0; j < NUM_ENTRIES; j=j+1)
-        //            if (entries[j].valid && $signed(IN_uop[i].sqN - entries[j].sqN) > 0)
-        //                entries[j].hasRsv <= 0;
-        //    end
-        //end
     end
 end
 

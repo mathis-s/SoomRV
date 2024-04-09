@@ -59,8 +59,8 @@ ICacheIF MC_IC_wr;
 CacheIF MC_DC_rd;
 CacheIF MC_DC_wr;
 
-MemController_Req MemC_ctrl[2:0];
-MemController_Res MemC_stat;
+MemController_Req MemC_ctrl[2:0] /* verilator public */;
+MemController_Res MemC_stat /* verilator public */;
 MemoryController memc
 (
     .clk(clk),

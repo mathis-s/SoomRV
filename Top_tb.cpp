@@ -621,13 +621,14 @@ struct CacheWrite
     uint8_t wmask;
 };
 
-std::array<CacheWrite, 2> GetCurrentWrites()
+std::array<CacheWrite, 3> GetCurrentWrites()
 {
-    std::array<CacheWrite, 2> ports;
+    // Regular write to cache
+    std::array<CacheWrite, 3> ports = {};
     auto ifCache = top->Top->soc->__PVT__IF_cache;
     for (int i = 0; i < 2; i++)
     {
-        ports[i].we = !((ifCache->__PVT__we >> i) & 1);
+        ports[i].we = !((ifCache->__PVT__we >> i) & 1) && !((ifCache->__PVT__busy >> i) & 1);
         ports[i].addr = (ifCache->__PVT__addr >> i*12) & 4095;
         ports[i].wassoc = (ifCache->__PVT__wassoc >> i*2) & 3;
         ports[i].wdata = (ifCache->__PVT__wdata >> i*32) & 0xffffffff;
@@ -648,6 +649,37 @@ std::array<CacheWrite, 2> GetCurrentWrites()
         port.addr = ((entry >> 1) << 12) | (port.addr & -4);
         //printf("[%.8x] = %x\n", port.addr, port.wdata);
     }
+    
+    // Writes fused into cache line load request
+    auto memcReq = top->Top->soc->MemC_ctrl[1];
+    auto memcStat = top->Top->soc->MemC_stat;
+    
+    auto cmd = ExtractField(memcReq, 0, 4);
+    
+    static bool allow = 1;
+    if (allow &&
+        (cmd == 1 /*MEMC_REPLACE*/ || 
+         cmd == 3 /*MEMC_CP_EXT_TO_CACHE*/))
+    {
+        allow = 0;
+        auto addr = ExtractField(memcReq, 5+32, 32) & -4;
+        auto mask = ExtractField(memcReq, 5+32+32+12+32, 4);
+        auto data = ExtractField(memcReq, 5+32+32+12, 32);
+
+        if (mask != 0)
+        {
+            ports[2] = (CacheWrite) {
+                .we = 1,
+                .addr = addr,
+                .wassoc = 0, //unused
+                .wdata = data,
+                .wmask = (uint8_t)mask
+            };
+        }
+    }
+    
+    // Allow memc extract in next cycle if not stalled
+    allow = (cmd == 0) || !ExtractField(memcStat, 2, 1);
     return ports;
 }
 
@@ -713,13 +745,22 @@ void CheckStoreConsistency()
             writeIt->we = 0;
             if (!isEvicted) { fprintf(stderr, "[%lu] inconsistent cache write\n", main_time); Exit(1); }
             if (main_time > DEBUG_TIME)
-                fprintf(stderr, "[%lu] MEM%d[%.8x] = %x (commit time %lu)\n", main_time, store.size*8, store.addr, store.data, store.time);
+                fprintf(stderr, "[%lu] MEM%d[%.8x] = %x (%zu, commit time %lu)\n", main_time, store.size*8, store.addr, store.data, writeIt - writes.begin(), store.time);
             it = inFlightStores.erase(it);
             continue;
         }
         it++;
     }
     
+    for (size_t i = 0; i < writes.size(); i++)
+    {
+        auto& write = writes[i];
+        if (write.we)
+        {
+            fprintf(stderr, "[%lu] MEM[%.8x] = %x (%x) write %zu unaccounted for\n", main_time, write.addr, write.wdata, write.wmask, i);
+            Exit(1);
+        }
+    }
 }
 
 void LogFlush(Inst& inst);
