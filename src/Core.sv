@@ -70,7 +70,7 @@ BranchSelector#(4) bsel
     .IN_mispredFlush(mispredFlush)
 );
 
-IF_Instr IF_instrs;
+IF_Instr IF_instrs /*verilator public*/;
 BTUpdate BP_btUpdates[1:0];
 
 FetchID_t PC_readAddress[4:0];
@@ -510,6 +510,7 @@ end
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[1:0];
 PW_LD_UOp PW_LD_uop[`NUM_AGUS-1:0];
+assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
 PageWalker pageWalker
 (
     .clk(clk),

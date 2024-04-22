@@ -1,6 +1,6 @@
 
 // Branch Target Buffer
-`define BTB_ENTRIES 1024
+`define BTB_ENTRIES 4096
 `define BTB_TAG_SIZE 16
 
 // TAGE Predictor

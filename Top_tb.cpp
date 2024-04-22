@@ -88,6 +88,8 @@ struct Inst
 struct FetchPacket
 {
     uint32_t returnAddr[4];
+    uint64_t fetchTime;
+    uint64_t pdTime;
 };
 
 struct Store
@@ -733,6 +735,7 @@ void CheckStoreConsistency()
         }
 
         fprintf(stderr, "[%lu] cannot find store in SQ/EQ: MEM%d[%.8x] = %x (commit time %lu)\n", main_time, store.size*8, store.addr, store.data, store.time);
+        DumpState(stderr, -1, -1);
         Exit(1);
         found_entry:
 
@@ -827,8 +830,26 @@ void LogPredec(Inst& inst)
         state.fetches[inst.fetchID].returnAddr[1] * 2 & 0xfff,
         state.fetches[inst.fetchID].returnAddr[2] * 2 & 0xfff,
         state.fetches[inst.fetchID].returnAddr[3] * 2 & 0xfff);*/
+
     fprintf(konataFile, "L\t%u\t%u\t%.8x (%.8x): %s\n", inst.id, 0, inst.pc, inst.inst,
             simif.disasm(inst.inst).c_str());
+
+    fprintf(konataFile, "C\t-%lu\n",
+        (main_time-state.fetches[inst.fetchID].fetchTime)/2);
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
+    if ((state.fetches[inst.fetchID].pdTime < state.fetches[inst.fetchID].fetchTime))
+    {
+        printf("%li %li\n", state.fetches[inst.fetchID].fetchTime, state.fetches[inst.fetchID].pdTime);
+        Exit(1);
+    }
+    fprintf(konataFile, "C\t%lu\n",
+        (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime)/2);
+
+    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "PD");
+    fprintf(konataFile, "C\t%lu\n",
+        (main_time - state.fetches[inst.fetchID].pdTime)/2);
+
+    
     fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
@@ -1076,6 +1097,14 @@ void LogInstructions()
         {
             for (int i = 0; i < 4; i++)
                 state.fetches[core->ifetch->ict->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
+
+            state.fetches[core->ifetch->ict->fetchID].fetchTime = main_time;
+        }
+
+        if ((core->IF_instrs[0] & 1))
+        {
+            int fetchID = ExtractField(core->ifetch->ict->packetRePred, 1+128+2+31+1+3+3+3+2, 5);
+            state.fetches[fetchID].pdTime = main_time + 2;
         }
     }
     LogCycle();

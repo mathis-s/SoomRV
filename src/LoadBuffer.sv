@@ -162,8 +162,14 @@ logic[NUM_ENTRIES-1:0] wAddrMatch[`NUM_AGUS-1:0];
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            wAddrMatch[h][i] = (entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E] &&
-                                (addrCompT[h] == LD_NACK || entries[i].addr[`CLSIZE_E:2] == wAddrToMatch[h][`CLSIZE_E:2]));
+            wAddrMatch[h][i] = ((entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E]) &&
+                                (addrCompT[h] != LD_FWD || 
+                                    entries[i].addr[`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)] == 
+                                    wAddrToMatch[h][`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)]) &&
+                                (addrCompT[h] != STORE  || 
+                                    entries[i].addr[`CLSIZE_E-1:2] == 
+                                    wAddrToMatch[h][`CLSIZE_E-1:2])
+                            );
         end
     end
 end
@@ -200,7 +206,7 @@ always_comb begin
                     (IN_uop[h].size == 2 ||
                     (IN_uop[h].size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uop[h].addr[1])) ||
                     (IN_uop[h].size == 0 && (entries[i].size > 0 || entries[i].addr[1:0] == IN_uop[h].addr[1:0])))
-                ) begin
+            ) begin
                 storeIsConflict[h] = 1;
             end
         end
@@ -227,7 +233,7 @@ always_comb begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             issueCandidates[i] =
                 entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec && 
-                    (!entries[i].noReIssue || (addrCompT[1] == LD_FWD && wAddrMatch[0][i]) || memcNotBusy);
+                    (!entries[i].noReIssue || (addrCompT[h] == LD_FWD && wAddrMatch[h][i]) || memcNotBusy);
         end
 
         for (integer i = 0; i < h; i=i+1) begin
@@ -237,7 +243,7 @@ always_comb begin
 
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
-            logic isLdDataFwd = (addrCompT[1] == LD_FWD) && wAddrMatch[0][idx];
+            logic isLdDataFwd = (addrCompT[h] == LD_FWD) && wAddrMatch[h][idx];
             if (issueCandidates[idx] && (!issue[h].valid || isLdDataFwd)) begin
                 issue[h].isLdFwd = isLdDataFwd;
                 issue[h].valid = 1;
@@ -399,10 +405,14 @@ always_ff@(posedge clk) begin
                 lateLoadUOp[i].valid <= 0;
             end
             else if (lateLoadUOp[i].valid && IN_memc.ldDataFwd.valid &&
-                     lateLoadUOp[i].addr[31:2] == IN_memc.ldDataFwd.addr[31:2]
+                     lateLoadUOp[i].addr[31:$clog2(`AXI_WIDTH/8)] == IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
             ) begin
                 lateLoadUOp[i].dataValid <= 1;
-                lateLoadUOp[i].data <= IN_memc.ldDataFwd.data;
+                lateLoadUOp[i].data <= IN_memc.ldDataFwd.data[(lateLoadUOp[i].addr[$clog2(`AXI_WIDTH/8)-1:2])*32+:32];
+            end
+            else begin
+                lateLoadUOp[i].dataValid <= 0;
+                lateLoadUOp[i].data <= 'x;
             end
         end
 
@@ -469,19 +479,21 @@ always_ff@(posedge clk) begin
 
                     // Issue non-speculative or cache missed loads, currently only on port 0.
                     if (issue[i].valid) begin
+                        LBEntry e = entries[issue[i].idx];
+
                         entries[issue[i].idx].issued <= 1;
-                        lateLoadUOp[i].data <= IN_memc.ldDataFwd.data;
+                        lateLoadUOp[i].data <= issue[i].isLdFwd ? (IN_memc.ldDataFwd.data[32*e.addr[$clog2(`AXI_WIDTH/8)-1:2]+:32]) : 'x;
                         lateLoadUOp[i].dataValid <= issue[i].isLdFwd;
-                        lateLoadUOp[i].addr <= entries[issue[i].idx].addr;
-                        lateLoadUOp[i].signExtend <= entries[issue[i].idx].signExtend;
-                        lateLoadUOp[i].size <= entries[issue[i].idx].size;
-                        lateLoadUOp[i].loadSqN <= {entries[issue[i].idx].highLdSqN, issue[i].idx};
-                        lateLoadUOp[i].tagDst <= entries[issue[i].idx].tagDst;
-                        lateLoadUOp[i].sqN <= entries[issue[i].idx].sqN;
-                        lateLoadUOp[i].doNotCommit <= entries[issue[i].idx].doNotCommit;
+                        lateLoadUOp[i].addr <= e.addr;
+                        lateLoadUOp[i].signExtend <= e.signExtend;
+                        lateLoadUOp[i].size <= e.size;
+                        lateLoadUOp[i].loadSqN <= {e.highLdSqN, issue[i].idx};
+                        lateLoadUOp[i].tagDst <= e.tagDst;
+                        lateLoadUOp[i].sqN <= e.sqN;
+                        lateLoadUOp[i].doNotCommit <= e.doNotCommit;
                         lateLoadUOp[i].external <= 0;
-                        lateLoadUOp[i].exception <= entries[issue[i].idx].exception;
-                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(entries[issue[i].idx].addr);
+                        lateLoadUOp[i].exception <= e.exception;
+                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(e.addr);
                         lateLoadUOp[i].valid <= 1;
                     end
                     else begin

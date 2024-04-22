@@ -1,6 +1,6 @@
 
 // [0] -> transfer exists; [1] -> allow pass thru
-function automatic logic[1:0] CheckTransfers(MemController_Req memcReq, MemController_Res memcRes, CacheID_t cacheID, logic[31:0] addr);
+function automatic logic[1:0] CheckTransfers(MemController_Req memcReq, MemController_Res memcRes, CacheID_t cacheID, logic[31:0] addr, logic isStore);
     logic[1:0] rv = 0;
 
     for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
@@ -66,6 +66,8 @@ module LoadStoreUnit
 
     output RES_UOp OUT_uopLd[`NUM_AGUS-1:0]
 );
+
+LoadResUOp ldResUOp[`NUM_AGUS-1:0];
 
 MemController_Req BLSU_memc;
 MemController_Req LSU_memc;
@@ -356,7 +358,7 @@ always_comb begin
     storeWriteAssoc = 'x;
 
     for (integer i = 0; i < `NUM_AGUS; i=i+1) 
-        OUT_uopLd[i] = RES_UOp'{valid: 0, default: 'x};
+        ldResUOp[i] = LoadResUOp'{valid: 0, default: 'x};
 
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
         miss[i] = 'x;
@@ -398,7 +400,7 @@ always_comb begin
             begin
                 reg transferExists;
                 reg allowPassThru;
-                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr);
+                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr, 1);
                 if (transferExists) begin
                     doCacheLoad = 0; // this is only needed for one cycle
                     cacheHit &= allowPassThru;
@@ -491,7 +493,7 @@ always_comb begin
                 begin
                     reg transferExists;
                     reg allowPassThru;
-                    {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, ld.addr);
+                    {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, ld.addr, 0);
                     if (transferExists) begin
                         doCacheLoad = 0;
                         cacheHit &= allowPassThru;
@@ -504,6 +506,16 @@ always_comb begin
                     doCacheLoad = 0;
                 end
             end
+            
+            // defaults
+            ldResUOp[i].doNotCommit = ld.doNotCommit;
+            ldResUOp[i].external = ld.external;
+            ldResUOp[i].sqN = ld.sqN;
+            ldResUOp[i].tagDst = ld.tagDst;
+            ldResUOp[i].exception = ld.exception;
+            ldResUOp[i].sext = ld.signExtend;
+            ldResUOp[i].size = ld.size;
+            ldResUOp[i].addr = ld.addr;
 
             if ((!loadCacheAccessFailed[i][1] || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) &&
                 (cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) && 
@@ -517,32 +529,13 @@ always_comb begin
                     end
                 end
                 
-                OUT_uopLd[i].valid = 1;
-                OUT_uopLd[i].tagDst = ld.tagDst;
-                OUT_uopLd[i].sqN = ld.sqN;
-                OUT_uopLd[i].doNotCommit = ld.doNotCommit;
-                
-                case (ld.exception)
-                    AGU_NO_EXCEPTION: OUT_uopLd[i].flags = FLAGS_NONE;
-                    AGU_ADDR_MISALIGN: OUT_uopLd[i].flags = FLAGS_LD_MA;
-                    AGU_ACCESS_FAULT: OUT_uopLd[i].flags = FLAGS_LD_AF;
-                    AGU_PAGE_FAULT: OUT_uopLd[i].flags = FLAGS_LD_PF;
-                endcase
-
-                case (ld.size)
-                    0: OUT_uopLd[i].result = 
-                        {{24{ld.signExtend ? readData[8*(ld.addr[1:0])+7] : 1'b0}},
-                        readData[8*(ld.addr[1:0])+:8]};
-
-                    1: OUT_uopLd[i].result = 
-                        {{16{ld.signExtend ? readData[16*(ld.addr[1])+15] : 1'b0}},
-                        readData[16*(ld.addr[1])+:16]};
-
-                    2: OUT_uopLd[i].result = readData;
-                    default: assert(0);
-                endcase
+                ldResUOp[i].valid = 1;
+                ldResUOp[i].dataAvail = 1;
+                ldResUOp[i].fwdMask = 4'b1111;
+                ldResUOp[i].data = readData;
             end
             else begin
+                // Signal Miss
                 miss[i].valid = 1;
                 if (IN_stFwd[i].conflict)
                     miss[i].mtype = SQ_CONFLICT;
@@ -557,10 +550,37 @@ always_comb begin
                 miss[i].writeAddr = {IF_ct.rdata[i][assocCnt].addr, ld.addr[`VIRT_IDX_LEN-1:0]};
                 miss[i].missAddr = ld.addr;
                 miss[i].assoc = assocCnt;
+
+                if (miss[i].mtype == TRANS_IN_PROG ||
+                    miss[i].mtype == REGULAR ||
+                    miss[i].mtype == REGULAR_NO_EVICT
+                ) begin
+                    ldResUOp[i].valid = 1;
+                    ldResUOp[i].dataAvail = 0;
+                    ldResUOp[i].fwdMask = IN_stFwd[i].mask;
+                    ldResUOp[i].data = IN_stFwd[i].data;
+                end
             end
         end
     end
 end
+
+// Load Result Buffering
+wire LRB_ready[`NUM_AGUS-1:0];
+LoadResUOp LRB_uop[`NUM_AGUS-1:0];
+LoadResultBuffer loadResBuf[1:0]
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_memc(IN_memc),
+    .IN_branch(IN_branch),
+
+    .IN_uop(LRB_uop),
+    .OUT_ready(LRB_ready),
+
+    .OUT_uop(OUT_uopLd)
+);
 
 // Store Pipeline
 reg[1:0] stConflictMiss;
@@ -617,12 +637,16 @@ enum logic[3:0]
     IDLE, FLUSH, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
 } state;
 
+// Place load in LoadResultBuffer or reactivate back in LoadBuffer via negative ack
 for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
     always_comb begin
-        OUT_ldAck[i] = 'x;
-        OUT_ldAck[i].valid = 0;
-        if (miss[i].valid && (!stOps[1].valid || stOpPort[1] != i)
-        ) begin
+        OUT_ldAck[i] = LD_Ack'{valid: 0, default: 'x};
+        LRB_uop[i] = LoadResUOp'{valid: 0, default: 'x};
+
+        if (ldResUOp[i].valid && (LRB_ready[i]) && (!miss[i].valid || forwardMiss[i])) begin
+            LRB_uop[i] = ldResUOp[i];
+        end
+        else if (curLd[i].valid) begin
             OUT_ldAck[i].valid = 1;
             OUT_ldAck[i].fail = 1;
             OUT_ldAck[i].external = curLd[i].external;
@@ -630,11 +654,13 @@ for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
             OUT_ldAck[i].addr = curLd[i].addr;
 
             OUT_ldAck[i].doNotReIssue = 0;
-            if (miss[i].mtype == TRANS_IN_PROG) begin
-                OUT_ldAck[i].doNotReIssue = 1;
-            end
-            else if (miss[i].mtype == REGULAR || miss[i].mtype == REGULAR_NO_EVICT) begin
-                OUT_ldAck[i].doNotReIssue = forwardMiss[i] && !missEvictConflict[i];
+            if (miss[i].valid && (!stOps[1].valid || stOpPort[1] != i)) begin
+                if (miss[i].mtype == TRANS_IN_PROG) begin
+                    OUT_ldAck[i].doNotReIssue = 1;
+                end
+                else if (miss[i].mtype == REGULAR || miss[i].mtype == REGULAR_NO_EVICT) begin
+                    OUT_ldAck[i].doNotReIssue = forwardMiss[i] && !missEvictConflict[i];
+                end
             end
         end
     end
@@ -655,7 +681,6 @@ wire redoStore = stOps[1].valid &&
     ) : 
         (!stOps[1].isMMIO && IF_cache.busy[stOpPort[1]]));
 
-// todo
 wire fuseStoreMiss = !missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT) && forwardMiss[stOpPort[1]] && miss[stOpPort[1]].valid;
 
 assign OUT_stAck.addr = stOps[1].addr;

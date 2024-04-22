@@ -308,7 +308,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[31:0] data;
+    logic[`AXI_WIDTH-1:0] data;
     logic[31:0] addr;
     logic valid;
 } MemController_LdDataFwd;
@@ -611,6 +611,23 @@ typedef struct packed
     logic compressed; // 1
     logic valid; // 1
 } AGU_UOp;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic[3:0] fwdMask;
+    logic[31:0] addr;
+    logic[1:0] size;
+    logic sext;
+    logic dataAvail;
+    
+    AGU_Exception exception;
+    Tag tagDst;
+    SqN sqN;
+    logic external;
+    logic doNotCommit;
+    logic valid;
+} LoadResUOp;
 
 typedef struct packed
 {

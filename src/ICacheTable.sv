@@ -226,7 +226,7 @@ always_comb begin
                 end
             end
             begin
-                {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, phyPC);
+                {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, phyPC, 0);
                 if (transferExists) begin
                     doCacheLoad = 0;
                     cacheHit &= allowPassThru;
@@ -264,7 +264,7 @@ end
 
 // Apply post-BranchHandler corrected branch pred metadata
 // to the fetch package.
-IF_Instr packetRePred;
+IF_Instr packetRePred /*verilator public*/;
 always_comb begin
     packetRePred = packet;
     

@@ -684,21 +684,21 @@ always_ff@(posedge clk) begin
             end
         end
         
-        /*if (s_axi_rvalid && s_axi_rready && 0) begin
+        if (s_axi_rvalid && s_axi_rready) begin
             if (transfers[s_axi_rid].cacheID == 0) begin
                 transfers[s_axi_rid].fwdAddrCounter <= transfers[s_axi_rid].fwdAddrCounter + WIDTH_W;
 
                 ldDataFwd.data <= s_axi_rdata;
                 if (transfers[s_axi_rid].fwdAddrCounter == 0) begin
-                    for (integer i = 0; i < 4; i=i+1)
+                    for (integer i = 0; i < `AXI_WIDTH/8; i=i+1)
                         if (transfers[s_axi_rid].storeMask[i])
                             ldDataFwd.data[i*8+:8] <= transfers[s_axi_rid].storeData[8*i+:8];
                 end
 
-                ldDataFwd.addr <= {transfers[s_axi_rid].readAddr[31:`CLSIZE_E], (transfers[s_axi_rid].readAddr[`CLSIZE_E-1:2] + transfers[s_axi_rid].fwdAddrCounter[1:0]), 2'b0};
+                ldDataFwd.addr <= {transfers[s_axi_rid].readAddr[31:`CLSIZE_E], (transfers[s_axi_rid].readAddr[`CLSIZE_E-1:2] + transfers[s_axi_rid].fwdAddrCounter[`CLSIZE_E-3:0]), 2'b0};
                 ldDataFwd.valid <= 1;
             end
-        end*/
+        end
 
         // Read ACK
         if (DCW_ackValid) begin

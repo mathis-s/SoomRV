@@ -56,7 +56,7 @@ SRC_FILES = \
 	src/Peripherals.sv \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
-	src/LoadMissQueue.sv \
+	src/LoadResultBuffer.sv \
 	src/TLB.sv \
 	src/BypassLSU.sv \
 	src/TValSelect.sv \
