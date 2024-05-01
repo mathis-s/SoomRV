@@ -916,7 +916,9 @@ void LogCycle()
 uint32_t mostRecentPC;
 void LogInstructions()
 {
+#ifdef COSIM
     CheckStoreConsistency();
+#endif
 
     auto core = top->Top->soc->core;
 
@@ -1004,7 +1006,7 @@ void LogInstructions()
                     state.insts[sqn].interrupt = Inst::IR_KEEP;
                 state.insts[sqn].interruptCause = (core->CSR_trapControl[0] >> 1) & 15;
                 state.insts[sqn].interruptDelegate = core->CSR_trapControl[0] & 1;
-                state.insts[sqn].incMinstret = (core->ROB_validRetire & (1 << i));
+                state.insts[sqn].incMinstret = (core->ROB_perfcInfo & (1 << i));
 
                 state.lastComSqN = curComSqN;
                 LogCommit(state.insts[sqn]);
@@ -1280,13 +1282,22 @@ void Initialize(int argc, char** argv, Args& args)
 
 void LogPerf(VTop_Core* core)
 {
-    std::array<uint64_t, 5> counters = {
-        core->csr->mcycle,       core->csr->minstret,     core->csr->mhpmcounter3,
-        core->csr->mhpmcounter4, core->csr->mhpmcounter5,
-    };
-    static std::array<uint64_t, 5> lastCounters;
+    std::array<uint64_t, 16> counters = {
+        core->csr->mcycle,       core->csr->minstret,     core->csr->mhpmcounter[3],
+        core->csr->mhpmcounter[4], core->csr->mhpmcounter[5],
 
-    std::array<uint64_t, 5> current;
+        core->csr->mhpmcounter[6], core->csr->mhpmcounter[7],
+        core->csr->mhpmcounter[8], core->csr->mhpmcounter[9],
+        core->csr->mhpmcounter[10], core->csr->mhpmcounter[11],
+
+        core->csr->mhpmcounter[12], core->csr->mhpmcounter[13],
+        core->csr->mhpmcounter[14], core->csr->mhpmcounter[15],
+        core->csr->mhpmcounter[16], 
+        
+    };
+    static std::array<uint64_t, 16> lastCounters;
+
+    std::array<uint64_t, 16> current;
     for (size_t i = 0; i < counters.size(); i++)
         current[i] = counters[i] - lastCounters[i];
 
@@ -1297,8 +1308,23 @@ void LogPerf(VTop_Core* core)
     fprintf(stderr, "cycles:             %lu\n", current[0]);
     fprintf(stderr, "instret:            %lu # %f IPC \n", current[1], ipc);
     fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
-    fprintf(stderr, "branches:           %lu\n", current[2]);
     fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
+    fprintf(stderr, "branches:           %lu\n", current[2]);
+    fprintf(stderr, "frontend stalled:   %lu # %f%%\n", current[12-1], 100.*current[12-1]/(4*current[0]));
+    fprintf(stderr, "backend stalled:    %lu # %f%%\n", current[13-1], 100.*current[13-1]/(4*current[0]));
+    fprintf(stderr, "store stalled:      %lu # %f%%\n", current[14-1], 100.*current[14-1]/(4*current[0]));
+    fprintf(stderr, "load stalled:       %lu # %f%%\n", current[15-1], 100.*current[15-1]/(4*current[0]));
+    fprintf(stderr, "ROB stalled:        %lu # %f%%\n", current[16-1], 100.*current[16-1]/(4*current[0]));
+
+    fprintf(stderr, 
+        "%7lu # %2.0f ORD | %7lu # %2.0f BTK | %7lu # %2.0f BNT\n"
+        "%7lu # %2.0f RET | %7lu # %2.0f IBR | %7lu # %2.0f MEM\n",
+        current[5], 100.*current[5] / current[4],
+        current[6], 100.*current[6] / current[4],
+        current[7], 100.*current[7] / current[4],
+        current[8], 100.*current[8] / current[4],
+        current[9], 100.*current[9] / current[4],
+        current[10], 100.*current[10] / current[4]);
 
     lastCounters = counters;
 }

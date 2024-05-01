@@ -219,6 +219,7 @@ always_comb begin
                     branch_c.dstPC = pcPlus4;
                     btUpdate_c.dst = pcPlus4;
                 end
+                branch_c.cause = branchTaken ? FLUSH_BRANCH_TK : FLUSH_BRANCH_NT;
                 branch_c.taken = 1;
                 
                 // if predicted but wrong, correct existing history bit
@@ -233,8 +234,9 @@ always_comb begin
         end
         // Check speculated return address
         else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
-            if (!indBranchCorrect) begin
+            if (!indBranchCorrect || !IN_uop.bpi.taken) begin
                 branch_c.dstPC = indBranchDst;
+                branch_c.cause = (IN_uop.opcode == INT_V_RET) ? FLUSH_RETURN : FLUSH_IBRANCH;
                 branch_c.taken = 1;
                 
                 if (IN_uop.opcode == INT_V_RET)

@@ -467,8 +467,7 @@ CSR csr
     .IN_branch(branch),
     .IN_fpNewFlags(ROB_fpNewFlags),
     
-    .IN_commitValid(ROB_validRetire),
-    .IN_commitBranch(ROB_retireBranch),
+    .IN_perfcInfo(ROB_perfcInfo),
     .IN_branchMispr(BS_PERFC_branchMispr),
     .IN_mispredFlush(mispredFlush),
     
@@ -844,8 +843,9 @@ end
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
-wire[`DEC_WIDTH-1:0] ROB_validRetire /*verilator public*/;
-wire[`DEC_WIDTH-1:0] ROB_retireBranch;
+
+ROB_PERFC_Info ROB_perfcInfo /*verilator public*/;
+
 BPUpdate0 ROB_bpUpdate0;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 SqN ROB_comLoadSqN;
@@ -858,6 +858,7 @@ ROB rob
     .IN_wbUOps(wbUOp),
     
     .IN_interruptPending(CSR_trapControl.interruptPending),
+    .OUT_perfcInfo(ROB_perfcInfo),
 
     .IN_branch(branch),
     .IN_sqInfo(SQ_info),
@@ -872,8 +873,6 @@ ROB rob
 
     .OUT_comUOp(comUOps),
     .OUT_fpNewFlags(ROB_fpNewFlags),
-    .OUT_PERFC_validRetire(ROB_validRetire),
-    .OUT_PERFC_retireBranch(ROB_retireBranch),
     .OUT_curFetchID(ROB_curFetchID),
     
     .OUT_trapUOp(ROB_trapUOp),

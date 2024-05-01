@@ -354,6 +354,7 @@ always_comb begin
                 OUT_branch.histAct = HIST_NONE;
                 OUT_branch.retAct = RET_NONE;
                 OUT_branch.isSCFail = 0;
+                OUT_branch.cause = FLUSH_MEM_ORDER;
                 
                 // For failed SCs we also roll back the SC itself. The SC is then re-run as `li rd, 1`.
                 // This saves as from needing a real register file write port for stores. Instead, all

@@ -11,9 +11,7 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     
     input wire[4:0] IN_fpNewFlags,
 
-    // for perf counters
-    input wire[`DEC_WIDTH-1:0] IN_commitValid,
-    input wire[`DEC_WIDTH-1:0] IN_commitBranch,
+    input ROB_PERFC_Info IN_perfcInfo,
     input wire IN_branchMispr,
     input wire IN_mispredFlush,
     
@@ -31,6 +29,9 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
     output RES_UOp OUT_uop
 );
 
+localparam NUM_PERFC = 17;
+
+typedef logic[11:0] CSR_Id;
 
 typedef enum logic[11:0]
 {
@@ -281,9 +282,7 @@ reg[2:0] frm;
 
 reg[63:0] mcycle /*verilator public*/;
 reg[63:0] minstret /*verilator public*/;
-reg[63:0] mhpmcounter3 /*verilator public*/; // branches
-reg[63:0] mhpmcounter4 /*verilator public*/; // branch mispredicts
-reg[63:0] mhpmcounter5 /*verilator public*/; // total mispredicts
+reg[63:0] mhpmcounter[NUM_PERFC-1:0] /*verilator public*/; // branches
 
 typedef struct packed
 {
@@ -330,8 +329,8 @@ reg[15:0] medeleg;
 reg[15:0] mideleg;
 reg[15:0] mip;
 reg[15:0] mie;
-reg[5:0] mcounteren;
-reg[5:0] mcountinhibit;
+reg[31:0] mcounteren;
+reg[31:0] mcountinhibit;
 
 typedef struct packed
 {
@@ -458,7 +457,6 @@ always_comb begin
     rdata = 32'bx;
     
     case (IN_uop.imm[11:0])
-    
 `ifdef ENABLE_FP
         CSR_fflags: rdata = {27'b0, fflags};
         CSR_frm: rdata = {29'b0, frm};
@@ -498,28 +496,6 @@ always_comb begin
                 (priv == PRIV_USER && mcounteren[2] && scounteren[2]));
             rdata = minstret[63:32];
         end
-        
-        CSR_hpmcounter3,
-        CSR_hpmcounter3h: begin
-            invalidCSR = !((priv == PRIV_MACHINE) ||
-                (priv == PRIV_SUPERVISOR && mcounteren[3]) ||
-                (priv == PRIV_USER && mcounteren[3] && scounteren[3]));
-            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter3) ? mhpmcounter3[31:0] : mhpmcounter3[63:32];
-        end
-        CSR_hpmcounter4,
-        CSR_hpmcounter4h: begin
-            invalidCSR = !((priv == PRIV_MACHINE) ||
-                (priv == PRIV_SUPERVISOR && mcounteren[4]) ||
-                (priv == PRIV_USER && mcounteren[4] && scounteren[4]));
-            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter4) ? mhpmcounter4[31:0] : mhpmcounter4[63:32];
-        end
-        CSR_hpmcounter5,
-        CSR_hpmcounter5h: begin
-            invalidCSR = !((priv == PRIV_MACHINE) ||
-                (priv == PRIV_SUPERVISOR && mcounteren[5]) ||
-                (priv == PRIV_USER && mcounteren[5] && scounteren[5]));
-            rdata = (IN_uop.imm[11:0] == CSR_hpmcounter5) ? mhpmcounter5[31:0] : mhpmcounter5[63:32];
-        end
 
         CSR_misa: rdata = 32'b01_0000_00000101000001000100000101 | {8'b0, misa_X, 23'b0};
         CSR_marchid: rdata = 32'h50087502;
@@ -532,16 +508,8 @@ always_comb begin
         CSR_minstret: rdata = minstret[31:0];
         CSR_minstreth: rdata = minstret[63:32];
         
-        CSR_mhpmcounter3: rdata = mhpmcounter3[31:0];
-        CSR_mhpmcounter4: rdata = mhpmcounter4[31:0];
-        CSR_mhpmcounter5: rdata = mhpmcounter5[31:0];
-        
-        CSR_mhpmcounter3h: rdata = mhpmcounter3[63:32];
-        CSR_mhpmcounter4h: rdata = mhpmcounter4[63:32];
-        CSR_mhpmcounter5h: rdata = mhpmcounter5[63:32];
-        
-        CSR_mcounteren: rdata = {26'b0, mcounteren};
-        CSR_mcountinhibit: rdata = {26'b0, mcountinhibit};
+        CSR_mcounteren: rdata = mcounteren;
+        CSR_mcountinhibit: rdata = mcountinhibit;
         
         CSR_mtvec: rdata = mtvec;
         CSR_medeleg: rdata = {16'b0, medeleg};
@@ -643,6 +611,29 @@ always_comb begin
         
         default: invalidCSR = 1;
     endcase
+
+
+    // handle HPM counters here to avoid code duplication
+    for (integer i = 3; i < NUM_PERFC; i++) begin
+        // unprivileged copies
+        CSR_Id hpm = CSR_cycle + CSR_Id'(i);
+        CSR_Id hpmh = CSR_cycleh + CSR_Id'(i);
+        
+        // privileged
+        CSR_Id mhpm = CSR_mcycle + CSR_Id'(i);
+        CSR_Id mhpmh = CSR_mcycleh + CSR_Id'(i);
+        
+        if (IN_uop.imm[11:0] == mhpm || IN_uop.imm[11:0] == mhpmh) begin
+            rdata = (IN_uop.imm[11:0] == mhpm) ? mhpmcounter[i][31:0] : mhpmcounter[i][63:32];
+            invalidCSR = 0;
+        end
+        else if (IN_uop.imm[11:0] == hpm || IN_uop.imm[11:0] == hpmh) begin
+            invalidCSR = !((priv == PRIV_MACHINE) ||
+                (priv == PRIV_SUPERVISOR && mcounteren[i]) ||
+                (priv == PRIV_USER && mcounteren[i] && scounteren[i]));
+            rdata = (IN_uop.imm[11:0] == hpm) ? mhpmcounter[i][31:0] : mhpmcounter[i][63:32];
+        end
+    end
 end
 
 always_ff@(posedge clk) begin
@@ -703,30 +694,39 @@ always_ff@(posedge clk) begin
         
         if (!mcountinhibit[0])
             mcycle <= mcycle + 1;
+
+        // MTIP
+        mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
+        mip[11] <= IN_irq;
         
         if (!mcountinhibit[2]) begin
             reg[2:0] temp = 0;
             for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-                if (IN_commitValid[i]) temp = temp + 1;
+                if (IN_perfcInfo.validRetire[i]) temp = temp + 1;
             minstret <= minstret + {32'b0, 29'b0, temp};
         end
         
         if (!mcountinhibit[3]) begin
             reg[2:0] temp = 0;
             for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-                if (IN_commitBranch[i]) temp = temp + 1;
-            mhpmcounter3 <= mhpmcounter3 + {32'b0, 29'b0, temp};
+                if (IN_perfcInfo.branchRetire[i]) temp = temp + 1;
+            mhpmcounter[3] <= mhpmcounter[3] + {32'b0, 29'b0, temp};
         end
         
         if (!mcountinhibit[4] && IN_branchMispr)
-            mhpmcounter4 <= mhpmcounter4 + 1;
+            mhpmcounter[4] <= mhpmcounter[4] + 1;
             
         if (!mcountinhibit[5] && IN_branch.taken)
-            mhpmcounter5 <= mhpmcounter5 + 1;
-        
-        // MTIP
-        mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
-        mip[11] <= IN_irq;
+            mhpmcounter[5] <= mhpmcounter[5] + 1;
+
+        // Mispredict Cause Counters
+        if (IN_branch.taken && !mcountinhibit[6 + IN_branch.cause])
+            mhpmcounter[6 + IN_branch.cause] <= mhpmcounter[6 + IN_branch.cause] + 1;
+
+        // Stall Cause Counters
+        if (IN_perfcInfo.stallCause != STALL_NONE)
+            mhpmcounter[11 + IN_perfcInfo.stallCause] <= 
+                mhpmcounter[11 + IN_perfcInfo.stallCause] + 64'(IN_perfcInfo.stallWeigth) + 1;
     end
     
     if (rst) begin
@@ -759,9 +759,8 @@ always_ff@(posedge clk) begin
         satp <= 0;
         senvcfg <= 0;
         
-        mhpmcounter3 <= 0;
-        mhpmcounter4 <= 0;
-        mhpmcounter5 <= 0;
+        for (integer i = 0; i < NUM_PERFC; i=i+1)
+            mhpmcounter[i] <= 0;
         
         OUT_uop.valid <= 0;
 
@@ -837,6 +836,12 @@ always_ff@(posedge clk) begin
                             default: begin end
                         endcase
                         
+                        for (integer i = 3; i <= 11; i=i+1) begin
+                            if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycle)
+                                mhpmcounter[i][31:0] <= wdata;
+                            if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycleh)
+                                mhpmcounter[i][63:32] <= wdata;
+                        end
                         case (IN_uop.imm[11:0])
 `ifdef ENABLE_FP
                             CSR_fflags: fflags <= wdata[4:0];
@@ -867,15 +872,7 @@ always_ff@(posedge clk) begin
                             CSR_minstret: minstret[31:0] <= wdata;
                             CSR_minstreth: minstret[63:32] <= wdata;
                             
-                            CSR_mhpmcounter3: mhpmcounter3[31:0] <= wdata;
-                            CSR_mhpmcounter4: mhpmcounter4[31:0] <= wdata;
-                            CSR_mhpmcounter5: mhpmcounter5[31:0] <= wdata;
-                            
-                            CSR_mhpmcounter3h: mhpmcounter3[63:32] <= wdata;
-                            CSR_mhpmcounter4h: mhpmcounter4[63:32] <= wdata;
-                            CSR_mhpmcounter5h: mhpmcounter5[63:32] <= wdata;
-                            
-                            CSR_mcounteren: mcounteren[5:0] <= wdata[5:0];
+                            CSR_mcounteren: mcounteren[11:0] <= wdata[11:0];
                             CSR_mcountinhibit: begin
                                 // do not allow disabling counters in verilator
                                 // simulation for performance measurement.

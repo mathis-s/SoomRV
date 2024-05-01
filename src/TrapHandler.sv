@@ -135,6 +135,7 @@ always_comb begin
                 OUT_branch_c.histAct = HIST_NONE;
                 OUT_branch_c.retAct = RET_NONE;
                 OUT_branch_c.isSCFail = 0;
+                OUT_branch_c.cause = FLUSH_ORDERING;
             end
 
 
@@ -195,6 +196,7 @@ always_comb begin
                 OUT_branch_c.histAct = HIST_NONE;
                 OUT_branch_c.retAct = RET_NONE;
                 OUT_branch_c.isSCFail = 0;
+                OUT_branch_c.cause = FLUSH_ORDERING;
             end
             else if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
                 OUT_bpUpdate1_c.valid = 1;

@@ -275,6 +275,26 @@ typedef enum logic[1:0]
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
+typedef enum logic[2:0]
+{
+    FLUSH_ORDERING,
+    FLUSH_BRANCH_TK,
+    FLUSH_BRANCH_NT,
+    FLUSH_RETURN,
+    FLUSH_IBRANCH,
+    FLUSH_MEM_ORDER
+} FlushCause;
+
+typedef enum logic[2:0]
+{
+    STALL_NONE,
+    STALL_FRONTEND,
+    STALL_BACKEND,
+    STALL_STORE,
+    STALL_LOAD,
+    STALL_ROB
+} StallCause;
+
 typedef enum logic[3:0]
 {
     MEMC_NONE,
@@ -392,6 +412,7 @@ typedef enum logic[1:0]
 
 typedef struct packed
 {
+    FlushCause cause; // only for performance counters
     logic isSCFail;
     RetStackAction retAct;
     HistoryAction histAct;
@@ -862,6 +883,14 @@ typedef struct packed
     logic[`CACHE_SIZE_E-3:0] addr;
     logic[127:0] data;
 } ICacheIF;
+
+typedef struct packed
+{
+    logic[1:0] stallWeigth;
+    StallCause stallCause;
+    logic[3:0] branchRetire;
+    logic[3:0] validRetire;
+} ROB_PERFC_Info;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
