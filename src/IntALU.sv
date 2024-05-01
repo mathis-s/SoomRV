@@ -281,9 +281,9 @@ always_ff@(posedge clk) begin
             OUT_amoData.sqN <= IN_uop.sqN;
         end
         
-        if (isBranch)
+        if (isBranch && (IN_uop.bpi.predicted || branchTaken != IN_uop.bpi.taken))
             OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
-        else if (IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR)
+        else if (isBranch || IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR)
             OUT_uop.flags <= FLAGS_BRANCH;
         else
             OUT_uop.flags <= flags;

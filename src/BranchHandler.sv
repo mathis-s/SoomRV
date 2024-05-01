@@ -245,7 +245,7 @@ end
 always_ff@(posedge clk) begin
     OUT_btUpdate <= BTUpdate'{valid: 0, default: 'x};
     OUT_retUpdate <= ReturnDecUpdate'{valid: 0, default: 'x};
-    if (IN_accept) begin
+    if (IN_accept && !IN_clear) begin
         OUT_btUpdate <= btUpdate_c;
         OUT_retUpdate <= retUpd_c;
     end
@@ -326,8 +326,19 @@ always_comb begin
                     btUpdate_c.dst = curBr.target;
                     btUpdate_c.compressed = curBr.compr;
                     btUpdate_c.isJump = curBr.btype == JUMP;
+                    
+                    if (curBr.btype == RETURN) begin
+                        decBranch_c.retAct = RET_POP;
+                        decBranch_c.dst = (!IN_op.bpi.taken ? IN_op.predTarget : IN_lateRetAddr[31:1]);
 
-                    // TODO: also handle returns here, we have a decent target prediction for them
+                        retUpd_c.valid = 1;
+                        retUpd_c.cleanRet = 0;
+                        retUpd_c.compr = curBr.compr;
+                        retUpd_c.isRet = 1;
+                        retUpd_c.isCall = 0;
+                        retUpd_c.idx = IN_op.rIdx - 1;
+                        retUpd_c.addr = {IN_op.pc[31:1+$bits(FetchOff_t)], actualOffs};
+                    end
                 end
                 else begin
                     if (predIllegal) begin
@@ -419,6 +430,17 @@ always_comb begin
                 retUpd_c.isCall = 1;
                 retUpd_c.idx = IN_op.rIdx;
                 retUpd_c.addr = {IN_op.pc[31:1+$bits(FetchOff_t)], actualOffs};
+
+                if (curBr.btype == ICALL) begin
+                    decBranch_c.taken = 1;
+                    decBranch_c.fetchID = IN_op.fetchID;
+                    decBranch_c.dst = curBr.fhPC[31:1] + 1;
+
+                    if (actualOffs != {$bits(FetchOff_t) {1'b1}}) begin
+                        endOffsValid = 1;
+                        endOffs = actualOffs + 1;
+                    end
+                end
             end
 
             if (curBr.btype == RETURN) begin
