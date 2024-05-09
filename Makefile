@@ -68,6 +68,7 @@ SRC_FILES = \
 	src/FIFO.sv \
 	src/RegFileRTL.sv \
 	src/BranchHandler.sv \
+	src/PriorityEncoder.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

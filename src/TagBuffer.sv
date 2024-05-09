@@ -34,62 +34,12 @@ reg mispredWait;
 reg issueTagsValid[NUM_ISSUE-1:0];
 reg[5:0] issueTags[NUM_ISSUE-1:0];
 
-localparam NUM_TAGS_POW2 = 1 << $clog2(NUM_TAGS);
-wire[NUM_TAGS_POW2-1:0] freePadded = {{(NUM_TAGS_POW2-NUM_TAGS){1'b0}}, free};
-
-// Search Tree for getting index of NUM_ISSUE unused entries.
-// This essentially is the classic count-leading-zeros type
-// search tree, but instead of tracking one index, we track
-// NUM_ISSUE indices. 
-localparam NUM_STAGES = $clog2(NUM_TAGS_POW2); // excl base case
-generate
-for (genvar g = 0; g < NUM_STAGES+1; g=g+1) begin : gen
-    logic[NUM_ISSUE-1:0][g:0] s[(NUM_TAGS_POW2>>g)-1:0];
-
-    // Base
-    if (g == 0) begin
-        always_comb begin
-            for (integer i = 0; i < NUM_TAGS_POW2; i=i+1) begin
-                for (integer j = 0; j < NUM_ISSUE; j=j+1)
-                    s[i][j] = 1; // LSBit represents undefined
-                s[i][0] = !freePadded[i];
-            end
-        end
-    end
-    // Step
-    else begin
-        for (genvar i = 0; i < (NUM_TAGS_POW2>>g); i=i+1) begin
-            wire[NUM_ISSUE-1:0][g-1:0] a = gen[g-1].s[2*i+0];
-            wire[NUM_ISSUE-1:0][g-1:0] b = gen[g-1].s[2*i+1];
-            
-            for (genvar j = 0; j < NUM_ISSUE; j=j+1) begin : gen2
-                
-                // manually build mux to avoid non-const index arithmetic
-                wire[g-1:0] mux[j+1:0];
-                for (genvar k = 0; k <= j; k=k+1)
-                    assign mux[k] = b[j - k];
-                assign mux[j+1] = a[j];
-                
-                // verilator lint_off WIDTHEXPAND
-                wire[j == 0 ? 0 : ($clog2(j+2)-1):0] redSum;
-                if (j == 0) assign redSum = !a[j][0];
-                else        assign redSum = !a[j][0] + gen2[j-1].redSum;
-                // verilator lint_on WIDTHEXPAND
-
-                assign s[i][j] = {a[j][0], mux[redSum]};
-            end
-        end
-    end
-end
-endgenerate
-
-always_comb begin
-    logic[NUM_ISSUE-1:0][PTAG_LEN:0] packedTags = gen[NUM_STAGES].s[0];
-    for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
-        issueTags[i] = packedTags[i][PTAG_LEN:1];
-        issueTagsValid[i] = !packedTags[i][0];
-    end
-end
+PriorityEncoder#(NUM_TAGS, NUM_ISSUE) penc
+(
+    .IN_data(free),
+    .OUT_idx(issueTags),
+    .OUT_idxValid(issueTagsValid)
+);
 
 always_ff@(posedge clk) begin
     
