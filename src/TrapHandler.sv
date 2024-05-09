@@ -93,7 +93,6 @@ always_comb begin
                 
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
-                        setMemoryWait = 1;
                         OUT_branch_c.dstPC = nextInstr;
                     end
                     FLAGS_FENCE: begin

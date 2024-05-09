@@ -1,4 +1,4 @@
-module LoadResultBuffer#(parameter SIZE=4)
+module LoadResultBuffer#(parameter SIZE=8)
 (
     input wire clk,
     input wire rst,
@@ -8,7 +8,8 @@ module LoadResultBuffer#(parameter SIZE=4)
     
     input LoadResUOp IN_uop,
     output wire OUT_ready,
-
+    
+    input wire IN_ready,
     output RES_UOp OUT_uop
 );
 
@@ -29,25 +30,28 @@ always_comb begin
     outLMQ_c = LoadResUOp'{valid: 0, default: 'x};
     deq_c = IdxN'{valid: 0, default: 'x};
     enqLMQ_c = IN_uop;
-
-    // TODO: build compare tree manually
-    for (integer i = 0; i < SIZE; i=i+1) begin
-        if (entries[i].valid && entries[i].dataAvail &&
-            (!outLMQ_c.valid || outLMQ_c.external || $signed(entries[i].sqN - outLMQ_c.sqN) <= 0)
-        ) begin
-            outLMQ_c = entries[i];
-            deq_c.valid = 1;
-            deq_c.idx = i[$clog2(SIZE)-1:0];
-        end
-    end
     
-    // immediately pass through incoming load if older
-    if (IN_uop.valid && IN_uop.dataAvail &&
-        (!outLMQ_c.valid || outLMQ_c.external || $signed(IN_uop.sqN - outLMQ_c.sqN) <= 0)
-    ) begin
-        outLMQ_c = IN_uop;
-        deq_c = IdxN'{valid: 0, default: 'x};
-        enqLMQ_c = LoadResUOp'{valid: 0, default: 'x};
+    // Select load result op to output
+    if (IN_ready) begin
+        // TODO: build compare tree manually
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            if (entries[i].valid && entries[i].dataAvail &&
+                (!outLMQ_c.valid || outLMQ_c.external || $signed(entries[i].sqN - outLMQ_c.sqN) <= 0)
+            ) begin
+                outLMQ_c = entries[i];
+                deq_c.valid = 1;
+                deq_c.idx = i[$clog2(SIZE)-1:0];
+            end
+        end
+        
+        // immediately pass through incoming load if older
+        if (IN_uop.valid && IN_uop.dataAvail &&
+            (!outLMQ_c.valid || outLMQ_c.external || $signed(IN_uop.sqN - outLMQ_c.sqN) <= 0)
+        ) begin
+            outLMQ_c = IN_uop;
+            deq_c = IdxN'{valid: 0, default: 'x};
+            enqLMQ_c = LoadResUOp'{valid: 0, default: 'x};
+        end
     end
 end
 

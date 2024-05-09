@@ -63,7 +63,8 @@ module LoadStoreUnit
     output MemController_Req OUT_memc,
     output MemController_Req OUT_BLSU_memc,
     input MemController_Res IN_memc,
-
+    
+    input wire[`NUM_AGUS-1:0] IN_ready,
     output RES_UOp OUT_uopLd[`NUM_AGUS-1:0]
 );
 
@@ -578,7 +579,8 @@ LoadResultBuffer loadResBuf[1:0]
 
     .IN_uop(LRB_uop),
     .OUT_ready(LRB_ready),
-
+    
+    .IN_ready(IN_ready),
     .OUT_uop(OUT_uopLd)
 );
 

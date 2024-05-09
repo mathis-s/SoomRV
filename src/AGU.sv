@@ -3,7 +3,6 @@ module AGU
 (
     input wire clk,
     input wire rst,
-    input wire en,
     input wire IN_stall,
     output wire OUT_stall,
 
@@ -65,7 +64,7 @@ always_comb begin
     aguUOp_c.isLrSc = 0;
     aguUOp_c.compressed = IN_uop.compressed;
     aguUOp_c.exception = AGU_NO_EXCEPTION;
-    aguUOp_c.valid = IN_uop.valid && en;
+    aguUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);
     
     if (IN_uop.opcode < LSU_SC_W) begin // is load
         aguUOp_c.isLoad = 1;
@@ -110,7 +109,7 @@ always_comb begin
         resUOp_c.sqN = IN_uop.sqN;
         resUOp_c.result = 'x;
         resUOp_c.doNotCommit = 0;
-        resUOp_c.valid = IN_uop.valid && en;
+        resUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);;
         
         // default
         aguUOp_c.wmask = 4'b1111;
@@ -252,7 +251,7 @@ always_comb begin
 
     TMQ_dequeue = 0;
     
-    if (aguUOp_c.valid && en && !OUT_stall) begin
+    if (aguUOp_c.valid && !OUT_stall) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end

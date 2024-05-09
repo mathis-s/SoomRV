@@ -1,15 +1,12 @@
 module IntALU
 (
     input wire clk,
-    input wire en,
     input wire rst,
 
     input wire IN_wbStall,
     input EX_UOp IN_uop,
     input IN_invalidate,
     input SqN IN_invalidateSqN,
-    
-    output wire OUT_wbReq,
 
     output BranchProv OUT_branch,
     output BTUpdate OUT_btUpdate,
@@ -24,14 +21,12 @@ wire[31:0] srcA = IN_uop.srcA;
 wire[31:0] srcB = IN_uop.srcB;
 wire[31:0] imm = IN_uop.imm;
 
-assign OUT_wbReq = IN_uop.valid && en;
-
 reg[31:0] resC;
 Flags flags;
 
 assign OUT_zcFwd.result = resC;
 assign OUT_zcFwd.tag = IN_uop.tagDst;
-assign OUT_zcFwd.valid = IN_uop.valid && en && !IN_uop.tagDst[$bits(Tag)-1];
+assign OUT_zcFwd.valid = IN_uop.valid && IN_uop.fu == FU_INT && !IN_uop.tagDst[$bits(Tag)-1];
 
 wire[5:0] resLzTz;
 
@@ -178,7 +173,7 @@ always_comb begin
     btUpdate_c.valid = 0;
 
     if (rst) ;
-    else if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+    else if (IN_uop.valid && IN_uop.fu == FU_INT && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
         branch_c.sqN = IN_uop.sqN;
         branch_c.loadSqN = IN_uop.loadSqN;
         branch_c.storeSqN = IN_uop.storeSqN;
@@ -270,7 +265,7 @@ always_ff@(posedge clk) begin
     OUT_amoData.valid <= 0;
 
     if (rst) ;
-    else if (IN_uop.valid && en && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+    else if (IN_uop.valid && IN_uop.fu == FU_INT && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
         OUT_uop.result <= resC;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.doNotCommit <= IN_uop.fu == FU_AGU;

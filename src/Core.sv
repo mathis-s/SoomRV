@@ -377,21 +377,17 @@ Load ld
 );
 
 
-wire INTALU_wbReq;
 RES_UOp INT0_uop;
 AMO_Data_UOp INT0_amoData;
 IntALU ialu
 (
     .clk(clk),
-    .en(LD_uop[0].fu == FU_INT),
     .rst(rst),
     
     .IN_wbStall(1'b0),
     .IN_uop(LD_uop[0]),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
-
-    .OUT_wbReq(INTALU_wbReq),
     
     .OUT_branch(branchProvs[0]),
     .OUT_btUpdate(BP_btUpdates[0]),
@@ -560,7 +556,6 @@ AGU#(.AGU_IDX(0), .RQ_ID(2)) aguLD
 (
     .clk(clk),
     .rst(rst),
-    .en(1'b1),
     .IN_stall(LSU_ldAGUStall[0]),
     .OUT_stall(stall[2]),
 
@@ -589,7 +584,6 @@ AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
 (
     .clk(clk),
     .rst(rst),
-    .en(1'b1),
     .IN_stall(LSU_ldAGUStall[1]),
     .OUT_stall(stall[3]),
 
@@ -737,7 +731,8 @@ LoadStoreUnit lsu
     .OUT_memc(LSU_MC_if),
     .OUT_BLSU_memc(BLSU_MC_if),
     .IN_memc(IN_memc),
-
+    
+    .IN_ready('{1'b1, 1'b1}),
     .OUT_uopLd(wbUOp[3:2])
 );
 
@@ -745,16 +740,13 @@ RES_UOp INT1_uop;
 IntALU ialu1
 (
     .clk(clk),
-    .en(LD_uop[1].fu == FU_INT),
     .rst(rst),
     
     .IN_wbStall(1'b0),
     .IN_uop(LD_uop[1]),
     .IN_invalidate(branch.taken),
     .IN_invalidateSqN(branch.sqN),
-
-    .OUT_wbReq(),
-
+    
     .OUT_branch(branchProvs[1]),
     .OUT_btUpdate(BP_btUpdates[1]),
     
