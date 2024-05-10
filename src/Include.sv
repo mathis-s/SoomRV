@@ -1,7 +1,9 @@
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
+typedef logic[5:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[11:0] BrID;
+typedef logic[31:0] RegT;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[11:0] BHist_t;
@@ -9,6 +11,7 @@ typedef logic[2:0] TageID_t;
 typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
+typedef logic[1:0] StOff_t;
 
 typedef enum logic[5:0]
 {
@@ -632,6 +635,21 @@ typedef struct packed
     logic compressed; // 1
     logic valid; // 1
 } AGU_UOp;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    SqN storeSqN;
+    logic valid;
+} StDataUOp;
+
+typedef struct packed
+{
+    StOff_t offs;
+    Tag tag;
+    SqN storeSqN;
+    logic valid;
+} StDataLookupUOp;
 
 typedef struct packed
 {

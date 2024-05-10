@@ -210,6 +210,8 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_defer('0),
     .OUT_stall(IQ_stalls[0]),
     
     .IN_stall(stall[0]),
@@ -221,8 +223,6 @@ IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp[3:0]),
-    .IN_loadForwardValid(LSU_loadFwdValid),
-    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -244,6 +244,8 @@ IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_defer('0),
     .OUT_stall(IQ_stalls[1]),
     
     .IN_stall(stall[1]),
@@ -255,8 +257,6 @@ IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp[3:0]),
-    .IN_loadForwardValid(LSU_loadFwdValid),
-    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -268,10 +268,12 @@ IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1
     
     .OUT_uop(IS_uop[1])
 );
-IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq2
+IssueQueue#(`IQ_2_SIZE,2,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq2
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_defer(stLookupIQStall[0]),
     .OUT_stall(IQ_stalls[2]),
     
     .IN_stall(stall[2]),
@@ -282,9 +284,7 @@ IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     .IN_uopOrdering(RN_uopOrdering),
     
     .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp[3:0]),
-    .IN_loadForwardValid(LSU_loadFwdValid),
-    .IN_loadForwardTag(LSU_loadFwdTag),  
+    .IN_resultUOp(wbUOp[3:0]), 
 
     .IN_branch(branch),
     
@@ -296,10 +296,12 @@ IssueQueue#(`IQ_2_SIZE,4,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     
     .OUT_uop(IS_uop[2])
 );
-IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq3 
+IssueQueue#(`IQ_3_SIZE,2,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq3 
 (
     .clk(clk),
     .rst(rst),
+
+    .IN_defer(stLookupIQStall[1]),
     .OUT_stall(IQ_stalls[3]),
     
     .IN_stall(stall[3]),
@@ -311,8 +313,6 @@ IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     
     .IN_resultValid(wbHasResult),
     .IN_resultUOp(wbUOp[3:0]),
-    .IN_loadForwardValid(LSU_loadFwdValid),
-    .IN_loadForwardTag(LSU_loadFwdTag),
     
     .IN_branch(branch),
     
@@ -325,8 +325,36 @@ IssueQueue#(`IQ_3_SIZE,4,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     .OUT_uop(IS_uop[3])
 );
 
-wire[5:0] RF_readAddress[7:0];
-wire[31:0] RF_readData[7:0];
+StDataLookupUOp stLookupUOp[`NUM_AGUS-1:0];
+wire stLookupUOp_ready[`NUM_AGUS-1:0];
+wire[`DEC_WIDTH-1:0] stLookupIQStall[`NUM_AGUS-1:0];
+
+generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
+    StoreDataIQ #(8, 2, i, 4, 4) iqStD
+    (
+        .clk(clk),
+        .rst(rst),
+
+        .OUT_stall(stLookupIQStall[i]),
+        .IN_uop(RN_uop),
+
+        .IN_resultValid(wbHasResult),
+        .IN_resultUOp(wbUOp[3:0]),
+
+        .IN_branch(branch),
+        
+        .IN_issueUOps(IS_uop),
+
+        .IN_aguUOps(LD_uop[3:2]),
+        .IN_maxStoreSqN(SQ_maxStoreSqN),
+
+        .IN_ready(stLookupUOp_ready[i]),
+        .OUT_uop(stLookupUOp[i])
+    );
+end endgenerate
+
+RFTag RF_readAddress[7:0];
+RegT RF_readData[7:0];
 
 RF rf
 (
@@ -343,8 +371,8 @@ RF rf
     .raddr3(RF_readAddress[3]), .rdata3(RF_readData[3]),
     .raddr4(RF_readAddress[4]), .rdata4(RF_readData[4]),
     .raddr5(RF_readAddress[5]), .rdata5(RF_readData[5]),
-    .raddr6(RF_readAddress[6]), .rdata6(RF_readData[6]),
-    .raddr7(SQ_RF_raddr), .rdata7(RF_SQ_rdata)
+    .raddr6(SDL_readTag[0]), .rdata6(SDL_readData[0]),
+    .raddr7(SDL_readTag[1]), .rdata7(SDL_readData[1])
 );
 
 EX_UOp LD_uop[3:0] /*verilator public*/;
@@ -376,9 +404,29 @@ Load ld
     .OUT_uop(LD_uop)
 );
 
+AMO_Data_UOp SDL_amoData[`NUM_AGUS-1:0];
+RFTag SDL_readTag[`NUM_AGUS-1:0];
+RegT SDL_readData[`NUM_AGUS-1:0];
+StDataUOp SDL_stDataUOp[`NUM_AGUS-1:0];
+StoreDataLoad stDataLd
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_branch(branch),
+    
+    .IN_uop(stLookupUOp),
+    .OUT_ready(stLookupUOp_ready),
+
+    .IN_atomicUOp(SDL_amoData),
+
+    .OUT_readTag(SDL_readTag),
+    .IN_readData(SDL_readData),
+
+    .OUT_uop(SDL_stDataUOp)
+);
 
 RES_UOp INT0_uop;
-AMO_Data_UOp INT0_amoData;
 IntALU ialu
 (
     .clk(clk),
@@ -394,7 +442,7 @@ IntALU ialu
     
     .OUT_zcFwd(LD_zcFwd[0]),
     
-    .OUT_amoData(INT0_amoData),
+    .OUT_amoData(SDL_amoData[0]),
     .OUT_uop(INT0_uop)
 );
 
@@ -650,8 +698,6 @@ SqN SQ_maxStoreSqN;
 wire SQ_flush;
 SQ_ComInfo SQ_info;
 
-wire[$bits(Tag)-2:0] SQ_RF_raddr;
-wire[31:0] RF_SQ_rdata;
 
 StoreQueue sq
 (
@@ -666,9 +712,8 @@ StoreQueue sq
     
     .IN_rnUOp(RN_uop),
     .IN_resultUOp(wbUOp[3:0]),
-    .IN_amoData(INT0_amoData),
-    .OUT_RF_raddr(SQ_RF_raddr),
-    .IN_RF_rdata(RF_SQ_rdata),
+    .IN_stDataUOp(SDL_stDataUOp),
+
     .IN_vmem(CSR_vmem),
     
     .IN_curSqN(ROB_curSqN),
@@ -686,8 +731,6 @@ StoreQueue sq
     .OUT_sqInfo(SQ_info)
 );
 
-wire LSU_loadFwdValid = 0;
-Tag LSU_loadFwdTag = 'x;
 wire CC_loadStall[`NUM_AGUS-1:0];
 wire CC_storeStall;
 wire LSU_ldAGUStall[`NUM_AGUS-1:0];
@@ -752,7 +795,7 @@ IntALU ialu1
     
     .OUT_zcFwd(LD_zcFwd[1]),
     
-    .OUT_amoData(),
+    .OUT_amoData(SDL_amoData[1]),
     .OUT_uop(INT1_uop)
 );
 

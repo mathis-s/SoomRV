@@ -708,8 +708,8 @@ void CheckStoreConsistency()
         {
             if (!entryUsedEQ[i] && (core->sq->evicted[i][0] & 1))
             {
-                uint32_t addr = ExtractField(core->sq->evicted[i], 4+16, 30) << 2;
-                uint8_t mask = ExtractField(core->sq->evicted[i], 4+12, 4);
+                uint32_t addr = ExtractField(core->sq->evicted[i], 4+13, 30) << 2;
+                uint8_t mask = ExtractField(core->sq->evicted[i], 4+9, 4);
                 if (addr == (store.addr & -4) && mask == storeMask)
                 {
                     entryUsedEQ[i] = 1;
@@ -722,10 +722,10 @@ void CheckStoreConsistency()
         for (int i = 0; i < 32; i++)
         {
             int idx = (i + core->sq->baseIndex) % 32;
-            if (!entryUsedSQ[idx] && (core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 4))
+            if (!entryUsedSQ[idx] && (core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 2))
             {
-                uint32_t addr = ExtractField(core->sq->entries[idx], 16, 30) << 2;
-                uint8_t mask = ExtractField(core->sq->entries[idx], 12, 4);
+                uint32_t addr = ExtractField(core->sq->entries[idx], 13, 30) << 2;
+                uint8_t mask = ExtractField(core->sq->entries[idx], 9, 4);
                 if (addr == (store.addr & -4) && mask == storeMask)
                 {
                     entryUsedSQ[idx] = 1;

@@ -17,9 +17,8 @@ module StoreQueue
     
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
-    input AMO_Data_UOp IN_amoData,
-    output reg[$bits(Tag)-2:0] OUT_RF_raddr,
-    input wire[31:0] IN_RF_rdata,
+    input StDataUOp IN_stDataUOp[`NUM_AGUS-1:0],
+
     input VirtMemState IN_vmem,
     
     input SqN IN_curSqN,
@@ -39,14 +38,7 @@ module StoreQueue
 
 typedef struct packed
 {
-    union packed
-    {
-        logic[31:0] _data;
-        struct packed
-        {
-            Tag tag;
-        } m;
-    } data;
+    RegT data;
 
     logic[29:0] addr;
 
@@ -55,11 +47,8 @@ typedef struct packed
     
     SqN sqN;
     
-    logic atomicLd;
-    logic atomic;
     logic addrAvail;
     logic loaded;
-    logic avail;
 
 } SQEntry;
 
@@ -115,6 +104,30 @@ always_ff@(posedge clk) begin
     else if (loadBaseIndexValid) begin
         OUT_sqInfo.valid <= 1;
         OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
+    end
+end
+
+// Find oldest not-yet-loaded entry 
+reg loadBaseIndexValid;
+reg[$clog2(NUM_ENTRIES)-1:0] loadBaseIndex;
+always_comb begin
+    reg[NUM_ENTRIES-1:0] isNotLoaded;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        isNotLoaded[i] =
+            entryValid_c[i] && (!entries[i].loaded);
+    end
+
+    // Priority encode beginning at base index
+    loadBaseIndexValid = 0;
+    loadBaseIndex = 'x;
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
+        if (!loadBaseIndexValid && 
+            isNotLoaded[idx]
+        ) begin
+            loadBaseIndexValid = 1;
+            loadBaseIndex = idx;
+        end
     end
 end
 
@@ -259,14 +272,13 @@ always_comb begin
 
     // actual forwarding
     lookupConflictList[h][i] = 0;
-    if ((entryValid_c[i]) && entries[i].addrAvail &&
+    if ((entryValid_r[i]) && entries[i].addrAvail &&
         entries[i].addr == IN_uopLd[h].addr[31:2] && 
         ($signed(entries[i].sqN - IN_uopLd[h].sqN) < 0 || entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
         
         if (entries[i].loaded) begin
-            
             for (integer j = 0; j < 4; j=j+1)
                 if (entries[i].wmask[j]) begin
                     lookupDataIter[h][i][j*8 +: 8] = entries[i].data[j*8 +: 8];
@@ -343,139 +355,6 @@ always_comb begin
             stAckIdxValid = 1;
         end
     end
-end
-
-// Track Store Data Availability
-logic[NUM_ENTRIES-1:0] dataAvail;
-always_comb begin
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        dataAvail[i] = 0;
-        if (entryValid_c[i] && !entries[i].avail) begin
-            for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-                if (IN_resultUOp[j].valid && 
-                    !IN_resultUOp[j].tagDst[6] &&
-                    IN_resultUOp[j].tagDst[$bits(Tag)-2:0] == entries[i].data.m.tag[$bits(Tag)-2:0]
-                ) begin
-                    dataAvail[i] = 1;
-                end
-            end
-        end
-    end
-end
-
-// Select entry for which to read store data from RF
-typedef struct packed
-{
-    logic[31:0] atomicData;
-    logic atomic;
-    Tag tag;
-    logic[3:0] wmask;
-    logic[$clog2(NUM_ENTRIES)-1:0] index;
-    logic valid;
-} SQLoad;
-
-SQLoad load_c;
-SQLoad load_r;
-always_comb begin
-    // Find candidates
-    reg[NUM_ENTRIES-1:0] isLoadCandidate;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        isLoadCandidate[i] =
-            entryValid_r[i] && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
-    end
-    if (load_r.valid) isLoadCandidate[load_r.index] = 0;
-
-    // Priority encode beginning at base index
-    load_c = 'x;
-    load_c.valid = 0;
-
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!load_c.valid && 
-            isLoadCandidate[idx]
-        ) begin
-            load_c.valid = 1;
-            load_c.index = idx;
-            load_c.atomic = 0;
-        end
-    end
-
-    // If an atomic op result is incoming, load that instead
-    if (IN_amoData.valid) begin
-        load_c.atomic = 1;
-        load_c.valid = 1;
-        load_c.index = IN_amoData.storeSqN[$clog2(NUM_ENTRIES)-1:0];
-        load_c.atomicData = IN_amoData.result;
-    end
-    
-    OUT_RF_raddr = '0;
-    if (load_c.valid) begin
-        load_c.wmask = entries[load_c.index].wmask;
-        load_c.tag = entries[load_c.index].data.m.tag[$bits(Tag)-1:0];
-
-        if (!load_c.tag[$bits(Tag)-1]) begin
-            OUT_RF_raddr = load_c.tag[$bits(Tag)-2:0];
-        end
-    end
-    
-    // Late override
-    if (IN_branch.taken && ($signed(entries[load_c.index].sqN - IN_branch.sqN) > 0 || IN_branch.flush))
-        load_c = SQLoad'{valid: 0, default: 'x};
-        
-end
-always_ff@(posedge clk) begin
-    if (rst) load_r <= SQLoad'{valid: 0, default: 'x};
-    else load_r <= load_c;
-end
-
-// Find oldest not-yet-loaded entry 
-reg loadBaseIndexValid;
-reg[$clog2(NUM_ENTRIES)-1:0] loadBaseIndex;
-always_comb begin
-    reg[NUM_ENTRIES-1:0] isNotLoaded;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        isNotLoaded[i] =
-            entryValid_c[i] && (!entries[i].loaded || !entries[i].addrAvail);
-    end
-
-    // Priority encode beginning at base index
-    loadBaseIndexValid = 0;
-    loadBaseIndex = 'x;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!loadBaseIndexValid && 
-            isNotLoaded[idx]
-        ) begin
-            loadBaseIndexValid = 1;
-            loadBaseIndex = idx;
-        end
-    end
-end
-
-// Preprocess store data
-reg[31:0] loadData;
-always_comb begin
-    reg[31:0] rawLoadData = 'x;
-    loadData = 'x;
-
-    if (load_r.atomic)
-        rawLoadData = load_r.atomicData;
-    else if (load_r.tag[$bits(Tag)-1])
-        rawLoadData = {{26{load_r.tag[5]}}, load_r.tag[5:0]};
-    else
-        rawLoadData = IN_RF_rdata;
-    // since we're deconstructing it anyways,
-    // we may want to store offset + size instead of wmask
-
-    case (load_r.wmask)
-        default: loadData = rawLoadData;
-        4'b0001: loadData[7:0] = rawLoadData[7:0];
-        4'b0010: loadData[15:8] = rawLoadData[7:0];
-        4'b0100: loadData[23:16] = rawLoadData[7:0];
-        4'b1000: loadData[31:24] = rawLoadData[7:0];
-        4'b0011: loadData[15:0] = rawLoadData[15:0];
-        4'b1100: loadData[31:16] = rawLoadData[15:0];
-    endcase
 end
 
 // Select evicted entry to re-issue
@@ -624,18 +503,20 @@ always_ff@(posedge clk) begin
                 modified = 1;
             end
         end
-        
-        // Set Availability
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (entryValid_c[i] && dataAvail[i])
-                entries[i].avail <= 1;
-        end
 
         // Write Loaded Data
-        if (load_r.valid) begin
-            entries[load_r.index].avail <= 1;
-            entries[load_r.index].loaded <= 1;
-            entries[load_r.index].data <= loadData;
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            if (IN_stDataUOp[i].valid && (!IN_branch.taken ||
+                (!IN_branch.flush && $signed(IN_stDataUOp[i].storeSqN - IN_branch.storeSqN) <= 0))
+            ) begin
+                logic[$clog2(NUM_ENTRIES)-1:0] idx = 
+                    IN_stDataUOp[i].storeSqN[$clog2(NUM_ENTRIES)-1:0];
+                
+                assert(idx[0] == i[0]); idx[0] = i[0];
+
+                entries[idx].loaded <= 1;
+                entries[idx].data <= IN_stDataUOp[i].data;
+            end
         end
 
         // Invalidate
@@ -675,32 +556,12 @@ always_ff@(posedge clk) begin
                     entries[index].addr <= 'x;
                     entries[index].wmask <= 0;
 
-                    entries[index].atomicLd <= 0;
-                    entries[index].atomic <= 0;
                     entries[index].loaded <= 0;
                     entries[index].sqN <= rnUOpSorted[i].sqN;
                     entries[index].addrAvail <= 0;
-                    entries[index].avail <= rnUOpSorted[i].availB;
-                    entries[index].data.m.tag <= rnUOpSorted[i].tagB;
-
-                    for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1)
-                        if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && rnUOpSorted[i].tagB == IN_resultUOp[j].tagDst)
-                            entries[index].avail <= 1;
-
-                    // Atomic Ops special handling
-                    if (rnUOpSorted[i].fu == FU_ATOMIC) begin
-                        entries[index].atomic <= 1;
-                        if (rnUOpSorted[i].opcode != ATOMIC_AMOSWAP_W) begin
-                            
-                            entries[index].atomicLd <= 1;
-                            entries[index].data.m.tag <= 'x;
-                            // operand cannot be available yet
-                            entries[index].avail <= 0;
-                        end
-                    end
                     
                     // Cache Block Ops special handling
-                    if (rnUOpSorted[i].fu == FU_AGU) begin
+                    /*if (rnUOpSorted[i].fu == FU_AGU) begin
                         case (rnUOpSorted[i].opcode)
                             LSU_CBO_CLEAN: begin
                                 entries[index].data <= {30'bx, 2'd0};
@@ -716,7 +577,7 @@ always_ff@(posedge clk) begin
                             end
                             default: ;
                         endcase
-                    end
+                    end*/
 
                     modified = 1;
                 end

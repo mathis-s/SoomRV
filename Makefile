@@ -69,6 +69,8 @@ SRC_FILES = \
 	src/RegFileRTL.sv \
 	src/BranchHandler.sv \
 	src/PriorityEncoder.sv \
+	src/StoreDataIQ.sv \
+	src/StoreDataLoad.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

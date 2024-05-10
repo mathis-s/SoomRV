@@ -329,8 +329,8 @@ always_ff@(posedge clk) begin
                         
                         if (!isRenamed || temp) OUT_perfcInfo.stallCause <= STALL_FRONTEND;
                         else if (!isExecuted) begin
-                            if (deqPorts[i].isLd) OUT_perfcInfo.stallCause <= STALL_LOAD;
-                            else if (deqPorts[i].isSt) OUT_perfcInfo.stallCause <= STALL_STORE;
+                            if (deqPorts[i].isSt) OUT_perfcInfo.stallCause <= STALL_STORE;
+                            else if (deqPorts[i].isLd) OUT_perfcInfo.stallCause <= STALL_LOAD;
                             else OUT_perfcInfo.stallCause <= STALL_BACKEND;
                         end
                         else if (!sqAllowsCommit) OUT_perfcInfo.stallCause <= STALL_STORE;

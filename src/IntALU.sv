@@ -173,7 +173,7 @@ always_comb begin
     btUpdate_c.valid = 0;
 
     if (rst) ;
-    else if (IN_uop.valid && IN_uop.fu == FU_INT && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+    else if (IN_uop.valid && (IN_uop.fu == FU_INT) && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
         branch_c.sqN = IN_uop.sqN;
         branch_c.loadSqN = IN_uop.loadSqN;
         branch_c.storeSqN = IN_uop.storeSqN;
