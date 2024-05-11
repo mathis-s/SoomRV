@@ -171,8 +171,8 @@ always_comb begin
     if (!IF_cache.re[0]) begin
         bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[0];
         bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[0];
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = (4*`CWIDTH)'(IF_cache.wmask[0]) << (IF_cache.addr[0][2 +: $clog2(`CWIDTH)] * 4);
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {`CWIDTH{IF_cache.wdata[0]}};
+        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[0];
+        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[0]};
         bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[0], IF_cache.addr[0][11:2]};
     end
     if (!MC_DC_rd.ce) begin
@@ -194,8 +194,8 @@ always_comb begin
     if (!IF_cache.re[1]) begin
         bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[1];
         bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[1];
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = (4*`CWIDTH)'(IF_cache.wmask[1]) << (IF_cache.addr[1][2 +: $clog2(`CWIDTH)] * 4);
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {`CWIDTH{IF_cache.wdata[1]}};
+        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[1];
+        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[1]};
         bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[1], IF_cache.addr[1][11:2]};
     end
     if (!MC_DC_wr.ce) begin

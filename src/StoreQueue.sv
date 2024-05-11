@@ -36,6 +36,8 @@ module StoreQueue
     output SQ_ComInfo OUT_sqInfo
 );
 
+localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
+
 typedef struct packed
 {
     RegT data;
@@ -51,6 +53,17 @@ typedef struct packed
     logic loaded;
 
 } SQEntry;
+
+typedef struct packed
+{
+    logic[`AXI_WIDTH-1:0] data;
+    logic[29:0] addr;
+    logic[`AXI_WIDTH/8-1:0] wmask;
+
+    StID_t id;
+    logic issued;
+    logic valid;
+} EQEntry;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
@@ -145,13 +158,6 @@ always_comb begin
     if (IN_stAck.valid && IN_stAck.fail) empty = 0;
 end
 
-typedef struct packed
-{
-    SQEntry s;
-    StID_t id;
-    logic issued;
-    logic valid;
-} EQEntry;
 EQEntry evicted[NUM_EVICTED-1:0] /* verilator public */;
 
 ST_Ack stAck_r;
@@ -181,21 +187,30 @@ reg lookupConflict[`NUM_AGUS-1:0];
 // Store queue lookup
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
+    
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
     lookupMask[h] = ~readMask[h];
     lookupData[h] = 32'bx;
     lookupConflict[h] = 0;
     
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid &&
-            evicted[i].s.addr == IN_uopLd[h].addr[31:2] && 
-            !`IS_MMIO_PMA_W(evicted[i].s.addr)
-        ) begin
-            for (integer j = 0; j < 4; j=j+1)
-                if (evicted[i].s.wmask[j])
-                    lookupData[h][j*8 +: 8] = evicted[i].s.data[j*8 +: 8];
-            lookupMask[h] = lookupMask[h] | evicted[i].s.wmask;
+    begin
+        reg[AXI_BWIDTH_E-3:0] shift = IN_uopLd[h].addr[2+:AXI_BWIDTH_E-2];
+
+        for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+            
+            reg[31:0] data = evicted[i].data[32*shift+:32];
+            reg[3:0] mask = evicted[i].wmask[4*shift+:4];
+
+            if (evicted[i].valid &&
+                evicted[i].addr[29:AXI_BWIDTH_E-2] == IN_uopLd[h].addr[31:AXI_BWIDTH_E] && 
+                !`IS_MMIO_PMA_W(evicted[i].addr)
+            ) begin
+                for (integer j = 0; j < 4; j=j+1)
+                    if (mask[j])
+                        lookupData[h][j*8 +: 8] = data[j*8 +: 8];
+                lookupMask[h] = lookupMask[h] | mask;
+            end
         end
     end
 
@@ -314,9 +329,9 @@ always_comb begin
                 (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
                 (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
 
-            ((evicted[i].s.addr == entries[baseIndexI].addr) || // todo: be less strict by looking at wmask
-                (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
-                (evicted[i].s.wmask == 0)))
+            ((evicted[i].addr == entries[baseIndexI].addr) || // todo: be less strict by looking at wmask
+                (`IS_MMIO_PMA_W(evicted[i].addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
+                (evicted[i].wmask == 0)))
             allowDequeue = 0;
     end
 end
@@ -374,11 +389,11 @@ always_comb begin
     // check for collisions with incoming store NACKs
     reIssueValid &= 
         (!stAck_r.valid || !stAck_r.fail || 
-            (stAck_r.addr[31:2] != evicted[reIssueIdx].s.addr && 
-                !(`IS_MMIO_PMA(stAck_r.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr)))) &&
+            (stAck_r.addr[31:2] != evicted[reIssueIdx].addr && 
+                !(`IS_MMIO_PMA(stAck_r.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].addr)))) &&
         (!IN_stAck.valid || !IN_stAck.fail || 
-            (IN_stAck.addr[31:2] != evicted[reIssueIdx].s.addr && 
-                !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr))));
+            (IN_stAck.addr[31:2] != evicted[reIssueIdx].addr && 
+                !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].addr))));
 end
 
 // Sort uops to enqueue by storeSqN
@@ -465,18 +480,35 @@ always_ff@(posedge clk) begin
                 entries[idx].loaded && allowDequeue &&
                 entries[idx].addrAvail
             ) begin
+
+                reg[`AXI_WIDTH-1:0] data = 'x;
+                reg[`AXI_WIDTH/8-1:0] mask = 'x;
+
                 assert(evictedNextIdValid);
                 modified = 1;
 
                 entries[idx] <= 'x;        
-                OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evictedNextId;
-                OUT_uopSt.addr <= {entries[idx].addr, 2'b0};
-                OUT_uopSt.data <= entries[idx].data;
-                OUT_uopSt.wmask <= entries[idx].wmask;
+                
+                if (`IS_MMIO_PMA_W(entries[idx].addr)) begin
+                    data[31:0] = entries[idx].data;
+                    mask[3:0] = entries[idx].wmask;
+                end
+                else begin
+                    data = `AXI_WIDTH'(entries[idx].data) << (entries[idx].addr[1:0] * 32);
+                    mask = (`AXI_WIDTH/8)'(entries[idx].wmask) << (entries[idx].addr[1:0] * 4);
+                end
+
                 OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[idx].addr);
                 
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[idx];
+                OUT_uopSt.valid <= 1;
+                OUT_uopSt.id <= evictedNextId;
+                OUT_uopSt.addr <= {entries[idx].addr[29:2], 4'b0};
+                OUT_uopSt.data <= data;
+                OUT_uopSt.wmask <= mask;
+                
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].data <= data;
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].wmask <= mask;
+                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].addr <= entries[idx].addr;
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= evictedNextId;
                 evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].valid <= 1;
@@ -490,10 +522,10 @@ always_ff@(posedge clk) begin
             else if (reIssueValid) begin
                 OUT_uopSt.valid <= 1;
                 OUT_uopSt.id <= evicted[reIssueIdx].id;
-                OUT_uopSt.addr <= {evicted[reIssueIdx].s.addr, 2'b0};
-                OUT_uopSt.data <= evicted[reIssueIdx].s.data;
-                OUT_uopSt.wmask <= evicted[reIssueIdx].s.wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr);
+                OUT_uopSt.addr <= {evicted[reIssueIdx].addr, 2'b0};
+                OUT_uopSt.data <= evicted[reIssueIdx].data;
+                OUT_uopSt.wmask <= evicted[reIssueIdx].wmask;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssueIdx].addr);
                 
                 if (stAck_r.valid && !stAck_r.fail && reIssueIdx >= stAckIdx)
                     evicted[reIssueIdx - 1].issued <= 1;
@@ -559,25 +591,6 @@ always_ff@(posedge clk) begin
                     entries[index].loaded <= 0;
                     entries[index].sqN <= rnUOpSorted[i].sqN;
                     entries[index].addrAvail <= 0;
-                    
-                    // Cache Block Ops special handling
-                    /*if (rnUOpSorted[i].fu == FU_AGU) begin
-                        case (rnUOpSorted[i].opcode)
-                            LSU_CBO_CLEAN: begin
-                                entries[index].data <= {30'bx, 2'd0};
-                                entries[index].loaded <= 1;
-                            end
-                            LSU_CBO_INVAL: begin
-                                entries[index].data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
-                                entries[index].loaded <= 1;
-                            end
-                            LSU_CBO_FLUSH: begin
-                                entries[index].data <= {30'bx, 2'd2};
-                                entries[index].loaded <= 1;
-                            end
-                            default: ;
-                        endcase
-                    end*/
 
                     modified = 1;
                 end

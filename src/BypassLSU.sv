@@ -74,7 +74,7 @@ always_ff@(posedge clk) begin
                         if (IN_uopSt.wmask[i] == 1)
                             addrLow = i[1:0];
 
-                    case (IN_uopSt.wmask)
+                    case (IN_uopSt.wmask[3:0])
                         4'b0001, 4'b0010, 4'b0100, 4'b1000:
                             OUT_memc.cmd <= MEMC_WRITE_BYTE;
                         4'b0011, 4'b1100:
@@ -87,7 +87,7 @@ always_ff@(posedge clk) begin
                     OUT_memc.cacheAddr <= 'x;
                     OUT_memc.writeAddr <= {IN_uopSt.addr[31:2], addrLow};
                     OUT_memc.cacheID <= 'x;
-                    OUT_memc.data <= IN_uopSt.data;
+                    OUT_memc.data[31:0] <= IN_uopSt.data[31:0];
 
                     state <= RQ_ST;
                 end

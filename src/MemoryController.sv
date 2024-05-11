@@ -622,9 +622,8 @@ always_ff@(posedge clk) begin
                 transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
                 
-                // shift words by offset lost due to alignment
-                transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data) << {selReq.readAddr[2+:$clog2($clog2(`AXI_WIDTH/8))], 5'b0};
-                transfers[enqIdx].storeMask <= (`AXI_WIDTH/8)'(selReq.mask) << {selReq.readAddr[2+:$clog2($clog2(`AXI_WIDTH/8))], 2'b0};
+                transfers[enqIdx].storeData <= selReq.data;
+                transfers[enqIdx].storeMask <= selReq.mask;
             end
             else begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr;

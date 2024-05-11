@@ -255,8 +255,8 @@ always_comb begin
     if (uopSt.valid && uopSt.isMMIO) begin
         IF_mmio.we = 0;
         IF_mmio.waddr = uopSt.addr;
-        IF_mmio.wdata = uopSt.data;
-        IF_mmio.wmask = uopSt.wmask;
+        IF_mmio.wdata = uopSt.data[31:0];
+        IF_mmio.wmask = uopSt.wmask[3:0];
     end
 end
 
@@ -621,13 +621,14 @@ always_ff@(posedge clk) begin
 end
 
 // Store Conflict Misses
+localparam AXI_WIDTH_E = $clog2(`AXI_WIDTH/8);
 always_comb begin
     stConflictMiss_c[0] = (redoStore &&
-        ((stOps[1].addr[31:2] == uopSt.addr[31:2] && |(stOps[1].wmask & uopSt.wmask)) ||
+        ((stOps[1].addr[31:AXI_WIDTH_E] == uopSt.addr[31:AXI_WIDTH_E] && |(stOps[1].wmask & uopSt.wmask)) ||
             stOps[1].isMMIO && uopSt.isMMIO));
 
     stConflictMiss_c[1] = (redoStore &&
-        ((stOps[1].addr[31:2] == stOps[0].addr[31:2] && |(stOps[1].wmask & stOps[0].wmask)) ||
+        ((stOps[1].addr[31:AXI_WIDTH_E] == stOps[0].addr[31:AXI_WIDTH_E] && |(stOps[1].wmask & stOps[0].wmask)) ||
             (stOps[1].isMMIO && stOps[0].isMMIO))) || 
         stConflictMiss[0];
 end

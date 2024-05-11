@@ -349,8 +349,9 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[3:0] mask;
-    logic[31:0] data;
+    logic[`AXI_WIDTH/8-1:0] mask;
+    logic[`AXI_WIDTH-1:0] data;
+
     logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
@@ -752,8 +753,8 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] addr;
-    logic[31:0] data;
-    logic[3:0] wmask;
+    logic[`AXI_WIDTH-1:0] data;
+    logic[`AXI_WIDTH/8-1:0] wmask;
     logic isMMIO;
     StID_t id;
     logic valid;
@@ -762,8 +763,8 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] addr;
-    logic[31:0] data;
-    logic[3:0] wmask;
+    logic[`AXI_WIDTH-1:0] data;
+    logic[`AXI_WIDTH/8-1:0] wmask;
     StID_t id;
     logic fail;
     logic valid;
@@ -962,8 +963,8 @@ interface IF_Cache();
     logic[`NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
     logic[`NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
     logic[`NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
-    logic[`NUM_AGUS-1:0][31:0] wdata;
-    logic[`NUM_AGUS-1:0][3:0] wmask;
+    logic[`NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
+    logic[`NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
     logic[`NUM_AGUS-1:0] busy;
     logic[`NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
     

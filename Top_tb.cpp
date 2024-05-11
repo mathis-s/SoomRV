@@ -631,10 +631,15 @@ std::array<CacheWrite, 3> GetCurrentWrites()
     for (int i = 0; i < 2; i++)
     {
         ports[i].we = !((ifCache->__PVT__we >> i) & 1) && !((ifCache->__PVT__busy >> i) & 1);
-        ports[i].addr = (ifCache->__PVT__addr >> i*12) & 4095;
+        ports[i].addr = (ifCache->__PVT__addr >> i*12) & 4095 & (~0xf);
         ports[i].wassoc = (ifCache->__PVT__wassoc >> i*2) & 3;
-        ports[i].wdata = (ifCache->__PVT__wdata >> i*32) & 0xffffffff;
-        ports[i].wmask = (ifCache->__PVT__wmask >> i*4) & 15;
+        
+        uint32_t mask = (ifCache->__PVT__wmask >> i*16) & 0xffff;
+        int shift = (__builtin_ctz(mask) / 4);
+
+        ports[i].wmask = (mask >> (shift * 4)) & 0xf;
+        ports[i].wdata = (ifCache->__PVT__wdata[4*i + shift]) & 0xffffffff;
+        ports[i].addr += shift * 4;
     }
     // translate
     auto ict = top->Top->soc->dctable->mem;
@@ -664,9 +669,13 @@ std::array<CacheWrite, 3> GetCurrentWrites()
          cmd == 3 /*MEMC_CP_EXT_TO_CACHE*/))
     {
         allow = 0;
-        auto addr = ExtractField(memcReq, 5+32, 32) & -4;
-        auto mask = ExtractField(memcReq, 5+32+32+12+32, 4);
-        auto data = ExtractField(memcReq, 5+32+32+12, 32);
+        auto addr = ExtractField(memcReq, 5+32, 32) & ~0xf;
+        auto mask = ExtractField(memcReq, 5+32+32+12+128, 16);
+        
+        int shift = (__builtin_ctz(mask) / 4);
+        mask = mask >> (shift * 4) & 0xf;
+        addr += shift * 4;
+        auto data = ExtractField(memcReq, 5+32+32+12+32*shift,32);
 
         if (mask != 0)
         {
@@ -708,8 +717,13 @@ void CheckStoreConsistency()
         {
             if (!entryUsedEQ[i] && (core->sq->evicted[i][0] & 1))
             {
-                uint32_t addr = ExtractField(core->sq->evicted[i], 4+13, 30) << 2;
-                uint8_t mask = ExtractField(core->sq->evicted[i], 4+9, 4);
+                uint32_t addr = (ExtractField(core->sq->evicted[i], 20, 30) << 2) & ~0xf;
+                uint32_t mask = ExtractField(core->sq->evicted[i], 4, 16);
+                int offs = __builtin_ctz(mask) / 4;
+                addr += offs * 4;
+                mask = (mask >> (offs * 4)) & 0xf;
+
+                //fprintf(stderr, "ev: [%.8x] @ %.4x\n", addr, mask);
                 if (addr == (store.addr & -4) && mask == storeMask)
                 {
                     entryUsedEQ[i] = 1;
