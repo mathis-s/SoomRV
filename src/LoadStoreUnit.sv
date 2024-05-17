@@ -327,7 +327,7 @@ end
 
 typedef enum logic[3:0]
 {
-    REGULAR, REGULAR_NO_EVICT, TRANS_IN_PROG, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, CONFLICT, SQ_CONFLICT
+    REGULAR, REGULAR_NO_EVICT, TRANS_IN_PROG, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, IO_BUSY, SQ_CONFLICT
 } MissType;
 
 typedef struct packed
@@ -419,14 +419,7 @@ always_comb begin
                 doCacheLoad = 0;
             end
             
-            if (stConflictMiss[1]) begin
-                miss[i].valid = 1;
-                miss[i].writeAddr = 'x;
-                miss[i].missAddr = 'x;
-                miss[i].assoc = 'x;
-                miss[i].mtype = CONFLICT;
-            end
-            else if (st.isMMIO) begin
+            if (st.isMMIO) begin
                 // nothing to do for MMIO
             end
             else if (st.wmask == 0) begin
@@ -585,14 +578,10 @@ LoadResultBuffer loadResBuf[1:0]
 );
 
 // Store Pipeline
-reg[1:0] stConflictMiss;
-reg[1:0] stConflictMiss_c;
-reg stallStConflict;
 always_ff@(posedge clk) begin
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
             stOps[i].valid <= 0;
-        stallStConflict <= 0;
     end
     else begin
         stOps[0] <= 'x;
@@ -600,39 +589,18 @@ always_ff@(posedge clk) begin
         stOps[1] <= 'x;
         stOps[1].valid <= 0;
         
-        // While a store is stalled, accumulate occurring conflicts
-        if (uopSt.valid && OUT_stStall)
-            stallStConflict <= stallStConflict | stConflictMiss_c[0];
-        else stallStConflict <= 0;
-        
         // Progress the delay line
         if (uopSt.valid && !OUT_stStall) begin
             stOps[0] <= uopSt;
             stOpPort[0] <= uopStPort;
-            stConflictMiss[0] <= stConflictMiss_c[0] || stallStConflict;
         end
         
         if (stOps[0].valid) begin
             stOps[1] <= stOps[0];
             stOpPort[1] <= stOpPort[0];
-            stConflictMiss[1] <= stConflictMiss_c[1];
         end
     end
 end
-
-// Store Conflict Misses
-localparam AXI_WIDTH_E = $clog2(`AXI_WIDTH/8);
-always_comb begin
-    stConflictMiss_c[0] = (redoStore &&
-        ((stOps[1].addr[31:AXI_WIDTH_E] == uopSt.addr[31:AXI_WIDTH_E] && |(stOps[1].wmask & uopSt.wmask)) ||
-            stOps[1].isMMIO && uopSt.isMMIO));
-
-    stConflictMiss_c[1] = (redoStore &&
-        ((stOps[1].addr[31:AXI_WIDTH_E] == stOps[0].addr[31:AXI_WIDTH_E] && |(stOps[1].wmask & stOps[0].wmask)) ||
-            (stOps[1].isMMIO && stOps[0].isMMIO))) || 
-        stConflictMiss[0];
-end
-
 
 // Cache Transfer State Machine
 enum logic[3:0]
@@ -675,7 +643,6 @@ wire redoStore = stOps[1].valid &&
         (miss[stOpPort[1]].mtype == REGULAR || 
          miss[stOpPort[1]].mtype == REGULAR_NO_EVICT ||
          miss[stOpPort[1]].mtype == IO_BUSY || 
-         miss[stOpPort[1]].mtype == CONFLICT ||
          miss[stOpPort[1]].mtype == TRANS_IN_PROG ||
          ((miss[stOpPort[1]].mtype == MGMT_CLEAN || 
            miss[stOpPort[1]].mtype == MGMT_FLUSH || 
@@ -839,8 +806,8 @@ always_comb begin
         if (!temp &&
             canOutputMiss &&
             miss[i].valid && !missEvictConflict[i] &&
-            miss[i].mtype != IO_BUSY && miss[i].mtype != CONFLICT &&
-            miss[i].mtype != SQ_CONFLICT && miss[i].mtype != TRANS_IN_PROG
+            miss[i].mtype != IO_BUSY && miss[i].mtype != SQ_CONFLICT &&
+            miss[i].mtype != TRANS_IN_PROG
         ) begin
             temp = 1;
             forwardMiss[i] = 1;
