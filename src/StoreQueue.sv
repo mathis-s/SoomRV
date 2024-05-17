@@ -51,7 +51,6 @@ typedef struct packed
     
     logic addrAvail;
     logic loaded;
-
 } SQEntry;
 
 typedef struct packed
@@ -59,11 +58,17 @@ typedef struct packed
     logic[`AXI_WIDTH-1:0] data;
     logic[29:0] addr;
     logic[`AXI_WIDTH/8-1:0] wmask;
-
-    StID_t id;
+    
     logic issued;
+    StNonce_t nonce;
     logic valid;
 } EQEntry;
+
+typedef struct packed
+{
+    StID_t idx;
+    logic valid;
+} IdxN;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
@@ -110,6 +115,8 @@ SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
 SqN baseIndex /* verilator public */;
 SqN lastIndex;
 
+SQEntry entryOut /* verilator public */;
+
 always_ff@(posedge clk) begin
     OUT_sqInfo <= 'x;
     OUT_sqInfo.valid <= 0;
@@ -152,7 +159,7 @@ always_comb begin
             empty = 0;
     end
     for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid && !evicted[i].issued)
+        if (evicted[i].valid)
             empty = 0;
     end
     if (IN_stAck.valid && IN_stAck.fail) empty = 0;
@@ -169,8 +176,6 @@ always_ff@(posedge clk) begin
     end
 end
 
-reg[$clog2(NUM_EVICTED):0] evictedIn;
-
 reg[3:0] readMask[`NUM_AGUS-1:0];
 always_comb begin
     for (integer i = 0; i < `NUM_AGUS; i=i+1)
@@ -181,6 +186,15 @@ always_comb begin
         endcase
 end
 
+typedef enum logic[0:0] {LOAD, STORE_FUSE} LookupType;
+reg[31:0] lookupAddr[`NUM_AGUS-1:0];
+LookupType lookupType[`NUM_AGUS-1:0];
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
+always_comb begin
+    lookupAddr[h] = IN_uopLd[h].addr;
+    lookupType[h] = LOAD;
+end
+
 reg[3:0] lookupMask[`NUM_AGUS-1:0];
 reg[31:0] lookupData[`NUM_AGUS-1:0];
 reg lookupConflict[`NUM_AGUS-1:0];
@@ -188,22 +202,24 @@ reg lookupConflict[`NUM_AGUS-1:0];
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
     
+    reg[AXI_BWIDTH_E-3:0] shift = lookupAddr[h][2+:AXI_BWIDTH_E-2];
+    reg[31:0] data = 'x;
+    reg[3:0] mask = 'x;
+
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
     lookupMask[h] = ~readMask[h];
     lookupData[h] = 32'bx;
     lookupConflict[h] = 0;
     
-    begin
-        reg[AXI_BWIDTH_E-3:0] shift = IN_uopLd[h].addr[2+:AXI_BWIDTH_E-2];
-
+    if (lookupType[h] == LOAD) begin
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
             
-            reg[31:0] data = evicted[i].data[32*shift+:32];
-            reg[3:0] mask = evicted[i].wmask[4*shift+:4];
+            data = evicted[i].data[32*shift+:32];
+            mask = evicted[i].wmask[4*shift+:4];
 
             if (evicted[i].valid &&
-                evicted[i].addr[29:AXI_BWIDTH_E-2] == IN_uopLd[h].addr[31:AXI_BWIDTH_E] && 
+                evicted[i].addr[29:AXI_BWIDTH_E-2] == lookupAddr[h][31:AXI_BWIDTH_E] && 
                 !`IS_MMIO_PMA_W(evicted[i].addr)
             ) begin
                 for (integer j = 0; j < 4; j=j+1)
@@ -212,6 +228,16 @@ always_comb begin
                 lookupMask[h] = lookupMask[h] | mask;
             end
         end
+    end
+
+    if (entryOut.loaded &&
+        entryOut.addr[29:0] == lookupAddr[h][31:2] && 
+        !`IS_MMIO_PMA_W(entryOut.addr)
+    ) begin
+        for (integer j = 0; j < 4; j=j+1)
+            if (entryOut.wmask[j])
+                lookupData[h][j*8 +: 8] = entryOut.data[j*8 +: 8];
+        lookupMask[h] = lookupMask[h] | entryOut.wmask;
     end
 
 `ifdef SQ_LINEAR
@@ -232,8 +258,9 @@ always_comb begin
 
                 if (active &&
                     entries[i].addrAvail &&
-                    entries[i].addr == IN_uopLd[h].addr[31:2] && 
-                    ($signed(entries[i].sqN - IN_uopLd[h].sqN) < 0 || entryReady_r[i]) &&
+                    entries[i].addr == lookupAddr[h][31:2] && 
+                    ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
+                        entryReady_r[i]) &&
                     !`IS_MMIO_PMA_W(entries[i].addr)
                 ) begin
                     
@@ -288,8 +315,9 @@ always_comb begin
     // actual forwarding
     lookupConflictList[h][i] = 0;
     if ((entryValid_r[i]) && entries[i].addrAvail &&
-        entries[i].addr == IN_uopLd[h].addr[31:2] && 
-        ($signed(entries[i].sqN - IN_uopLd[h].sqN) < 0 || entryReady_r[i]) &&
+        entries[i].addr == lookupAddr[h][31:2] && 
+        ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
+            entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
         
@@ -309,91 +337,48 @@ endgenerate
 wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 wire[$clog2(NUM_ENTRIES)-1:0] comStSqNI = IN_comStSqN[$clog2(NUM_ENTRIES)-1:0];
 
-assign OUT_done = 
-    baseIndex == IN_comStSqN &&
-    evictedIn == 0;
-
-// Do not re-order stores before stores at the same address; and do not re-order MMIO stores.
-reg allowDequeue;
+logic mmioOpInEv;
+logic anyInEv;
 always_comb begin
-    allowDequeue = 1;
-    
-    // When a store cache miss occurs, collisions with any issued ops
-    // are handled by the LSU. We have to make sure not to issue any
-    // conflicting new ops though.
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid &&
-
-            (!evicted[i].issued || 
-                // Forward negative store acks
-                (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
-                (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
-
-            ((evicted[i].addr == entries[baseIndexI].addr) || // todo: be less strict by looking at wmask
-                (`IS_MMIO_PMA_W(evicted[i].addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
-                (evicted[i].wmask == 0)))
-            allowDequeue = 0;
-    end
+    mmioOpInEv = 0;
+    anyInEv = 0;
+    for (integer i = 0; i < NUM_EVICTED; i=i+1)
+        if (evicted[i].valid) begin
+            anyInEv = 1;
+           if (`IS_MMIO_PMA_W(evicted[i].addr))
+            mmioOpInEv = 1;
+        end
 end
 
-// Bitfield for tracking used/free evicted store IDs
-reg[NUM_EVICTED-1:0] evictedUsedIds;
-reg[$clog2(NUM_EVICTED)-1:0] evictedNextId;
-reg evictedNextIdValid;
-always_comb begin
-    evictedNextId = 'x;
-    evictedNextIdValid = 0;
-    for (integer i = NUM_EVICTED-1; i >= 0; i=i-1) begin
-        if (!evictedUsedIds[i]) begin
-            evictedNextId = i[$clog2(NUM_EVICTED)-1:0];
-            evictedNextIdValid = 1;
-        end
-    end
-    
-    // Re-use id from current ack if possible to avoid wait cycle
-    if (stAck_r.valid && !stAck_r.fail) begin
-        evictedNextId = stAck_r.id;
-        evictedNextIdValid = 1;
-    end
-end
+assign OUT_done = baseIndex == IN_comStSqN && !anyInEv;
 
-// Find index of entry corresponding to current store acknowledgement from LSU 
-reg[$clog2(NUM_EVICTED)-1:0] stAckIdx;
-reg stAckIdxValid;
+
+
+IdxN evInsert;
 always_comb begin
-    stAckIdx = 'x;
-    stAckIdxValid = 0;
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (stAck_r.valid && evicted[i].valid && evicted[i].id == stAck_r.id) begin
-            //assert(!stAckIdxValid);
-            stAckIdx = i[$clog2(NUM_EVICTED)-1:0];
-            stAckIdxValid = 1;
+    evInsert = IdxN'{valid: 0, default: 'x};
+
+    if (!(mmioOpInEv && `IS_MMIO_PMA_W(entryOut.addr)))
+        for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+            if ((evicted[i].valid && evicted[i].addr[29:AXI_BWIDTH_E-2] == entryOut.addr[29:AXI_BWIDTH_E-2]) ||
+                (!evicted[i].valid && !evInsert.valid)
+            ) begin
+                evInsert.valid = 1;
+                evInsert.idx = i[$bits(evInsert.idx)-1:0];
+            end
         end
-    end
 end
 
 // Select evicted entry to re-issue
-logic reIssueValid;
-logic[$clog2(NUM_EVICTED)-1:0] reIssueIdx;
+IdxN reIssue;
 always_comb begin
-    reIssueValid = 0;
-    reIssueIdx = 'x;
-
+    reIssue = IdxN'{valid: 0, default: 'x};
     for (integer i = NUM_EVICTED - 1; i >= 0; i=i-1) begin
         if (evicted[i].valid && !evicted[i].issued) begin
-            reIssueValid = 1;
-            reIssueIdx = i[$clog2(NUM_EVICTED)-1:0];
+            reIssue.valid = 1;
+            reIssue.idx = i[$clog2(NUM_EVICTED)-1:0];
         end
     end
-    
-    // check for collisions with incoming store NACKs
-    reIssueValid &= 
-        (!stAck_r.valid || !stAck_r.fail || 
-            (stAck_r.addr[31:2] != evicted[reIssueIdx].addr && 
-                !(`IS_MMIO_PMA(stAck_r.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].addr)))) &&
-        (!IN_stAck.valid || !IN_stAck.fail || 
-            (IN_stAck.addr[31:2] != evicted[reIssueIdx].addr && 
-                !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].addr))));
 end
 
 // Sort uops to enqueue by storeSqN
@@ -429,8 +414,6 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < NUM_EVICTED; i=i+1)
             evicted[i].valid <= 0;
         
-        evictedIn <= 0;
-        
         baseIndex <= 0;
         lastIndex <= '1;
         
@@ -438,101 +421,108 @@ always_ff@(posedge clk) begin
         OUT_empty <= 1;
         OUT_uopSt.valid <= 0;
         flushing <= 0;
-        evictedUsedIds <= 0;
+
+        entryOut <= SQEntry'{loaded: 0, default: 'x};
     end
     else begin
     
         SqN nextBaseIndex = baseIndex;
-
         reg modified = 0;
-        reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
 
-        if (!IN_stallSt)
-            OUT_uopSt.valid <= 0;
-        
-        // Delete entry from evicted if we get a positive store ack
-        if (stAck_r.valid) begin
-            assert(stAckIdxValid);
-            if (!stAck_r.fail) begin
-                for (integer i = 0; i < NUM_EVICTED-1; i=i+1) begin
-                    if (i >= stAckIdx) begin
-                        evicted[i] <= evicted[i+1];
-                    end
+        if (OUT_uopSt.valid) begin
+            OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
+            if (IN_stallSt)
+                evicted[OUT_uopSt.id].issued <= 0;
+        end
+
+        if (stAck_r.valid && stAck_r.nonce == evicted[stAck_r.idx].nonce) begin
+            // delete if store ack has most recent nonce and successful
+            if (evicted[stAck_r.idx].nonce == stAck_r.nonce) begin
+                evicted[stAck_r.idx].issued <= 0;
+                if (!stAck_r.fail) begin
+                    evicted[stAck_r.idx] <= 'x;
+                    evicted[stAck_r.idx].wmask <= 0;
+                    evicted[stAck_r.idx].valid <= 0;
                 end
-                evicted[NUM_EVICTED-1] <= 'x;
-                evicted[NUM_EVICTED-1].valid <= 0;
-
-                nextEvictedIn = nextEvictedIn - 1;
-                evictedUsedIds[stAck_r.id] <= 0;
-            end
-            else begin
-                evicted[stAckIdx].issued <= 0;
-                modified = 1;
             end
         end
 
-        // Dequeue
-        if (!IN_stallSt) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
-            // Try storing new op
-            if (!IN_branch.taken && 
-                entryReady_r[idx] && nextEvictedIn < NUM_EVICTED &&
-                entries[idx].loaded && allowDequeue &&
-                entries[idx].addrAvail
-            ) begin
+        // Issue op from evicted
+        if (reIssue.valid) begin
+            modified = 1;
+            
+            evicted[reIssue.idx].issued <= 1;
 
-                reg[`AXI_WIDTH-1:0] data = 'x;
-                reg[`AXI_WIDTH/8-1:0] mask = 'x;
+            OUT_uopSt.valid <= 1;
+            OUT_uopSt.id <= reIssue.idx;
+            OUT_uopSt.nonce <= evicted[reIssue.idx].nonce;
+            OUT_uopSt.addr <= {evicted[reIssue.idx].addr, 2'b0};
+            OUT_uopSt.data <= evicted[reIssue.idx].data;
+            OUT_uopSt.wmask <= evicted[reIssue.idx].wmask;
+            OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssue.idx].addr);
+        end
+        
+        // Enqueue into evicted
+        if (entryOut.loaded && evInsert.valid) begin
+            reg[`AXI_WIDTH-1:0] data = 'x;
+            reg[`AXI_WIDTH/8-1:0] mask = 'x;
+            StNonce_t newNonce = evicted[evInsert.idx].nonce + 1;
+            
+            modified = 1;
 
-                assert(evictedNextIdValid);
-                modified = 1;
+            entryOut <= SQEntry'{loaded: 0, default: 'x};   
+            
+            if (`IS_MMIO_PMA_W(entryOut.addr)) begin
+                data[31:0] = entryOut.data;
+                mask[3:0] = entryOut.wmask;
+            end
+            else begin
+                mask = evicted[evInsert.idx].wmask | 
+                    (`AXI_WIDTH/8)'(entryOut.wmask) << (entryOut.addr[AXI_BWIDTH_E-3:0]*4);
 
-                entries[idx] <= 'x;        
-                
-                if (`IS_MMIO_PMA_W(entries[idx].addr)) begin
-                    data[31:0] = entries[idx].data;
-                    mask[3:0] = entries[idx].wmask;
+                for (integer i = 0; i < 16; i=i+1) begin
+                    if ((AXI_BWIDTH_E-2)'(i/4) == entryOut.addr[AXI_BWIDTH_E-3:0] && entryOut.wmask[i%4])
+                        data[i*8+:8] = entryOut.data[(i%4)*8+:8];
+                    else
+                        data[i*8+:8] = evicted[evInsert.idx].data[i*8+:8];
                 end
-                else begin
-                    data = `AXI_WIDTH'(entries[idx].data) << (entries[idx].addr[1:0] * 32);
-                    mask = (`AXI_WIDTH/8)'(entries[idx].wmask) << (entries[idx].addr[1:0] * 4);
-                end
+            end
+            
+            evicted[evInsert.idx].issued <= 0;
+            evicted[evInsert.idx].nonce <= newNonce;
+            evicted[evInsert.idx].data <= data;
+            evicted[evInsert.idx].wmask <= mask;
+            evicted[evInsert.idx].addr <= entryOut.addr;
+            evicted[evInsert.idx].valid <= 1;
+            
+            if (!reIssue.valid) begin
+                evicted[evInsert.idx].issued <= 1;
 
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[idx].addr);
-                
                 OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evictedNextId;
-                OUT_uopSt.addr <= {entries[idx].addr[29:2], 4'b0};
+                OUT_uopSt.id <= evInsert.idx;
+                OUT_uopSt.nonce <= newNonce;
+                OUT_uopSt.addr <= {entryOut.addr[29:2], 4'b0};
                 OUT_uopSt.data <= data;
                 OUT_uopSt.wmask <= mask;
-                
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].data <= data;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].wmask <= mask;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].addr <= entries[idx].addr;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= evictedNextId;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].valid <= 1;
-                nextEvictedIn = nextEvictedIn + 1;
-                    
-                evictedUsedIds[evictedNextId] <= 1;
-                nextBaseIndex = nextBaseIndex + 1;
+                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entryOut.addr);
             end
 
-            // Re-issue op that previously missed cache
-            else if (reIssueValid) begin
-                OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evicted[reIssueIdx].id;
-                OUT_uopSt.addr <= {evicted[reIssueIdx].addr, 2'b0};
-                OUT_uopSt.data <= evicted[reIssueIdx].data;
-                OUT_uopSt.wmask <= evicted[reIssueIdx].wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssueIdx].addr);
-                
-                if (stAck_r.valid && !stAck_r.fail && reIssueIdx >= stAckIdx)
-                    evicted[reIssueIdx - 1].issued <= 1;
-                else
-                    evicted[reIssueIdx].issued <= 1;
+        end
+
+        // Dequeue
+        begin
+            reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
+            if (!IN_branch.taken && 
+                entryReady_r[idx] &&
+                entries[idx].loaded &&
+                entries[idx].addrAvail &&
+                (!entryOut.loaded || evInsert.valid)
+            ) begin
 
                 modified = 1;
+                entryOut <= entries[idx];
+                entries[idx] <= 'x;        
+                nextBaseIndex = nextBaseIndex + 1;
             end
         end
 
@@ -614,7 +604,6 @@ always_ff@(posedge clk) begin
                 OUT_fwd[i].conflict <= lookupConflict[i];
             end
 
-        evictedIn <= nextEvictedIn;
         baseIndex <= nextBaseIndex;
     end
 end

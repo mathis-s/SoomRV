@@ -10,21 +10,21 @@
 #endif
 
 #include "VTop.h"
+#include "VTop_BranchPredictor__N3.h"
 #include "VTop_CSR.h"
 #include "VTop_Core.h"
 #include "VTop_ExternalAXISim.h"
-#include "VTop_IFetch.h"
 #include "VTop_ICacheTable.h"
+#include "VTop_IF_Cache.h"
+#include "VTop_IFetch.h"
+#include "VTop_MemRTL__W54_N40_WB15.h"
 #include "VTop_RF.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable.h"
-#include "VTop_BranchPredictor__N3.h"
-#include "VTop_MemRTL__W54_N40_WB15.h"
-#include "VTop_StoreQueue.h"
 #include "VTop_ReturnStack.h"
-#include "VTop_IF_Cache.h"
 #include "VTop_SoC.h"
+#include "VTop_StoreQueue.h"
 #include "VTop_TagBuffer.h"
 #include "VTop_Top.h"
 #include <cstdio>
@@ -361,11 +361,7 @@ class SpikeSimif : public simif_t
             uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
             if (phy >= 0x80000000)
                 inFlightStores.push_back((Store){
-                    .addr = phy,
-                    .data = (uint32_t)std::get<1>(write),
-                    .size = std::get<2>(write),
-                    .time = main_time
-                });
+                    .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});
         }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
@@ -619,8 +615,8 @@ struct CacheWrite
     bool we;
     uint32_t addr;
     uint8_t wassoc;
-    uint32_t wdata;
-    uint8_t wmask;
+    std::array<uint8_t, 16> wdata;
+    uint16_t wmask;
 };
 
 std::array<CacheWrite, 3> GetCurrentWrites()
@@ -631,21 +627,20 @@ std::array<CacheWrite, 3> GetCurrentWrites()
     for (int i = 0; i < 2; i++)
     {
         ports[i].we = !((ifCache->__PVT__we >> i) & 1) && !((ifCache->__PVT__busy >> i) & 1);
-        ports[i].addr = (ifCache->__PVT__addr >> i*12) & 4095 & (~0xf);
-        ports[i].wassoc = (ifCache->__PVT__wassoc >> i*2) & 3;
+        ports[i].addr = (ifCache->__PVT__addr >> i * 12) & 4095 & (~0xf);
+        ports[i].wassoc = (ifCache->__PVT__wassoc >> i * 2) & 3;
         
-        uint32_t mask = (ifCache->__PVT__wmask >> i*16) & 0xffff;
-        int shift = (__builtin_ctz(mask) / 4);
+        ports[i].wmask = (ifCache->__PVT__wmask >> i * 16) & 0xffff;
 
-        ports[i].wmask = (mask >> (shift * 4)) & 0xf;
-        ports[i].wdata = (ifCache->__PVT__wdata[4*i + shift]) & 0xffffffff;
-        ports[i].addr += shift * 4;
+        for (int j = 0; j < 16; j++)
+            ports[i].wdata[j] = ExtractField(ifCache->__PVT__wdata, 128 * i + 8 * j, 8);
     }
     // translate
     auto ict = top->Top->soc->dctable->mem;
     for (auto& port : ports)
     {
-        if (!port.we) continue;
+        if (!port.we)
+            continue;
         int idx = port.addr / 64; // 64 byte cache lines
         uint32_t entry = ExtractField(ict[idx], 21 * port.wassoc, 21);
         if (!(entry & 1))
@@ -653,8 +648,8 @@ std::array<CacheWrite, 3> GetCurrentWrites()
             fprintf(stderr, "[%lu] invalid cache write\n", main_time);
             Exit(1);
         }
-        port.addr = ((entry >> 1) << 12) | (port.addr & -4);
-        //printf("[%.8x] = %x\n", port.addr, port.wdata);
+        port.addr = ((entry >> 1) << 12) | (port.addr & -16);
+        // printf("[%.8x] = %x\n", port.addr, port.wdata);
     }
     
     // Writes fused into cache line load request
@@ -664,28 +659,22 @@ std::array<CacheWrite, 3> GetCurrentWrites()
     auto cmd = ExtractField(memcReq, 0, 4);
     
     static bool allow = 1;
-    if (allow &&
-        (cmd == 1 /*MEMC_REPLACE*/ || 
-         cmd == 3 /*MEMC_CP_EXT_TO_CACHE*/))
+    if (allow && (cmd == 1 /*MEMC_REPLACE*/ || cmd == 3 /*MEMC_CP_EXT_TO_CACHE*/))
     {
         allow = 0;
-        auto addr = ExtractField(memcReq, 5+32, 32) & ~0xf;
-        auto mask = ExtractField(memcReq, 5+32+32+12+128, 16);
-        
-        int shift = (__builtin_ctz(mask) / 4);
-        mask = mask >> (shift * 4) & 0xf;
-        addr += shift * 4;
-        auto data = ExtractField(memcReq, 5+32+32+12+32*shift,32);
+        auto addr = ExtractField(memcReq, 5 + 32, 32) & ~0xf;
+        auto mask = ExtractField(memcReq, 5 + 32 + 32 + 12 + 128, 16);
+        std::array<uint8_t, 16> data;
+        for (int i = 0; i < 16; i++)
+            data[i] = ExtractField(memcReq, 5 + 32 + 32 + 12 + 8 * i, 8);
 
         if (mask != 0)
         {
-            ports[2] = (CacheWrite) {
-                .we = 1,
+            ports[2] = (CacheWrite){.we = 1,
                 .addr = addr,
-                .wassoc = 0, //unused
+                                    .wassoc = 0, // unused
                 .wdata = data,
-                .wmask = (uint8_t)mask
-            };
+                                    .wmask = (uint16_t)mask};
         }
     }
     
@@ -694,12 +683,201 @@ std::array<CacheWrite, 3> GetCurrentWrites()
     return ports;
 }
 
+void CheckStoreConsistency2()
+{
+    auto writes = GetCurrentWrites();
+    auto core = top->Top->soc->core;
+
+    auto it = inFlightStores.rbegin();
+    int sqIter = 0;
+
+    if (main_time > DEBUG_TIME)
+    {
+    fprintf(stderr, "---\n");
+        for (int i = 0; i < 32; i = i + 1)
+    {
+            int idx = (((31 - i) + core->sq->baseIndex) % 32);
+        if ((core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 2))
+        {
+            uint32_t addr = ExtractField(core->sq->entries[idx], 13, 30) << 2;
+            uint8_t mask = ExtractField(core->sq->entries[idx], 9, 4);
+
+            fprintf(stderr, "sq: [%.8x] @ %.1x\n", addr, mask);
+        }
+    }
+
+    for (auto& st : inFlightStores)
+        printf("if: [%.8x] = %.8x << %d [%lu]\n", st.addr & ~3, st.data, st.addr & 3, st.time);
+    }
+
+    for (; it != inFlightStores.rend(); it++)
+    {
+        Store& store = *it;
+        uint8_t storeMask = ((1 << store.size) - 1) << (store.addr & 3);
+
+        // SQ entries
+        // Youngest stores will still be in SQ
+        for (; sqIter < 32; sqIter++)
+        {
+            int idx = (((31 - sqIter) + core->sq->baseIndex) % 32);
+            if ((core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 2))
+            {
+                uint32_t addr = ExtractField(core->sq->entries[idx], 13, 30) << 2;
+                uint8_t mask = ExtractField(core->sq->entries[idx], 9, 4);
+
+                if (addr == (store.addr & ~3) && mask == storeMask)
+                {
+                    sqIter++;
+                    goto next_store;
+                }
+            }
+        }
+
+        // Just dequeued entry
+        if ((core->sq->entryOut[0] & 1))
+        {
+            uint32_t addr = ExtractField(core->sq->entryOut, 13, 30) << 2;
+            uint8_t mask = ExtractField(core->sq->entryOut, 9, 4);
+            if (addr == (store.addr & -4) && mask == storeMask)
+                it++;
+        }
+        break;
+        next_store:;
+    }
+
+    // All stores beyond this point are flattened into the evicted queue.
+    struct EQStore
+    {
+        uint16_t mask;
+        std::array<uint8_t, 16> data = {};
+        std::vector<Store> srcs;
+    };
+    std::unordered_map<uint32_t, EQStore> storesFlat = {};
+    for (; it != inFlightStores.rend(); it++)
+    {
+        Store store = *it;
+        auto& eqStore = storesFlat[store.addr & ~0xF];
+
+        int offs = store.addr & 15;
+
+        for (int i = 0; i < store.size; i++)
+            if (!(eqStore.mask & (1 << (i + offs))))
+                eqStore.data[i + offs] = (store.data >> (i * 8)) & 0xFF;
+        
+        eqStore.srcs.push_back(store);
+        eqStore.mask |= ((1 << store.size) - 1) << offs;
+    }
+    
+    std::array<bool, 4> evEntryUsed = {};
+    
+    if (main_time > DEBUG_TIME)
+    for (int i = 0; i < 4; i++)
+    {
+        if (core->sq->evicted[i][0] & 1)
+        {
+            uint16_t wmask = ExtractField(core->sq->evicted[i], 5, 16);
+            uint32_t addr = (ExtractField(core->sq->evicted[i], 21, 30) & ~3) << 2;
+            std::array<uint8_t, 16> data;
+            for (int j = 0; j < 16; j++)
+                data[j] = ExtractField(core->sq->evicted[i], 51 + j * 8, 8);
+
+            fprintf(stderr, "ev: [%.8x] =", addr);
+            for (auto b = data.rbegin(); b != data.rend(); b++)
+                fprintf(stderr, " %.2x", *b);
+            fprintf(stderr, " (%.4x)\n", wmask);
+        }
+    }
+
+    for (auto const& store : storesFlat)
+    {
+        auto& eqStore = store.second;
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (!evEntryUsed[i] && core->sq->evicted[i][0] & 1)
+            {
+                uint16_t wmask = ExtractField(core->sq->evicted[i], 5, 16);
+                uint32_t addr = (ExtractField(core->sq->evicted[i], 21, 30) & ~3) << 2;
+                std::array<uint8_t, 16> data;
+                for (int j = 0; j < 16; j++)
+                    data[j] = ExtractField(core->sq->evicted[i], 51 + j * 8, 8);
+                
+                bool dataMatch = 1;
+                for (int j = 0; j < 16; j++)
+                    if ((eqStore.mask & (1 << j)) && eqStore.data[j] != data[j])
+                        dataMatch = 0;
+
+                if (store.first == addr && wmask >= eqStore.mask && dataMatch)
+                {
+                    evEntryUsed[i] = 1;
+                    goto store_found;
+                }
+            }
+        }
+
+        fprintf(stderr, "[%lu] could not find in EQ [%.8x] =", main_time, store.first);
+        for (auto b = eqStore.data.rbegin(); b != eqStore.data.rend(); b++)
+            fprintf(stderr, " %.2x", *b);
+        fprintf(stderr, " (%.4x)\n", eqStore.mask);
+        Exit(1);
+
+        store_found:;
+        
+        // check if store is being executed
+        for (size_t i = 0; i < writes.size(); i++)
+        {
+            auto& write = writes[i];
+            if (write.we)
+            {
+                if (write.addr == store.first && write.wmask >= store.second.mask)
+                {
+                    /*if (main_time > DEBUG_TIME)
+                    {
+                        fprintf(stderr, "[%lu] MEM[%.8x] =", main_time, write.addr);
+                        for (auto b = write.wdata.rbegin(); b != write.wdata.rend(); b++)
+                            fprintf(stderr, " %.2x", *b);
+                        fprintf(stderr, " (%.4x) write %zu\n", write.wmask, i);
+                    }*/
+
+                    for (auto itA = inFlightStores.begin(); itA != inFlightStores.end();)
+                    {
+                        for (auto itB = store.second.srcs.begin(); itB != store.second.srcs.end(); itB++)
+                        {
+                            if (itA->time == itB->time && itA->addr == itB->addr && itA->data == itB->data &&
+                                itA->size == itB->size)
+                            {
+                                itA = inFlightStores.erase(itA);
+                                goto found;
+                            }
+                        }
+                        itA++;
+                        found:;
+                    }
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < writes.size(); i++)
+    {
+        auto& write = writes[i];
+        if (write.we && main_time > DEBUG_TIME)
+        {
+            fprintf(stderr, "[%lu] MEM[%.8x] =", main_time, write.addr);
+            for (auto b = write.wdata.rbegin(); b != write.wdata.rend(); b++)
+                fprintf(stderr, " %.2x", *b);
+            fprintf(stderr, " (%.4x) write %zu\n", write.wmask, i);
+        }
+    }
+}
     
 // every store that hasn't yet been written to cache must be in the StoreQueue
 void CheckStoreConsistency()
 {
     std::array<bool, 32> entryUsedSQ = {};
     std::array<bool, 4> entryUsedEQ = {};
+    bool entryOutUsed = 0;
+
     auto writes = GetCurrentWrites();
 
     auto core = top->Top->soc->core;
@@ -723,7 +901,7 @@ void CheckStoreConsistency()
                 addr += offs * 4;
                 mask = (mask >> (offs * 4)) & 0xf;
 
-                //fprintf(stderr, "ev: [%.8x] @ %.4x\n", addr, mask);
+                // fprintf(stderr, "ev: [%.8x] @ %.4x\n", addr, mask);
                 if (addr == (store.addr & -4) && mask == storeMask)
                 {
                     entryUsedEQ[i] = 1;
@@ -732,10 +910,23 @@ void CheckStoreConsistency()
                 }
             }
         }
+        
+        // Just dequeued entry
+        if (!entryOutUsed && (core->sq->entryOut[0] & 1))
+        {
+            uint32_t addr = ExtractField(core->sq->entryOut, 13, 30) << 2;
+            uint8_t mask = ExtractField(core->sq->entryOut, 9, 4);
+            if (addr == (store.addr & -4) && mask == storeMask)
+            {
+                entryOutUsed = 1;
+                goto found_entry;
+            }
+        }
+
         // SQ entries
         for (int i = 0; i < 32; i++)
         {
-            int idx = (i + core->sq->baseIndex) % 32;
+            int idx = 32 - 1 - ((i + core->sq->baseIndex) % 32);
             if (!entryUsedSQ[idx] && (core->sq->entryReady_r & (1UL << idx)) && (core->sq->entries[idx][0] & 2))
             {
                 uint32_t addr = ExtractField(core->sq->entries[idx], 13, 30) << 2;
@@ -748,21 +939,27 @@ void CheckStoreConsistency()
             }
         }
 
-        fprintf(stderr, "[%lu] cannot find store in SQ/EQ: MEM%d[%.8x] = %x (commit time %lu)\n", main_time, store.size*8, store.addr, store.data, store.time);
+        fprintf(stderr, "[%lu] cannot find store in SQ/EQ: MEM%d[%.8x] = %x %.1x (commit time %lu)\n", main_time,
+                store.size * 8, store.addr, store.data, storeMask, store.time);
         DumpState(stderr, -1, -1);
         Exit(1);
         found_entry:
 
         // check if store is being executed
-        auto writeIt = std::find_if(writes.begin(), writes.end(), [&](CacheWrite const& w) {
-            return w.we && (w.addr & -4) == (store.addr & -4) && w.wmask == storeMask;
-        });
+        auto writeIt = std::find_if(writes.begin(), writes.end(),
+                                    [&](CacheWrite const& w)
+                                    { return w.we && (w.addr & -4) == (store.addr & -4) && w.wmask == storeMask; });
         if (writeIt != writes.end())
         {
             writeIt->we = 0;
-            if (!isEvicted) { fprintf(stderr, "[%lu] inconsistent cache write\n", main_time); Exit(1); }
+            if (!isEvicted)
+            {
+                fprintf(stderr, "[%lu] inconsistent cache write\n", main_time);
+                Exit(1);
+            }
             if (main_time > DEBUG_TIME)
-                fprintf(stderr, "[%lu] MEM%d[%.8x] = %x (%zu, commit time %lu)\n", main_time, store.size*8, store.addr, store.data, writeIt - writes.begin(), store.time);
+                fprintf(stderr, "[%lu] MEM%d[%.8x] = %x (%zu, commit time %lu)\n", main_time, store.size * 8,
+                        store.addr, store.data, writeIt - writes.begin(), store.time);
             it = inFlightStores.erase(it);
             continue;
         }
@@ -774,7 +971,8 @@ void CheckStoreConsistency()
         auto& write = writes[i];
         if (write.we)
         {
-            fprintf(stderr, "[%lu] MEM[%.8x] = %x (%x) write %zu unaccounted for\n", main_time, write.addr, write.wdata, write.wmask, i);
+            fprintf(stderr, "[%lu] MEM[%.8x] = %x (%x) write %zu unaccounted for\n", main_time, write.addr, write.wdata,
+                    write.wmask, i);
             Exit(1);
         }
     }
@@ -931,13 +1129,13 @@ uint32_t mostRecentPC;
 void LogInstructions()
 {
 #ifdef COSIM
-    CheckStoreConsistency();
+    CheckStoreConsistency2();
 #endif
 
     auto core = top->Top->soc->core;
 
     bool brTaken = core->branch[0] & 1;
-    int brSqN = ExtractField(core->branch, 1 + 5 + 1  + 7 + 7, 8);
+    int brSqN = ExtractField(core->branch, 1 + 5 + 1 + 7 + 7, 8);
 
     // Issue
     for (size_t i = 0; i < 4; i++)
@@ -955,7 +1153,7 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 1+1+4+7+7+2+5, 7);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 1 + 1 + 4 + 7 + 7 + 2 + 5, 7);
             state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 181 - 32, 32);
             state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 181 - 32 - 32, 32);
             state.insts[sqn].imm = ExtractField(core->LD_uop[i], 181 - 32 - 32 - 32 - 3 - 3 - 32, 32);
@@ -1008,8 +1206,8 @@ void LogInstructions()
                 bool isXRETinterrupt = false;
                 if (core->ROB_trapUOp & 1)
                 {
-                    int trapSQN = (core->ROB_trapUOp >> (15+14)) & 127;
-                    int flags = (core->ROB_trapUOp >> (29+14)) & 15;
+                    int trapSQN = (core->ROB_trapUOp >> (15 + 14)) & 127;
+                    int flags = (core->ROB_trapUOp >> (29 + 14)) & 15;
                     int rd = (core->ROB_trapUOp >> 10) & 31;
                     isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
                     isXRETinterrupt =
@@ -1055,8 +1253,8 @@ void LogInstructions()
         for (size_t i = 0; i < 4; i++)
             if (core->RN_uop[i][0] & 1)
             {
-                int sqn = ExtractField<4>(core->RN_uop[i], 46+4, 7);
-                int fu = ExtractField<4>(core->RN_uop[i], 2+4, 4);
+                int sqn = ExtractField<4>(core->RN_uop[i], 46 + 4, 7);
+                int fu = ExtractField<4>(core->RN_uop[i], 2 + 4, 4);
                 uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 + 4 - 7, 7);
 
                 state.insts[sqn].valid = 1;
@@ -1119,7 +1317,7 @@ void LogInstructions()
 
         if ((core->IF_instrs[0] & 1))
         {
-            int fetchID = ExtractField(core->ifetch->ict->packetRePred, 1+128+2+31+1+3+3+3+2, 5);
+            int fetchID = ExtractField(core->ifetch->ict->packetRePred, 1 + 128 + 2 + 31 + 1 + 3 + 3 + 3 + 2, 5);
             state.fetches[fetchID].pdTime = main_time + 2;
         }
     }
@@ -1398,7 +1596,9 @@ int main(int argc, char** argv)
     if (args.deviceTreeAddr != 0)
         WriteRegister(11, args.deviceTreeAddr);
 
+    const uint64_t perfInterval = 1024 * 1024 * 8;
     uint64_t lastMInstret = core->csr->minstret;
+    uint64_t nextMinstretPerf = core->csr->minstret + perfInterval;
 
     // Run
     top->en = 1;
@@ -1431,7 +1631,6 @@ int main(int argc, char** argv)
             uint64_t minstret = core->csr->minstret;
             if (minstret == lastMInstret)
             {
-
                 fprintf(stderr, "ERROR: Hang detected\n");
                 fprintf(stderr, "ROB_curSqN=%x\n", core->ROB_curSqN);
                 DumpState(stderr, mostRecentPC, -1);
@@ -1439,11 +1638,14 @@ int main(int argc, char** argv)
             }
             lastMInstret = minstret;
         }
-        if ((main_time & 0xffffff) == 0)
+        if (core->csr->minstret >= nextMinstretPerf)
         {
             if (args.logPerformance)
                 LogPerf(core);
-
+            nextMinstretPerf = core->csr->minstret + perfInterval;
+        }
+        if ((main_time & 0xffffff) == 0)
+        {
             if (!args.backupFile.empty())
                 save_model(args.backupFile);
         }

@@ -12,6 +12,7 @@ typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
 typedef logic[1:0] StOff_t;
+typedef logic[2:0] StNonce_t;
 
 typedef enum logic[5:0]
 {
@@ -756,6 +757,7 @@ typedef struct packed
     logic[`AXI_WIDTH-1:0] data;
     logic[`AXI_WIDTH/8-1:0] wmask;
     logic isMMIO;
+    StNonce_t nonce;
     StID_t id;
     logic valid;
 } ST_UOp;
@@ -765,7 +767,8 @@ typedef struct packed
     logic[31:0] addr;
     logic[`AXI_WIDTH-1:0] data;
     logic[`AXI_WIDTH/8-1:0] wmask;
-    StID_t id;
+    StNonce_t nonce;
+    StID_t idx;
     logic fail;
     logic valid;
 } ST_Ack;

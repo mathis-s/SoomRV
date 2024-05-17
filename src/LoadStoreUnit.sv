@@ -689,7 +689,8 @@ wire fuseStoreMiss = !missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype
 assign OUT_stAck.addr = stOps[1].addr;
 assign OUT_stAck.data = stOps[1].data;
 assign OUT_stAck.wmask = stOps[1].wmask;
-assign OUT_stAck.id = stOps[1].id;
+assign OUT_stAck.nonce = stOps[1].nonce;
+assign OUT_stAck.idx = stOps[1].id;
 assign OUT_stAck.valid = stOps[1].valid;
 assign OUT_stAck.fail = redoStore && !fuseStoreMiss;
 
