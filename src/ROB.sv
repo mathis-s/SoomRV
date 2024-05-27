@@ -37,10 +37,8 @@ module ROB
     output ROB_PERFC_Info OUT_perfcInfo,
     
     input BranchProv IN_branch,
-    input SQ_ComInfo IN_sqInfo,
-
-    input wire IN_maxComLdSqNValid,
-    input SqN IN_maxComLdSqN,
+    input ComLimit IN_stComLimit[`NUM_AGUS-1:0],
+    input ComLimit IN_ldComLimit,
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
@@ -232,8 +230,10 @@ always_ff@(posedge clk) begin
                 reg isRenamed = (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex));
                 reg isExecuted = deqFlags[i] != FLAGS_NX;
                 reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
-                reg sqAllowsCommit = (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0);
-                reg lbAllowsCommit = (!IN_maxComLdSqNValid || $signed(deqEntries[i].loadSqN - IN_maxComLdSqN) < 0);
+                reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(deqEntries[i].loadSqN - IN_ldComLimit.sqN) < 0);
+                reg sqAllowsCommit = 1;
+                for (integer j = 0; j < `NUM_AGUS-1; j=j+1)
+                    sqAllowsCommit &= (!IN_stComLimit[j].valid || $signed(deqEntries[i].storeSqN - IN_stComLimit[j].sqN) < 0);
                 
                 if (!temp && isRenamed && isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) begin
 

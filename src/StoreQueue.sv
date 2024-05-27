@@ -32,8 +32,7 @@ module StoreQueue
     input ST_Ack IN_stAck,
     
     output wire OUT_flush,
-    output SqN OUT_maxStoreSqN,
-    output SQ_ComInfo OUT_sqInfo
+    output SqN OUT_maxStoreSqN
 );
 
 localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
@@ -41,14 +40,12 @@ localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
 typedef struct packed
 {
     RegT data;
-
     logic[29:0] addr;
 
     // wmask == 0 is escape sequence for special operations
     logic[3:0] wmask;
     
     SqN sqN;
-    
     logic addrAvail;
     logic loaded;
 } SQEntry;
@@ -115,41 +112,9 @@ SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
 SqN baseIndex /* verilator public */;
 SqN lastIndex;
 
+reg[NUM_ENTRIES-1:0] entryFused /* verilator public */;
+
 SQEntry entryOut /* verilator public */;
-
-always_ff@(posedge clk) begin
-    OUT_sqInfo <= 'x;
-    OUT_sqInfo.valid <= 0;
-    if (rst) ;
-    else if (loadBaseIndexValid) begin
-        OUT_sqInfo.valid <= 1;
-        OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
-    end
-end
-
-// Find oldest not-yet-loaded entry 
-reg loadBaseIndexValid;
-reg[$clog2(NUM_ENTRIES)-1:0] loadBaseIndex;
-always_comb begin
-    reg[NUM_ENTRIES-1:0] isNotLoaded;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        isNotLoaded[i] =
-            entryValid_c[i] && (!entries[i].loaded);
-    end
-
-    // Priority encode beginning at base index
-    loadBaseIndexValid = 0;
-    loadBaseIndex = 'x;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!loadBaseIndexValid && 
-            isNotLoaded[idx]
-        ) begin
-            loadBaseIndexValid = 1;
-            loadBaseIndex = idx;
-        end
-    end
-end
 
 reg empty;
 always_comb begin
@@ -176,28 +141,40 @@ always_ff@(posedge clk) begin
     end
 end
 
-reg[3:0] readMask[`NUM_AGUS-1:0];
-always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
-        case (IN_uopLd[i].size)
-            0: readMask[i] = (4'b1 << IN_uopLd[i].addr[1:0]);
-            1: readMask[i] = ((IN_uopLd[i].addr[1:0] == 2) ? 4'b1100 : 4'b0011);
-            default: readMask[i] = 4'b1111;
-        endcase
-end
-
 typedef enum logic[0:0] {LOAD, STORE_FUSE} LookupType;
 reg[31:0] lookupAddr[`NUM_AGUS-1:0];
 LookupType lookupType[`NUM_AGUS-1:0];
+
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
     lookupAddr[h] = IN_uopLd[h].addr;
     lookupType[h] = LOAD;
+    if (!IN_uopLd[h].valid && entryOut.loaded) begin
+        case (h)
+            0: lookupAddr[h] = {entryOut.addr[29:2], entryOut.addr[1:0] + 2'd2, 2'b0};
+            1: lookupAddr[h] = {entryOut.addr[29:2], (&entryOut.wmask) ? (entryOut.addr[1:0] + 2'd3) : entryOut.addr[1:0], 2'b0};
+        endcase
+        lookupType[h] = STORE_FUSE;
+    end
+end
+
+reg[3:0] readMask[`NUM_AGUS-1:0];
+always_comb begin
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        readMask[i] = 4'b1111;
+        if (IN_uopLd[i].valid)
+            case (IN_uopLd[i].size)
+                0: readMask[i] = (4'b1 << IN_uopLd[i].addr[1:0]);
+                1: readMask[i] = ((IN_uopLd[i].addr[1:0] == 2) ? 4'b1100 : 4'b0011);
+                default: readMask[i] = 4'b1111;
+            endcase
+    end
 end
 
 reg[3:0] lookupMask[`NUM_AGUS-1:0];
 reg[31:0] lookupData[`NUM_AGUS-1:0];
 reg lookupConflict[`NUM_AGUS-1:0];
+reg[NUM_ENTRIES-1:0] lookupFuse[`NUM_AGUS-1:0];
 // Store queue lookup
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
@@ -211,6 +188,7 @@ always_comb begin
     lookupMask[h] = ~readMask[h];
     lookupData[h] = 32'bx;
     lookupConflict[h] = 0;
+    lookupFuse[h] = '0;
     
     if (lookupType[h] == LOAD) begin
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
@@ -263,9 +241,8 @@ always_comb begin
                         entryReady_r[i]) &&
                     !`IS_MMIO_PMA_W(entries[i].addr)
                 ) begin
-                    
                     if (entries[i].loaded) begin
-                        
+                        lookupFuse[h][i] = 1;
                         for (integer j = 0; j < 4; j=j+1)
                             if (entries[i].wmask[j]) begin
                                 lookupData[h][j*8 +: 8] = entries[i].data[j*8 +: 8];
@@ -314,6 +291,7 @@ always_comb begin
 
     // actual forwarding
     lookupConflictList[h][i] = 0;
+    lookupFuse[h][i] = 0;
     if ((entryValid_r[i]) && entries[i].addrAvail &&
         entries[i].addr == lookupAddr[h][31:2] && 
         ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
@@ -322,6 +300,7 @@ always_comb begin
     ) begin
         
         if (entries[i].loaded) begin
+            lookupFuse[h][i] = 1;
             for (integer j = 0; j < 4; j=j+1)
                 if (entries[i].wmask[j]) begin
                     lookupDataIter[h][i][j*8 +: 8] = entries[i].data[j*8 +: 8];
@@ -333,6 +312,7 @@ always_comb begin
 end
 endgenerate
 `endif
+
 
 wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 wire[$clog2(NUM_ENTRIES)-1:0] comStSqNI = IN_comStSqN[$clog2(NUM_ENTRIES)-1:0];
@@ -399,6 +379,16 @@ always_comb begin
     end
 end
 
+reg[NUM_ENTRIES-1:0] entryFused_c;
+always_comb begin
+    entryFused_c = entryFused;
+    if (entryOut.loaded && evInsert.valid)
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            if (lookupType[i] == STORE_FUSE)
+                entryFused_c = entryFused_c | lookupFuse[i];
+        end
+end
+
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
@@ -413,6 +403,7 @@ always_ff@(posedge clk) begin
         
         for (integer i = 0; i < NUM_EVICTED; i=i+1)
             evicted[i].valid <= 0;
+        entryFused <= 0;
         
         baseIndex <= 0;
         lastIndex <= '1;
@@ -470,7 +461,10 @@ always_ff@(posedge clk) begin
             
             modified = 1;
 
-            entryOut <= SQEntry'{loaded: 0, default: 'x};   
+            entryOut <= SQEntry'{loaded: 0, default: 'x};  
+
+            // Mark fused entries as such
+            entryFused <= entryFused_c;
             
             if (`IS_MMIO_PMA_W(entryOut.addr)) begin
                 data[31:0] = entryOut.data;
@@ -478,13 +472,21 @@ always_ff@(posedge clk) begin
             end
             else begin
                 mask = evicted[evInsert.idx].wmask | 
-                    (`AXI_WIDTH/8)'(entryOut.wmask) << (entryOut.addr[AXI_BWIDTH_E-3:0]*4);
+                    ((`AXI_WIDTH/8)'(entryOut.wmask) << (entryOut.addr[AXI_BWIDTH_E-3:0]*4));
+
+                for (integer i = 0; i < `NUM_AGUS; i=i+1)
+                    if (lookupType[i] == STORE_FUSE)
+                        mask |= ((`AXI_WIDTH/8)'(lookupMask[i]) << (lookupAddr[i][AXI_BWIDTH_E-1:2]*4));
 
                 for (integer i = 0; i < 16; i=i+1) begin
                     if ((AXI_BWIDTH_E-2)'(i/4) == entryOut.addr[AXI_BWIDTH_E-3:0] && entryOut.wmask[i%4])
                         data[i*8+:8] = entryOut.data[(i%4)*8+:8];
                     else
                         data[i*8+:8] = evicted[evInsert.idx].data[i*8+:8];
+
+                    for (integer j = 0; j < `NUM_AGUS; j=j+1)
+                        if ((AXI_BWIDTH_E-2)'(i/4) == lookupAddr[j][AXI_BWIDTH_E-1:2] && lookupMask[j][i%4] && lookupType[j] == STORE_FUSE)
+                            data[i*8+:8] = lookupData[j][(i%4)*8+:8];     
                 end
             end
             
@@ -518,11 +520,21 @@ always_ff@(posedge clk) begin
                 entries[idx].addrAvail &&
                 (!entryOut.loaded || evInsert.valid)
             ) begin
-
                 modified = 1;
-                entryOut <= entries[idx];
-                entries[idx] <= 'x;        
-                nextBaseIndex = nextBaseIndex + 1;
+
+                entries[idx] <= 'x;
+                entryFused[idx] <= 0;
+
+                if (!entryFused_c[idx]) begin
+                    entryOut <= entries[idx];
+                end
+
+                if (entryFused_c[idx] && entryFused_c[idx+1]) begin
+                    nextBaseIndex = nextBaseIndex + 2;
+                    entries[idx+1] <= 'x;
+                    entryFused[idx+1] <= 0;
+                end
+                else nextBaseIndex = nextBaseIndex + 1;
             end
         end
 

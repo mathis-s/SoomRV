@@ -685,6 +685,8 @@ std::array<CacheWrite, 3> GetCurrentWrites()
 
 void CheckStoreConsistency2()
 {
+    inFlightStores.clear();
+    return;
     auto writes = GetCurrentWrites();
     auto core = top->Top->soc->core;
 

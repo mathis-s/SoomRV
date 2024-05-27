@@ -26,9 +26,8 @@ module LoadBuffer
     output BranchProv OUT_branch,
     
     output SqN OUT_maxLoadSqN,
-
-    output reg OUT_maxComLdSqNValid,
-    output SqN OUT_maxComLdSqN
+    
+    output ComLimit OUT_comLimit
 );
 
 localparam TAG_SIZE = $bits(SqN) - $clog2(NUM_ENTRIES);
@@ -316,15 +315,15 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    OUT_maxComLdSqN <= 'x;
+    OUT_comLimit.sqN <= 'x;
 
     if (rst) begin
-        OUT_maxComLdSqNValid <= 0;
+        OUT_comLimit.valid <= 0;
     end
     else begin
-        OUT_maxComLdSqNValid <= loadRsvIndexValid;
+        OUT_comLimit.valid <= loadRsvIndexValid;
         if (loadRsvIndexValid)
-            OUT_maxComLdSqN <= {entries[loadRsvIdx].highLdSqN, loadRsvIdx};
+            OUT_comLimit.sqN <= {entries[loadRsvIdx].highLdSqN, loadRsvIdx};
     end
 end
 

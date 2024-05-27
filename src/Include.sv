@@ -775,9 +775,9 @@ typedef struct packed
 
 typedef struct packed
 {
-    SqN maxComSqN;
+    SqN sqN;
     logic valid;
-} SQ_ComInfo;
+} ComLimit;
 
 typedef struct packed
 {

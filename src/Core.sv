@@ -328,6 +328,7 @@ IssueQueue#(`IQ_3_SIZE,2,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
 StDataLookupUOp stLookupUOp[`NUM_AGUS-1:0];
 wire stLookupUOp_ready[`NUM_AGUS-1:0];
 wire[`DEC_WIDTH-1:0] stLookupIQStall[`NUM_AGUS-1:0];
+ComLimit stCommitLimit[`NUM_AGUS-1:0];
 
 generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
     StoreDataIQ #(8, 2, i, 4, 4) iqStD
@@ -347,6 +348,8 @@ generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
 
         .IN_aguUOps(LD_uop[3:2]),
         .IN_maxStoreSqN(SQ_maxStoreSqN),
+
+        .OUT_comLimit(stCommitLimit[i]),
 
         .IN_ready(stLookupUOp_ready[i]),
         .OUT_uop(stLookupUOp[i])
@@ -658,8 +661,7 @@ SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd[`NUM_AGUS-1:0];
 LD_UOp LB_aguUOpLd[`NUM_AGUS-1:0];
 
-wire LB_maxComLdSqNValid;
-SqN LB_maxComLdSqN;
+ComLimit LB_ldComLimit;
 LoadBuffer lb
 (
     .clk(clk),
@@ -683,8 +685,7 @@ LoadBuffer lb
     
     .OUT_maxLoadSqN(LB_maxLoadSqN),
     
-    .OUT_maxComLdSqNValid(LB_maxComLdSqNValid),
-    .OUT_maxComLdSqN(LB_maxComLdSqN)
+    .OUT_comLimit(LB_ldComLimit)
 );
 
 wire CSR_we;
@@ -696,8 +697,6 @@ ST_UOp SQ_uop;
 StFwdResult SQ_fwd[`NUM_AGUS-1:0];
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
-SQ_ComInfo SQ_info;
-
 
 StoreQueue sq
 (
@@ -727,8 +726,7 @@ StoreQueue sq
     .IN_stAck(LSU_stAck),
     
     .OUT_flush(SQ_flush),
-    .OUT_maxStoreSqN(SQ_maxStoreSqN),
-    .OUT_sqInfo(SQ_info)
+    .OUT_maxStoreSqN(SQ_maxStoreSqN)
 );
 
 wire CC_loadStall[`NUM_AGUS-1:0];
@@ -896,10 +894,9 @@ ROB rob
     .OUT_perfcInfo(ROB_perfcInfo),
 
     .IN_branch(branch),
-    .IN_sqInfo(SQ_info),
-
-    .IN_maxComLdSqNValid(LB_maxComLdSqNValid),
-    .IN_maxComLdSqN(LB_maxComLdSqN),
+    
+    .IN_stComLimit(stCommitLimit),
+    .IN_ldComLimit(LB_ldComLimit),
     
     .OUT_maxSqN(ROB_maxSqN),
     .OUT_curSqN(ROB_curSqN),
