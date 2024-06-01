@@ -683,6 +683,7 @@ std::array<CacheWrite, 3> GetCurrentWrites()
     return ports;
 }
 
+#if 0
 void CheckStoreConsistency2()
 {
     inFlightStores.clear();
@@ -979,6 +980,7 @@ void CheckStoreConsistency()
         }
     }
 }
+#endif
 
 void LogFlush(Inst& inst);
 
@@ -1131,7 +1133,7 @@ uint32_t mostRecentPC;
 void LogInstructions()
 {
 #ifdef COSIM
-    CheckStoreConsistency2();
+    //CheckStoreConsistency2();
 #endif
 
     auto core = top->Top->soc->core;

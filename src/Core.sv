@@ -29,7 +29,7 @@ assign OUT_dbg.sqNStall = sqNStall;
 assign OUT_dbg.stSqNStall = stSqNStall;
 assign OUT_dbg.rnStall = RN_stall;
 assign OUT_dbg.memBusy = MEMSUB_busy;
-assign OUT_dbg.sqBusy = !SQ_empty || SQ_uop.valid;
+assign OUT_dbg.sqBusy = !SQ_empty || SQB_uop.valid;
 assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
@@ -693,40 +693,54 @@ wire[31:0] CSR_dataOut;
 
 wire SQ_empty;
 wire SQ_done;
-ST_UOp SQ_uop;
+
 StFwdResult SQ_fwd[`NUM_AGUS-1:0];
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
-
+SQ_UOp SQ_uops[`NUM_AGUS-1:0];
+wire SQ_stall[`NUM_AGUS-1:0];
 StoreQueue sq
 (
     .clk(clk),
     .rst(rst),
-    .IN_stallSt(CC_storeStall),
+
     .OUT_empty(SQ_empty),
     .OUT_done(SQ_done),
     
-    .IN_uopSt(AGU_uop),
     .IN_uopLd(CC_SQ_uopLd),
-    
+    .OUT_fwd(SQ_fwd),
+
+    .IN_uopSt(AGU_uop),
     .IN_rnUOp(RN_uop),
-    .IN_resultUOp(wbUOp[3:0]),
     .IN_stDataUOp(SDL_stDataUOp),
 
-    .IN_vmem(CSR_vmem),
-    
     .IN_curSqN(ROB_curSqN),
     .IN_comStSqN(ROB_comStoreSqN),
     
     .IN_branch(branch),
     
-    .OUT_uopSt(SQ_uop),
-    .OUT_fwd(SQ_fwd),
-
-    .IN_stAck(LSU_stAck),
+    .OUT_uop(SQ_uops),
+    .IN_stall(SQ_stall),
     
     .OUT_flush(SQ_flush),
     .OUT_maxStoreSqN(SQ_maxStoreSqN)
+);
+
+ST_UOp SQB_uop;
+StoreQueueBackend sqb
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_uopLd(CC_SQ_uopLd),
+    .OUT_fwd(SQ_fwd),
+
+    .IN_uop(SQ_uops),
+    .OUT_stall(SQ_stall),
+    
+    .IN_stallSt(CC_storeStall),
+    .OUT_uopSt(SQB_uop),
+    .IN_stAck(LSU_stAck)
 );
 
 wire CC_loadStall[`NUM_AGUS-1:0];
@@ -760,7 +774,7 @@ LoadStoreUnit lsu
     .OUT_uopLdSq(CC_SQ_uopLd),
     .OUT_ldAck(LSU_ldAck),
 
-    .IN_uopSt(SQ_uop),
+    .IN_uopSt(SQB_uop),
     
     .IF_cache(IF_cache),
     .IF_mmio(IF_mmio),
@@ -913,7 +927,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || SQ_uop.valid || LSU_busy || AGU_uop[0].valid || LB_uopLd[0].valid;
+wire MEMSUB_busy = !SQ_empty || SQB_uop.valid || LSU_busy || AGU_uop[0].valid || LB_uopLd[0].valid;
 
 wire TH_flushTLB;
 wire TH_startFence;

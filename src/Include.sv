@@ -753,6 +753,14 @@ typedef struct packed
 
 typedef struct packed
 {
+    RegT data;
+    logic[31:0] addr;
+    logic[3:0] wmask;
+    logic valid;
+} SQ_UOp;
+
+typedef struct packed
+{
     logic[31:0] addr;
     logic[`AXI_WIDTH-1:0] data;
     logic[`AXI_WIDTH/8-1:0] wmask;

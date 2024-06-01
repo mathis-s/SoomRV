@@ -71,6 +71,7 @@ SRC_FILES = \
 	src/PriorityEncoder.sv \
 	src/StoreDataIQ.sv \
 	src/StoreDataLoad.sv \
+	src/StoreQueueBackend.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \
