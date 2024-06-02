@@ -57,7 +57,8 @@ module LoadStoreUnit
     IF_MMIO.HOST IF_mmio,
     IF_CTable.HOST IF_ct,
     
-    input StFwdResult IN_stFwd[`NUM_AGUS-1:0],
+    input StFwdResult IN_sqStFwd[`NUM_AGUS-1:0],
+    input StFwdResult IN_sqbStFwd[`NUM_AGUS-1:0],
     output ST_Ack OUT_stAck,
 
     output MemController_Req OUT_memc,
@@ -110,6 +111,18 @@ BypassLSU bypassLSU
     .OUT_memc(BLSU_memc),
     .IN_memc(IN_memc)
 );
+
+StFwdResult stFwd[`NUM_AGUS-1:0];
+always_comb begin
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        stFwd[i] = IN_sqbStFwd[i];
+        stFwd[i].mask |= IN_sqStFwd[i].mask;
+        stFwd[i].conflict |= IN_sqStFwd[i].conflict;
+        for (integer j = 0; j < 4; j=j+1)
+            if (IN_sqStFwd[i].mask[j])
+                stFwd[i].data[8*j+:8] = IN_sqStFwd[i].data[8*j+:8];
+    end
+end
 
 // During a cache table write cycle, we cannot issue a store as
 // the cache table write port is the same as the store read port.
@@ -495,7 +508,7 @@ always_comb begin
                 end
                 
                 // don't care if cache is hit if this is a complete forward
-                if (!(isExtMMIO || isIntMMIO) && IN_stFwd[i].mask == 4'b1111) begin
+                if (!(isExtMMIO || isIntMMIO) && stFwd[i].mask == 4'b1111) begin
                     cacheHit = 1;
                     doCacheLoad = 0;
                 end
@@ -514,12 +527,12 @@ always_comb begin
             if ((!loadCacheAccessFailed[i][1] || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) &&
                 (cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) && 
                 (!loadWasExtIOBusy[i] || isExtMMIO) &&
-                (ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || !IN_stFwd[i].conflict)
+                (ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || !stFwd[i].conflict)
             ) begin
                 // Use forwarded store data if available
                 if (!(isExtMMIO || isIntMMIO)) begin
                     for (integer j = 0; j < 4; j=j+1) begin
-                        if (IN_stFwd[i].mask[j]) readData[j*8+:8] = IN_stFwd[i].data[j*8+:8];
+                        if (stFwd[i].mask[j]) readData[j*8+:8] = stFwd[i].data[j*8+:8];
                     end
                 end
                 
@@ -531,7 +544,7 @@ always_comb begin
             else begin
                 // Signal Miss
                 miss[i].valid = 1;
-                if (IN_stFwd[i].conflict)
+                if (stFwd[i].conflict)
                     miss[i].mtype = SQ_CONFLICT;
                 else if (loadWasExtIOBusy[i])
                     miss[i].mtype = IO_BUSY;
@@ -551,8 +564,8 @@ always_comb begin
                 ) begin
                     ldResUOp[i].valid = 1;
                     ldResUOp[i].dataAvail = 0;
-                    ldResUOp[i].fwdMask = IN_stFwd[i].mask;
-                    ldResUOp[i].data = IN_stFwd[i].data;
+                    ldResUOp[i].fwdMask = stFwd[i].mask;
+                    ldResUOp[i].data = stFwd[i].data;
                 end
             end
         end

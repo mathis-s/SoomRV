@@ -153,24 +153,6 @@ always_comb begin
     lookupConflict[h] = 0;
     lookupFuse[h] = '0;
     
-    /*if (lookupType[h] == LOAD) begin
-        for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-            
-            data = evicted[i].data[32*shift+:32];
-            mask = evicted[i].wmask[4*shift+:4];
-
-            if (evicted[i].valid &&
-                evicted[i].addr[29:AXI_BWIDTH_E-2] == lookupAddr[h][31:AXI_BWIDTH_E] && 
-                !`IS_MMIO_PMA_W(evicted[i].addr)
-            ) begin
-                for (integer j = 0; j < 4; j=j+1)
-                    if (mask[j])
-                        lookupData[h][j*8 +: 8] = data[j*8 +: 8];
-                lookupMask[h] = lookupMask[h] | mask;
-            end
-        end
-    end*/
-    
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
         if (OUT_uop[i].valid &&
             OUT_uop[i].addr[31:2] == lookupAddr[h][31:2] && 
@@ -358,13 +340,20 @@ always_comb begin
         outDeqView[i+NUM_OUT] = deqEntries[i];
 end
 
-reg[$clog2(NUM_OUT):0] numHandled_c;
+logic[NUM_OUT*2-1:0] unhandled;
 always_comb begin
-    numHandled_c = 0;
     for (integer i = 0; i < NUM_OUT; i=i+1)
-        if (!IN_stall[i] || !OUT_uop[i].valid)
-            numHandled_c = numHandled_c + 1;
+        unhandled[i] = OUT_uop[i].valid && IN_stall[i];
+    for (integer i = NUM_OUT; i < NUM_OUT*2; i=i+1)
+        unhandled[i] = 1;
 end
+logic[$clog2(NUM_OUT):0] srcIdx[NUM_OUT-1:0];
+PriorityEncoder#(2*NUM_OUT, NUM_OUT) penc
+(
+    .IN_data(unhandled),
+    .OUT_idx(srcIdx),
+    .OUT_idxValid()
+);
 
 // Dequeue/Enqueue
 reg flushing;
@@ -396,11 +385,17 @@ always_ff@(posedge clk) begin
         
         // Dequeue
         for (integer i = 0; i < NUM_OUT; i=i+1) begin
-            if (!IN_stall[i] || !OUT_uop[i].valid) begin
-                reg[$clog2(NUM_OUT):0] idx = numHandled_c + $bits(numHandled_c)'(i);
-                OUT_uop[i] <= outDeqView[idx];
-                if (outDeqView[idx].valid && idx >= NUM_OUT)
-                    nextBaseIndex = nextBaseIndex + 1;
+            reg[$clog2(NUM_OUT):0] idx = srcIdx[i];
+            OUT_uop[i] <= outDeqView[idx];
+            if (outDeqView[idx].valid && idx >= NUM_OUT) begin
+
+                // todo: infer sequential writes
+                reg[$clog2(NUM_ENTRIES)-1:0] idxSQ = 
+                    baseIndexI + $clog2(NUM_ENTRIES)'(idx) - $clog2(NUM_ENTRIES)'(NUM_OUT);
+                entries[idxSQ].loaded <= 0;
+                entries[idxSQ].addrAvail <= 0;
+
+                nextBaseIndex = nextBaseIndex + 1;
             end
         end
 
@@ -409,8 +404,7 @@ always_ff@(posedge clk) begin
             if (IN_stDataUOp[i].valid && (!IN_branch.taken ||
                 (!IN_branch.flush && $signed(IN_stDataUOp[i].storeSqN - IN_branch.storeSqN) <= 0))
             ) begin
-                logic[IDX_LEN-1:0] idx = 
-                    IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
+                logic[IDX_LEN-1:0] idx = IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
                 
                 assert(idx[0] == i[0]); idx[0] = i[0];
 

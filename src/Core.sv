@@ -688,13 +688,12 @@ LoadBuffer lb
     .OUT_comLimit(LB_ldComLimit)
 );
 
-wire CSR_we;
-wire[31:0] CSR_dataOut;
-
 wire SQ_empty;
 wire SQ_done;
 
 StFwdResult SQ_fwd[`NUM_AGUS-1:0];
+StFwdResult SQB_fwd[`NUM_AGUS-1:0];
+
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
 SQ_UOp SQ_uops[`NUM_AGUS-1:0];
@@ -727,13 +726,16 @@ StoreQueue sq
 );
 
 ST_UOp SQB_uop;
+wire SQB_busy;
 StoreQueueBackend sqb
 (
     .clk(clk),
     .rst(rst),
 
+    .OUT_busy(SQB_busy),
+
     .IN_uopLd(CC_SQ_uopLd),
-    .OUT_fwd(SQ_fwd),
+    .OUT_fwd(SQB_fwd),
 
     .IN_uop(SQ_uops),
     .OUT_stall(SQ_stall),
@@ -780,7 +782,8 @@ LoadStoreUnit lsu
     .IF_mmio(IF_mmio),
     .IF_ct(IF_ct),
 
-    .IN_stFwd(SQ_fwd),
+    .IN_sqStFwd(SQ_fwd),
+    .IN_sqbStFwd(SQB_fwd),
     .OUT_stAck(LSU_stAck),
     
     .OUT_memc(LSU_MC_if),
@@ -927,7 +930,7 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || SQB_uop.valid || LSU_busy || AGU_uop[0].valid || LB_uopLd[0].valid;
+wire MEMSUB_busy = !SQ_empty || SQB_busy || LSU_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;
