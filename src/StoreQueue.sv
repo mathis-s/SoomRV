@@ -309,11 +309,12 @@ always_comb begin
 end
 SQ_UOp deqPorts[NUM_OUT-1:0];
 always_comb begin
+
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
         logic[IDX_LEN-1:0] addr = 
             {deqAddrsSorted[i][IDX_LEN-1:$clog2(NUM_OUT)], i[$clog2(NUM_OUT)-1:0]};
         SQEntry entry = entries[addr];
-        logic ready = entryReady_r[addr];
+        logic ready = entryReady_r[addr] && entry.loaded;
 
         deqPorts[i] = SQ_UOp'{valid: 0, default: 'x};
         if (ready) begin
@@ -326,8 +327,12 @@ always_comb begin
 end
 SQ_UOp deqEntries[NUM_OUT-1:0];
 always_comb begin
+    logic prevValid = 1;
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
-        deqEntries[i] = deqPorts[deqAddrs[i][$clog2(NUM_OUT)-1:0]];
+        deqEntries[i] = prevValid ? 
+            deqPorts[deqAddrs[i][$clog2(NUM_OUT)-1:0]] :
+            SQ_UOp'{valid: 0, default: 'x};
+        prevValid = deqEntries[i].valid;
     end
 end
 
