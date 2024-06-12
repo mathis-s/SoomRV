@@ -26,7 +26,7 @@ assign OUT_memc[2] = BLSU_MC_if;
 
 assign OUT_dbg.stallPC = TH_stallPC;
 assign OUT_dbg.sqNStall = sqNStall;
-assign OUT_dbg.stSqNStall = stSqNStall;
+assign OUT_dbg.stSqNStall = 0;
 assign OUT_dbg.rnStall = RN_stall;
 assign OUT_dbg.memBusy = MEMSUB_busy;
 assign OUT_dbg.sqBusy = !SQ_empty || SQB_uop.valid;
@@ -153,10 +153,8 @@ InstrDecoder idec
 );
 
 wire sqNStall = ($signed((RN_nextSqN) - ROB_maxSqN) > -(`DEC_WIDTH));
-wire stSqNStall = ($signed((RN_nextStoreSqN) - SQ_maxStoreSqN) > -(`DEC_WIDTH - 1));
 wire frontendEn /*verilator public*/ = 
     !sqNStall &&
-    !stSqNStall &&
     !branch.taken &&
     !SQ_flush;
 

@@ -44,18 +44,16 @@ typedef struct packed
     logic[3:0] wmask;
     
     SqN sqN;
-    logic addrAvail;
     logic loaded;
+    logic addrAvail;
 } SQEntry;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
-reg[NUM_ENTRIES-1:0] entryValid_r;
-always_ff@(posedge clk) entryValid_r <= rst ? 0 : entryValid_c;
 
 wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[IDX_LEN-1:0]);
 wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[IDX_LEN-1:0]);
-wire[NUM_ENTRIES-1:0] lastIndexOneHot = (1 << lastIndex[IDX_LEN-1:0]);
+wire[NUM_ENTRIES-1:0] branchStSqNOneHot = (1 << IN_branch.storeSqN[IDX_LEN-1:0]);
 
 reg[NUM_ENTRIES-1:0] entryReady_c;
 always_comb begin
@@ -72,26 +70,24 @@ always_comb begin
     end
 end
 
-reg[NUM_ENTRIES-1:0] entryValid_c;
+reg[NUM_ENTRIES-1:0] invalRange_c;
 always_comb begin
-
-    reg active = lastIndex[IDX_LEN-1:0] + 1'b1 < baseIndex[IDX_LEN-1:0];
+    reg active = baseIndex[IDX_LEN-1:0] <= (IN_branch.storeSqN[IDX_LEN-1:0] + IDX_LEN'(1));
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-        if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex)
-            active = 1;
-        else if (lastIndexOneHot[prev])
-            active = 0;
-        else if (baseIndexOneHot[i])
-            active = 1;
         
-        entryValid_c[i] = active;
+        if ($signed(IN_branch.storeSqN - baseIndex) >= NUM_ENTRIES-1)
+            active = 0;
+        else if (branchStSqNOneHot[(i-1) % NUM_ENTRIES])
+            active = 1;
+        else if (baseIndexOneHot[i])
+            active = 0;
+        
+        invalRange_c[i] = active;
     end
 end
 
 SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
 SqN baseIndex /* verilator public */;
-SqN lastIndex;
 
 reg[NUM_ENTRIES-1:0] entryFused /* verilator public */;
 
@@ -99,8 +95,7 @@ reg empty;
 always_comb begin
     empty = 1;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (entryValid_c[i])
-            empty = 0;
+        if (entries[i].addrAvail) empty = 0;
     end
 end
 
@@ -165,52 +160,14 @@ always_comb begin
         end
     end
 
-`ifdef SQ_LINEAR
-    begin
-        reg active = 0;
-        for (integer base = 0; base < 2; base=base+1)
-            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-
-                if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex) begin
-                    if (baseIndexOneHot[i] && base == 0) active = 1;
-                    else if (lastIndexOneHot[prev]) active = 0;
-                end
-                else begin
-                    if (lastIndexOneHot[prev]) active = 0;
-                    else if (baseIndexOneHot[i] && base == 0) active = 1;
-                end
-
-                if (active &&
-                    entries[i].addrAvail &&
-                    entries[i].addr == lookupAddr[h][31:2] && 
-                    ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
-                        entryReady_r[i]) &&
-                    !`IS_MMIO_PMA_W(entries[i].addr)
-                ) begin
-                    if (entries[i].loaded) begin
-                        lookupFuse[h][i] = 1;
-                        for (integer j = 0; j < 4; j=j+1)
-                            if (entries[i].wmask[j]) begin
-                                lookupData[h][j*8 +: 8] = entries[i].data[j*8 +: 8];
-                                lookupMask[h][j] = 1;
-                            end
-                    end
-                    else if ((entries[i].wmask & readMask[h]) != 0) lookupConflict[h] = 1;
-                end
-            end
-    end
-`else
     for (integer i = 0; i < 4; i=i+1)
         if (lookupMaskIter[h][outputIdx][i])
             lookupData[h][i*8 +: 8] = lookupDataIter[h][outputIdx][i*8 +: 8];
 
     lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];    
     lookupConflict[h] = |lookupConflictList[h];
-`endif
 end
 
-`ifndef SQ_LINEAR
 // This generates circular logic to iterate through the StoreQueue for forwarding data to loads.
 // Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
 // If tooling does not support this, it might be necessary to make the SQ a shift register again
@@ -239,7 +196,7 @@ always_comb begin
     // actual forwarding
     lookupConflictList[h][i] = 0;
     lookupFuse[h][i] = 0;
-    if ((entryValid_r[i]) && entries[i].addrAvail &&
+    if (entries[i].addrAvail &&
         entries[i].addr == lookupAddr[h][31:2] && 
         ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
             entryReady_r[i]) &&
@@ -258,8 +215,6 @@ always_comb begin
     end
 end
 endgenerate
-`endif
-
 
 wire[IDX_LEN-1:0] baseIndexI = baseIndex[IDX_LEN-1:0];
 wire[IDX_LEN-1:0] comStSqNI = IN_comStSqN[IDX_LEN-1:0];
@@ -374,7 +329,6 @@ always_ff@(posedge clk) begin
         entryFused <= 0;
         
         baseIndex <= 0;
-        lastIndex <= '1;
         
         OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         OUT_empty <= 1;
@@ -382,6 +336,9 @@ always_ff@(posedge clk) begin
         
         for (integer i = 0; i < NUM_OUT; i=i+1)
             OUT_uop[i] <= SQ_UOp'{valid: 0, default: 'x};
+
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1)
+            entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
     end
     else begin
     
@@ -419,51 +376,41 @@ always_ff@(posedge clk) begin
         end
 
         // Invalidate
-        if (IN_branch.taken) begin            
-            lastIndex <= IN_branch.storeSqN;
+        if (IN_branch.taken) begin
             flushing <= IN_branch.flush;
+
+            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+                if (entries[i].addrAvail)
+                    if(!entryReady_c[i] &&
+                        invalRange_c[i] !=
+                        $signed(entries[i].sqN - IN_branch.sqN) > 0
+                    ) begin
+                        $display("got %x, baseIndex=%x, storeSqN=%x, %d\n", invalRange_c[i], baseIndex, IN_branch.storeSqN, i);
+                        assert(0);
+                    end
+                if (invalRange_c[i] || (IN_branch.flush && !entryReady_r[i]))
+                    entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
+            end
         end
     
         // Set Address
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-            // TODO: indexed insert
             if (IN_uopSt[i].valid && IN_uopSt[i].isStore &&
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
                 reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
-                assert(entryValid_c[index]);
                 assert(!entries[index].addrAvail);
+                
+                
                 if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
+                    entries[index].sqN <= IN_uopSt[i].sqN;
                     entries[index].addr <= IN_uopSt[i].addr[31:2];
                     entries[index].wmask <= IN_uopSt[i].wmask;
                     entries[index].addrAvail <= 1;
                 end
+
                 modified = 1;
-            end
-        end
-
-        // Enqueue
-        if (!IN_branch.taken) begin
-            for (integer i = 0; i < WIDTH_RN; i=i+1)
-                if (rnUOpSorted[i].valid) begin
-                    
-                    reg[IDX_LEN-1:0] index = {rnUOpSorted[i].storeSqN[IDX_LEN-1:$clog2(`DEC_WIDTH)], i[0+:$clog2(`DEC_WIDTH)]};
-                    assert(rnUOpSorted[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
-                    
-                    entries[index].data <= 'x;
-                    entries[index].addr <= 'x;
-                    entries[index].wmask <= 0;
-
-                    entries[index].loaded <= 0;
-                    entries[index].sqN <= rnUOpSorted[i].sqN;
-                    entries[index].addrAvail <= 0;
-
-                    modified = 1;
-                end
-            for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-                if (IN_rnUOp[i].valid && ((IN_rnUOp[i].fu == FU_AGU && IN_rnUOp[i].opcode >= LSU_SC_W) || IN_rnUOp[i].fu == FU_ATOMIC))
-                    lastIndex <= IN_rnUOp[i].storeSqN;
             end
         end
 

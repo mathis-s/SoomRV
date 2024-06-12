@@ -166,6 +166,11 @@ always_comb begin
                 (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) || 
                 (queue[i].opcode >= LSU_SC_W && queue[i].opcode < ATOMIC_AMOSWAP_W) || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0) &&
 
+            // Only stores that fit into store queue
+            ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) || 
+                (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) || 
+                (queue[i].opcode < LSU_SC_W) || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
+
             // Issue SCs in order (currently we don't have a recovery mechanism for reservations)
             ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) ||
                 queue[i].fu != FU_AGU || queue[i].opcode != LSU_SC_W || 

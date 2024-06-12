@@ -143,7 +143,8 @@ end
 reg[SIZE-1:0] deqCandidate_c;
 always_comb begin
     for (integer i = 0; i < SIZE; i=i+1) begin
-        deqCandidate_c[i] = (i < insertIndex) && &(queue[i].avail | newAvail[i]);
+        deqCandidate_c[i] = (i < insertIndex) && &(queue[i].avail | newAvail[i]) &&
+            $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0;
     end
 end
 

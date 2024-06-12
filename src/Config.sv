@@ -21,7 +21,7 @@
 `define IQ_3_SIZE 8
 
 // Memory
-`define SQ_SIZE 32
+`define SQ_SIZE 16
 `define LB_SIZE 16
 `define LD_MISS_QUEUE_SIZE 4
 
