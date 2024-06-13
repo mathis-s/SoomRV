@@ -40,7 +40,7 @@ module IFetch
     input MemController_Res IN_memc
 );
 
-reg[30:0] pc;
+wire[30:0] pc;
 wire[31:0] pcFull = {pc, 1'b0};
 
 
