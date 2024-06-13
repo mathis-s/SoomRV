@@ -41,11 +41,11 @@ typedef struct packed
     logic[1:0] size;
     logic[31:0] addr;
     logic signExtend;
-    logic hasRsv;
     logic doNotCommit;
     logic nonSpec;
     logic noReIssue;
     logic issued;
+    logic hasRsv; // also set if not valid
     logic valid;
 } LBEntry;
 
@@ -55,6 +55,12 @@ typedef struct packed
     logic[29:0] addr;
     logic valid;
 } LoadRsv;
+
+typedef struct packed
+{
+    logic[$clog2(NUM_ENTRIES)-1:0] idx;
+    logic valid;
+} IdxN;
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
@@ -219,7 +225,7 @@ typedef struct packed
     logic valid;
 } LateIssue;
 
-LateIssue issue[`NUM_AGUS-1:0];
+LateIssue ltIssue[`NUM_AGUS-1:0];
 always_comb begin
     logic memcNotBusy = !IN_memc.transfers[0].valid;
     
@@ -227,8 +233,8 @@ always_comb begin
         
         logic[NUM_ENTRIES-1:0] issueCandidates = 0;
 
-        issue[h] = LateIssue'{valid: 0, default: 'x};
-        // Out-of-order late issue (regular loads)
+        ltIssue[h] = LateIssue'{valid: 0, default: 'x};
+        // Out-of-order late ltIssue (regular loads)
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             issueCandidates[i] =
                 entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec && 
@@ -236,31 +242,51 @@ always_comb begin
         end
 
         for (integer i = 0; i < h; i=i+1) begin
-            if (issue[i].valid)
-                issueCandidates[issue[i].idx] = 0;
+            if (ltIssue[i].valid)
+                issueCandidates[ltIssue[i].idx] = 0;
         end
 
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
             logic isLdDataFwd = (addrCompT[h] == LD_FWD) && wAddrMatch[h][idx];
-            if (issueCandidates[idx] && (!issue[h].valid || isLdDataFwd)) begin
-                issue[h].isLdFwd = isLdDataFwd;
-                issue[h].valid = 1;
-                issue[h].idx = idx[$clog2(NUM_ENTRIES)-1:0];
+            if (issueCandidates[idx] && (!ltIssue[h].valid || isLdDataFwd)) begin
+                ltIssue[h].isLdFwd = isLdDataFwd;
+                ltIssue[h].valid = 1;
+                ltIssue[h].idx = idx[$clog2(NUM_ENTRIES)-1:0];
             end
         end
 
-        // In-order late issue (MMIO)
+        // In-order late ltIssue (MMIO)
         if (h == 0 &&
             entries[deqIndex].valid && !entries[deqIndex].issued && entries[deqIndex].nonSpec &&
             ((IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
         ) begin
             // Overwrite. This load is in-order, so it always has top priority.
-            issue[h].isLdFwd = 0;
-            issue[h].valid = 1;
-            issue[h].idx = deqIndex;
+            ltIssue[h].isLdFwd = 0;
+            ltIssue[h].valid = 1;
+            ltIssue[h].idx = deqIndex;
         end
     end
+end
+
+logic[2*NUM_ENTRIES-1:0] hasRsvOrInvalid;
+always_comb begin
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        hasRsvOrInvalid[i] = entries[i].hasRsv;
+        hasRsvOrInvalid[i+NUM_ENTRIES] = entries[i].hasRsv;
+    end
+    hasRsvOrInvalid &= {{NUM_ENTRIES{1'b0}}, {NUM_ENTRIES{1'b1}}} << baseIndex[$clog2(NUM_ENTRIES)-1:0];
+end
+
+IdxN loadRsv;
+wire[$clog2(NUM_ENTRIES):0] PENC_idx;
+wire PENC_valid;
+PriorityEncoder#(2*NUM_ENTRIES) penc(hasRsvOrInvalid, {PENC_idx}, {PENC_valid});
+always_comb begin
+    loadRsv.idx = ($clog2(NUM_ENTRIES))'(PENC_idx);
+    loadRsv.valid = PENC_valid;
+    if (loadRsv.valid && !entries[loadRsv.idx].valid)
+        loadRsv = IdxN'{valid: 0, default: 'x};
 end
 
 
@@ -289,41 +315,15 @@ always_comb begin
     end
 end
 
-// Find most recent load reservation
-reg[$clog2(NUM_ENTRIES)-1:0] loadRsvIdx;
-reg loadRsvIndexValid;
-// While load rsv index is valid do not commit beyond it
-// Move reservation out of queue into pre-commit and then commit regs
-always_comb begin
-    // todo: optimize
-    reg fail = 0;
-    loadRsvIndexValid = 0;
-    loadRsvIdx = 'x;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0] + i[$clog2(NUM_ENTRIES)-1:0];
-
-        if (!loadRsvIndexValid && !fail) begin
-            // Any non-filled load slot we encounter may be the actual most recent LR
-            if (!entries[idx].valid)
-                fail = 1;
-            else if (entries[idx].hasRsv) begin
-                loadRsvIndexValid = 1;
-                loadRsvIdx = idx;
-            end
-        end
-    end
-end
-
 always_ff@(posedge clk) begin
     OUT_comLimit.sqN <= 'x;
+    OUT_comLimit.valid <= 0;
 
-    if (rst) begin
-        OUT_comLimit.valid <= 0;
-    end
+    if (rst) ;
     else begin
-        OUT_comLimit.valid <= loadRsvIndexValid;
-        if (loadRsvIndexValid)
-            OUT_comLimit.sqN <= {entries[loadRsvIdx].highLdSqN, loadRsvIdx};
+        OUT_comLimit.valid <= loadRsv.valid;
+        if (loadRsv.valid)
+            OUT_comLimit.sqN <= {entries[loadRsv.idx].highLdSqN, loadRsv.idx};
     end
 end
 
@@ -380,7 +380,7 @@ always_ff@(posedge clk) begin
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            entries[i].valid <= 0;
+            entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
         end
         OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
@@ -454,8 +454,7 @@ always_ff@(posedge clk) begin
         if (IN_branch.taken) begin
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if ((invalMask[i] && !($signed(IN_branch.loadSqN - baseIndex) >= NUM_ENTRIES)) || IN_branch.flush) begin
-                    entries[i] <= 'x;
-                    entries[i].valid <= 0;
+                    entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
                 end
             end
             
@@ -472,22 +471,22 @@ always_ff@(posedge clk) begin
             // Issue Late Loads          
             for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
 
-                if (!lateLoadUOp[i].valid || !IN_stall[i] || issue[i].isLdFwd) begin
+                if (!lateLoadUOp[i].valid || !IN_stall[i] || ltIssue[i].isLdFwd) begin
 
                     if (IN_stall[i] && lateLoadUOp[i].valid)
                         entries[lateLoadUOp[i].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
 
                     // Issue non-speculative or cache missed loads, currently only on port 0.
-                    if (issue[i].valid) begin
-                        LBEntry e = entries[issue[i].idx];
+                    if (ltIssue[i].valid) begin
+                        LBEntry e = entries[ltIssue[i].idx];
 
-                        entries[issue[i].idx].issued <= 1;
-                        lateLoadUOp[i].data <= issue[i].isLdFwd ? (IN_memc.ldDataFwd.data[32*e.addr[$clog2(`AXI_WIDTH/8)-1:2]+:32]) : 'x;
-                        lateLoadUOp[i].dataValid <= issue[i].isLdFwd;
+                        entries[ltIssue[i].idx].issued <= 1;
+                        lateLoadUOp[i].data <= ltIssue[i].isLdFwd ? (IN_memc.ldDataFwd.data[32*e.addr[$clog2(`AXI_WIDTH/8)-1:2]+:32]) : 'x;
+                        lateLoadUOp[i].dataValid <= ltIssue[i].isLdFwd;
                         lateLoadUOp[i].addr <= e.addr;
                         lateLoadUOp[i].signExtend <= e.signExtend;
                         lateLoadUOp[i].size <= e.size;
-                        lateLoadUOp[i].loadSqN <= {e.highLdSqN, issue[i].idx};
+                        lateLoadUOp[i].loadSqN <= {e.highLdSqN, ltIssue[i].idx};
                         lateLoadUOp[i].tagDst <= e.tagDst;
                         lateLoadUOp[i].sqN <= e.sqN;
                         lateLoadUOp[i].doNotCommit <= e.doNotCommit;
@@ -499,11 +498,11 @@ always_ff@(posedge clk) begin
                     else begin
                         
                         // Use the read port on entries to move load reservations into dedicated registers
-                        if (i == 0 && loadRsvIndexValid && !specRsv.valid) begin
-                            entries[loadRsvIdx].hasRsv <= 0;
+                        if (i == 0 && !specRsv.valid && loadRsv.valid) begin
+                            entries[loadRsv.idx].hasRsv <= 0;
                             specRsv.valid <= 1;
-                            specRsv.sqN <= entries[loadRsvIdx].sqN;
-                            specRsv.addr <= entries[loadRsvIdx].addr[31:2];
+                            specRsv.sqN <= entries[loadRsv.idx].sqN;
+                            specRsv.addr <= entries[loadRsv.idx].addr[31:2];
                         end
 
                         // Try to pass through ops for which early lookup failed
@@ -531,8 +530,7 @@ always_ff@(posedge clk) begin
 
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if (invalMask[i]) begin
-                    entries[i] <= 'x;
-                    entries[i].valid <= 0;
+                    entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
                 end
             end
         end
