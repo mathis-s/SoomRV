@@ -415,9 +415,15 @@ typedef enum logic[1:0]
     HIST_NONE, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
 } HistoryAction;
 
+typedef enum logic[1:0]
+{
+    BR_TGT_CUR, BR_TGT_NEXT, BR_TGT_MANUAL
+} BranchTargetSpec;
+
 typedef struct packed
 {
     FlushCause cause; // only for performance counters
+    BranchTargetSpec tgtSpec;
     logic isSCFail;
     RetStackAction retAct;
     HistoryAction histAct;
@@ -432,6 +438,16 @@ typedef struct packed
 
 typedef struct packed
 {
+    RetStackAction retAct;
+    HistoryAction histAct;
+    logic[30:0] dst;
+    FetchID_t fetchID;
+    logic wfi;
+    logic taken;
+} DecodeBranchProv;
+
+typedef struct packed
+{
     logic[30:0] addr;
     RetStackIdx_t idx;
     logic isCall;
@@ -440,16 +456,6 @@ typedef struct packed
     logic cleanRet;
     logic valid;
 } ReturnDecUpdate;
-
-typedef struct packed
-{
-    RetStackAction retAct;
-    HistoryAction histAct;
-    logic[30:0] dst;
-    FetchID_t fetchID;
-    logic wfi;
-    logic taken;
-} DecodeBranchProv;
 
 typedef struct packed
 {

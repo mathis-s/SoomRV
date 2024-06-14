@@ -1,4 +1,5 @@
 
+
 module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=4)
 (
     input logic clk,
@@ -29,11 +30,6 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     output logic OUT_pcFileWE,
     output FetchID_t OUT_pcFileAddr,
     output PCFileEntry OUT_pcFileEntry,
-    
-    // miss
-    output logic OUT_icacheMiss,
-    output FetchID_t OUT_icacheMissFetchID,
-    output logic[31:0] OUT_icacheMissPC,
 
     // branch mispredict handling
     output DecodeBranchProv OUT_decBranch,
@@ -63,6 +59,7 @@ FetchOff_t BH_endOffset;
 
 logic BH_newPredTaken;
 FetchOff_t BH_newPredPos;
+DecodeBranchProv BH_decBranch;
 BranchHandler branchHandler
 (
     .clk(clk),
@@ -75,7 +72,7 @@ BranchHandler branchHandler
     .IN_op(fetch1),
     .IN_instrs(IF_icache.rdata[assocHit]),
 
-    .OUT_decBranch(OUT_decBranch),
+    .OUT_decBranch(BH_decBranch),
     .OUT_btUpdate(OUT_btUpdate),
     .OUT_retUpdate(OUT_retUpdate),
     .OUT_endOffsValid(BH_endOffsetValid),
@@ -96,7 +93,7 @@ always_ff@(posedge clk) begin
         OUT_pcFileAddr <= fetch1.fetchID;
         OUT_pcFileEntry.pc <= fetch1.pc[31:1];
         OUT_pcFileEntry.branchPos <= packetRePred.predPos;
-        OUT_pcFileEntry.bpi.predicted <= fetch1.bpi.predicted;
+        OUT_pcFileEntry.bpi.predicted <= fetch1.bpi.predicted; // todo: set if late pred?
         OUT_pcFileEntry.bpi.taken <= packetRePred.predTaken;
     end
 end
@@ -285,8 +282,8 @@ always_comb begin
             end
         end
 
-        if (OUT_decBranch.taken) begin
-            packetRePred.predTarget = OUT_decBranch.dst;
+        if (BH_decBranch.taken) begin
+            packetRePred.predTarget = BH_decBranch.dst;
             packetRePred.predPos = BH_newPredPos;
             packetRePred.predTaken = BH_newPredTaken;
         end
@@ -359,12 +356,15 @@ end
 always_ff@(posedge clk) OUT_memc <= rst ? MemController_Req'{cmd: MEMC_NONE, default: 'x} : OUT_memc_c;
 
 always_comb begin
-    OUT_icacheMissFetchID = 'x;
-    OUT_icacheMissPC = 'x;
-    OUT_icacheMiss = cacheMiss || tlbMiss;
-    if (OUT_icacheMiss) begin
-        OUT_icacheMissPC = fetch1.pc;
-        OUT_icacheMissFetchID = fetch1.fetchID;
+    OUT_decBranch = BH_decBranch;
+
+    if (cacheMiss || tlbMiss) begin
+        OUT_decBranch = DecodeBranchProv'{
+            taken: 1,
+            fetchID: fetch1.fetchID,
+            dst: fetch1.pc[31:1],
+            default: '0
+        };
     end
 end
 
@@ -428,8 +428,8 @@ always_ff@(posedge clk) begin
     else if (IN_mispr) begin
         fetchID <= IN_misprFetchID + 1;
     end
-    else if (OUT_decBranch.taken) begin
-        fetchID <= OUT_decBranch.fetchID + 1;
+    else if (BH_decBranch.taken) begin
+        fetchID <= BH_decBranch.fetchID + 1;
     end
     else begin
         if (cacheMiss || tlbMiss) begin

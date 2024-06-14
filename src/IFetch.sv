@@ -43,13 +43,35 @@ module IFetch
 wire[30:0] pc;
 wire[31:0] pcFull = {pc, 1'b0};
 
-
 wire BPF_we;
 FetchOff_t BP_lastOffs;
 PredBranch predBr /*verilator public*/;
 wire BP_stall;
 wire[30:0] BP_curRetAddr;
 RetStackIdx_t BP_rIdx;
+
+wire BP_pcFileRE;
+FetchID_t BP_pcFileRAddr;
+PCFileEntry BP_pcFileRData_r;
+PCFileEntry BP_pcFileRData_c;
+always_ff@(posedge clk)
+    if (!rst && BP_pcFileRE) BP_pcFileRData_r <= BP_pcFileRData_c;
+
+DecodeBranchProv BP_mispr;
+always_comb begin
+    BP_mispr = BH_decBranch;
+    if (IN_branch.taken) begin
+        BP_mispr = DecodeBranchProv'{
+            taken: IN_branch.taken,
+            fetchID: IN_branch.fetchID,
+            dst: IN_branch.dstPC[31:1],
+            histAct: IN_branch.histAct,
+            retAct: IN_branch.retAct,
+            default: '0
+        };
+    end
+end
+
 BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 (
     .clk(clk),
@@ -61,11 +83,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .IN_clearICache(IN_clearICache),
     
     .IN_mispredFlush(IN_mispredFlush),
-    .IN_mispr(IN_branch.taken || BH_decBranch.taken || icacheMiss),
-    .IN_misprFetchID(IN_branch.taken ? IN_branch.fetchID : BH_decBranch.taken ? BH_decBranch.fetchID : icacheMissFetchID),
-    .IN_misprRetAct(IN_branch.taken ? IN_branch.retAct : BH_decBranch.taken ? BH_decBranch.retAct : RET_NONE),
-    .IN_misprHistAct(IN_branch.taken ? IN_branch.histAct : BH_decBranch.taken ? BH_decBranch.histAct : HIST_NONE),
-    .IN_misprDst(IN_branch.taken ? IN_branch.dstPC[31:1] : BH_decBranch.taken ? BH_decBranch.dst : icacheMissPC[31:1]),
+    .IN_mispr(BP_mispr),
     
     .IN_pcValid(ifetchEn),
     .IN_fetchID(BPF_writeAddr),
@@ -81,6 +99,11 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .OUT_predBr(predBr),
 
     .IN_retDecUpd(BH_retDecUpd),
+    
+    .OUT_pcFileRE(BP_pcFileRE),
+    .OUT_pcFileRAddr(BP_pcFileRAddr),
+    .IN_pcFileRData(BP_pcFileRData_r),
+
     .IN_btUpdates('{BH_btUpdate, IN_btUpdates[1], IN_btUpdates[0]}),
     .IN_bpUpdate0(IN_bpUpdate0),
     .IN_bpUpdate1(IN_bpUpdate1)
@@ -94,9 +117,6 @@ wire ifetchEn /* verilator public */ =
     baseEn && !icacheStall;
 
 wire icacheStall;
-wire icacheMiss;
-wire[31:0] icacheMissPC;
-FetchID_t icacheMissFetchID;
 
 DecodeBranchProv BH_decBranch;
 BTUpdate BH_btUpdate;
@@ -126,10 +146,6 @@ ICacheTable ict
     .OUT_pcFileWE(pcFileWriteEn),
     .OUT_pcFileAddr(PCF_writeAddr),
     .OUT_pcFileEntry(PCF_writeData),
-
-    .OUT_icacheMiss(icacheMiss),
-    .OUT_icacheMissFetchID(icacheMissFetchID),
-    .OUT_icacheMissPC(icacheMissPC),
 
     .OUT_decBranch(BH_decBranch),
     .OUT_btUpdate(BH_btUpdate),
@@ -170,14 +186,15 @@ PCFile#($bits(PCFileEntry), $bits(FetchID_t)) pcFile
     .raddr1(IN_pcReadAddr[1]), .rdata1(OUT_pcReadData[1]),
     .raddr2(IN_pcReadAddr[2]), .rdata2(OUT_pcReadData[2]),
     .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3]),
-    .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4])
+    .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4]),
+    .raddr5(BP_pcFileRAddr),   .rdata5(BP_pcFileRData_c)
 );
 
 IFetchOp ifetchOp;
 always_comb begin
     ifetchOp = IFetchOp'{valid: 0, default: 'x};
 
-    if (IN_branch.taken || BH_decBranch.taken || icacheMiss) begin
+    if (IN_branch.taken || BH_decBranch.taken) begin
     end
     else if (ifetchEn) begin
         ifetchOp.valid = 1;
@@ -208,7 +225,7 @@ always_ff@(posedge clk) begin
                 waitForInterrupt <= 0;
         end
     
-        if (IN_branch.taken || BH_decBranch.taken || icacheMiss) begin
+        if (IN_branch.taken || BH_decBranch.taken) begin
             if (IN_branch.taken) begin
                 waitForInterrupt <= 0;
             end
@@ -218,8 +235,6 @@ always_ff@(posedge clk) begin
                 waitForInterrupt <= BH_decBranch.wfi;
                 if (BH_decBranch.wfi)
                     wfiCount <= $clog2(`WFI_DELAY)'(`WFI_DELAY - 1);
-            end
-            else if (icacheMiss) begin
             end
             issuedInterrupt <= 0;
         end

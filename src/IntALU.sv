@@ -186,6 +186,7 @@ always_comb begin
         branch_c.histAct = HIST_NONE;
         branch_c.retAct = RET_NONE;
         branch_c.isSCFail = 0;
+        branch_c.tgtSpec = BR_TGT_MANUAL;
         
         if (isBranch) begin
             // Send branch target to BTB if unknown.

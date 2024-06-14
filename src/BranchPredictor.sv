@@ -11,15 +11,11 @@ module BranchPredictor
     input wire IN_clearICache,
     
     input wire IN_mispredFlush,
-    input wire IN_mispr,
-    input FetchID_t IN_misprFetchID,
-    input RetStackAction IN_misprRetAct,
-    input HistoryAction IN_misprHistAct,
-    input wire[30:0] IN_misprDst,
+    input DecodeBranchProv IN_mispr,
     
     // IF interface
     input wire IN_pcValid,
-    
+
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
 
@@ -32,8 +28,12 @@ module BranchPredictor
     
     output PredBranch OUT_predBr,
 
-    
     input ReturnDecUpdate IN_retDecUpd,
+
+    // PC File read interface
+    output logic OUT_pcFileRE,
+    output FetchID_t OUT_pcFileRAddr,
+    input PCFileEntry IN_pcFileRData,
     
     // Branch XU interface
     input BTUpdate IN_btUpdates[NUM_IN-1:0],
@@ -42,6 +42,9 @@ module BranchPredictor
     input BPUpdate0 IN_bpUpdate0,
     input BPUpdate1 IN_bpUpdate1
 );
+
+assign OUT_pcFileRE = 0;
+assign OUT_pcFileRAddr = 0;
 
 assign OUT_stall = RET_stall;
 
@@ -76,8 +79,8 @@ RegFile#($bits(BPBackup), 1 << $bits(FetchID_t), 2, 1) bpFile
 (
     .clk(clk),
     
-    .IN_re({IN_mispr, IN_bpUpdate0.valid}),
-    .IN_raddr({IN_misprFetchID, IN_bpUpdate0.fetchID}),
+    .IN_re({IN_mispr.taken, IN_bpUpdate0.valid}),
+    .IN_raddr({IN_mispr.fetchID, IN_bpUpdate0.fetchID}),
     .OUT_rdata({bpBackupRec, bpBackupUpd}),
     
     .IN_we(en1),
@@ -133,13 +136,13 @@ always_comb begin
         OUT_pc = OUT_predBr.dst;
         OUT_lastOffs = OUT_predBr.offs;
     end
-    else if (TAGE_taken) begin
-        // No target found, but we still output the taken
-        // direction prediction.
-        OUT_predBr.valid = 1;
-        OUT_predBr.dirOnly = 1;
-        OUT_predBr.taken = 1;
-    end
+    //else if (TAGE_taken) begin
+    //    // No target found, but we still output the taken
+    //    // direction prediction.
+    //    OUT_predBr.valid = 1;
+    //    OUT_predBr.dirOnly = 1;
+    //    OUT_predBr.taken = 1;
+    //end
 end
 
 PredBranch BTB_br;
@@ -210,10 +213,10 @@ ReturnStack retStack
     .OUT_curRetAddr(OUT_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
 
-    .IN_mispr(IN_mispr),
-    .IN_misprAct(IN_misprRetAct),
+    .IN_mispr(IN_mispr.taken),
+    .IN_misprAct(IN_mispr.retAct),
     .IN_misprIdx(recRIdx),
-    .IN_misprFetchID(IN_misprFetchID),
+    .IN_misprFetchID(IN_mispr.fetchID),
     
     .OUT_curIdx(RET_idx),
     .OUT_predBr(RET_br),
@@ -294,13 +297,13 @@ always_ff@(posedge clk) begin
             pcRegNoInc <= OUT_pc;
             ignorePred <= 0;
         end
-        if (IN_mispr) begin
+        if (IN_mispr.taken) begin
             recovery.valid <= 1;
-            recovery.fetchID <= IN_misprFetchID;
-            recovery.retAct <= IN_misprRetAct;
-            recovery.histAct <= IN_misprHistAct;
+            recovery.fetchID <= IN_mispr.fetchID;
+            recovery.retAct <= IN_mispr.retAct;
+            recovery.histAct <= IN_mispr.histAct;
             
-            pcReg <= IN_misprDst;
+            pcReg <= IN_mispr.dst;
             ignorePred <= 1;
         end
 
