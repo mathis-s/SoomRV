@@ -90,6 +90,7 @@ always_ff@(posedge clk) begin
                     outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
                 end
 
+                outUOpReg[i].fetchOffs <= IN_uop[i].fetchOffs;
                 outUOpReg[i].sqN <= IN_uop[i].sqN;
                 outUOpReg[i].tagDst <= IN_uop[i].tagDst;
                 outUOpReg[i].fetchID <= IN_uop[i].fetchID;

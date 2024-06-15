@@ -344,26 +344,28 @@ always_comb begin
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
                 // in the buffer, we just use the store's snapshot.
                 OUT_branch.taken = 1;
-                OUT_branch.dstPC = IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
+                OUT_branch.dstPC = 'x;//IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
                 OUT_branch.sqN = IN_uop[i].sqN;
                 OUT_branch.loadSqN = IN_uop[i].loadSqN + ((IN_uop[i].isLoad && IN_uop[i].isStore) ? 1 : 0);
                 OUT_branch.storeSqN = IN_uop[i].storeSqN;
                 OUT_branch.fetchID = IN_uop[i].fetchID;
+                OUT_branch.fetchOffs = IN_uop[i].fetchOffs;
                 OUT_branch.flush = 0;
                 OUT_branch.histAct = HIST_NONE;
                 OUT_branch.retAct = RET_NONE;
                 OUT_branch.isSCFail = 0;
-                OUT_branch.tgtSpec = BR_TGT_MANUAL;
+                OUT_branch.tgtSpec = BR_TGT_CP2;
                 OUT_branch.cause = FLUSH_MEM_ORDER;
                 
                 // For failed SCs we also roll back the SC itself. The SC is then re-run as `li rd, 1`.
                 // This saves as from needing a real register file write port for stores. Instead, all
                 // of this can be handled in rename.
                 if (IN_uop[i].isLrSc && !storeHasRsv[i]) begin
-                    OUT_branch.dstPC = IN_uop[i].pc;
+                    OUT_branch.dstPC = 'x;//IN_uop[i].pc;
                     OUT_branch.sqN = IN_uop[i].sqN - 1;
                     OUT_branch.storeSqN = IN_uop[i].storeSqN - 1;
                     OUT_branch.isSCFail = 1;
+                    OUT_branch.tgtSpec = BR_TGT_CUR;
                 end
 
                 prevStoreConflict = 1;

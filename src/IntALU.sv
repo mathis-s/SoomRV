@@ -183,6 +183,7 @@ always_comb begin
         branch_c.flush = 0;
         
         branch_c.fetchID = IN_uop.fetchID;
+        branch_c.fetchOffs = IN_uop.fetchOffs;
         branch_c.histAct = HIST_NONE;
         branch_c.retAct = RET_NONE;
         branch_c.isSCFail = 0;

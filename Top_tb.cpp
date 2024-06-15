@@ -1158,9 +1158,9 @@ void LogInstructions()
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
             uint32_t sqn = ExtractField(core->LD_uop[i], 1 + 1 + 4 + 7 + 7 + 2 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 181 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 181 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 181 - 32 - 32 - 32 - 3 - 3 - 32, 32);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 184 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 184 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 184 - 32 - 32 - 32 - 3 - 3 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }

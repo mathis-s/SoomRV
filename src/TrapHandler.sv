@@ -131,6 +131,7 @@ always_comb begin
                 OUT_branch_c.loadSqN = IN_trapInstr.loadSqN;
 
                 OUT_branch_c.fetchID = IN_trapInstr.fetchID;
+                OUT_branch_c.fetchOffs = IN_trapInstr.fetchOffs;
                 OUT_branch_c.histAct = HIST_NONE;
                 OUT_branch_c.retAct = RET_NONE;
                 OUT_branch_c.isSCFail = 0;
@@ -193,6 +194,7 @@ always_comb begin
                     OUT_branch_c.storeSqN = IN_trapInstr.storeSqN - 1;
 
                 OUT_branch_c.fetchID = IN_trapInstr.fetchID;
+                OUT_branch_c.fetchOffs = IN_trapInstr.fetchOffs;
                 OUT_branch_c.histAct = HIST_NONE;
                 OUT_branch_c.retAct = RET_NONE;
                 OUT_branch_c.isSCFail = 0;

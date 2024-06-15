@@ -43,9 +43,6 @@ module BranchPredictor
     input BPUpdate1 IN_bpUpdate1
 );
 
-assign OUT_pcFileRE = 0;
-assign OUT_pcFileRAddr = 0;
-
 assign OUT_stall = RET_stall;
 
 typedef struct packed
@@ -99,12 +96,8 @@ always_comb begin
     end
 end
 
+wire[30:0] recoveredPC = {IN_pcFileRData.pc[30:$bits(FetchOff_t)], pcRecovery.fetchOffs};
 wire[30:0] branchAddr = OUT_pc;
-
-reg[30:0] pcReg;
-reg[30:0] pcRegNoInc;
-
-reg ignorePred;
 always_comb begin
 
     OUT_predBr = '0;
@@ -114,8 +107,13 @@ always_comb begin
     OUT_pc = pcReg; // current cycle's PC
     OUT_lastOffs = {$bits(FetchOff_t){1'b1}};; // last valid offset for last cycle's PC
     
-    if (ignorePred) begin
-        // ignore
+    if (pcRecovery.valid) begin
+        case (pcRecovery.tgtSpec)
+            BR_TGT_CUR: OUT_pc = recoveredPC;
+            BR_TGT_CP2: OUT_pc = recoveredPC + 1;
+            BR_TGT_CP4: OUT_pc = recoveredPC + 2;
+            BR_TGT_MANUAL: ;
+        endcase
     end
     else if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
@@ -224,23 +222,13 @@ ReturnStack retStack
     .IN_returnUpd(IN_retDecUpd)
 );
 
-BPUpdate0 update;
 BHist_t updHistory;
 always_comb begin
     updHistory = bpBackupUpd.history;
-    //if (bpBackupUpd.pred && !bpBackupUpd.isJump && update.fetchOffs > bpBackupUpd.predOffs)
-    //    updHistory = {updHistory[$bits(BHist_t)-2:0], bpBackupUpd.predTaken};
+    if (bpBackupUpd.pred && !bpBackupUpd.isJump && update.fetchOffs > bpBackupUpd.predOffs)
+        updHistory = {updHistory[$bits(BHist_t)-2:0], bpBackupUpd.predTaken};
 end
 
-typedef struct packed
-{
-    logic valid;
-    FetchID_t fetchID;
-    FetchOff_t fetchOffs;
-    RetStackAction retAct;
-    HistoryAction histAct;
-} Recovery;
-Recovery recovery;
 BHist_t recHistory;
 always_comb begin
     recHistory = bpBackupRec.history;
@@ -249,7 +237,7 @@ always_comb begin
         HIST_WRITE_0,
         HIST_WRITE_1: recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_WRITE_1 ? 1'b1 : 1'b0};
         default: begin
-            if (bpBackupRec.pred && bpBackupRec.predOffs <= recovery.fetchOffs)
+            if (bpBackupRec.pred && recovery.fetchOffs > bpBackupRec.predOffs)
                 recHistory = {recHistory[$bits(BHist_t)-2:0], bpBackupRec.predTaken};
         end
     endcase
@@ -274,37 +262,73 @@ always_comb begin
     lookupHistory = history;
     if (recovery.valid)
         lookupHistory = recHistory;
-    else if (OUT_predBr.valid && !OUT_predBr.isJump && !OUT_predBr.dirOnly && !ignorePred)
+    else if (OUT_predBr.valid && !OUT_predBr.isJump && !OUT_predBr.dirOnly)
         lookupHistory = {lookupHistory[$bits(BHist_t)-2:0], OUT_predBr.taken};
 end
 
+// Read from PC file if necessary
+always_comb begin
+    OUT_pcFileRAddr = 'x;
+    OUT_pcFileRE = 0;
+    // Read PC of instruction we revert to
+    if (IN_mispr.taken && IN_mispr.tgtSpec != BR_TGT_MANUAL) begin
+        OUT_pcFileRAddr = IN_mispr.fetchID;
+        OUT_pcFileRE = 1;
+    end
+end
+
+typedef struct packed
+{
+    logic valid;
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
+    RetStackAction retAct;
+    HistoryAction histAct;
+} Recovery;
+Recovery recovery;
+
+typedef struct packed
+{
+    logic valid;
+    BranchTargetSpec tgtSpec;
+    FetchOff_t fetchOffs;
+} PCRecovery;
+PCRecovery pcRecovery;
+
+BPUpdate0 update;
+
 BHist_t history;
+reg[30:0] pcReg;
+reg[30:0] pcRegNoInc;
 always_ff@(posedge clk) begin
     
-    recovery <= 'x;
-    recovery.valid <= 0;
+    recovery <= Recovery'{valid: 0, default: 'x};
 
     update <= 'x;
     update.valid <= 0;
 
     if (rst) begin
         pcReg <= 31'(`ENTRY_POINT >> 1);
-        ignorePred <= 1;
+        pcRecovery <= PCRecovery'{valid: 1, tgtSpec: BR_TGT_MANUAL, default: 'x};
     end
     else begin
         if (IN_pcValid) begin
             pcReg <= {OUT_pc[30:$bits(FetchOff_t)] + 1'b1, $bits(FetchOff_t)'(1'b0)};
             pcRegNoInc <= OUT_pc;
-            ignorePred <= 0;
+            pcRecovery <= PCRecovery'{valid: 0, default: 'x};
         end
         if (IN_mispr.taken) begin
             recovery.valid <= 1;
             recovery.fetchID <= IN_mispr.fetchID;
             recovery.retAct <= IN_mispr.retAct;
             recovery.histAct <= IN_mispr.histAct;
+            recovery.fetchOffs <= IN_mispr.fetchOffs;
+
+            pcRecovery.valid <= 1;
+            pcRecovery.tgtSpec <= IN_mispr.tgtSpec;
+            pcRecovery.fetchOffs <= IN_mispr.fetchOffs;
             
-            pcReg <= IN_mispr.dst;
-            ignorePred <= 1;
+            pcReg <= IN_mispr.tgtSpec == BR_TGT_MANUAL ? IN_mispr.dst : 'x;
         end
 
         history <= lookupHistory;

@@ -417,7 +417,7 @@ typedef enum logic[1:0]
 
 typedef enum logic[1:0]
 {
-    BR_TGT_CUR, BR_TGT_NEXT, BR_TGT_MANUAL
+    BR_TGT_MANUAL, BR_TGT_CUR, BR_TGT_CP2, BR_TGT_CP4
 } BranchTargetSpec;
 
 typedef struct packed
@@ -425,6 +425,7 @@ typedef struct packed
     FlushCause cause; // only for performance counters
     BranchTargetSpec tgtSpec;
     logic isSCFail;
+    FetchOff_t fetchOffs;
     RetStackAction retAct;
     HistoryAction histAct;
     logic[31:0] dstPC;
@@ -438,6 +439,8 @@ typedef struct packed
 
 typedef struct packed
 {
+    BranchTargetSpec tgtSpec;
+    FetchOff_t fetchOffs;
     RetStackAction retAct;
     HistoryAction histAct;
     logic[30:0] dst;
@@ -580,6 +583,7 @@ typedef struct packed
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] pc;
+    FetchOff_t fetchOffs;
     FetchOff_t fetchStartOffs;
     FetchOff_t fetchPredOffs;
     logic[31:0] imm;
@@ -637,6 +641,7 @@ typedef struct packed
     SqN sqN;
     SqN storeSqN; // 7
     SqN loadSqN; // 7
+    FetchOff_t fetchOffs;
     FetchID_t fetchID; // 5
     logic doNotCommit; // 1
     AGU_Exception exception; // 2

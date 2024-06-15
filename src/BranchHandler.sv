@@ -292,8 +292,10 @@ always_comb begin
                 
                 decBranch_c.taken = 1;
                 decBranch_c.fetchID = IN_op.fetchID;
+                decBranch_c.fetchOffs = FetchOff_t'(i);
                 decBranch_c.retAct = RET_NONE;
                 decBranch_c.histAct = HIST_NONE;
+                decBranch_c.tgtSpec = BR_TGT_MANUAL;
                 decBranch_c.wfi = 0;
                 
                 case (curBr.btype)

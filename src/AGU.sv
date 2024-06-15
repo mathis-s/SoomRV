@@ -61,6 +61,7 @@ always_comb begin
     aguUOp_c.storeSqN = IN_uop.storeSqN;
     aguUOp_c.loadSqN = IN_uop.loadSqN;
     aguUOp_c.fetchID = IN_uop.fetchID;
+    aguUOp_c.fetchOffs = IN_uop.fetchOffs;
     aguUOp_c.isLrSc = 0;
     aguUOp_c.compressed = IN_uop.compressed;
     aguUOp_c.exception = AGU_NO_EXCEPTION;

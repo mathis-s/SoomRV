@@ -67,6 +67,8 @@ always_comb begin
             dst: IN_branch.dstPC[31:1],
             histAct: IN_branch.histAct,
             retAct: IN_branch.retAct,
+            fetchOffs: IN_branch.fetchOffs,
+            tgtSpec: IN_branch.tgtSpec,
             default: '0
         };
     end

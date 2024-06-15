@@ -362,7 +362,9 @@ always_comb begin
         OUT_decBranch = DecodeBranchProv'{
             taken: 1,
             fetchID: fetch1.fetchID,
+            fetchOffs: fetch1.pc[1+:$bits(FetchOff_t)],
             dst: fetch1.pc[31:1],
+            tgtSpec: BR_TGT_MANUAL,
             default: '0
         };
     end
