@@ -29,7 +29,7 @@ reg memoryWait;
 assign OUT_disableIFetch = memoryWait;
 
 assign OUT_pcReadAddr = IN_trapInstr.fetchID;
-wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:3], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
+wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:$bits(FetchOff_t)], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
 wire[31:0] nextInstr = {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
 
 BranchPredInfo baseIndexBPI;
@@ -37,31 +37,53 @@ always_comb begin
     baseIndexBPI = IN_pcReadData.bpi;
 end
 
+logic[31:0] OUT_dbgStallPC_c;
+logic OUT_fence_c;
+logic OUT_clearICache_c;
+BPUpdate1 OUT_bpUpdate1_c;
+BranchProv OUT_branch_c;
+TrapInfoUpdate OUT_trapInfo_c;
+logic OUT_flushTLB_c;
+logic setMemoryWait;
 always_ff@(posedge clk) begin
+    OUT_fence <= OUT_fence_c;
+    OUT_clearICache <= OUT_clearICache_c;
+    OUT_bpUpdate1 <= OUT_bpUpdate1_c;
+    OUT_trapInfo <= OUT_trapInfo_c;
+    OUT_flushTLB <= OUT_flushTLB_c;
+    OUT_dbgStallPC <= OUT_dbgStallPC_c;
     
-    OUT_fence <= 0;
-    OUT_clearICache <= 0;
-    
-    OUT_bpUpdate1 <= 'x;
-    OUT_bpUpdate1.valid <= 0;
-    OUT_branch <= 'x;
-    OUT_branch.taken <= 0;
-    OUT_trapInfo <= 'x;
-    OUT_trapInfo.valid <= 0;
-    OUT_flushTLB <= 0;
-    
-    if (rst) begin
+    if (rst)
         memoryWait <= 0;
-    end
+    else if (setMemoryWait)
+        memoryWait <= 1;
+    else if (memoryWait && !IN_MEM_busy)
+        memoryWait <= 0;
+
+end
+
+assign OUT_branch = OUT_branch_c;
+
+always_comb begin
+    OUT_fence_c = 0;
+    OUT_clearICache_c = 0;
+
+    OUT_bpUpdate1_c = 'x;
+    OUT_bpUpdate1_c.valid = 0;
+    OUT_branch_c = 'x;
+    OUT_branch_c.taken = 0;
+    OUT_trapInfo_c = 'x;
+    OUT_trapInfo_c.valid = 0;
+    OUT_flushTLB_c = 0;
+
+    setMemoryWait = 0;
+
+    OUT_dbgStallPC_c = OUT_dbgStallPC;
+
+    if (rst) ;
     else begin
-        
-        if (memoryWait && !IN_MEM_busy) begin
-            memoryWait <= 0;
-        end
-            
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
-            
             // Instructions requiring pipeline flush and MRET/SRET handling
             if (IN_trapInstr.flags == FLAGS_FENCE || 
                 IN_trapInstr.flags == FLAGS_ORDERING || 
@@ -71,22 +93,21 @@ always_ff@(posedge clk) begin
                 
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
-                        memoryWait <= 1;
-                        OUT_branch.dstPC <= nextInstr;
+                        OUT_branch_c.dstPC = nextInstr;
                     end
                     FLAGS_FENCE: begin
-                        OUT_clearICache <= 1;
-                        memoryWait <= 1;
-                        OUT_fence <= 1;
-                        OUT_branch.dstPC <= nextInstr;
+                        OUT_clearICache_c = 1;
+                        setMemoryWait = 1;
+                        OUT_fence_c = 1;
+                        OUT_branch_c.dstPC = nextInstr;
                     end
                     FLAGS_XRET: begin
-                        OUT_branch.dstPC <= {IN_trapControl.retvec, 1'b0};
+                        OUT_branch_c.dstPC = {IN_trapControl.retvec, 1'b0};
                     end
 
                     FLAGS_TRAP: begin // TRAP_V_SFENCE_VMA
-                        OUT_flushTLB <= 1;
-                        OUT_branch.dstPC <= nextInstr;
+                        OUT_flushTLB_c = 1;
+                        OUT_branch_c.dstPC = nextInstr;
                     end
                     default: begin end
                 endcase
@@ -94,31 +115,35 @@ always_ff@(posedge clk) begin
                 // When an interrupt is pending after mret/sret or FLAGS_ORDERING (includes CSR write), execute it immediately
                 if (IN_trapInstr.flags == FLAGS_XRET || IN_trapInstr.flags == FLAGS_ORDERING)
                     if (IN_trapControl.interruptPending) begin
-                        OUT_trapInfo.valid <= 1;
-                        OUT_trapInfo.trapPC <= IN_trapInstr.flags == FLAGS_XRET ? {IN_trapControl.retvec, 1'b0} : nextInstr;
-                        OUT_trapInfo.cause <= IN_trapControl.interruptCause;
-                        OUT_trapInfo.delegate <= IN_trapControl.interruptDelegate;
-                        OUT_trapInfo.isInterrupt <= 1;
-                        OUT_branch.dstPC <= {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
+                        OUT_trapInfo_c.valid = 1;
+                        OUT_trapInfo_c.trapPC = IN_trapInstr.flags == FLAGS_XRET ? {IN_trapControl.retvec, 1'b0} : nextInstr;
+                        OUT_trapInfo_c.cause = IN_trapControl.interruptCause;
+                        OUT_trapInfo_c.delegate = IN_trapControl.interruptDelegate;
+                        OUT_trapInfo_c.isInterrupt = 1;
+                        OUT_branch_c.dstPC = {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                     end
                 
-                OUT_branch.taken <= 1;
-                OUT_branch.sqN <= IN_trapInstr.sqN;
-                OUT_branch.flush <= 1;
+                OUT_branch_c.taken = 1;
+                OUT_branch_c.sqN = IN_trapInstr.sqN;
+                OUT_branch_c.flush = 1;
                 
-                OUT_branch.storeSqN <= IN_trapInstr.storeSqN;
-                OUT_branch.loadSqN <= IN_trapInstr.loadSqN;
+                OUT_branch_c.storeSqN = IN_trapInstr.storeSqN;
+                OUT_branch_c.loadSqN = IN_trapInstr.loadSqN;
 
-                OUT_branch.fetchID <= IN_trapInstr.fetchID;
-                OUT_branch.histAct <= HIST_NONE;
-                OUT_branch.retAct <= RET_NONE;
+                OUT_branch_c.fetchID = IN_trapInstr.fetchID;
+                OUT_branch_c.fetchOffs = IN_trapInstr.fetchOffs;
+                OUT_branch_c.histAct = HIST_NONE;
+                OUT_branch_c.retAct = RET_NONE;
+                OUT_branch_c.isSCFail = 0;
+                OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
+                OUT_branch_c.cause = FLUSH_ORDERING;
             end
 
 
             // Traps, Exceptions, Interrupts Handling
             else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)) begin
                 
-                reg[3:0] trapCause;
+                reg[3:0] trapCause = RVP_TRAP_ILLEGAL;
                 reg delegate;
                 reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT);
                         
@@ -151,36 +176,40 @@ always_ff@(posedge clk) begin
                 delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
                     (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
                 
-                OUT_trapInfo.valid <= 1;
-                OUT_trapInfo.trapPC <= {baseIndexPC, 1'b0};
-                OUT_trapInfo.cause <= trapCause;
-                OUT_trapInfo.delegate <= delegate;
-                OUT_trapInfo.isInterrupt <= isInterrupt;
+                OUT_trapInfo_c.valid = 1;
+                OUT_trapInfo_c.trapPC = {baseIndexPC, 1'b0};
+                OUT_trapInfo_c.cause = trapCause;
+                OUT_trapInfo_c.delegate = delegate;
+                OUT_trapInfo_c.isInterrupt = isInterrupt;
 
-                OUT_branch.taken <= 1;
-                OUT_branch.dstPC <= {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
-                OUT_branch.sqN <= IN_trapInstr.sqN;
-                OUT_branch.flush <= 1;
+                OUT_branch_c.taken = 1;
+                OUT_branch_c.dstPC = {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
+                OUT_branch_c.sqN = IN_trapInstr.sqN;
+                OUT_branch_c.flush = 1;
 
-                OUT_branch.storeSqN <= IN_trapInstr.storeSqN;
-                OUT_branch.loadSqN <= IN_trapInstr.loadSqN;
+                OUT_branch_c.storeSqN = IN_trapInstr.storeSqN;
+                OUT_branch_c.loadSqN = IN_trapInstr.loadSqN;
 
                 if (IN_trapInstr.flags == FLAGS_ST_MA || IN_trapInstr.flags == FLAGS_ST_AF || IN_trapInstr.flags == FLAGS_ST_PF)
-                    OUT_branch.storeSqN <= IN_trapInstr.storeSqN - 1;
+                    OUT_branch_c.storeSqN = IN_trapInstr.storeSqN - 1;
 
-                OUT_branch.fetchID <= IN_trapInstr.fetchID;
-                OUT_branch.histAct <= HIST_NONE;
-                OUT_branch.retAct <= RET_NONE;
+                OUT_branch_c.fetchID = IN_trapInstr.fetchID;
+                OUT_branch_c.fetchOffs = IN_trapInstr.fetchOffs;
+                OUT_branch_c.histAct = HIST_NONE;
+                OUT_branch_c.retAct = RET_NONE;
+                OUT_branch_c.isSCFail = 0;
+                OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
+                OUT_branch_c.cause = FLUSH_ORDERING;
             end
             else if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
-                OUT_bpUpdate1.valid <= 1;
-                OUT_bpUpdate1.pc <= IN_pcReadData.pc;
+                OUT_bpUpdate1_c.valid = 1;
+                OUT_bpUpdate1_c.pc = IN_pcReadData.pc;
             end
             else begin
                 // If the not-executed flag is still set, this is not a trap uop but a request to look up the PC
                 // of the instruction we're stalled on. This is only used for debugging.
                 assert(IN_trapInstr.flags == FLAGS_NX);
-                OUT_dbgStallPC <= {baseIndexPC, 1'b0};
+                OUT_dbgStallPC_c = {baseIndexPC, 1'b0};
             end
         end
     end

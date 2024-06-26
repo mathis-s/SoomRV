@@ -129,6 +129,7 @@ always_ff@(posedge clk) begin
         end
 
         OUT_predBr.taken <= 1;
+        OUT_predBr.dirOnly <= 0;
         OUT_predBr.isJump <= 1;
         OUT_predBr.isCall <= 0;
         OUT_predBr.isRet <= 1;
@@ -142,8 +143,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < RET_PRED_ASSOC; i=i+1) begin
             if (rtable[lookupIdx][i].valid && 
                 rtable[lookupIdx][i].tag == lookupTag && 
-                rtable[lookupIdx][i].offs >= lookupOffs &&
-                (!OUT_predBr.valid || OUT_predBr.offs > rtable[lookupIdx][i].offs)
+                rtable[lookupIdx][i].offs >= lookupOffs
             ) begin
                 OUT_predBr.valid <= 1;
                 OUT_predBr.offs <= rtable[lookupIdx][i].offs;

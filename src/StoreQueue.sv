@@ -1,139 +1,63 @@
 module StoreQueue
 #(
     parameter NUM_ENTRIES=`SQ_SIZE,
-    parameter NUM_EVICTED=4,
-    parameter RESULT_BUS_COUNT=3,
+    parameter RESULT_BUS_COUNT=4,
     parameter WIDTH_RN = `DEC_WIDTH,
-    parameter AMO_RES_PORT=0
+    parameter NUM_OUT=2
 )
 (
     input wire clk,
     input wire rst,
-    input wire IN_stallSt,
-    input wire IN_stallLd,
+
     output reg OUT_empty,
     output wire OUT_done,
     
-    input AGU_UOp IN_uopSt,
-    input LD_UOp IN_uopLd,
+    input LD_UOp IN_uopLd[`NUM_AGUS-1:0],
+    output StFwdResult OUT_fwd[`NUM_AGUS-1:0],
+
+    input AGU_UOp IN_uopSt[`NUM_AGUS-1:0],
     
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
-    input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
-    output reg[$bits(Tag)-2:0] OUT_RF_raddr,
-    input wire[31:0] IN_RF_rdata,
-    input VirtMemState IN_vmem,
+    input StDataUOp IN_stDataUOp[`NUM_AGUS-1:0],
     
     input SqN IN_curSqN,
     input SqN IN_comStSqN,
     
     input BranchProv IN_branch,
     
-    output ST_UOp OUT_uopSt,
-    output StFwdResult OUT_fwd,
-    
-    input ST_Ack IN_stAck,
+    output SQ_UOp OUT_uop[NUM_OUT-1:0],
+    input wire IN_stall[NUM_OUT-1:0],
     
     output wire OUT_flush,
-    output SqN OUT_maxStoreSqN,
-    output SQ_ComInfo OUT_sqInfo
+    output SqN OUT_maxStoreSqN
 );
+
+localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
+localparam IDX_LEN = $clog2(NUM_ENTRIES);
 
 typedef struct packed
 {
-    union packed
-    {
-        logic[31:0] _data;
-        struct packed
-        {
-            Tag tag;
-        } m;
-    } data;
-
+    RegT data;
     logic[29:0] addr;
 
     // wmask == 0 is escape sequence for special operations
     logic[3:0] wmask;
     
     SqN sqN;
-    
-    logic atomicLd;
-    logic atomic;
-    logic addrAvail;
     logic loaded;
-    logic avail;
-
+    logic addrAvail;
 } SQEntry;
 
-reg[NUM_ENTRIES-1:0] entryReady_r;
+reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
-reg[NUM_ENTRIES-1:0] entryValid_r;
-always_ff@(posedge clk) entryValid_r <= rst ? 0 : entryValid_c;
 
-wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
-wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
-wire[NUM_ENTRIES-1:0] lastIndexOneHot = (1 << lastIndex[$clog2(NUM_ENTRIES)-1:0]);
-/*
-// verilator lint_off UNOPTFLAT
-// Circular logic to find range of ready entries
-reg[NUM_ENTRIES-1:0] entryReady_c;
-generate
-for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
-always_comb begin
-    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-    
-    if (SqN'(baseIndex + SqN'(NUM_ENTRIES)) == IN_comStSqN)
-        entryReady_c[i] = 1;
-    else begin
-        if (comStSqNOneHot[i])
-            entryReady_c[i] = 0;
-        else if (baseIndexOneHot[i])
-            entryReady_c[i] = 1;
-        else
-            entryReady_c[i] = entryReady_c[prev];
-    end
-end
-endgenerate
-
-// Circular logic to find range of valid (but not ready) entries
-reg[NUM_ENTRIES-1:0] entryValid_c;
-generate
-for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
-always_comb begin
-    integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-    
-    if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex)
-        entryValid_c[i] = 1;
-    else begin
-        if (lastIndexOneHot[prev])
-            entryValid_c[i] = 0;
-        else if (baseIndexOneHot[i])
-            entryValid_c[i] = 1;
-        else
-            entryValid_c[i] = entryValid_c[prev];
-    end
-end
-endgenerate
-// verilator lint_on UNOPTFLAT
-always_ff@(posedge clk) begin
-    if (entryReady_c2 != entryReady_c) begin
-        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], IN_comStSqN[$clog2(NUM_ENTRIES)-1:0]);
-        $display("%b %b", entryReady_c, entryReady_c2);
-        assert(0);
-    end
-end
-
-always_ff@(posedge clk) begin
-    if (entryValid_c2 != entryValid_c) begin
-        $display("start=%d end=%d", baseIndex[$clog2(NUM_ENTRIES)-1:0], lastIndex[$clog2(NUM_ENTRIES)-1:0]);
-        $display("%b %b", entryValid_c, entryValid_c2);
-        assert(0);
-    end
-end
-*/
+wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[IDX_LEN-1:0]);
+wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[IDX_LEN-1:0]);
+wire[NUM_ENTRIES-1:0] branchStSqNOneHot = (1 << IN_branch.storeSqN[IDX_LEN-1:0]);
 
 reg[NUM_ENTRIES-1:0] entryReady_c;
 always_comb begin
-    reg active = IN_comStSqN[$clog2(NUM_ENTRIES)-1:0] < baseIndex[$clog2(NUM_ENTRIES)-1:0];
+    reg active = IN_comStSqN[IDX_LEN-1:0] < baseIndex[IDX_LEN-1:0];
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
         if (SqN'(baseIndex + SqN'(NUM_ENTRIES)) == IN_comStSqN)
             active = 1;
@@ -146,427 +70,156 @@ always_comb begin
     end
 end
 
-reg[NUM_ENTRIES-1:0] entryValid_c;
+reg[NUM_ENTRIES-1:0] invalRange_c;
 always_comb begin
-
-    reg active = lastIndex[$clog2(NUM_ENTRIES)-1:0] + 1'b1 < baseIndex[$clog2(NUM_ENTRIES)-1:0];
+    reg active = baseIndex[IDX_LEN-1:0] <= (IN_branch.storeSqN[IDX_LEN-1:0] + IDX_LEN'(1));
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-        if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex)
-            active = 1;
-        else if (lastIndexOneHot[prev])
-            active = 0;
-        else if (baseIndexOneHot[i])
-            active = 1;
         
-        entryValid_c[i] = active;
+        if ($signed(IN_branch.storeSqN - baseIndex) >= NUM_ENTRIES-1)
+            active = 0;
+        else if (branchStSqNOneHot[(i-1) % NUM_ENTRIES])
+            active = 1;
+        else if (baseIndexOneHot[i])
+            active = 0;
+        
+        invalRange_c[i] = active;
     end
 end
 
-SQEntry entries[NUM_ENTRIES-1:0];
-SqN baseIndex;
-SqN lastIndex;
-//assign OUT_sqInfo = SQ_ComInfo'{valid: 0, default: 'x};
+SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
+SqN baseIndex /* verilator public */;
 
-always_ff@(posedge clk) begin
-    OUT_sqInfo <= 'x;
-    OUT_sqInfo.valid <= 0;
-    if (rst) ;
-    else if (loadBaseIndexValid) begin
-        OUT_sqInfo.valid <= 1;
-        if (entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].atomic &&
-            (!entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].loaded ||
-             !entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].addrAvail)
-        ) begin
-            // For atomics, do not allow commit until other UOps are done and store
-            // data is known
-            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN - 1;
-        end
-        else
-            OUT_sqInfo.maxComSqN <= entries[loadBaseIndex[$clog2(NUM_ENTRIES)-1:0]].sqN;
-    end
-end
+reg[NUM_ENTRIES-1:0] entryFused /* verilator public */;
 
 reg empty;
 always_comb begin
     empty = 1;
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (entryValid_c[i])
-            empty = 0;
-    end
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid && !evicted[i].issued) // todo: strict
-            empty = 0;
-    end
-    if (IN_stAck.valid && IN_stAck.fail) empty = 0;
-end
-
-typedef struct packed
-{
-    SQEntry s;
-    StID_t id;
-    logic issued;
-    logic valid;
-} EQEntry;
-EQEntry evicted[NUM_EVICTED-1:0];
-
-ST_Ack stAck_r;
-always_ff@(posedge clk) begin
-    if (!rst) stAck_r <= IN_stAck;
-    else begin
-        stAck_r <= 'x;
-        stAck_r.valid <= 0;
+        if (entries[i].addrAvail) empty = 0;
     end
 end
 
-reg[$clog2(NUM_EVICTED):0] evictedIn;
+typedef enum logic[0:0] {LOAD, STORE_FUSE} LookupType;
+reg[31:0] lookupAddr[`NUM_AGUS-1:0];
+LookupType lookupType[`NUM_AGUS-1:0];
 
-reg[3:0] readMask;
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
-    case (IN_uopLd.size)
-        0: readMask = (4'b1 << IN_uopLd.addr[1:0]);
-        1: readMask = ((IN_uopLd.addr[1:0] == 2) ? 4'b1100 : 4'b0011);
-        default: readMask = 4'b1111;
-    endcase
+    lookupAddr[h] = IN_uopLd[h].addr;
+    lookupType[h] = LOAD;
+    //if (!IN_uopLd[h].valid && OUT_uop.valid) begin
+    //    case (h)
+    //        0: lookupAddr[h] = {OUT_uop.addr[29:2], OUT_uop.addr[1:0] + 2'd2, 2'b0};
+    //        1: lookupAddr[h] = {OUT_uop.addr[29:2], (&OUT_uop.wmask) ? (OUT_uop.addr[1:0] + 2'd3) : OUT_uop.addr[1:0], 2'b0};
+    //    endcase
+    //    lookupType[h] = STORE_FUSE;
+    //end
 end
 
-reg[3:0] lookupMask;
-reg[31:0] lookupData;
-reg lookupConflict;
+reg[3:0] readMask[`NUM_AGUS-1:0];
+always_comb begin
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        readMask[i] = 4'b1111;
+        if (IN_uopLd[i].valid)
+            case (IN_uopLd[i].size)
+                0: readMask[i] = (4'b1 << IN_uopLd[i].addr[1:0]);
+                1: readMask[i] = ((IN_uopLd[i].addr[1:0] == 2) ? 4'b1100 : 4'b0011);
+                default: readMask[i] = 4'b1111;
+            endcase
+    end
+end
+
+reg[3:0] lookupMask[`NUM_AGUS-1:0];
+reg[31:0] lookupData[`NUM_AGUS-1:0];
+reg lookupConflict[`NUM_AGUS-1:0];
+reg[NUM_ENTRIES-1:0] lookupFuse[`NUM_AGUS-1:0];
 // Store queue lookup
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
+    
+    reg[AXI_BWIDTH_E-3:0] shift = lookupAddr[h][2+:AXI_BWIDTH_E-2];
+    reg[31:0] data = 'x;
+    reg[3:0] mask = 'x;
+
     // Bytes that are not read by this op are set to available in the lookup mask
     // (could also do this in LSU)
-    lookupMask = ~readMask;
-    lookupData = 32'bx;
-    lookupConflict = 0;
+    lookupMask[h] = ~readMask[h];
+    lookupData[h] = 32'bx;
+    lookupConflict[h] = 0;
+    lookupFuse[h] = '0;
     
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid &&
-            evicted[i].s.addr == IN_uopLd.addr[31:2] && 
-            !`IS_MMIO_PMA_W(evicted[i].s.addr)
+    for (integer i = 0; i < NUM_OUT; i=i+1) begin
+        if (OUT_uop[i].valid &&
+            OUT_uop[i].addr[31:2] == lookupAddr[h][31:2] && 
+            !`IS_MMIO_PMA(OUT_uop[i].addr)
         ) begin
             for (integer j = 0; j < 4; j=j+1)
-                if (evicted[i].s.wmask[j])
-                    lookupData[j*8 +: 8] = evicted[i].s.data[j*8 +: 8];
-            lookupMask = lookupMask | evicted[i].s.wmask;
+                if (OUT_uop[i].wmask[j])
+                    lookupData[h][j*8 +: 8] = OUT_uop[i].data[j*8 +: 8];
+            lookupMask[h] = lookupMask[h] | OUT_uop[i].wmask;
         end
     end
 
-`ifdef SQ_LINEAR
-    begin
-        reg active = 0;
-        for (integer base = 0; base < 2; base=base+1)
-            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
-
-                if (SqN'(baseIndex + SqN'(NUM_ENTRIES - 1)) == lastIndex) begin
-                    if (baseIndexOneHot[i] && base == 0) active = 1;
-                    else if (lastIndexOneHot[prev]) active = 0;
-                end
-                else begin
-                    if (lastIndexOneHot[prev]) active = 0;
-                    else if (baseIndexOneHot[i] && base == 0) active = 1;
-                end
-
-                if (active &&
-                    entries[i].addrAvail &&
-                    entries[i].addr == IN_uopLd.addr[31:2] && 
-                    ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entryReady_r[i]) &&
-                    !`IS_MMIO_PMA_W(entries[i].addr)
-                ) begin
-                    
-                    if (entries[i].loaded) begin
-                        
-                        for (integer j = 0; j < 4; j=j+1)
-                            if (entries[i].wmask[j]) begin
-                                lookupData[j*8 +: 8] = entries[i].data[j*8 +: 8];
-                                lookupMask[j] = 1;
-                            end
-                    end
-                    else if ((entries[i].wmask & readMask) != 0) lookupConflict = 1;
-                end
-            end
-    end
-`else
     for (integer i = 0; i < 4; i=i+1)
-        if (lookupMaskIter[outputIdx][i])
-            lookupData[i*8 +: 8] = lookupDataIter[outputIdx][i*8 +: 8];
+        if (lookupMaskIter[h][outputIdx][i])
+            lookupData[h][i*8 +: 8] = lookupDataIter[h][outputIdx][i*8 +: 8];
 
-    lookupMask = lookupMask | lookupMaskIter[outputIdx];    
-    lookupConflict = |lookupConflictList;
-`endif
+    lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];    
+    lookupConflict[h] = |lookupConflictList[h];
 end
 
-`ifndef SQ_LINEAR
 // This generates circular logic to iterate through the StoreQueue for forwarding data to loads.
 // Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
 // If tooling does not support this, it might be necessary to make the SQ a shift register again
 // or chose one of the less efficient methods of iteration.
-logic[31:0] lookupDataIter[NUM_ENTRIES-1:0];
-logic[3:0]  lookupMaskIter[NUM_ENTRIES-1:0];
-logic[NUM_ENTRIES-1:0] lookupConflictList;
-wire[$clog2(NUM_ENTRIES)-1:0] outputIdx = baseIndex[$clog2(NUM_ENTRIES)-1:0] - 1;
+logic[31:0] lookupDataIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[3:0]  lookupMaskIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[NUM_ENTRIES-1:0] lookupConflictList[`NUM_AGUS-1:0];
+wire[IDX_LEN-1:0] outputIdx = baseIndex[IDX_LEN-1:0] - 1;
 generate
+for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
 always_comb begin
 
     integer prev = ((i-1) >= 0) ? (i-1) : (NUM_ENTRIES-1);
     // break in circular feedback
-    if (i == baseIndex[$clog2(NUM_ENTRIES)-1:0]) begin
-        lookupMaskIter[i] = 0;
-        lookupDataIter[i] = 0;
+    if (i == baseIndex[IDX_LEN-1:0]) begin
+        lookupMaskIter[h][i] = 0;
+        lookupDataIter[h][i] = 0;
     end
     // continue circular feedback
     else begin
-        lookupMaskIter[i] = lookupMaskIter[prev];
-        lookupDataIter[i] = lookupDataIter[prev];
+        lookupMaskIter[h][i] = lookupMaskIter[h][prev];
+        lookupDataIter[h][i] = lookupDataIter[h][prev];
     end
 
     // actual forwarding
-    lookupConflictList[i] = 0;
-    if ((entryValid_c[i]) && entries[i].addrAvail &&
-        entries[i].addr == IN_uopLd.addr[31:2] && 
-        ($signed(entries[i].sqN - IN_uopLd.sqN) < 0 || entryReady_r[i]) &&
+    lookupConflictList[h][i] = 0;
+    lookupFuse[h][i] = 0;
+    if (entries[i].addrAvail &&
+        entries[i].addr == lookupAddr[h][31:2] && 
+        ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
+            entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
         
         if (entries[i].loaded) begin
-            
+            lookupFuse[h][i] = 1;
             for (integer j = 0; j < 4; j=j+1)
                 if (entries[i].wmask[j]) begin
-                    lookupDataIter[i][j*8 +: 8] = entries[i].data[j*8 +: 8];
-                    lookupMaskIter[i][j] = 1;
+                    lookupDataIter[h][i][j*8 +: 8] = entries[i].data[j*8 +: 8];
+                    lookupMaskIter[h][i][j] = 1;
                 end
         end
-        else if ((entries[i].wmask & readMask) != 0) lookupConflictList[i] = 1;
+        else if ((entries[i].wmask & readMask[h]) != 0) lookupConflictList[h][i] = 1;
     end
 end
 endgenerate
-`endif
 
-wire[$clog2(NUM_ENTRIES)-1:0] baseIndexI = baseIndex[$clog2(NUM_ENTRIES)-1:0];
-wire[$clog2(NUM_ENTRIES)-1:0] comStSqNI = IN_comStSqN[$clog2(NUM_ENTRIES)-1:0];
+wire[IDX_LEN-1:0] baseIndexI = baseIndex[IDX_LEN-1:0];
+wire[IDX_LEN-1:0] comStSqNI = IN_comStSqN[IDX_LEN-1:0];
 
-assign OUT_done = 
-    baseIndex == IN_comStSqN &&
-    evictedIn == 0;
-
-// Do not re-order stores before stores at the same address; and do not re-order MMIO stores.
-reg allowDequeue;
-always_comb begin
-    allowDequeue = 1;
-    
-    // When a store cache miss occurs, collisions with any issued ops
-    // are handled by the LSU. We have to make sure not to issue any
-    // conflicting new ops though.
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (evicted[i].valid &&
-
-            (!evicted[i].issued || 
-                // Forward negative store acks
-                (IN_stAck.valid && IN_stAck.fail && IN_stAck.id == evicted[i].id) ||
-                (stAck_r.valid && stAck_r.fail && stAck_r.id == evicted[i].id)) &&
-
-            ((evicted[i].s.addr == entries[baseIndexI].addr) || // todo: be less strict by looking at wmask
-                (`IS_MMIO_PMA_W(evicted[i].s.addr) && `IS_MMIO_PMA_W(entries[baseIndexI].addr)) ||
-                (evicted[i].s.wmask == 0)))
-            allowDequeue = 0;
-    end
-end
-
-// Bitfield for tracking used/free evicted store IDs
-reg[NUM_EVICTED-1:0] evictedUsedIds;
-reg[$clog2(NUM_EVICTED)-1:0] evictedNextId;
-reg evictedNextIdValid;
-always_comb begin
-    evictedNextId = 'x;
-    evictedNextIdValid = 0;
-    for (integer i = NUM_EVICTED-1; i >= 0; i=i-1) begin
-        if (!evictedUsedIds[i]) begin
-            evictedNextId = i[$clog2(NUM_EVICTED)-1:0];
-            evictedNextIdValid = 1;
-        end
-    end
-    
-    // Re-use id from current ack if possible to avoid wait cycle
-    if (stAck_r.valid && !stAck_r.fail) begin
-        evictedNextId = stAck_r.id;
-        evictedNextIdValid = 1;
-    end
-end
-
-// Find index of entry corresponding to current store acknowledgement from LSU 
-reg[$clog2(NUM_EVICTED)-1:0] stAckIdx;
-reg stAckIdxValid;
-always_comb begin
-    stAckIdx = 'x;
-    stAckIdxValid = 0;
-    for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-        if (stAck_r.valid && evicted[i].valid && evicted[i].id == stAck_r.id) begin
-            //assert(!stAckIdxValid);
-            stAckIdx = i[$clog2(NUM_EVICTED)-1:0];
-            stAckIdxValid = 1;
-        end
-    end
-end
-
-// Track Store Data Availability
-logic[NUM_ENTRIES-1:0] dataAvail;
-always_comb begin
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        dataAvail[i] = 0;
-        if (entryValid_c[i] && !entries[i].avail) begin
-            for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-                if (IN_resultUOp[j].valid && 
-                    !IN_resultUOp[j].tagDst[6] &&
-                    IN_resultUOp[j].tagDst[$bits(Tag)-2:0] == entries[i].data.m.tag[$bits(Tag)-2:0]
-                ) begin
-                    dataAvail[i] = 1;
-                end
-            end
-        end
-    end
-end
-
-// Select entry for which to read store data from RF
-typedef struct packed
-{
-    logic[31:0] atomicData;
-    logic atomic;
-    Tag tag;
-    logic[3:0] wmask;
-    logic[$clog2(NUM_ENTRIES)-1:0] index;
-    logic valid;
-} SQLoad;
-
-SQLoad load_c;
-SQLoad load_r;
-always_comb begin
-    // Find candidates
-    reg[NUM_ENTRIES-1:0] isLoadCandidate;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        isLoadCandidate[i] =
-            entryValid_r[i] && !entries[i].loaded && entries[i].avail && entries[i].addrAvail && !entries[i].atomicLd;
-    end
-    if (load_r.valid) isLoadCandidate[load_r.index] = 0;
-
-    // Priority encode beginning at base index
-    load_c = 'x;
-    load_c.valid = 0;
-
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!load_c.valid && 
-            isLoadCandidate[idx]
-        ) begin
-            load_c.valid = 1;
-            load_c.index = idx;
-            load_c.atomic = 0;
-        end
-    end
-
-    // If an atomic op result is incoming, load that instead
-    if (IN_resultUOp[AMO_RES_PORT].valid && IN_resultUOp[AMO_RES_PORT].doNotCommit) begin
-        load_c.atomic = 1;
-        load_c.valid = 1;
-        load_c.index = IN_resultUOp[AMO_RES_PORT].storeSqN[$clog2(NUM_ENTRIES)-1:0];
-        load_c.atomicData = IN_resultUOp[AMO_RES_PORT].result;
-    end
-    
-    OUT_RF_raddr = '0;
-    if (load_c.valid) begin
-        load_c.wmask = entries[load_c.index].wmask;
-        load_c.tag = entries[load_c.index].data.m.tag[$bits(Tag)-1:0];
-
-        if (!load_c.tag[$bits(Tag)-1]) begin
-            OUT_RF_raddr = load_c.tag[$bits(Tag)-2:0];
-        end
-    end
-    
-    // Late override
-    if (IN_branch.taken && ($signed(entries[load_c.index].sqN - IN_branch.sqN) > 0 || IN_branch.flush))
-        load_c = SQLoad'{valid: 0, default: 'x};
-        
-end
-always_ff@(posedge clk) begin
-    if (rst) load_r <= SQLoad'{valid: 0, default: 'x};
-    else load_r <= load_c;
-end
-
-// Find oldest not-yet-loaded entry 
-reg loadBaseIndexValid;
-reg[$clog2(NUM_ENTRIES)-1:0] loadBaseIndex;
-always_comb begin
-    reg[NUM_ENTRIES-1:0] isNotLoaded;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        isNotLoaded[i] =
-            entryValid_c[i] && (!entries[i].loaded || !entries[i].addrAvail);
-    end
-
-    // Priority encode beginning at base index
-    loadBaseIndexValid = 0;
-    loadBaseIndex = 'x;
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        reg[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + baseIndex[$clog2(NUM_ENTRIES)-1:0];
-        if (!loadBaseIndexValid && 
-            isNotLoaded[idx]
-        ) begin
-            loadBaseIndexValid = 1;
-            loadBaseIndex = idx;
-        end
-    end
-end
-
-// Preprocess store data
-reg[31:0] loadData;
-always_comb begin
-    reg[31:0] rawLoadData = 'x;
-    loadData = 'x;
-
-    if (load_r.atomic)
-        rawLoadData = load_r.atomicData;
-    else if (load_r.tag[$bits(Tag)-1])
-        rawLoadData = {{26{load_r.tag[5]}}, load_r.tag[5:0]};
-    else
-        rawLoadData = IN_RF_rdata;
-    // since we're deconstructing it anyways,
-    // we may want to store offset + size instead of wmask
-
-    case (load_r.wmask)
-        default: loadData = rawLoadData;
-        4'b0001: loadData[7:0] = rawLoadData[7:0];
-        4'b0010: loadData[15:8] = rawLoadData[7:0];
-        4'b0100: loadData[23:16] = rawLoadData[7:0];
-        4'b1000: loadData[31:24] = rawLoadData[7:0];
-        4'b0011: loadData[15:0] = rawLoadData[15:0];
-        4'b1100: loadData[31:16] = rawLoadData[15:0];
-    endcase
-end
-
-// Select evicted entry to re-issue
-logic reIssueValid;
-logic[$clog2(NUM_EVICTED)-1:0] reIssueIdx;
-always_comb begin
-    reIssueValid = 0;
-    reIssueIdx = 'x;
-
-    for (integer i = NUM_EVICTED - 1; i >= 0; i=i-1) begin
-        if (evicted[i].valid && !evicted[i].issued) begin
-            reIssueValid = 1;
-            reIssueIdx = i[$clog2(NUM_EVICTED)-1:0];
-        end
-    end
-    
-    // check for collisions with incoming store NACKs
-    reIssueValid &= 
-        (!stAck_r.valid || !stAck_r.fail || 
-            (stAck_r.addr[31:2] != evicted[reIssueIdx].s.addr && 
-                !(`IS_MMIO_PMA(stAck_r.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr)))) &&
-        (!IN_stAck.valid || !IN_stAck.fail || 
-            (IN_stAck.addr[31:2] != evicted[reIssueIdx].s.addr && 
-                !(`IS_MMIO_PMA(IN_stAck.addr) && `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr))));
-end
+assign OUT_done = baseIndex == IN_comStSqN;// && !anyInEv;
 
 // Sort uops to enqueue by storeSqN
 R_UOp rnUOpSorted[`DEC_WIDTH-1:0];
@@ -578,7 +231,7 @@ always_comb begin
         for (integer j = 0; j < `DEC_WIDTH; j=j+1) begin
             // This could be one-hot...
             if (IN_rnUOp[j].valid && IN_rnUOp[j].storeSqN[$clog2(`DEC_WIDTH)-1:0] == i[$clog2(`DEC_WIDTH)-1:0] &&
-                (IN_rnUOp[j].fu == FU_ST || IN_rnUOp[j].fu == FU_ATOMIC)
+                ((IN_rnUOp[j].fu == FU_AGU && IN_rnUOp[j].opcode >= LSU_SC_W) || IN_rnUOp[j].fu == FU_ATOMIC)
             ) begin
                 rnUOpSorted[i] = IN_rnUOp[j];
             end
@@ -586,204 +239,178 @@ always_comb begin
     end
 end
 
+reg[NUM_ENTRIES-1:0] entryFused_c;
+always_comb begin
+    entryFused_c = entryFused;
+    //if (OUT_uop.loaded && evInsert.valid)
+    //    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    //        if (lookupType[i] == STORE_FUSE)
+    //            entryFused_c = entryFused_c | lookupFuse[i];
+    //    end
+end
+
+// Dequeue logic to infer sequential reads from SQ
+logic[IDX_LEN-1:0] deqAddrsSorted[NUM_OUT-1:0];
+logic[IDX_LEN-1:0] deqAddrs[NUM_OUT-1:0];
+always_comb begin
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        deqAddrs[i] = baseIndexI + i[IDX_LEN-1:0];
+    
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        deqAddrsSorted[i] = 'x;
+
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        deqAddrsSorted[deqAddrs[i][$clog2(NUM_OUT)-1:0]] = deqAddrs[i];
+end
+SQ_UOp deqPorts[NUM_OUT-1:0];
+always_comb begin
+
+    for (integer i = 0; i < NUM_OUT; i=i+1) begin
+        logic[IDX_LEN-1:0] addr = 
+            {deqAddrsSorted[i][IDX_LEN-1:$clog2(NUM_OUT)], i[$clog2(NUM_OUT)-1:0]};
+        SQEntry entry = entries[addr];
+        logic ready = entryReady_r[addr] && entry.loaded;
+
+        deqPorts[i] = SQ_UOp'{valid: 0, default: 'x};
+        if (ready) begin
+            deqPorts[i].data = entry.data;
+            deqPorts[i].addr = {entry.addr, 2'b0};
+            deqPorts[i].wmask = entry.wmask;
+            deqPorts[i].valid = 1;
+        end
+    end
+end
+SQ_UOp deqEntries[NUM_OUT-1:0];
+always_comb begin
+    logic prevValid = 1;
+    for (integer i = 0; i < NUM_OUT; i=i+1) begin
+        deqEntries[i] = prevValid ? 
+            deqPorts[deqAddrs[i][$clog2(NUM_OUT)-1:0]] :
+            SQ_UOp'{valid: 0, default: 'x};
+        prevValid = deqEntries[i].valid;
+    end
+end
+
+SQ_UOp outDeqView[NUM_OUT*2-1:0];
+always_comb begin
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        outDeqView[i] = OUT_uop[i];
+
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        outDeqView[i+NUM_OUT] = deqEntries[i];
+end
+
+logic[NUM_OUT*2-1:0] unhandled;
+always_comb begin
+    for (integer i = 0; i < NUM_OUT; i=i+1)
+        unhandled[i] = OUT_uop[i].valid && IN_stall[i];
+    for (integer i = NUM_OUT; i < NUM_OUT*2; i=i+1)
+        unhandled[i] = 1;
+end
+logic[$clog2(NUM_OUT):0] srcIdx[NUM_OUT-1:0];
+PriorityEncoder#(2*NUM_OUT, NUM_OUT) penc
+(
+    .IN_data(unhandled),
+    .OUT_idx(srcIdx),
+    .OUT_idxValid()
+);
+
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
 always_ff@(posedge clk) begin
-
-    OUT_fwd <= 'x;
-    OUT_fwd.valid <= 0;
+    
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        OUT_fwd[i] <= 'x;
+        OUT_fwd[i].valid <= 0;
+    end
 
     if (rst) begin
-        
-        for (integer i = 0; i < NUM_EVICTED; i=i+1)
-            evicted[i].valid <= 0;
-        
-        evictedIn <= 0;
+        entryFused <= 0;
         
         baseIndex <= 0;
-        lastIndex <= '1;
         
-        OUT_maxStoreSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
+        OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         OUT_empty <= 1;
-        OUT_uopSt.valid <= 0;
         flushing <= 0;
-        evictedUsedIds <= 0;
+        
+        for (integer i = 0; i < NUM_OUT; i=i+1)
+            OUT_uop[i] <= SQ_UOp'{valid: 0, default: 'x};
+
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1)
+            entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
     end
     else begin
     
         SqN nextBaseIndex = baseIndex;
-
         reg modified = 0;
-        reg[$clog2(NUM_EVICTED):0] nextEvictedIn = evictedIn;
-
-        if (!IN_stallSt)
-            OUT_uopSt.valid <= 0;
         
-        // Delete entry from evicted if we get a positive store ack
-        if (stAck_r.valid) begin
-            assert(stAckIdxValid);
-            if (!stAck_r.fail) begin
-                for (integer i = 0; i < NUM_EVICTED-1; i=i+1) begin
-                    if (i >= stAckIdx) begin
-                        evicted[i] <= evicted[i+1];
-                    end
-                end
-                evicted[NUM_EVICTED-1] <= 'x;
-                evicted[NUM_EVICTED-1].valid <= 0;
-
-                nextEvictedIn = nextEvictedIn - 1;
-                evictedUsedIds[stAck_r.id] <= 0;
-            end
-            else begin
-                evicted[stAckIdx].issued <= 0;
-                modified = 1;
-            end
-        end
-
         // Dequeue
-        if (!IN_stallSt) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] idx = baseIndex[$clog2(NUM_ENTRIES)-1:0];
-            // Try storing new op
-            if (!IN_branch.taken && 
-                entryReady_r[idx] && nextEvictedIn < NUM_EVICTED &&
-                entries[idx].loaded && allowDequeue &&
-                entries[idx].addrAvail
-            ) begin
-                assert(evictedNextIdValid);
-                modified = 1;
+        for (integer i = 0; i < NUM_OUT; i=i+1) begin
+            reg[$clog2(NUM_OUT):0] idx = srcIdx[i];
+            OUT_uop[i] <= outDeqView[idx];
+            if (outDeqView[idx].valid && idx >= NUM_OUT) begin
 
-                entries[idx] <= 'x;        
-                OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evictedNextId;
-                OUT_uopSt.addr <= {entries[idx].addr, 2'b0};
-                OUT_uopSt.data <= entries[idx].data;
-                OUT_uopSt.wmask <= entries[idx].wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(entries[idx].addr);
-                
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].s <= entries[idx];
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].issued <= 1;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].id <= evictedNextId;
-                evicted[nextEvictedIn[$clog2(NUM_EVICTED)-1:0]].valid <= 1;
-                nextEvictedIn = nextEvictedIn + 1;
-                    
-                evictedUsedIds[evictedNextId] <= 1;
+                // todo: infer sequential writes
+                reg[$clog2(NUM_ENTRIES)-1:0] idxSQ = 
+                    baseIndexI + $clog2(NUM_ENTRIES)'(idx) - $clog2(NUM_ENTRIES)'(NUM_OUT);
+                entries[idxSQ].loaded <= 0;
+                entries[idxSQ].addrAvail <= 0;
+
                 nextBaseIndex = nextBaseIndex + 1;
             end
-
-            // Re-issue op that previously missed cache
-            else if (reIssueValid) begin
-                OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evicted[reIssueIdx].id;
-                OUT_uopSt.addr <= {evicted[reIssueIdx].s.addr, 2'b0};
-                OUT_uopSt.data <= evicted[reIssueIdx].s.data;
-                OUT_uopSt.wmask <= evicted[reIssueIdx].s.wmask;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssueIdx].s.addr);
-                
-                if (stAck_r.valid && !stAck_r.fail && reIssueIdx >= stAckIdx)
-                    evicted[reIssueIdx - 1].issued <= 1;
-                else
-                    evicted[reIssueIdx].issued <= 1;
-
-                modified = 1;
-            end
-        end
-        
-        // Set Availability
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (entryValid_c[i] && dataAvail[i])
-                entries[i].avail <= 1;
         end
 
         // Write Loaded Data
-        if (load_r.valid) begin
-            entries[load_r.index].avail <= 1;
-            entries[load_r.index].loaded <= 1;
-            entries[load_r.index].data <= loadData;
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            if (IN_stDataUOp[i].valid && (!IN_branch.taken ||
+                (!IN_branch.flush && $signed(IN_stDataUOp[i].storeSqN - IN_branch.storeSqN) <= 0))
+            ) begin
+                logic[IDX_LEN-1:0] idx = IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
+                
+                assert(idx[0] == i[0]); idx[0] = i[0];
+
+                entries[idx].loaded <= 1;
+                entries[idx].data <= IN_stDataUOp[i].data;
+            end
         end
 
         // Invalidate
-        if (IN_branch.taken) begin            
-            lastIndex <= IN_branch.storeSqN;
+        if (IN_branch.taken) begin
             flushing <= IN_branch.flush;
+
+            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+                if (entries[i].addrAvail)
+                    if(!entryReady_c[i] &&
+                        invalRange_c[i] !=
+                        $signed(entries[i].sqN - IN_branch.sqN) > 0
+                    ) begin
+                        $display("got %x, baseIndex=%x, storeSqN=%x, %d\n", invalRange_c[i], baseIndex, IN_branch.storeSqN, i);
+                        assert(0);
+                    end
+                if (invalRange_c[i] || (IN_branch.flush && !entryReady_r[i]))
+                    entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
+            end
         end
     
         // Set Address
-        if (IN_uopSt.valid && 
-            (!IN_branch.taken || ($signed(IN_uopSt.sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
-        ) begin
-            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uopSt.storeSqN[$clog2(NUM_ENTRIES)-1:0];
-            assert(IN_uopSt.storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
-            assert(entryValid_c[index]);
-            assert(!entries[index].addrAvail);
-            if (IN_uopSt.exception == AGU_NO_EXCEPTION) begin
-                entries[index].addr <= IN_uopSt.addr[31:2];
-                entries[index].wmask <= IN_uopSt.wmask;
-                entries[index].addrAvail <= 1;
-            end
-            modified = 1;
-        end
-
-        // Enqueue
-        if (!IN_branch.taken) begin
-            for (integer i = 0; i < WIDTH_RN; i=i+1)
-                if (rnUOpSorted[i].valid) begin
-                    
-                    reg[$clog2(NUM_ENTRIES)-1:0] index = {rnUOpSorted[i].storeSqN[$clog2(NUM_ENTRIES)-1:$clog2(`DEC_WIDTH)], i[0+:$clog2(`DEC_WIDTH)]};
-                    assert(rnUOpSorted[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
-                    
-                    entries[index].data <= 'x;
-                    entries[index].addr <= 'x;
-                    entries[index].wmask <= 0;
-
-                    entries[index].atomicLd <= 0;
-                    entries[index].atomic <= 0;
-                    entries[index].loaded <= 0;
-                    entries[index].sqN <= rnUOpSorted[i].sqN;
-                    entries[index].addrAvail <= 0;
-                    entries[index].avail <= rnUOpSorted[i].availB;
-                    entries[index].data.m.tag <= rnUOpSorted[i].tagB;
-
-                    for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1)
-                        if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[6] && rnUOpSorted[i].tagB == IN_resultUOp[j].tagDst)
-                            entries[index].avail <= 1;
-
-                    // Atomic Ops special handling
-                    if (rnUOpSorted[i].fu == FU_ATOMIC) begin
-                        entries[index].atomic <= 1;
-                        if (rnUOpSorted[i].opcode != ATOMIC_AMOSWAP_W) begin
-                            
-                            entries[index].atomicLd <= 1;
-                            entries[index].data.m.tag <= 'x;
-                            // operand cannot be available yet
-                            entries[index].avail <= 0;
-                        end
-                    end
-                    
-                    // Cache Block Ops special handling
-                    if (rnUOpSorted[i].fu == FU_ST) begin
-                        case (rnUOpSorted[i].opcode)
-                            LSU_CBO_CLEAN: begin
-                                entries[index].data <= {30'bx, 2'd0};
-                                entries[index].loaded <= 1;
-                            end
-                            LSU_CBO_INVAL: begin
-                                entries[index].data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
-                                entries[index].loaded <= 1;
-                            end
-                            LSU_CBO_FLUSH: begin
-                                entries[index].data <= {30'bx, 2'd2};
-                                entries[index].loaded <= 1;
-                            end
-                            default: ;
-                        endcase
-                    end
-
-                    modified = 1;
+        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            if (IN_uopSt[i].valid && IN_uopSt[i].isStore &&
+                (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
+            ) begin
+                reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
+                assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
+                assert(!entries[index].addrAvail);
+                
+                
+                if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
+                    entries[index].sqN <= IN_uopSt[i].sqN;
+                    entries[index].addr <= IN_uopSt[i].addr[31:2];
+                    entries[index].wmask <= IN_uopSt[i].wmask;
+                    entries[index].addrAvail <= 1;
                 end
-            for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-                if (IN_rnUOp[i].valid && (IN_rnUOp[i].fu == FU_ST || IN_rnUOp[i].fu == FU_ATOMIC))
-                    lastIndex <= IN_rnUOp[i].storeSqN;
+
+                modified = 1;
             end
         end
 
@@ -793,14 +420,14 @@ always_ff@(posedge clk) begin
         end
         OUT_maxStoreSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         
-        if (IN_uopLd.valid) begin
-            OUT_fwd.valid <= 1;
-            OUT_fwd.data <= lookupData;
-            OUT_fwd.mask <= lookupMask;
-            OUT_fwd.conflict <= lookupConflict;
-        end
+        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+            if (IN_uopLd[i].valid) begin
+                OUT_fwd[i].valid <= 1;
+                OUT_fwd[i].data <= lookupData[i];
+                OUT_fwd[i].mask <= lookupMask[i];
+                OUT_fwd[i].conflict <= lookupConflict[i];
+            end
 
-        evictedIn <= nextEvictedIn;
         baseIndex <= nextBaseIndex;
     end
 end

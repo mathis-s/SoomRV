@@ -47,7 +47,6 @@ always@(posedge clk) begin
     
     if (!rst && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         
-        OUT_uop.storeSqN <= IN_uop.storeSqN;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.valid <= 1;

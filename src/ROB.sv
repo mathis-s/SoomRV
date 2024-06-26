@@ -22,7 +22,7 @@ module ROB
     parameter ID_LEN = `ROB_SIZE_EXP,
     parameter WIDTH_RN = `DEC_WIDTH,
     parameter WIDTH = 4,
-    parameter WIDTH_WB = 4
+    parameter WIDTH_WB = 6
 )
 (
     input wire clk,
@@ -34,11 +34,11 @@ module ROB
     input wire IN_interruptPending /*verilator public*/,
     
     // for perf counters
-    output reg[WIDTH-1:0] OUT_PERFC_validRetire,
-    output reg[WIDTH-1:0] OUT_PERFC_retireBranch,
+    output ROB_PERFC_Info OUT_perfcInfo,
     
     input BranchProv IN_branch,
-    input SQ_ComInfo IN_sqInfo,
+    input ComLimit IN_stComLimit[`NUM_AGUS-1:0],
+    input ComLimit IN_ldComLimit,
 
     output SqN OUT_maxSqN,
     output SqN OUT_curSqN,
@@ -133,12 +133,6 @@ always_comb begin
     end
 end
 
-
-always_comb begin
-    for (integer i = 0; i < WIDTH; i=i+1) 
-        OUT_PERFC_retireBranch[i] = OUT_PERFC_validRetire[i] && OUT_comUOp[i].isBranch;
-end
-
 reg stop;
 reg misprReplay;
 reg misprReplayEnd;
@@ -148,7 +142,12 @@ SqN misprReplayEndSqN;
 always_ff@(posedge clk) begin
 
     OUT_fpNewFlags <= 0;
-    OUT_PERFC_validRetire <= 0;
+
+    OUT_perfcInfo.validRetire <= 0;
+    OUT_perfcInfo.branchRetire <= 0;
+    // by default (if nothing is in the pipeline at all), blame the frontend
+    OUT_perfcInfo.stallWeigth <= 3;
+    OUT_perfcInfo.stallCause <= STALL_FRONTEND;
     
     OUT_trapUOp <= 'x;
     OUT_trapUOp.valid <= 0;
@@ -218,35 +217,44 @@ always_ff@(posedge clk) begin
         else if (!stop && !IN_branch.taken) begin
             
             reg temp = 0;
+            reg temp2 = 0;
             reg pred = 0;
             reg[ID_LEN-1:0] cnt = 0;
+            
+            OUT_perfcInfo.stallCause <= STALL_NONE;
             
             for (integer i = 0; i < WIDTH; i=i+1) begin
             
                 reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
+
+                reg isRenamed = (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex));
+                reg isExecuted = deqFlags[i] != FLAGS_NX;
+                reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
+                reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(deqEntries[i].loadSqN - IN_ldComLimit.sqN) < 0);
+                reg sqAllowsCommit = 1;
+                for (integer j = 0; j < `NUM_AGUS-1; j=j+1)
+                    sqAllowsCommit &= (!IN_stComLimit[j].valid || $signed(deqEntries[i].storeSqN - IN_stComLimit[j].sqN) < 0);
                 
-                if (!temp && 
-                    (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex)) &&
-                    deqFlags[i] != FLAGS_NX &&
-                    (!pred || (deqFlags[i] == FLAGS_NONE)) &&
-                    (!IN_sqInfo.valid || $signed({deqEntries[i].sqN_msb, id} - IN_sqInfo.maxComSqN) <= 0)
-                ) begin
+                if (!temp && isRenamed && isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) begin
+
+                    reg isBranch = deqFlags[i] == FLAGS_BRANCH || 
+                        deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN;
+                    // Synchronous exceptions do not increment minstret, but mret/sret do.
+                    reg minstretRetire = (deqFlags[i] <= FLAGS_ORDERING) || 
+                        (deqFlags[i] == FLAGS_XRET) ||
+                        (deqEntries[i].isFP && deqFlags[i] != FLAGS_ILLEGAL_INSTR) ||
+                        (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
                 
                     OUT_comUOp[i].rd <= deqEntries[i].rd;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                     OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id};
-                    OUT_comUOp[i].isBranch <= deqFlags[i] == FLAGS_BRANCH || 
-                        deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN;
+                    OUT_comUOp[i].isBranch <= isBranch;
                         
                     OUT_comUOp[i].compressed <= deqEntries[i].compressed;
                     OUT_comUOp[i].valid <= 1;
-                    
-                    // Synchronous exceptions do not increment minstret, but mret/sret do.
-                    OUT_PERFC_validRetire[i] <= 
-                        (deqFlags[i] <= FLAGS_ORDERING) || 
-                        (deqFlags[i] == FLAGS_XRET) ||
-                        (deqEntries[i].isFP && deqFlags[i] != FLAGS_ILLEGAL_INSTR) ||
-                        (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
+
+                    OUT_perfcInfo.validRetire[i] <= minstretRetire;
+                    OUT_perfcInfo.branchRetire[i] <= minstretRetire && isBranch;
                     
                     OUT_curFetchID <= deqEntries[i].fetchID;
 
@@ -305,7 +313,6 @@ always_ff@(posedge clk) begin
                     cnt = cnt + 1;
                 end
                 else begin
-                    temp = 1;
                     // If we are unable to commit anything in this cycle, we use the TrapHandler's PCFile
                     // lookup to get the address of the instruction we're stalled on (for debugging/analysis). 
                     if (i == 0 && (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex))) begin
@@ -315,10 +322,27 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
                         OUT_trapUOp.flags <= FLAGS_NX;
                     end
+
+                    // General stall/commit debug info
+                    if (!temp2) begin
+                        OUT_perfcInfo.stallWeigth <= 3 - i[1:0];
+                        
+                        if (!isRenamed || temp) OUT_perfcInfo.stallCause <= STALL_FRONTEND;
+                        else if (!isExecuted) begin
+                            if (deqPorts[i].isSt) OUT_perfcInfo.stallCause <= STALL_STORE;
+                            else if (deqPorts[i].isLd) OUT_perfcInfo.stallCause <= STALL_LOAD;
+                            else OUT_perfcInfo.stallCause <= STALL_BACKEND;
+                        end
+                        else if (!sqAllowsCommit) OUT_perfcInfo.stallCause <= STALL_STORE;
+                        else if (!lbAllowsCommit) OUT_perfcInfo.stallCause <= STALL_LOAD;
+                        else if (!noFlagConflict) OUT_perfcInfo.stallCause <= STALL_ROB;
+                        temp2 = 1;
+                    end
+
+                    temp = 1;
                 end
                     
             end
-            
             baseIndex <= baseIndex + cnt;
         end
         
@@ -341,8 +365,8 @@ always_ff@(posedge clk) begin
                 entry.fetchOffs = rnUOpSorted[i].fetchOffs;
                 entry.storeSqN = rnUOpSorted[i].storeSqN;
                 entry.loadSqN = rnUOpSorted[i].loadSqN;
-                entry.isLd = rnUOpSorted[i].fu == FU_LD || rnUOpSorted[i].fu == FU_ATOMIC;
-                entry.isSt = rnUOpSorted[i].fu == FU_ST || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
+                entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
                 
                 case (id0)
                     0: gen[0].entries[id1] <= entry;
@@ -376,6 +400,5 @@ always_ff@(posedge clk) begin
         
     end
 end
-
 
 endmodule

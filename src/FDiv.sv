@@ -69,7 +69,6 @@ always_ff@(posedge clk) begin
     else if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         
         // Store metadata in output uop (without setting it valid)
-        OUT_uop.storeSqN <= IN_uop.storeSqN;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.doNotCommit <= 0;

@@ -90,6 +90,7 @@ always_ff@(posedge clk) begin
                     outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
                 end
 
+                outUOpReg[i].fetchOffs <= IN_uop[i].fetchOffs;
                 outUOpReg[i].sqN <= IN_uop[i].sqN;
                 outUOpReg[i].tagDst <= IN_uop[i].tagDst;
                 outUOpReg[i].fetchID <= IN_uop[i].fetchID;
@@ -108,7 +109,6 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].fetchOffs != IN_pcReadData[i].branchPos) begin
                     outUOpReg[i].bpi.predicted <= 0;
                     outUOpReg[i].bpi.taken <= 0;
-                    outUOpReg[i].bpi.isJump <= 0;
                 end
 
                 operandIsReg[i] <= 2'b00;

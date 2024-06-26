@@ -33,6 +33,7 @@ SRC_FILES = \
 	src/BranchSelector.sv \
 	src/PreDecode.sv \
 	src/MemRTL.sv \
+	src/MemRTL2W.sv \
 	src/Top.sv \
 	src/MemoryController.sv \
 	src/RenameTable.sv \
@@ -55,7 +56,7 @@ SRC_FILES = \
 	src/Peripherals.sv \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
-	src/LoadMissQueue.sv \
+	src/LoadResultBuffer.sv \
 	src/TLB.sv \
 	src/BypassLSU.sv \
 	src/TValSelect.sv \
@@ -66,6 +67,11 @@ SRC_FILES = \
 	src/CacheReadInterface.sv \
 	src/FIFO.sv \
 	src/RegFileRTL.sv \
+	src/BranchHandler.sv \
+	src/PriorityEncoder.sv \
+	src/StoreDataIQ.sv \
+	src/StoreDataLoad.sv \
+	src/StoreQueueBackend.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

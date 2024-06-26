@@ -87,6 +87,8 @@ SoC soc
     .clk(clk),
     .rst(rst),
     .en(en),
+
+    .IN_irq(1'b0),
     
     .OUT_powerOff(SOC_poweroff),
     .OUT_reboot(SOC_reboot),

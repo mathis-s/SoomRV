@@ -206,10 +206,6 @@ module InstrDecoder
     input wire[30:0] IN_lateRetAddr,
     
     input wire IN_enCustom,
-    
-    output DecodeBranchProv OUT_decBranch,
-    output ReturnDecUpdate OUT_retUpd,
-    output BTUpdate OUT_btUpdate,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -221,29 +217,10 @@ Instr32 instr;
 Instr16 i16;
 I32 i32;
 
-DecodeBranchProv decBranch_c;
-BTUpdate btUpdate_c;
-ReturnDecUpdate retUpd_c;
-
 D_UOp uopsComb[NUM_UOPS-1:0];
-reg[3:0] validMask;
 
 always_comb begin
-    
-    btUpdate_c = 'x;
-    btUpdate_c.valid = 0;
 
-    retUpd_c = 'x;
-    retUpd_c.valid = 0;
-    
-    decBranch_c = 'x;
-    decBranch_c.wfi = 0;
-    decBranch_c.taken = 0;
-    decBranch_c.retAct = RET_NONE;
-    decBranch_c.histAct = HIST_NONE;
-
-    validMask = 4'b1111;
-    
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         
         instr = IN_instrs[i].instr;
@@ -253,9 +230,9 @@ always_comb begin
         uop = 0;
         invalidEnc = 1;
         //uop.pc = {IN_instrs[i].pc, 1'b0};
-        uop.valid = IN_instrs[i].valid && en && !decBranch_c.taken;
+        uop.valid = IN_instrs[i].valid && en;
         uop.fetchID = IN_instrs[i].fetchID;
-        uop.fetchOffs = IN_instrs[i].pc[2:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
+        uop.fetchOffs = IN_instrs[i].pc[$bits(FetchOff_t)-1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
         
         case (instr.opcode)
             `OPC_LUI,
@@ -266,12 +243,13 @@ always_comb begin
             `OPC_LOAD,
             `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
             `OPC_BRANCH:     uop.imm = $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
+            `OPC_CUST0,
             `OPC_STORE:    uop.imm = $signed({{20{instr[31]}}, instr[31:25], instr[11:7]});
             //`OPC_REG_REG,
             default:      uop.imm = 0;
         endcase
         
-        if (IN_instrs[i].valid && en && !decBranch_c.taken) begin
+        if (IN_instrs[i].valid && en) begin
             
             reg isBranch = 0;
             reg isIndirBranch = 0;
@@ -279,9 +257,6 @@ always_comb begin
             reg isCall = 0;
             reg isJump = 0;
             reg isWFI = 0;
-            reg[30:0] branchTarget = 'x;
-            
-            reg[30:0] lateReturnAddr = IN_instrs[i].targetIsRetAddr ? IN_instrs[i].predTarget : IN_lateRetAddr;
             
             if (IN_instrs[i].predInvalid) begin
                 // A branch was predicted that is impossible considering actual instruction boundaries
@@ -444,8 +419,7 @@ always_comb begin
                         
                         isBranch = 1;
                         isJump = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-
+                        
                         // there is the slim chance that this jump's dst was predicted, but it being a call wasn't...
                         isCall = (uop.rd == 1);      
                         
@@ -473,8 +447,6 @@ always_comb begin
                         // destination (for the ALU to check)
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                        else if (isReturn)
-                            uop.imm = {lateReturnAddr, 1'b0};
                         else 
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
                         
@@ -486,7 +458,7 @@ always_comb begin
                         uop.immB = 1;
                         uop.rd = instr.rd;
 
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         case (instr.funct3)
                             0: uop.opcode = LSU_LB;
                             1: uop.opcode = LSU_LH;
@@ -502,37 +474,51 @@ always_comb begin
                     `OPC_STORE: begin
                         uop.rs1 = instr.rs1;
                         uop.rs2 = instr.rs2;
-                        uop.immB = 0;
+                        uop.immB = 1;
                         uop.rd = 0;
-
-                        uop.fu = FU_ST;
-                        if (IN_enCustom && 0) begin
+                        uop.fu = FU_AGU;
+                        invalidEnc = 0;
+                        case (instr.funct3)
+                            0: uop.opcode = LSU_SB;
+                            1: uop.opcode = LSU_SH;
+                            2: uop.opcode = LSU_SW;
+                            default: invalidEnc = 1;
+                        endcase
+                    end
+                    `OPC_CUST0: if (IN_dec.allowCustom) begin
+                        if (instr.funct3 == 3'b011 && instr.funct7[6:3] == 0) begin
+                            uop.rs1 = instr.rs1;
+                            uop.rs2 = instr.rs2;
+                            uop.rd = instr.rd;
+                            uop.fu = FU_AGU;
+                            uop.imm = 0;
                             invalidEnc = 0;
-                            
-                            case (instr.funct3)
-                                0: uop.opcode = LSU_SB;
-                                1: uop.opcode = LSU_SH;
-                                2: uop.opcode = LSU_SW;
-                                3: invalidEnc = 1;
-                                
-                                4: uop.opcode = LSU_SB_I;
-                                5: uop.opcode = LSU_SH_I;
-                                6: uop.opcode = LSU_SW_I;
-                                7: invalidEnc = 1;
+                            case (instr.funct7[2:0])
+                                0: uop.opcode = LSU_LB;
+                                1: uop.opcode = LSU_LH;
+                                2: uop.opcode = LSU_LW;
+                                4: uop.opcode = LSU_LBU;
+                                5: uop.opcode = LSU_LHU;
+                                default: invalidEnc = 1;
                             endcase
-                            
-                            if (instr.funct3[2])
-                                uop.rd = uop.rs1;
                         end
                         else begin
+                            uop.rs1 = instr.rs1;
+                            uop.rs2 = instr.rs2;
+                            uop.rd = instr.rs1;
+                            uop.immB = 1;
+                            uop.fu = FU_AGU;
+                            invalidEnc = 0;
                             case (instr.funct3)
-                                0: uop.opcode = LSU_SB;
-                                1: uop.opcode = LSU_SH;
-                                2: uop.opcode = LSU_SW;
+                                0: uop.opcode = LSU_SB_PREINC;
+                                1: uop.opcode = LSU_SH_PREINC;
+                                2: uop.opcode = LSU_SW_PREINC;
+
+                                4: uop.opcode = LSU_SB_POSTINC;
+                                5: uop.opcode = LSU_SH_POSTINC;
+                                6: uop.opcode = LSU_SW_POSTINC;
+                                default: invalidEnc = 1;
                             endcase
-                            invalidEnc = 
-                                instr.funct3 != 0 && instr.funct3 != 1 &&
-                                instr.funct3 != 2;
                         end
                     end
                     `OPC_BRANCH: begin
@@ -546,38 +532,14 @@ always_comb begin
                             (uop.opcode == 2) || (uop.opcode == 3);
                         
                         isBranch = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                        
-                        /* verilator lint_off ALWCOMBORDER */
-                        /*if (!invalidEnc && DO_FUSE && i != 0 && 
-                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0 && uopsComb[i-1].imm != 0) begin
-                            
-                            uop.rd = uopsComb[i-1].rd;
-                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
-                            validMask[i-1] = 0;
-                            
-                            $display("fused at %x", IN_instrs[i].pc);
-                            
-                            case (instr.funct3)
-                                0: uop.opcode = INT_F_ADDI_BEQ;
-                                1: uop.opcode = INT_F_ADDI_BNE;
-                                4: uop.opcode = INT_F_ADDI_BLT;
-                                5: uop.opcode = INT_F_ADDI_BGE;
-                                6: uop.opcode = INT_F_ADDI_BLTU;
-                                7: uop.opcode = INT_F_ADDI_BGEU;
-                            endcase
-                        end
-                        else*/ begin
-                            case (instr.funct3)
-                                0: uop.opcode = INT_BEQ;
-                                1: uop.opcode = INT_BNE;
-                                4: uop.opcode = INT_BLT;
-                                5: uop.opcode = INT_BGE;
-                                6: uop.opcode = INT_BLTU;
-                                7: uop.opcode = INT_BGEU;
-                            endcase
-                        end
+                        case (instr.funct3)
+                            0: uop.opcode = INT_BEQ;
+                            1: uop.opcode = INT_BNE;
+                            4: uop.opcode = INT_BLT;
+                            5: uop.opcode = INT_BGE;
+                            6: uop.opcode = INT_BLTU;
+                            7: uop.opcode = INT_BGEU;
+                        endcase
                     end
                     `OPC_FENCE: begin
                         if (instr.funct3 == 0) begin
@@ -596,22 +558,25 @@ always_comb begin
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_INVAL;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
+                            uop.rs2 = 0;
                         end
                         // cbo.clean -> runs as store op
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_CLEAN;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
+                            uop.rs2 = 0;
                         end
                         // cbo.flush -> runs as store op, invalidates to instruction after itself
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_FLUSH;
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
+                            uop.rs2 = 0;
                         end
                     end
                     `OPC_REG_IMM: begin
@@ -633,15 +598,6 @@ always_comb begin
                                 6: uop.opcode = INT_OR;
                                 7: uop.opcode = INT_AND;
                             endcase
-                            
-                            if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
-                                uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
-                                uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs1) begin
-                                
-                                uopsComb[i-1].imm[11:0] = uop.imm[11:0];
-                                if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
-                                uop.valid = 0;
-                            end
                             
                             invalidEnc = 0;
                         end
@@ -760,6 +716,13 @@ always_comb begin
                                 6: uop.opcode = DIV_REM;
                                 7: uop.opcode = DIV_REMU;
                             endcase
+
+                            `ifndef ENABLE_INT_DIV
+                                if (uop.fu == FU_DIV) invalidEnc = 1;
+                            `endif
+                            `ifndef ENABLE_INT_MUL
+                                if (uop.fu == FU_MUL) invalidEnc = 1;
+                            `endif
                         end
                         else if (instr.funct7 == 7'h20) begin
                             invalidEnc = (instr.funct3 != 0 && instr.funct3 != 5);
@@ -874,7 +837,7 @@ always_comb begin
                             
                             invalidEnc = 0;
                             
-                            uop.fu = FU_LD;
+                            uop.fu = FU_AGU;
                             case (instr.funct3)
                                 0: uop.opcode = LSU_LB_RR;
                                 1: uop.opcode = LSU_LH_RR;
@@ -889,7 +852,7 @@ always_comb begin
                     
                     /*`OPC_FLW: begin
                         if (i32.flw.width == 3'b010) begin
-                            uop.fu = FU_LD;
+                            uop.fu = FU_AGU;
                             uop.opcode = LSU_FLW;
                             uop.rs1 = i32.flw.rs1;
                             uop.rd = i32.flw.rd;
@@ -900,7 +863,7 @@ always_comb begin
                     end
                     `OPC_FSW: begin
                         if (i32.fsw.width == 3'b010) begin
-                            uop.fu = FU_ST;
+                            uop.fu = FU_AGU;
                             uop.opcode = LSU_FSW;
                             uop.rs1 = i32.fsw.rs1;
                             uop.rs2 = i32.fsw.rs2;
@@ -1096,13 +1059,16 @@ always_comb begin
                                 5'b00010: begin // lr.w
                                     if (instr.rs2 == 5'b0) begin
                                         uop.opcode = LSU_LR_W;
-                                        uop.fu = FU_LD;
+                                        uop.fu = FU_AGU;
+                                        uop.immB = 0;
+                                        uop.rs2 = 0;
                                         invalidEnc = 0;
                                     end
                                 end
                                 5'b00011: begin // sc.w
                                     uop.opcode = LSU_SC_W;
-                                    uop.fu = FU_ST;
+                                    uop.fu = FU_AGU;
+                                    uop.immB = 1;
                                     invalidEnc = 0;
                                 end
                                 5'b00001: begin // amoswap.w
@@ -1157,31 +1123,21 @@ always_comb begin
                     // c.lw
                     if (i16.cl.funct3 == 3'b010) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         uop.imm = {25'b0, i16.cl.imm[0], i16.cl.imm2, i16.cl.imm[1], 2'b00};
                         uop.rs1 = {2'b01, i16.cl.rs1};
                         uop.rd = {2'b01, i16.cl.rd};
+                        uop.immB = 1;
                         invalidEnc = 0;
                     end
                     // c.sw
                     else if (i16.cs.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_ST;
+                        uop.fu = FU_AGU;
                         uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
                         uop.rs1 = {2'b01, i16.cs.rd_rs1};
                         uop.rs2 = {2'b01, i16.cs.rs2};
-                        
-                        /*if (FUSE_STORE_DATA && i != 0 && uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT &&
-                            uopsComb[i-1].rs0 == uopsComb[i-1].rd && uopsComb[i-1].immB &&
-                            uopsComb[i-1].rs0 == uop.rs2 &&
-                            uopsComb[i-1].opcode == INT_ADD) begin
-                            
-                            uop.opcode = LSU_F_ADDI_SW;
-                            uop.rd = uopsComb[i-1].rd;
-                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
-                            validMask[i-1] = 0;
-                            
-                        end*/
+                        uop.immB = 1;
                         invalidEnc = 0;
                     end
                     // c.addi4spn
@@ -1193,6 +1149,102 @@ always_comb begin
                         uop.immB = 1;
                         uop.rd = {2'b01, i16.ciw.rd};
                         invalidEnc = 0;
+                    end
+                    `ifdef ENABLE_ZCB
+                    // c.lbu
+                    else if (i16.ciw.funct3 == 3'b100 && i16.raw[12:10] == 3'b000) begin
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rs2 = 0;
+                        uop.immB = 1;
+                        uop.imm = {30'b0, i16.raw[5], i16.raw[6]};
+                        uop.rd = {2'b01, i16.raw[4:2]};
+                        uop.fu = FU_AGU;
+                        uop.opcode = LSU_LBU;
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.lhu
+                    else if (i16.ciw.funct3 == 3'b100 && i16.raw[12:10] == 3'b001 && i16.raw[6] == 0) begin
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rs2 = 0;
+                        uop.immB = 1;
+                        uop.imm = {30'b0, i16.raw[5], 1'b0};
+                        uop.rd = {2'b01, i16.raw[4:2]};
+                        uop.fu = FU_AGU;
+                        uop.opcode = LSU_LHU;
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.lh
+                    else if (i16.ciw.funct3 == 3'b100 && i16.raw[12:10] == 3'b001 && i16.raw[6] == 1) begin
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rs2 = 0;
+                        uop.immB = 1;
+                        uop.imm = {30'b0, i16.raw[5], 1'b0};
+                        uop.rd = {2'b01, i16.raw[4:2]};
+                        uop.fu = FU_AGU;
+                        uop.opcode = LSU_LH;
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.sb
+                    else if (i16.ciw.funct3 == 3'b100 && i16.raw[12:10] == 3'b010) begin
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rs2 = {2'b01, i16.raw[4:2]};
+                        uop.imm = {30'b0, i16.raw[5], i16.raw[6]};
+                        uop.immB = 0;
+                        uop.rd = 0;
+                        uop.fu = FU_AGU;
+                        uop.opcode = LSU_SB;
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    `endif
+                    // c.sw with preinc
+                    else if (i16.ciw.funct3 == 3'b101 && IN_dec.allowCustom) begin
+                        uop.opcode = LSU_SW_PREINC;
+                        uop.fu = FU_AGU;
+                        uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
+                        uop.rs1 = {2'b01, i16.cs.rd_rs1};
+                        uop.rs2 = {2'b01, i16.cs.rs2};
+                        uop.rd = {2'b01, i16.cs.rd_rs1};
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.sw with postinc
+                    else if (i16.ciw.funct3 == 3'b111 && IN_dec.allowCustom) begin
+                        uop.opcode = LSU_SW_POSTINC;
+                        uop.fu = FU_AGU;
+                        uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
+                        uop.rs1 = {2'b01, i16.cs.rd_rs1};
+                        uop.rs2 = {2'b01, i16.cs.rs2};
+                        uop.rd = {2'b01, i16.cs.rd_rs1};
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.lw with full-range address register
+                    else if (i16.cl.funct3 == 3'b011 && {i16.raw[12], i16.raw[5]} != 2'b01 && IN_dec.allowCustom) begin
+                        uop.opcode = LSU_LW;
+                        uop.fu = FU_AGU;
+                        uop.imm = {27'b0, i16.cl.imm2[1:0], i16.cl.imm[1], 2'b00};
+                        uop.rs1 = {i16.raw[12], i16.raw[5], i16.cl.rs1};
+                        uop.rd = {2'b01, i16.cl.rd};
+                        uop.immB = 1;
+                        invalidEnc = 0;
+                    end
+                    // c.lw r8 r8(r8)
+                    else if (i16.cl.funct3 == 3'b001 && IN_dec.allowCustom) begin
+                        uop.fu = FU_AGU;
+                        uop.rs2 = {2'b01, i16.raw[12:10]};
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd =  {2'b01, i16.raw[4:2]};
+                        invalidEnc = 0;
+                        case (i16.raw[6:5])
+                            0: uop.opcode = LSU_LB;
+                            1: uop.opcode = LSU_LH;
+                            2: uop.opcode = LSU_LW;
+                            default: invalidEnc = 1;
+                        endcase
                     end
                 end
                 else if (i16.raw[1:0] == 2'b01) begin
@@ -1206,7 +1258,6 @@ always_comb begin
                         
                         isBranch = 1;
                         isJump = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
                         uop.fu = FU_RN;
                         
                         uop.immB = 1;
@@ -1224,8 +1275,6 @@ always_comb begin
                         isBranch = 1;
                         isJump = 1;
                         isCall = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-
                         invalidEnc = 0;
                     end
                     // c.beqz
@@ -1238,18 +1287,6 @@ always_comb begin
                         uop.rs1 = {2'b01, i16.cb.rd_rs1};
                         
                         isBranch = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                        
-                        /*if (DO_FUSE && i != 0 && 
-                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0) begin
-                            
-                            uop.rd = uopsComb[i-1].rd;
-                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
-                            validMask[i-1] = 0;
-                            uop.opcode = INT_F_ADDI_BEQ;
-                        end*/
-                        
                         invalidEnc = 0;
                     end
                     // c.bnez
@@ -1262,17 +1299,6 @@ always_comb begin
                         uop.rs1 = {2'b01, i16.cb.rd_rs1};
                         
                         isBranch = 1;
-                        branchTarget = IN_instrs[i].pc[30:0] + uop.imm[31:1];
-                        
-                        /*if (DO_FUSE && i != 0 && 
-                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_ADD &&
-                            uopsComb[i-1].immB && uopsComb[i-1].rs0 == uop.rs1 && uop.rs1 != 0) begin
-                            
-                            uop.rd = uopsComb[i-1].rd;
-                            uop.imm[31:20] = uopsComb[i-1].imm[11:0];
-                            validMask[i-1] = 0;
-                            uop.opcode = INT_F_ADDI_BNE;
-                        end*/
                         invalidEnc = 0;
                     end
                     // c.li 
@@ -1310,15 +1336,6 @@ always_comb begin
                         uop.immB = 1;
                         uop.rs1 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
-                        
-                        if (FUSE_LUI && i != 0 && uop.opcode == INT_ADD && 
-                            uopsComb[i-1].valid && uopsComb[i-1].fu == FU_INT && uopsComb[i-1].opcode == INT_LUI &&
-                            uopsComb[i-1].rd == uop.rd && uop.rd == uop.rs1) begin
-                            
-                            uopsComb[i-1].imm[11:0] = uop.imm[11:0];
-                            if (uop.imm[11]) uopsComb[i-1].imm[31:12] = uopsComb[i-1].imm[31:12] - 1;
-                            uop.valid = 0;
-                        end
                         
                         invalidEnc = 0;
                     end
@@ -1371,24 +1388,98 @@ always_comb begin
                         uop.fu = FU_RN;
                         invalidEnc = 0;
                     end
+                    `ifdef ENABLE_ZCB
+                    // c.zext.b
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b000) begin
+                        
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_INT;
+                        uop.opcode = INT_AND;
+                        uop.immB = 1;
+                        uop.imm = 32'h000000FF;
+                        invalidEnc = 0;
+                    end
+                    // c.sext.b
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b001) begin
+                        
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_INT;
+                        uop.opcode = INT_SE_B;
+                        uop.immB = 0;
+                        invalidEnc = 0;
+                    end
+                    // c.zext.h
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b010) begin
+                        
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_INT;
+                        uop.opcode = INT_ZE_H;
+                        uop.immB = 0;
+                        invalidEnc = 0;
+                    end
+                    // c.sext.h
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b011) begin
+                        
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_INT;
+                        uop.opcode = INT_SE_H;
+                        uop.immB = 0;
+                        invalidEnc = 0;
+                    end
+                    // c.not
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b101) begin
+                        
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_INT;
+                        uop.opcode = INT_XNOR;
+                        uop.immB = 1;
+                        uop.imm = 0;
+                        invalidEnc = 0;
+                    end
+                    `ifdef ENABLE_INT_MUL
+                    // c.mul
+                    else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b10) begin
+                        uop.rs2 = {2'b01, i16.raw[4:2]};
+                        uop.rs1 = {2'b01, i16.raw[9:7]};
+                        uop.rd = {2'b01, i16.raw[9:7]};
+
+                        uop.fu = FU_MUL;
+                        uop.opcode = MUL_MUL;
+                        uop.immB = 0;
+                        invalidEnc = 0;
+                    end
+                    `endif
+                    `endif
                 end
                 else if (i16.raw[1:0] == 2'b10) begin
                     // c.lwsp
                     if (i16.ci.funct3 == 3'b010 && !(i16.ci.rd_rs1 == 0)) begin
                         uop.opcode = LSU_LW;
-                        uop.fu = FU_LD;
+                        uop.fu = FU_AGU;
                         uop.imm = {24'b0, i16.ci.imm[1:0], i16.ci.imm2, i16.ci.imm[4:2], 2'b00};
                         uop.rs1 = 2; // sp
                         uop.rd = i16.ci.rd_rs1;
+                        uop.immB = 1;
                         invalidEnc = 0;
                     end
                     // c.swsp
                     else if (i16.css.funct3 == 3'b110) begin
                         uop.opcode = LSU_SW;
-                        uop.fu = FU_ST;
+                        uop.fu = FU_AGU;
                         uop.imm = {24'b0, i16.css.imm[1:0], i16.css.imm[5:2], 2'b00};
                         uop.rs1 = 2; // sp
                         uop.rs2 = i16.css.rs2;
+                        uop.immB = 1;
                         invalidEnc = 0;
                     end
                     // c.jr
@@ -1404,8 +1495,6 @@ always_comb begin
                         
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                        else if (isReturn)
-                            uop.imm = {lateReturnAddr, 1'b0};
                         else 
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
 
@@ -1464,145 +1553,6 @@ always_comb begin
                     end
                 end
             end
-            
-            // Handle branch target mispredictions
-            if (IN_instrs[i].predTaken) begin
-                if (!(isBranch || isIndirBranch) || 
-                    (IN_instrs[i].predTarget != branchTarget && !isIndirBranch) || 
-                    IN_instrs[i].predInvalid) begin
-                    
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-
-                    if (isCall && !isReturn)
-                        decBranch_c.retAct = RET_PUSH;
-                    else if (!isCall && isReturn)
-                        decBranch_c.retAct = RET_POP;
-                    else
-                        decBranch_c.retAct = RET_NONE;
-                
-                    // Delete matching return prediction entries
-                    // TODO: Only clean if this actually was an invalid return pred
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 1;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 0;
-                    retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
-                    if (!IN_instrs[i].predInvalid)
-                        retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
-                    else
-                        retUpd_c.addr = IN_instrs[i].pc;
-                    
-                    
-                    // Branch back to following instruction if this is not a branch at all,
-                    // or branch to correct destination if this is a branch.
-                    if (IN_instrs[i].predInvalid) begin
-                        decBranch_c.dst = IN_instrs[i].pc;
-                        invalidEnc = 1;
-                        uop.valid = 0;
-                        
-                        // Delete matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 1;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.src = {IN_instrs[i].pc, 1'b0};
-                    end
-                    else if (isBranch) begin
-                        decBranch_c.dst = branchTarget;
-                        // Correct matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 0;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.isCall = isCall;
-                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.dst = {branchTarget, 1'b0};
-                        btUpdate_c.compressed = uop.compressed;
-                        btUpdate_c.isJump = isJump;
-                        
-                    end
-                    else begin
-                        decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
-
-                        // Delete matching regular branch prediction entries
-                        btUpdate_c.valid = 1;
-                        btUpdate_c.clean = 1;
-                        btUpdate_c.multiple = 0;
-                        btUpdate_c.multipleOffs = 'x;
-                        btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                        btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                    end
-                end
-            end
-            else begin
-                // Handle non-predicted taken jumps
-                if (isJump) begin
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.dst = branchTarget;
-
-                    // Register branch target
-                    btUpdate_c.valid = 1;
-                    btUpdate_c.clean = 0;
-                    btUpdate_c.isCall = isCall;
-                    btUpdate_c.src = uop.compressed ? {IN_instrs[i].pc, 1'b0} : ({IN_instrs[i].pc, 1'b0} + 2);
-                    btUpdate_c.fetchStartOffs = IN_instrs[i].fetchStartOffs;
-                    btUpdate_c.dst = {branchTarget, 1'b0};
-                    btUpdate_c.compressed = uop.compressed;
-                    btUpdate_c.isJump = isJump;
-                    btUpdate_c.multiple = uop.fetchOffs > IN_instrs[i].fetchPredOffs;
-                    btUpdate_c.multipleOffs = IN_instrs[i].fetchPredOffs + 1;
-                end
-                
-                // Update return stack
-                if (isCall) begin
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 0;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 0;
-                    retUpd_c.isCall = 1;
-                    retUpd_c.idx = IN_instrs[i].rIdx;
-                    retUpd_c.addr = uop.compressed ? {IN_instrs[i].pc} : ({IN_instrs[i].pc} + 1);
-
-                    decBranch_c.retAct = RET_PUSH;
-                    
-                    // We need to make sure that all rets after the call use the correct return address.
-                    // A ret may have been fetched already (for short functions), so flush the fetch pipeline.
-                    if (isIndirBranch) begin
-                        decBranch_c.taken = 1;
-                        decBranch_c.fetchID = IN_instrs[i].fetchID;
-                        decBranch_c.dst = retUpd_c.addr + 1;
-                    end
-                end
-                // Update return stack for non-predicted rets
-                else if (isReturn) begin
-                    retUpd_c.valid = 1;
-                    retUpd_c.cleanRet = 0;
-                    retUpd_c.compr = uop.compressed;
-                    retUpd_c.isRet = 1;
-                    retUpd_c.isCall = 0;
-                    retUpd_c.idx = IN_instrs[i].rIdx - 1;
-                    retUpd_c.addr = uop.compressed ? IN_instrs[i].pc : (IN_instrs[i].pc + 1);
-                    
-                    decBranch_c.taken = 1;
-                    decBranch_c.fetchID = IN_instrs[i].fetchID;
-                    decBranch_c.retAct = RET_POP;
-                    decBranch_c.dst = lateReturnAddr;
-                end
-            end
-            
-            // Wait For Interrupt jumps to the instruction after itself
-            // and disables the frontend until interrupt.
-            if (isWFI) begin
-                decBranch_c.taken = 1;
-                decBranch_c.wfi = 1;
-                decBranch_c.fetchID = IN_instrs[i].fetchID;
-                decBranch_c.dst = (IN_instrs[i].pc + (uop.compressed ? 1 : 2));
-            end
         end
         
         if (invalidEnc) begin
@@ -1613,18 +1563,7 @@ always_comb begin
     end
 end
 
-//assign OUT_retUpd = retUpd_c;
-
-always_ff@(posedge clk) begin
-    
-    OUT_btUpdate <= 'x;
-    OUT_btUpdate.valid <= 0;
-
-    OUT_decBranch <= 'x;
-    OUT_decBranch.taken <= 0;
-
-    OUT_retUpd <= 'x;
-    OUT_retUpd.valid <= 0;    
+always_ff@(posedge clk) begin   
 
     if (rst || IN_invalidate) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
@@ -1633,20 +1572,8 @@ always_ff@(posedge clk) begin
         end
     end
     else if (en) begin
-        if (OUT_decBranch.taken) begin
-            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                OUT_uop[i] <= 'x;
-                OUT_uop[i].valid <= 0;
-            end
-        end
-        else begin
-            for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-                OUT_uop[i] <= uopsComb[i];
-                if (!validMask[i]) OUT_uop[i].valid <= 0;
-            end
-            OUT_btUpdate <= btUpdate_c;
-            OUT_decBranch <= decBranch_c;
-            OUT_retUpd <= retUpd_c;
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+            OUT_uop[i] <= uopsComb[i];
         end
     end
 end

@@ -1,7 +1,9 @@
 typedef logic[4:0] RegNm;
 typedef logic[6:0] Tag;
+typedef logic[5:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[11:0] BrID;
+typedef logic[31:0] RegT;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[11:0] BHist_t;
@@ -9,6 +11,8 @@ typedef logic[2:0] TageID_t;
 typedef logic[1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
+typedef logic[1:0] StOff_t;
+typedef logic[2:0] StNonce_t;
 
 typedef enum logic[5:0]
 {
@@ -56,10 +60,11 @@ typedef enum logic[5:0]
     INT_BEXT,
     INT_BINV,
     INT_BSET,
+`ifdef ENABLE_FP
     INT_FSGNJ_S,
     INT_FSGNJN_S,
     INT_FSGNJX_S,
-    
+`endif
     INT_V_RET,
     INT_V_JALR,
     INT_V_JR
@@ -85,21 +90,13 @@ typedef enum logic[5:0]
 {
     LSU_LB, 
     LSU_LH, 
-    LSU_LW, 
+    LSU_LW,
+
     LSU_LBU,
     LSU_LHU,
-    
-    LSU_LR_W
-    //LSU_LB_RR, 
-    //LSU_LH_RR, 
-    //LSU_LW_RR, 
-    //LSU_LBU_RR,
-    //LSU_LHU_RR
-    
-} OPCode_LSU;
+    LSU_LR_W,
 
-typedef enum logic[5:0]
-{
+    LSU_SC_W,
     LSU_SB,
     LSU_SH,
     LSU_SW,
@@ -107,16 +104,15 @@ typedef enum logic[5:0]
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
     LSU_CBO_FLUSH,
-    
-    LSU_F_ADDI_SW,
-    
-    LSU_SB_I,
-    LSU_SH_I,
-    LSU_SW_I,
-    
-    LSU_SC_W
-    
-} OPCode_ST;
+
+    LSU_SB_PREINC=48,
+    LSU_SH_PREINC,
+    LSU_SW_PREINC,
+    LSU_SB_POSTINC,
+    LSU_SH_POSTINC,
+    LSU_SW_POSTINC
+
+} OPCode_AGU;
 
 typedef enum logic[2:0]
 {
@@ -233,7 +229,7 @@ typedef enum logic[5:0]
     
 } OPCode_FU_TRAP;
 
-typedef enum logic[3:0] {FU_INT, FU_LD, FU_ST, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 
 typedef enum logic[3:0] 
 {
@@ -283,6 +279,26 @@ typedef enum logic[1:0]
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
 } IFetchFault;
 
+typedef enum logic[2:0]
+{
+    FLUSH_ORDERING,
+    FLUSH_BRANCH_TK,
+    FLUSH_BRANCH_NT,
+    FLUSH_RETURN,
+    FLUSH_IBRANCH,
+    FLUSH_MEM_ORDER
+} FlushCause;
+
+typedef enum logic[2:0]
+{
+    STALL_NONE,
+    STALL_FRONTEND,
+    STALL_BACKEND,
+    STALL_STORE,
+    STALL_LOAD,
+    STALL_ROB
+} StallCause;
+
 typedef enum logic[3:0]
 {
     MEMC_NONE,
@@ -316,6 +332,13 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[`AXI_WIDTH-1:0] data;
+    logic[31:0] addr;
+    logic valid;
+} MemController_LdDataFwd;
+
+typedef struct packed
+{
     logic[31:0] writeAddr;
     logic[31:0] readAddr;
     logic[`CACHE_SIZE_E-3:0] cacheAddr;
@@ -327,16 +350,19 @@ typedef struct packed
 
 typedef struct packed
 {
-    MemC_Cmd cmd;
-    logic[31:0] data; // only used for MMIO stores
+    logic[`AXI_WIDTH/8-1:0] mask;
+    logic[`AXI_WIDTH-1:0] data;
+
     logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
     CacheID_t cacheID;
+    MemC_Cmd cmd;
 } MemController_Req;
 
 typedef struct packed
 {
+    MemController_LdDataFwd ldDataFwd;
     MemController_Transf[`AXI_NUM_TRANS-1:0] transfers;
     MemController_SglLdRes sglLdRes;
     MemController_SglStRes sglStRes;
@@ -355,6 +381,7 @@ typedef struct packed
     logic isRet;
     logic multiple;
     logic taken;
+    logic dirOnly;
     logic valid;
 } PredBranch;
 
@@ -362,7 +389,6 @@ typedef struct packed
 {
     logic predicted;
     logic taken;
-    logic isJump;
 } BranchPredInfo;
 
 typedef struct packed
@@ -389,8 +415,17 @@ typedef enum logic[1:0]
     HIST_NONE, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
 } HistoryAction;
 
+typedef enum logic[1:0]
+{
+    BR_TGT_MANUAL, BR_TGT_CUR, BR_TGT_CP2, BR_TGT_CP4
+} BranchTargetSpec;
+
 typedef struct packed
 {
+    FlushCause cause; // only for performance counters
+    BranchTargetSpec tgtSpec;
+    logic isSCFail;
+    FetchOff_t fetchOffs;
     RetStackAction retAct;
     HistoryAction histAct;
     logic[31:0] dstPC;
@@ -404,6 +439,18 @@ typedef struct packed
 
 typedef struct packed
 {
+    BranchTargetSpec tgtSpec;
+    FetchOff_t fetchOffs;
+    RetStackAction retAct;
+    HistoryAction histAct;
+    logic[30:0] dst;
+    FetchID_t fetchID;
+    logic wfi;
+    logic taken;
+} DecodeBranchProv;
+
+typedef struct packed
+{
     logic[30:0] addr;
     RetStackIdx_t idx;
     logic isCall;
@@ -412,16 +459,6 @@ typedef struct packed
     logic cleanRet;
     logic valid;
 } ReturnDecUpdate;
-
-typedef struct packed
-{
-    RetStackAction retAct;
-    HistoryAction histAct;
-    logic[30:0] dst;
-    logic[4:0] fetchID;
-    logic wfi;
-    logic taken;
-} DecodeBranchProv;
 
 typedef struct packed
 {
@@ -438,6 +475,7 @@ typedef struct packed
     FetchOff_t lastValid;
     FetchOff_t predPos;
     BranchPredInfo bpi;
+    logic predDirOnly;
     logic[30:0] predTarget;
     RetStackIdx_t rIdx;
 
@@ -545,6 +583,7 @@ typedef struct packed
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] pc;
+    FetchOff_t fetchOffs;
     FetchOff_t fetchStartOffs;
     FetchOff_t fetchPredOffs;
     logic[31:0] imm;
@@ -563,13 +602,20 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] result;
-    SqN storeSqN; // this is only used for atomics, may be 'x otherwise
     Tag tagDst;
     SqN sqN;
     Flags flags;
     logic doNotCommit;
     logic valid;
 } RES_UOp;
+
+typedef struct packed
+{
+    logic[31:0] result;
+    SqN storeSqN;
+    SqN sqN;
+    logic valid;
+} AMO_Data_UOp;
 
 typedef enum logic[1:0] 
 {
@@ -586,18 +632,54 @@ typedef struct packed
     logic[3:0] wmask;
     logic signExtend;
     logic[1:0] size;
+    logic isStore; // both isLoad and isStore may be set (for atomics)
     logic isLoad;
+    logic isLrSc;
+    logic earlyLoadFailed;
     logic[31:0] pc;
     Tag tagDst;
     SqN sqN;
     SqN storeSqN; // 7
     SqN loadSqN; // 7
+    FetchOff_t fetchOffs;
     FetchID_t fetchID; // 5
     logic doNotCommit; // 1
     AGU_Exception exception; // 2
     logic compressed; // 1
     logic valid; // 1
 } AGU_UOp;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    SqN storeSqN;
+    logic valid;
+} StDataUOp;
+
+typedef struct packed
+{
+    StOff_t offs;
+    Tag tag;
+    SqN storeSqN;
+    logic valid;
+} StDataLookupUOp;
+
+typedef struct packed
+{
+    logic[31:0] data;
+    logic[3:0] fwdMask;
+    logic[31:0] addr;
+    logic[1:0] size;
+    logic sext;
+    logic dataAvail;
+    
+    AGU_Exception exception;
+    Tag tagDst;
+    SqN sqN;
+    logic external;
+    logic doNotCommit;
+    logic valid;
+} LoadResUOp;
 
 typedef struct packed
 {
@@ -649,6 +731,8 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] data;
+    logic dataValid;
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;
@@ -670,18 +754,29 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[31:0] addr;
     SqN loadSqN;
     logic fail;
+    logic doNotReIssue;
     logic external;
     logic valid;
 } LD_Ack;
 
 typedef struct packed
 {
+    RegT data;
     logic[31:0] addr;
-    logic[31:0] data;
     logic[3:0] wmask;
+    logic valid;
+} SQ_UOp;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic[`AXI_WIDTH-1:0] data;
+    logic[`AXI_WIDTH/8-1:0] wmask;
     logic isMMIO;
+    StNonce_t nonce;
     StID_t id;
     logic valid;
 } ST_UOp;
@@ -689,18 +784,19 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] addr;
-    logic[31:0] data;
-    logic[3:0] wmask;
-    StID_t id;
+    logic[`AXI_WIDTH-1:0] data;
+    logic[`AXI_WIDTH/8-1:0] wmask;
+    StNonce_t nonce;
+    StID_t idx;
     logic fail;
     logic valid;
 } ST_Ack;
 
 typedef struct packed
 {
-    SqN maxComSqN;
+    SqN sqN;
     logic valid;
-} SQ_ComInfo;
+} ComLimit;
 
 typedef struct packed
 {
@@ -801,6 +897,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic allowCustom;
     logic allowWFI;
 } DecodeState;
 
@@ -827,6 +924,14 @@ typedef struct packed
     logic[`CACHE_SIZE_E-3:0] addr;
     logic[127:0] data;
 } ICacheIF;
+
+typedef struct packed
+{
+    logic[1:0] stallWeigth;
+    StallCause stallCause;
+    logic[3:0] branchRetire;
+    logic[3:0] validRetire;
+} ROB_PERFC_Info;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
@@ -875,36 +980,32 @@ endinterface
 
 interface IF_Cache();
     
-    logic we;
-    logic[11:0] waddr;
-    logic[$clog2(`CASSOC)-1:0] wassoc;
-    logic[31:0] wdata;
-    logic[3:0] wmask;
-    
-    logic re;
-    logic[11:0] raddr;
-    logic[`CASSOC-1:0][31:0] rdata;
-    
-    logic rbusy;
-    logic[$clog2(`CBANKS)-1:0] rbusyBank;
-    logic wbusy;
+    logic[`NUM_AGUS-1:0] re;
+    logic[`NUM_AGUS-1:0] we;
+    logic[`NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
+    logic[`NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
+    logic[`NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
+    logic[`NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
+    logic[`NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
+    logic[`NUM_AGUS-1:0] busy;
+    logic[`NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
     
     modport HOST
     (
-        output we, waddr, wassoc, wdata, wmask, re, raddr,
-        input rdata, rbusy, rbusyBank, wbusy
+        output we, wassoc, wdata, wmask, re, addr,
+        input rdata, busy, rbusyBank
     );
     
     modport MEM
     (
-        input we, waddr, wassoc, wdata, wmask, re, raddr,
-        output rdata, rbusy, rbusyBank, wbusy
+        input we, wassoc, wdata, wmask, re, addr,
+        output rdata, busy, rbusyBank
     );
 endinterface
 
 typedef struct packed
 {
-    logic[19:0] addr;
+    logic[32-`VIRT_IDX_LEN-1:0] addr;
     logic valid;
 } CTEntry;
 
@@ -919,12 +1020,12 @@ typedef struct packed
 interface IF_CTable();
     
     logic we;
-    logic[11:0] waddr;
+    logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
     
     logic re[1:0];
-    logic[11:0] raddr[1:0];
+    logic[`VIRT_IDX_LEN-1:0] raddr[1:0];
     CTEntry[1:0][`CASSOC-1:0] rdata;
     
     modport HOST
@@ -973,12 +1074,12 @@ endinterface
 interface IF_ICTable();
     
     logic we;
-    logic[11:0] waddr;
+    logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
     
     logic re;
-    logic[11:0] raddr;
+    logic[`VIRT_IDX_LEN-1:0] raddr;
     CTEntry[`CASSOC-1:0] rdata;
     
     modport HOST
@@ -999,17 +1100,18 @@ interface IF_ICache();
     logic re;
     logic[11:0] raddr;
     logic[`CASSOC-1:0][127:0] rdata;
+    logic busy;
     
     modport HOST
     (
         output re, raddr,
-        input rdata
+        input rdata, busy
     );
     
     modport MEM
     (
         input re, raddr,
-        output rdata
+        output rdata, busy
     );
 endinterface
 

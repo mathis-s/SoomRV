@@ -21,7 +21,7 @@ module CacheReadInterface
     output logic OUT_last,
     
     // Cache Interface
-    input reg IN_CACHE_ready,
+    input wire IN_CACHE_ready,
     output reg OUT_CACHE_ce,
     output reg OUT_CACHE_we,
     output reg[ADDR_BITS-1:0] OUT_CACHE_addr,

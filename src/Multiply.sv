@@ -96,7 +96,6 @@ always_ff@(posedge clk) begin
             if (pl[NUM_STAGES].valid && (!IN_branch.taken || $signed(pl[NUM_STAGES].sqN - IN_branch.sqN) <= 0)) begin
                 
                 OUT_uop.valid <= 1;
-                OUT_uop.storeSqN <= 'x;
                 OUT_uop.tagDst <= pl[NUM_STAGES].tagDst;
                 OUT_uop.sqN <= pl[NUM_STAGES].sqN;
                 OUT_uop.flags <= FLAGS_NONE;

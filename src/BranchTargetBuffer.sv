@@ -29,6 +29,7 @@ typedef struct packed
 } BTBEntry;
 
 localparam LENGTH = `BTB_ENTRIES;
+localparam U_CNT_LEN = 2;
 
 
 (* ram_style = "block" *)
@@ -36,6 +37,8 @@ BTBEntry entries[LENGTH-1:0];
 
 (* ram_style = "block" *)
 logic multiple[LENGTH-1:0];
+
+logic[U_CNT_LEN-1:0] useful[LENGTH-1:0];
 
 // Predict
 struct packed
@@ -61,7 +64,11 @@ always_comb begin
     OUT_branchCompr = 0;
     OUT_branchSrcOffs = 'x;
     
-    if (fetched.entry.valid && fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE]) begin
+    if (fetched.entry.valid && 
+        fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE] &&
+        // ignore predictions in the same line but before the current PC
+        fetched.entry.offs >= fetched.pc[0+:$bits(FetchOff_t)]
+    ) begin
         OUT_branchFound = 1;
         OUT_multipleBranches = fetched.multiple;
         OUT_branchDst = fetched.entry.dst;
@@ -87,12 +94,12 @@ always_ff@(posedge clk) begin
     end
     else begin
         if (IN_btUpdate.valid) begin
-            reg[$clog2(LENGTH)-1:0] idx = {IN_btUpdate.src[$clog2(LENGTH):4], IN_btUpdate.fetchStartOffs};
+            reg[$clog2(LENGTH)-1:0] idx = {IN_btUpdate.src[$clog2(LENGTH):$bits(FetchOff_t)+1], IN_btUpdate.fetchStartOffs};
             if (IN_btUpdate.clean) begin
                 entries[idx] <= 'x;
                 entries[idx].valid <= 0;
             end
-            else begin
+            else if (useful[idx] == 0) begin
                 
                 if (IN_btUpdate.multiple) begin
                     // Special handling for multiple branches in the same fetch package:
@@ -114,30 +121,25 @@ always_ff@(posedge clk) begin
                 entries[idx].dst <= IN_btUpdate.dst[31:1];
                 entries[idx].src <= IN_btUpdate.src[$clog2(LENGTH)+1 +: `BTB_TAG_SIZE];
                 entries[idx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];
+
+                assert((IN_btUpdate.src[1+:$bits(FetchOff_t)]) >= idx[0+:$bits(FetchOff_t)]);
+
                 multiple[idx] <= 0;
             end
+            else useful[idx] <= useful[idx] - 1;
         end
-        else if (setMult.valid) begin
-            multiple[setMult.idx] <= 1;
-            setMult <= SetMultiple'{valid: 0, default: 'x};
+        else begin
+            if (setMult.valid) begin
+                multiple[setMult.idx] <= 1;
+                setMult <= SetMultiple'{valid: 0, default: 'x};
+            end
+            if (OUT_branchFound) begin
+                reg[$clog2(LENGTH)-1:0] idx = fetched.pc[$clog2(LENGTH)-1:0];
+                if (useful[idx] != {U_CNT_LEN{1'b1}})
+                    useful[idx] <= useful[idx] + 1;
+            end
         end
     end
-end
-
-logic[$clog2(`BTB_ENTRIES):0] dbgOcc;
-
-logic[`BTB_ENTRIES-1:0] dbgValid;
-logic[`BTB_ENTRIES-1:0] dbgUsed;
-
-always_comb begin
-    dbgOcc = 0;
-    dbgValid = 0;
-    dbgUsed = 0;
-    for (integer i = 0; i < LENGTH; i=i+1)
-        if (entries[i].valid) begin
-            dbgOcc = dbgOcc + 1;
-            dbgValid[i] = 1;
-        end
 end
 
 endmodule

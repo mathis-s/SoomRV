@@ -68,9 +68,16 @@ typedef enum logic[1:0]
 
 typedef struct packed
 {
+    // On store cache misses, we allow fusing a single
+    // store into the cache line read
+    logic[`AXI_WIDTH-1:0] storeData;
+    logic[(`AXI_WIDTH/8)-1:0] storeMask;
+    
+
     logic[`CLSIZE_E-2:0] evictProgress;
     logic[`CLSIZE_E-2:0] progress;
     logic[`CLSIZE_E-2:0] addrCounter;
+    logic[`CLSIZE_E-2:0] fwdAddrCounter;
     logic[`CACHE_SIZE_E-3:0] cacheAddr;
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
@@ -104,6 +111,7 @@ end
 
 MemController_SglLdRes sglLdRes;
 MemController_SglStRes sglStRes;
+MemController_LdDataFwd ldDataFwd;
 
 // Find enqueue index
 logic[$clog2(`AXI_NUM_TRANS)-1:0] enqIdx;
@@ -166,19 +174,20 @@ typedef struct packed
 AXI_AR axiAR;
 logic arFIFO_outValid;
 logic arFIFO_ready;
-FIFO#($bits(AXI_AR), 4, 1, 1) arFIFO
+assign s_axi_arvalid = arFIFO_outValid;
+FIFO#($bits(AXI_AR)-1, 2, 1, 0) arFIFO
 (
     .clk(clk),
     .rst(rst),
     .free(),
 
     .IN_valid(axiAR.arvalid),
-    .IN_data(axiAR),
+    .IN_data(axiAR[1+:$bits(AXI_AR)-1]),
     .OUT_ready(arFIFO_ready),
     
     .OUT_valid(arFIFO_outValid),
     .IN_ready(s_axi_arready),
-    .OUT_data({s_axi_arid, s_axi_araddr, s_axi_arlen, s_axi_arsize, s_axi_arburst, s_axi_arlock, s_axi_arcache, s_axi_arvalid})
+    .OUT_data({s_axi_arid, s_axi_araddr, s_axi_arlen, s_axi_arsize, s_axi_arburst, s_axi_arlock, s_axi_arcache})
 );
 reg[$clog2(`AXI_NUM_TRANS)-1:0] arIdx;
 reg arIdxValid;
@@ -203,7 +212,7 @@ always_comb begin
     if (arIdxValid) begin
         axiAR.arvalid = 1;
         axiAR.arburst = isMMIO[arIdx] ? FIXED : WRAP;
-        axiAR.arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - 4)) - 1);
+        axiAR.arlen = isMMIO[arIdx] ? 0 : ((1 << (`CLSIZE_E - $clog2(WIDTH / 8))) - 1);
         axiAR.araddr = transfers[arIdx].readAddr;
         axiAR.arid = arIdx;
 
@@ -240,9 +249,12 @@ always_comb begin
         end
     end
     
+    OUT_stat.ldDataFwd = ldDataFwd;
+
     // MMIO
     OUT_stat.sglLdRes = sglLdRes;
     OUT_stat.sglStRes = sglStRes;
+
 end
 
 // Output Debug Info
@@ -258,13 +270,13 @@ end
 logic ICW_ready;
 logic ICW_valid;
 logic[`CACHE_SIZE_E-3:0] ICW_addr;
-logic[127:0] ICW_data;
+logic[WIDTH-1:0] ICW_data;
 logic[`AXI_ID_LEN-1:0] ICW_id;
 
 logic ICW_ackValid;
 logic[`AXI_ID_LEN-1:0] ICW_ackId;
 
-CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 128, `AXI_ID_LEN) icacheWriteIF
+CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, `AXI_ID_LEN) icacheWriteIF
 (
     .clk(clk),
     .rst(rst),
@@ -288,7 +300,7 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 128, `AXI_ID_LEN) icacheWriteIF
 logic DCW_ready;
 logic DCW_valid;
 logic[`CACHE_SIZE_E-3:0] DCW_addr;
-logic[127:0] DCW_data;
+logic[WIDTH-1:0] DCW_data;
 logic[`AXI_ID_LEN-1:0] DCW_id;
 
 logic DCW_ackValid;
@@ -381,6 +393,13 @@ always_comb begin
                 DCW_addr = GetCacheRdAddr(transfers[buf_rid]);
                 DCW_data = buf_rdata;
                 DCW_id = buf_rid;
+
+                if (transfers[buf_rid].addrCounter == 0) begin
+                    for (integer i = 0; i < (`AXI_WIDTH/8); i=i+1)
+                        if (transfers[buf_rid].storeMask[i]) begin
+                            DCW_data[i*8+:8] = transfers[buf_rid].storeData[i*8+:8];
+                        end
+                end
             end
 
             1: if (ICW_ready) begin // icache
@@ -417,7 +436,7 @@ logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
 
 logic DCR_cacheReadValid;
 logic[`AXI_ID_LEN-1:0] DCR_cacheReadId;
-CacheReadInterface#(`CACHE_SIZE_E-2, 8, 128, `CWIDTH*32, 32, `AXI_ID_LEN) dcacheReadIF
+CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 32, `AXI_ID_LEN) dcacheReadIF
 (
     .clk(clk),
     .rst(rst),
@@ -461,19 +480,20 @@ typedef struct packed
 AXI_AW axiAW;
 logic awFIFO_outValid;
 logic awFIFO_ready;
-FIFO#($bits(AXI_AW), 4, 1, 1) awFIFO
+assign s_axi_awvalid = awFIFO_outValid;
+FIFO#($bits(AXI_AW)-1, 4, 1, 1) awFIFO
 (
     .clk(clk),
     .rst(rst),
     .free(),
 
     .IN_valid(axiAW.awvalid),
-    .IN_data(axiAW),
+    .IN_data(axiAW[1+:$bits(AXI_AW)-1]),
     .OUT_ready(awFIFO_ready),
     
     .OUT_valid(awFIFO_outValid),
     .IN_ready(s_axi_awready),
-    .OUT_data({s_axi_awid, s_axi_awaddr, s_axi_awlen, s_axi_awsize, s_axi_awburst, s_axi_awlock, s_axi_awcache, s_axi_awvalid})
+    .OUT_data({s_axi_awid, s_axi_awaddr, s_axi_awlen, s_axi_awsize, s_axi_awburst, s_axi_awlock, s_axi_awcache})
 );
 logic[`AXI_ID_LEN-1:0] awIdx;
 logic awIdxValid;
@@ -529,7 +549,7 @@ always_comb begin
         DCR_reqLen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - 2)) - 1);
         DCR_reqAddr = isMMIO[awIdx] ? 'x : transfers[awIdx].cacheAddr;
         DCR_reqMMIO = isMMIO[awIdx];
-        DCR_reqMMIOData = isMMIO[awIdx] ? transfers[awIdx].readAddr : 'x;
+        DCR_reqMMIOData = isMMIO[awIdx] ? transfers[awIdx].storeData[31:0] : 'x;
     end
 end
 
@@ -560,6 +580,9 @@ always_ff@(posedge clk) begin
     
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};
+    
+    ldDataFwd <= 'x;
+    ldDataFwd.valid <= 0;
 
     if (rst) begin
         for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
@@ -586,6 +609,7 @@ always_ff@(posedge clk) begin
             transfers[enqIdx].needWriteRq <= '0;
             transfers[enqIdx].progress <= 0;
             transfers[enqIdx].addrCounter <= 0;
+            transfers[enqIdx].fwdAddrCounter <= 0;
             transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
             transfers[enqIdx].cacheID <= selReq.cacheID;
 
@@ -597,11 +621,17 @@ always_ff@(posedge clk) begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
+                
+                transfers[enqIdx].storeData <= selReq.data;
+                transfers[enqIdx].storeMask <= selReq.mask;
             end
             else begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr;
                 transfers[enqIdx].readAddr <= selReq.readAddr;
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
+                
+                transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data);
+                transfers[enqIdx].storeMask <= '1; // unused
             end
 
             case (selReq.cmd)
@@ -628,8 +658,6 @@ always_ff@(posedge clk) begin
                 MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
                     transfers[enqIdx].needWriteRq <= 2'b11;
                     transfers[enqIdx].writeDone <= 0;
-                    // readAddr field is used to store data to write
-                    transfers[enqIdx].readAddr <= selReq.data;
                 end
                 default: assert(0);
             endcase
@@ -654,11 +682,27 @@ always_ff@(posedge clk) begin
                 sglLdRes.data <= buf_rdata[31:0];
             end
         end
+        
+        if (s_axi_rvalid && s_axi_rready) begin
+            if (transfers[s_axi_rid].cacheID == 0) begin
+                transfers[s_axi_rid].fwdAddrCounter <= transfers[s_axi_rid].fwdAddrCounter + WIDTH_W;
+
+                ldDataFwd.data <= s_axi_rdata;
+                if (transfers[s_axi_rid].fwdAddrCounter == 0) begin
+                    for (integer i = 0; i < `AXI_WIDTH/8; i=i+1)
+                        if (transfers[s_axi_rid].storeMask[i])
+                            ldDataFwd.data[i*8+:8] <= transfers[s_axi_rid].storeData[8*i+:8];
+                end
+
+                ldDataFwd.addr <= {transfers[s_axi_rid].readAddr[31:`CLSIZE_E], (transfers[s_axi_rid].readAddr[`CLSIZE_E-1:2] + transfers[s_axi_rid].fwdAddrCounter[`CLSIZE_E-3:0]), 2'b0};
+                ldDataFwd.valid <= 1;
+            end
+        end
 
         // Read ACK
         if (DCW_ackValid) begin
             transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + WIDTH_W;
-            if ((transfers[DCW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
+            if ((transfers[DCW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
                 transfers[DCW_ackId].readDone <= 1;
                 if (transfers[DCW_ackId].writeDone) begin
                     transfers[DCW_ackId] <= 'x;
@@ -668,7 +712,7 @@ always_ff@(posedge clk) begin
         end
         if (ICW_ackValid) begin
             transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + WIDTH_W;
-            if ((transfers[ICW_ackId].progress >> 2) == (1 << (`CLSIZE_E - 4)) - 1) begin
+            if ((transfers[ICW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
                 transfers[ICW_ackId].readDone <= 1;
                 if (transfers[ICW_ackId].writeDone) begin
                     transfers[ICW_ackId] <= 'x;
