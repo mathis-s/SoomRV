@@ -4,7 +4,7 @@ SoomRV is a simple superscalar out-of-order RISC-V core. It can execute up to 4 
 
 For running SoomRV on FPGA, have a look at the [SoomRV-Arty Repo](https://github.com/mathis-s/SoomRV-Arty).
 ## Basic Architecture
-<img src="https://user-images.githubusercontent.com/39701487/218574949-e18bcb51-5050-4f99-82a6-c8ea58c11a93.png" width="600" />
+<img src="https://github.com/mathis-s/SoomRV/assets/39701487/908afb93-b8b7-4bad-80b5-7cc20fa375cf.png" width="800" />
 
 ## Sample `strcmp` Execution (visualized using [Konata](https://github.com/shioyadan/Konata))
 ![Sample](https://user-images.githubusercontent.com/39701487/229142050-121ed8de-ae9b-4b49-b332-f6c7b5281daf.png)
