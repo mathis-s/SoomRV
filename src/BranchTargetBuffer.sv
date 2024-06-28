@@ -37,8 +37,6 @@ BTBEntry entries[LENGTH-1:0];
 (* ram_style = "block" *)
 logic multiple[LENGTH-1:0];
 
-logic[U_CNT_LEN-1:0] useful[LENGTH-1:0];
-
 // Predict
 struct packed
 {
