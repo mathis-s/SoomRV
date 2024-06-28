@@ -129,11 +129,6 @@ always_ff@(posedge clk) begin
                 multiple[setMult.idx] <= 1;
                 setMult <= SetMultiple'{valid: 0, default: 'x};
             end
-            if (OUT_branchFound) begin
-                reg[$clog2(LENGTH)-1:0] idx = fetched.pc[$clog2(LENGTH)-1:0];
-                if (useful[idx] != {U_CNT_LEN{1'b1}})
-                    useful[idx] <= useful[idx] + 1;
-            end
         end
     end
 end
