@@ -29,7 +29,6 @@ typedef struct packed
 } BTBEntry;
 
 localparam LENGTH = `BTB_ENTRIES;
-localparam U_CNT_LEN = 2;
 
 
 (* ram_style = "block" *)
@@ -99,7 +98,7 @@ always_ff@(posedge clk) begin
                 entries[idx] <= 'x;
                 entries[idx].valid <= 0;
             end
-            else if (useful[idx] == 0) begin
+            else begin
                 
                 if (IN_btUpdate.multiple) begin
                     // Special handling for multiple branches in the same fetch package:
@@ -126,7 +125,6 @@ always_ff@(posedge clk) begin
 
                 multiple[idx] <= 0;
             end
-            else useful[idx] <= useful[idx] - 1;
         end
         else begin
             if (setMult.valid) begin

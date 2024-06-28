@@ -11,7 +11,6 @@ module TrapHandler
     input TrapControlState IN_trapControl,
     output TrapInfoUpdate OUT_trapInfo,
 
-    output BPUpdate1 OUT_bpUpdate1,
     output BranchProv OUT_branch,
 
     input wire IN_MEM_busy,
@@ -32,15 +31,9 @@ assign OUT_pcReadAddr = IN_trapInstr.fetchID;
 wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:$bits(FetchOff_t)], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
 wire[31:0] nextInstr = {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
 
-BranchPredInfo baseIndexBPI;
-always_comb begin
-    baseIndexBPI = IN_pcReadData.bpi;
-end
-
 logic[31:0] OUT_dbgStallPC_c;
 logic OUT_fence_c;
 logic OUT_clearICache_c;
-BPUpdate1 OUT_bpUpdate1_c;
 BranchProv OUT_branch_c;
 TrapInfoUpdate OUT_trapInfo_c;
 logic OUT_flushTLB_c;
@@ -48,7 +41,6 @@ logic setMemoryWait;
 always_ff@(posedge clk) begin
     OUT_fence <= OUT_fence_c;
     OUT_clearICache <= OUT_clearICache_c;
-    OUT_bpUpdate1 <= OUT_bpUpdate1_c;
     OUT_trapInfo <= OUT_trapInfo_c;
     OUT_flushTLB <= OUT_flushTLB_c;
     OUT_dbgStallPC <= OUT_dbgStallPC_c;
@@ -68,8 +60,6 @@ always_comb begin
     OUT_fence_c = 0;
     OUT_clearICache_c = 0;
 
-    OUT_bpUpdate1_c = 'x;
-    OUT_bpUpdate1_c.valid = 0;
     OUT_branch_c = 'x;
     OUT_branch_c.taken = 0;
     OUT_trapInfo_c = 'x;
@@ -93,21 +83,22 @@ always_comb begin
                 
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
-                        OUT_branch_c.dstPC = nextInstr;
+                        OUT_branch_c.tgtSpec = BR_TGT_NEXT;
                     end
                     FLAGS_FENCE: begin
                         OUT_clearICache_c = 1;
                         setMemoryWait = 1;
                         OUT_fence_c = 1;
-                        OUT_branch_c.dstPC = nextInstr;
+                        OUT_branch_c.tgtSpec = BR_TGT_NEXT;
                     end
                     FLAGS_XRET: begin
+                        OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                         OUT_branch_c.dstPC = {IN_trapControl.retvec, 1'b0};
                     end
 
                     FLAGS_TRAP: begin // TRAP_V_SFENCE_VMA
                         OUT_flushTLB_c = 1;
-                        OUT_branch_c.dstPC = nextInstr;
+                        OUT_branch_c.tgtSpec = BR_TGT_NEXT;
                     end
                     default: begin end
                 endcase
@@ -120,6 +111,8 @@ always_comb begin
                         OUT_trapInfo_c.cause = IN_trapControl.interruptCause;
                         OUT_trapInfo_c.delegate = IN_trapControl.interruptDelegate;
                         OUT_trapInfo_c.isInterrupt = 1;
+
+                        OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                         OUT_branch_c.dstPC = {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                     end
                 
@@ -135,7 +128,6 @@ always_comb begin
                 OUT_branch_c.histAct = HIST_NONE;
                 OUT_branch_c.retAct = RET_NONE;
                 OUT_branch_c.isSCFail = 0;
-                OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                 OUT_branch_c.cause = FLUSH_ORDERING;
             end
 
@@ -200,10 +192,6 @@ always_comb begin
                 OUT_branch_c.isSCFail = 0;
                 OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                 OUT_branch_c.cause = FLUSH_ORDERING;
-            end
-            else if (IN_trapInstr.flags == FLAGS_PRED_TAKEN || IN_trapInstr.flags == FLAGS_PRED_NTAKEN) begin
-                OUT_bpUpdate1_c.valid = 1;
-                OUT_bpUpdate1_c.pc = IN_pcReadData.pc;
             end
             else begin
                 // If the not-executed flag is still set, this is not a trap uop but a request to look up the PC

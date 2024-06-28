@@ -11,6 +11,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
     input FetchID_t IN_misprFetchID,
 
     input FetchID_t IN_ROB_curFetchID,
+    input FetchLimit IN_BP_fetchLimit,
     
     // first cycle
     input IFetchOp IN_ifetchOp,
@@ -82,8 +83,6 @@ BranchHandler branchHandler
     .OUT_newPredPos(BH_newPredPos)
 );
 
-
-
 always_ff@(posedge clk) begin
     OUT_pcFileWE <= 0;
     OUT_pcFileEntry <= 'x;
@@ -103,6 +102,7 @@ always_comb begin
     OUT_bpFileAddr = fetchID;
 end
 
+wire FetchID_t fetchLimit = (IN_BP_fetchLimit.valid ? IN_BP_fetchLimit.fetchID : IN_ROB_curFetchID);
 always_comb begin
     OUT_stall = 0;
     if (IN_pw.busy && IN_pw.rqID == RQ_ID)
@@ -111,7 +111,7 @@ always_comb begin
     if ($signed(FIFO_free - $clog2(FIFO_SIZE)'(fetch0.valid) - $clog2(FIFO_SIZE)'(fetch1.valid) - 1) <= -1)
         OUT_stall = 1;
 
-    if (IN_ROB_curFetchID == (fetchID + FetchID_t'(fetch0.valid)))
+    if (fetchLimit == (fetchID + FetchID_t'(fetch0.valid)))
         OUT_stall = 1;
 
     if (flushState != FLUSH_IDLE)

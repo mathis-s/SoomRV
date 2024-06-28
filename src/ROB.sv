@@ -1,20 +1,3 @@
-  
-typedef struct packed 
-{
-    Tag tag;
-    logic sqN_msb;
-    RegNm rd; // also used to differentiate between decode-time exceptions (these have no dst anyways)
-    FetchOff_t fetchOffs;
-    FetchID_t fetchID;
-    logic isFP;
-    logic compressed;
-    
-    SqN storeSqN;
-    SqN loadSqN;
-    logic isLd;
-    logic isSt;
-} ROBEntry;
-
 module ROB
 #(
     // how many entries, ie how many instructions can we
@@ -51,11 +34,26 @@ module ROB
     output FetchID_t OUT_curFetchID,
     
     output Trap_UOp OUT_trapUOp,
-    output BPUpdate0 OUT_bpUpdate0,
+    output BPUpdate OUT_bpUpdate,
 
     output reg OUT_mispredFlush
 );
 
+typedef struct packed 
+{
+    Tag tag;
+    logic sqN_msb;
+    RegNm rd; // also used to differentiate between decode-time exceptions (these have no dst anyways)
+    FetchOff_t fetchOffs;
+    FetchID_t fetchID;
+    logic isFP;
+    logic compressed;
+    
+    SqN storeSqN;
+    SqN loadSqN;
+    logic isLd;
+    logic isSt;
+} ROBEntry;
 
 localparam LENGTH = 1 << ID_LEN;
 
@@ -104,7 +102,7 @@ Flags deqFlagPorts[WIDTH-1:0];
 always_comb begin
     reg[ID_LEN-1:0] deqBase = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];    
     
-    // Generate the sequence of SqNs which could be committed in this cycle
+    // Generate the sequence of SqNs that possibly can be committed in this cycle
     for (integer i = 0; i < WIDTH; i=i+1)
         deqAddrs[i] = deqBase + i[ID_LEN-1:0];
     
@@ -152,8 +150,8 @@ always_ff@(posedge clk) begin
     OUT_trapUOp <= 'x;
     OUT_trapUOp.valid <= 0;
 
-    OUT_bpUpdate0 <= 'x;
-    OUT_bpUpdate0.valid <= 0;
+    OUT_bpUpdate <= 'x;
+    OUT_bpUpdate.valid <= 0;
     
     for (integer i = 0; i < WIDTH; i=i+1) begin
         OUT_comUOp[i] <= 'x;
@@ -231,6 +229,7 @@ always_ff@(posedge clk) begin
                 reg isExecuted = deqFlags[i] != FLAGS_NX;
                 reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
                 reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(deqEntries[i].loadSqN - IN_ldComLimit.sqN) < 0);
+                
                 reg sqAllowsCommit = 1;
                 for (integer j = 0; j < `NUM_AGUS-1; j=j+1)
                     sqAllowsCommit &= (!IN_stComLimit[j].valid || $signed(deqEntries[i].storeSqN - IN_stComLimit[j].sqN) < 0);
@@ -264,13 +263,14 @@ always_ff@(posedge clk) begin
                     end
 
                     if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
-                        OUT_bpUpdate0.valid <= 1;
-                        OUT_bpUpdate0.branchTaken <= (deqFlags[i] == FLAGS_PRED_TAKEN);
-                        OUT_bpUpdate0.fetchID <= deqEntries[i].fetchID;
-                        OUT_bpUpdate0.fetchOffs <= deqEntries[i].fetchOffs;
+                        OUT_bpUpdate.valid <= 1;
+                        OUT_bpUpdate.branchTaken <= (deqFlags[i] == FLAGS_PRED_TAKEN);
+                        OUT_bpUpdate.fetchID <= deqEntries[i].fetchID;
+                        OUT_bpUpdate.fetchOffs <= deqEntries[i].fetchOffs;
+                        pred = 1;
                     end
-                                    
-                    if ((deqFlags[i] >= FLAGS_PRED_TAKEN && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
+                  
+                    if ((deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR))) begin
                         
                         OUT_trapUOp.flags <= deqFlags[i];
                         OUT_trapUOp.tag <= deqEntries[i].tag;
@@ -281,24 +281,19 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
                         OUT_trapUOp.compressed <= deqEntries[i].compressed;
-                        OUT_trapUOp.valid <= 1;
+                        OUT_trapUOp.valid <= 1;    
                         
-                        if (deqFlags[i] >= FLAGS_PRED_TAKEN)
-                            pred = 1;
-                        
-                        if (deqFlags[i] >= FLAGS_FENCE) begin
-                            // Redirect result of exception to x0
-                            // The exception causes an invalidation to committed state,
-                            // so changing these is fine (does not leave us with inconsistent RAT/TB)
-                            if ((deqFlags[i] >= FLAGS_ILLEGAL_INSTR &&
-                                deqFlags[i] <= FLAGS_ST_PF)) begin
-                                OUT_comUOp[i].rd <= 0;
-                                OUT_comUOp[i].tagDst <= 7'h40;
-                            end
-                            
-                            stop <= 1;
-                            temp = 1;
+                        // Redirect result of exception to x0
+                        // The exception causes an invalidation to committed state,
+                        // so changing these is fine (does not leave us with inconsistent RAT/TB)
+                        if ((deqFlags[i] >= FLAGS_ILLEGAL_INSTR &&
+                            deqFlags[i] <= FLAGS_ST_PF)) begin
+                            OUT_comUOp[i].rd <= 0;
+                            OUT_comUOp[i].tagDst <= 7'h40;
                         end
+                        
+                        stop <= 1;
+                        temp = 1;
                     end
                     else if (deqEntries[i].isFP && deqFlags[i] >= Flags'(FLAGS_FP_NX) && deqFlags[i] <= Flags'(FLAGS_FP_NV)) begin
                         OUT_fpNewFlags[deqFlags[i][2:0] - 3'(FLAGS_FP_NX)] <= 1;
@@ -309,7 +304,6 @@ always_ff@(posedge clk) begin
                         end
                     end
                     
-
                     cnt = cnt + 1;
                 end
                 else begin

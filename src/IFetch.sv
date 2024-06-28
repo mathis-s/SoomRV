@@ -15,15 +15,13 @@ module IFetch
     IF_ICTable.HOST IF_ict,
     IF_ICache.HOST IF_icache,
 
-    input wire IN_mispredFlush,
     input FetchID_t IN_ROB_curFetchID,
     input BranchProv IN_branch,
     
     input wire IN_clearICache,
     input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
-    input BPUpdate0 IN_bpUpdate0,
-    input BPUpdate1 IN_bpUpdate1,
+    input BPUpdate IN_bpUpdate,
     
     input FetchID_t IN_pcReadAddr[4:0],
     output PCFileEntry OUT_pcReadData[4:0],
@@ -74,6 +72,7 @@ always_comb begin
     end
 end
 
+FetchLimit BP_fetchLimit;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 (
     .clk(clk),
@@ -81,13 +80,10 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .en1(BPF_we),
 
     .OUT_stall(BP_stall),
-    
-    .IN_clearICache(IN_clearICache),
-    
-    .IN_mispredFlush(IN_mispredFlush),
     .IN_mispr(BP_mispr),
     
     .IN_pcValid(ifetchEn),
+    .OUT_fetchLimit(BP_fetchLimit),
     .IN_fetchID(BPF_writeAddr),
     .IN_comFetchID(IN_ROB_curFetchID),
     
@@ -107,8 +103,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .IN_pcFileRData(BP_pcFileRData_r),
 
     .IN_btUpdates('{BH_btUpdate, IN_btUpdates[1], IN_btUpdates[0]}),
-    .IN_bpUpdate0(IN_bpUpdate0),
-    .IN_bpUpdate1(IN_bpUpdate1)
+    .IN_bpUpdate(IN_bpUpdate)
 );
 
 wire baseEn = IN_en && !waitForInterrupt && !issuedInterrupt && !BP_stall;
@@ -134,6 +129,7 @@ ICacheTable ict
     .IN_misprFetchID(IN_branch.fetchID),
     
     .IN_ROB_curFetchID(IN_ROB_curFetchID),
+    .IN_BP_fetchLimit(BP_fetchLimit),
 
     .IN_ifetchOp(ifetchOp),
     .OUT_stall(icacheStall),

@@ -92,15 +92,13 @@ IFetch ifetch
     .IF_ict(IF_ict),
     .IF_icache(IF_icache),
     
-    .IN_mispredFlush(mispredFlush),
     .IN_ROB_curFetchID(ROB_curFetchID),
     .IN_branch(branch),
     
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
     .IN_btUpdates(BP_btUpdates),
-    .IN_bpUpdate0(ROB_bpUpdate0),
-    .IN_bpUpdate1(TH_bpUpdate1),
+    .IN_bpUpdate(ROB_bpUpdate),
     
     .IN_pcReadAddr(PC_readAddress),
     .OUT_pcReadData(PC_readData),
@@ -894,7 +892,7 @@ wire[4:0] ROB_fpNewFlags;
 
 ROB_PERFC_Info ROB_perfcInfo /*verilator public*/;
 
-BPUpdate0 ROB_bpUpdate0;
+BPUpdate ROB_bpUpdate;
 Trap_UOp ROB_trapUOp /*verilator public*/;
 SqN ROB_comLoadSqN;
 SqN ROB_comStoreSqN;
@@ -923,7 +921,7 @@ ROB rob
     .OUT_curFetchID(ROB_curFetchID),
     
     .OUT_trapUOp(ROB_trapUOp),
-    .OUT_bpUpdate0(ROB_bpUpdate0),
+    .OUT_bpUpdate(ROB_bpUpdate),
 
     .OUT_mispredFlush(mispredFlush)
 );
@@ -934,7 +932,6 @@ wire TH_flushTLB;
 wire TH_startFence;
 wire TH_disableIFetch;
 wire TH_clearICache;
-BPUpdate1 TH_bpUpdate1;
 TrapInfoUpdate TH_trapInfo;
 wire[31:0] TH_stallPC;
 TrapHandler trapHandler
@@ -947,7 +944,6 @@ TrapHandler trapHandler
     .IN_pcReadData(PC_readData[4]),
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(TH_trapInfo),
-    .OUT_bpUpdate1(TH_bpUpdate1),
     .OUT_branch(branchProvs[3]),
     
     .IN_MEM_busy(MEMSUB_busy),

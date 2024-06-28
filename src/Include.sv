@@ -236,7 +236,7 @@ typedef enum logic[3:0]
     // Flags that do not cause a flush or trap
     FLAGS_NONE, FLAGS_BRANCH,
     
-    // Exceptions that require PC lookup (all following)
+    // Flags for sending direction prediction updates
     FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
     
     // Flags that cause a flush
@@ -417,7 +417,7 @@ typedef enum logic[1:0]
 
 typedef enum logic[1:0]
 {
-    BR_TGT_MANUAL, BR_TGT_CUR, BR_TGT_CP2, BR_TGT_CP4
+    BR_TGT_MANUAL, BR_TGT_NEXT, BR_TGT_CUR16, BR_TGT_CUR32
 } BranchTargetSpec;
 
 typedef struct packed
@@ -800,6 +800,12 @@ typedef struct packed
 
 typedef struct packed
 {
+    FetchID_t fetchID;
+    logic valid;
+} FetchLimit;
+
+typedef struct packed
+{
     RegNm rd;
     Tag tagDst;
     SqN sqN;
@@ -830,13 +836,7 @@ typedef struct packed
     FetchID_t fetchID;
     logic branchTaken;
     logic valid;
-} BPUpdate0;
-
-typedef struct packed
-{
-    logic[30:0] pc;
-    logic valid;
-} BPUpdate1;
+} BPUpdate;
 
 typedef struct packed
 {

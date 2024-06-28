@@ -27,6 +27,13 @@ always_ff@(posedge clk) begin
     for (integer i = 0; i < NUM_WRITE; i=i+1) begin
         if (IN_we[i]) mem[IN_waddr[i]] <= IN_wdata[i];
     end
+    
+    for (integer i = 0; i < NUM_READ; i=i+1)
+        for (integer j = 0; j < NUM_WRITE; j=j+1)
+            if (IN_re[i] && IN_we[j] && IN_raddr[i] == IN_waddr[j]) begin
+                $display("write collision: %x", IN_waddr[j]);
+                assert(0);
+            end
 end
 
 endmodule
