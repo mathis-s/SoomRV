@@ -359,6 +359,7 @@ class SpikeSimif : public simif_t
         for (auto write : processor->get_state()->log_mem_write)
         {
             uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
+            if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
             //if (phy >= 0x80000000)
             //    inFlightStores.push_back((Store){
             //        .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});

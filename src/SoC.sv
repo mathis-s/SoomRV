@@ -140,25 +140,6 @@ Core core
     .OUT_dbg(OUT_dbg)
 );
 
-/*
-CacheIF CORE_DC_if;
-always_comb begin
-    CORE_DC_if.ce = IF_cache.we;
-    CORE_DC_if.we = IF_cache.we;
-    CORE_DC_if.addr = {IF_cache.wassoc, IF_cache.waddr[11:2]};
-end
-if (`CWIDTH == 1) always_comb begin
-    CORE_DC_if.wm = '0;
-    CORE_DC_if.wm[3:0] = IF_cache.wmask;
-    CORE_DC_if.data = 'x;
-    CORE_DC_if.data[31:0] = IF_cache.wdata;
-end
-else always_comb begin
-    CORE_DC_if.wm = (4*`CWIDTH)'(IF_cache.wmask) << (IF_cache.waddr[2 +: $clog2(`CWIDTH)] * 4);
-    CORE_DC_if.data = {`CWIDTH{IF_cache.wdata}};
-end
-*/
-
 logic[`CWIDTH*32-1:0] DC_dataOut;
 // R port
 CacheIF[`CBANKS-1:0] bankIFs_1;

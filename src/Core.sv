@@ -564,8 +564,8 @@ PageWalker pageWalker
 
     .IN_ldStall(CC_PW_LD_stall[0]),
     .OUT_ldUOp(PW_LD_uop[0]),
-    .IN_ldAck(LSU_ldAck[0]),
-    .IN_ldResUOp(wbUOp[2])
+    .IN_ldAck(LSU_ldAck),
+    .IN_ldResUOp(wbUOp[3:2])
 );
 
 wire LS_AGULD_uopStall[`NUM_AGUS-1:0];

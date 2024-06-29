@@ -89,3 +89,5 @@
 `define ENABLE_INT_DIV
 `define ENABLE_INT_MUL
 `define ENABLE_ZCB
+
+`define DEBUG

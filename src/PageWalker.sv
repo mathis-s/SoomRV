@@ -8,8 +8,8 @@ module PageWalker#(parameter NUM_RQS=3)
     
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
-    input LD_Ack IN_ldAck,
-    input RES_UOp IN_ldResUOp
+    input LD_Ack IN_ldAck[`NUM_AGUS-1:0],
+    input RES_UOp IN_ldResUOp[`NUM_AGUS-1:0]
 );
 
 
@@ -22,8 +22,19 @@ enum logic[1:0]
     IDLE, WAIT_FOR_LOAD
 } state;
 
-wire[31:0] nextLookup = {IN_ldResUOp.result[29:10], pageWalkAddr[21:12], 2'b0};
-wire ldResValid = IN_ldResUOp.valid && IN_ldResUOp.doNotCommit && IN_ldResUOp.sqN == 0 && IN_ldResUOp.tagDst == 7'h40;
+RES_UOp pwLdRes;
+always_comb begin
+    pwLdRes = RES_UOp'{valid: 0, default: 'x};
+    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit && 
+            IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == 7'h40
+        ) begin
+            pwLdRes = IN_ldResUOp[i];
+        end
+    end
+end
+
+wire[31:0] nextLookup = {pwLdRes.result[29:10], pageWalkAddr[21:12], 2'b0};
 
 reg pageFault_c;
 reg isSuperPage_c;
@@ -31,7 +42,7 @@ reg[21:0] ppn_c;
 reg[2:0] rwx_c;
 reg[3:0] dagu_c;
 always_comb begin
-    reg[31:0] pte = IN_ldResUOp.result;
+    reg[31:0] pte = pwLdRes.result;
     isSuperPage_c = pageWalkIter;
     pageFault_c = 0;
     ppn_c = pte[31:10];
@@ -103,9 +114,9 @@ always_ff@(posedge clk) begin
                 if (OUT_ldUOp.valid) begin
                     if (!IN_ldStall) OUT_ldUOp.valid <= 0;
                 end
-                else if (ldResValid) begin
+                else if (pwLdRes.valid) begin
                     // Pointer to next page
-                    if (IN_ldResUOp.result[3:0] == 4'b0001 && IN_ldResUOp.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
+                    if (pwLdRes.result[3:0] == 4'b0001 && pwLdRes.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
                         
                         OUT_ldUOp.valid <= 1;
                         OUT_ldUOp.addr <= nextLookup;
@@ -128,11 +139,14 @@ always_ff@(posedge clk) begin
                         state <= IDLE;
                     end
                 end
-                else if (IN_ldAck.valid && IN_ldAck.external && IN_ldAck.fail) begin
+                else begin
                     // If a lot of misses are coming in, the LSU might not have capacity to
                     // buffer our op. Page walk loads cannot use the LB as fallback buffering,
                     // so we just re-issue on NACK.
-                    OUT_ldUOp.valid <= 1;
+                    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+                        if (IN_ldAck[i].valid && IN_ldAck[i].external && IN_ldAck[i].fail)
+                            OUT_ldUOp.valid <= 1;
+                    end
                 end
             end
         endcase

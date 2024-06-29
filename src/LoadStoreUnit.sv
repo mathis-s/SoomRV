@@ -76,15 +76,25 @@ MemController_Req LSU_memc;
 assign OUT_memc = LSU_memc;
 assign OUT_BLSU_memc = BLSU_memc;
 
-wire[1:0] isCacheBypassLdUOp = {1'b0, 
-    `ENABLE_EXT_MMIO && uopLd_0[0].valid && uopLd_0[0].isMMIO && uopLd_0[0].exception == AGU_NO_EXCEPTION &&
-    uopLd_0[0].addr >= `EXT_MMIO_START_ADDR && uopLd_0[0].addr < `EXT_MMIO_END_ADDR};
+logic[`NUM_AGUS-1:0] isCacheBypassLdUOp;
+always_comb begin
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        isCacheBypassLdUOp[i] =
+            `ENABLE_EXT_MMIO && uopLd_0[i].valid && uopLd_0[i].isMMIO && uopLd_0[i].exception == AGU_NO_EXCEPTION &&
+            uopLd_0[i].addr >= `EXT_MMIO_START_ADDR && uopLd_0[i].addr < `EXT_MMIO_END_ADDR;
+end
+    
 
 wire isCacheBypassStUOp = 
     `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO && 
     IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
 
 wire ignoreSt = isCacheBypassStUOp;
+
+wire[$clog2(`NUM_AGUS)-1:0] blsuLdIdx;
+wire blsuLdIdxValid;
+ OHEncoder#(`NUM_AGUS, 1) ohEnc(
+    .IN_idxOH(isCacheBypassLdUOp), .OUT_idx(blsuLdIdx), .OUT_valid(blsuLdIdxValid));
 
 wire BLSU_stStall;
 wire BLSU_ldStall;
@@ -96,15 +106,15 @@ BypassLSU bypassLSU
     .rst(rst),
     
     .IN_branch(IN_branch),
-    .IN_uopLdEn(isCacheBypassLdUOp[0]),
+    .IN_uopLdEn(blsuLdIdxValid),
     .OUT_ldStall(BLSU_ldStall),
-    .IN_uopLd(uopLd_0[0]),
+    .IN_uopLd(uopLd_0[blsuLdIdx]),
 
     .IN_uopStEn(isCacheBypassStUOp && !OUT_stStall),
     .OUT_stStall(BLSU_stStall),
     .IN_uopSt(IN_uopSt),
 
-    .IN_ldStall(ldOps[0][1].valid),
+    .IN_ldStall(!blsuLoadHandled),
     .OUT_uopLd(BLSU_uopLd),
     .OUT_ldData(BLSU_ldResult),
 
@@ -131,18 +141,14 @@ assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || f
 
 reg[$clog2(`NUM_AGUS)-1:0] uopStPort;
 reg uopStPortValid;
-reg[$clog2(`NUM_AGUS)-1:0] startIdx;
-always_comb begin
-    uopStPort = 'x;
-    uopStPortValid = 0;
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
-        if (!uopLd[i[$clog2(`NUM_AGUS)-1:0] + startIdx].valid) begin
-            uopStPort = i[$clog2(`NUM_AGUS)-1:0] + startIdx;
-            uopStPortValid = 1;
-        end
+always_comb begin
+    uopStPort = 0;
+    uopStPortValid = 0;
+    if (!uopLd[0].valid) begin
+        uopStPortValid = 1;
+    end
 end
-always_ff@(posedge clk) startIdx <= startIdx + 1;
 
 LD_UOp uopLd[`NUM_AGUS-1:0];
 always_comb
@@ -173,21 +179,46 @@ always_comb begin
     end
 end
 
+reg[$clog2(`NUM_AGUS)-1:0] startIdx;
+always_ff@(posedge clk)
+    startIdx <= rst ? 0 : (startIdx + 1);
+
+// Store only go through port 0. To still make port
+// pressure even we shuffle incoming loads.
+reg[`NUM_AGUS-1:0][$clog2(`NUM_AGUS)-1:0] idxs_c;
+always_comb begin
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        idxs_c[i] = startIdx + $clog2(`NUM_AGUS)'(i);
+end
+
+reg[`NUM_AGUS-1:0][$clog2(`NUM_AGUS)-1:0] idxs_r;
+always_ff@(posedge clk) idxs_r <= idxs_c;
+
+reg[`NUM_AGUS-1:0] regularLd_c;
+reg[`NUM_AGUS-1:0] regularLd_r;
+always_ff@(posedge clk) regularLd_r <= rst ? '0 : regularLd_c;
+
 // Select load to execute
 // 1. special load (page walk, non-speculative or external)
 // 2. regular load
 always_comb begin
+    
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-        uopLd[i] = 'x;
-        uopLd[i].valid = 0;
-
         OUT_ldStall[i] = IN_uopLd[i].valid;
         OUT_ldAGUStall[i] = IN_uopELd[i].valid;
+    end
+
+    for (integer i = `NUM_AGUS-1; i >= 0; i=i-1) begin
+        reg[$clog2(`NUM_AGUS)-1:0] idx = idxs_c[i];
+
+        uopLd[i] = 'x;
+        uopLd[i].valid = 0;
+        regularLd_c[i] = 0;
         
         // Only addr[11:0] is well defined, the rest is 
         // still being calculated (for regular loads at least) and will
         // only be available in the next cycle.
-
+        
         if (flushActive) begin
             // do not issue load
         end
@@ -197,48 +228,45 @@ always_comb begin
         else if (i == 1 && cacheTableWrite) begin
             // cache table port is being used to handle cache miss
         end
-        else if (IN_uopLd[i].valid &&
-            (!IN_branch.taken || IN_uopLd[i].external || $signed(IN_uopLd[i].sqN - IN_branch.sqN) <= 0) &&
-            (!IF_cache.busy[i] || IF_cache.rbusyBank[i] != IN_uopLd[i].addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
+        else if (IN_uopLd[idx].valid &&
+            (!IN_branch.taken || IN_uopLd[idx].external || $signed(IN_uopLd[idx].sqN - IN_branch.sqN) <= 0) &&
+            (!IF_cache.busy[i] || IF_cache.rbusyBank[i] != IN_uopLd[idx].addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
         ) begin
-            uopLd[i] = IN_uopLd[i];
-            OUT_ldStall[i] = 0;
+            // todo: do not check busy for MMIO and forwards
+            uopLd[i] = IN_uopLd[idx];
+            OUT_ldStall[idx] = 0;
         end
-        else if (IN_uopELd[i].valid &&
-            (!IF_cache.busy[i] || IF_cache.rbusyBank[i] != IN_uopELd[i].addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
+        else if (IN_uopELd[idx].valid &&
+            (!IF_cache.busy[i] || IF_cache.rbusyBank[i] != IN_uopELd[idx].addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)])
         ) begin
             uopLd[i].valid = 1;
             uopLd[i].external = 0;
-            uopLd[i].addr[11:0] = IN_uopELd[i].addr;
+            uopLd[i].addr[11:0] = IN_uopELd[idx].addr;
 
             uopLd[i].isMMIO = 0; // assume that this is not MMIO such that cache is read
             uopLd[i].exception = AGU_NO_EXCEPTION; // assume no exception
 
-            OUT_ldAGUStall[i] = 0;
+            OUT_ldAGUStall[idx] = 0;
+            regularLd_c[i] = 1;
         end
     end
-end
-
-reg regularLd[`NUM_AGUS-1:0];
-always_ff@(posedge clk)
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-    if (rst) regularLd[i] <= 0;
-    else regularLd[i] <= IN_uopELd[i].valid && !OUT_ldAGUStall[i];
 end
 
 LD_UOp uopLd_0[`NUM_AGUS-1:0];
 always_comb begin
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        reg[$clog2(`NUM_AGUS)-1:0] idx = idxs_r[i];
         uopLd_0[i] = ldOps[i][0];
 
         // For regular loads, we only get the full address and other
         // info now.
-        if (regularLd[i]) begin
-            assert(rst || !IN_aguLd[i].valid || IN_aguLd[i].addr[11:0] == uopLd_0[i].addr[11:0]);
+        if (regularLd_r[i]) begin
+            assert(rst || !IN_aguLd[idx].valid || IN_aguLd[idx].addr[11:0] == uopLd_0[i].addr[11:0]);
+
             uopLd_0[i] = 'x;
             uopLd_0[i].valid = 0;
-            if (IN_aguLd[i].valid)
-                uopLd_0[i] = IN_aguLd[i];
+            if (IN_aguLd[idx].valid)
+                uopLd_0[i] = IN_aguLd[idx];
         end
     end
 end
@@ -250,12 +278,13 @@ always_comb begin
     IF_mmio.re = 1;
     IF_mmio.raddr = 'x;
     IF_mmio.rsize = 'x;
-
-    if (uopLd_0[0].valid && uopLd_0[0].isMMIO && !isCacheBypassLdUOp[0]) begin
-        IF_mmio.re = 0;
-        IF_mmio.raddr = uopLd_0[0].addr;
-        IF_mmio.rsize = uopLd_0[0].size;
-    end
+    
+    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        if (uopLd_0[i].valid && uopLd_0[i].isMMIO && !isCacheBypassLdUOp[i]) begin
+            IF_mmio.re = 0;
+            IF_mmio.raddr = uopLd_0[i].addr;
+            IF_mmio.rsize = uopLd_0[i].size;
+        end
 end
 
 // Stores to internal MMIO are uncached, they run right away
@@ -301,7 +330,7 @@ always_ff@(posedge clk) begin
             
             if (uopLd_0[i].valid && (!IN_branch.taken || uopLd_0[i].external || $signed(uopLd_0[i].sqN - IN_branch.sqN) <= 0) &&
                 // if the BLSU is busy, we place the OP in the Load Miss Queue.
-                (!isCacheBypassLdUOp[i] || (BLSU_ldStall && i == 0))
+                (!isCacheBypassLdUOp[i] || BLSU_ldStall)
             ) begin
                 ldOps[i][1] <= uopLd_0[i];
                 loadWasExtIOBusy[i] <= isCacheBypassLdUOp[i];
@@ -361,9 +390,10 @@ reg setDirty;
 reg[$clog2(SIZE)-1:0] setDirtyIdx;
 // Process Cache Table Read Responses
 LD_UOp curLd[1:0];
+reg blsuLoadHandled;
 always_comb begin
     
-    reg blsuLoadHandled = 0;
+    blsuLoadHandled = 0;
 
     setDirty = 0;
     setDirtyIdx = 'x;
