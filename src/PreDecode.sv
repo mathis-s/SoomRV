@@ -7,8 +7,8 @@ module PreDecode
 (
     input wire clk,
     input wire rst,
-    input wire outEn,
-    input wire mispred,
+    input wire IN_en,
+    input wire IN_invalidate,
     
     output reg OUT_full,
     
@@ -48,9 +48,9 @@ always_ff@(posedge clk) begin
             OUT_instrs[i].valid <= 0;
         freeEntries = BUF_SIZE;
     end
-    else if (!mispred) begin
+    else if (!IN_invalidate) begin
 
-        if (outEn) begin
+        if (IN_en) begin
             for (integer i = 0; i < NUM_INSTRS_OUT; i=i+1) begin
                 
                 if ((bufIndexOut != bufIndexIn || freeEntries == 0)) begin

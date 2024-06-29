@@ -359,9 +359,9 @@ class SpikeSimif : public simif_t
         for (auto write : processor->get_state()->log_mem_write)
         {
             uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
-            if (phy >= 0x80000000)
-                inFlightStores.push_back((Store){
-                    .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});
+            //if (phy >= 0x80000000)
+            //    inFlightStores.push_back((Store){
+            //        .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});
         }
 
         if ((mem_pass_thru || is_pass_thru_inst(inst)) && inst.rd != 0 && inst.flags < 6)
@@ -383,8 +383,8 @@ class SpikeSimif : public simif_t
             return -3;
         if (!compare_state())
             return -4;
-        //if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
-        //    return -5;
+        // if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
+        //     return -5;
         return 0;
     }
 
@@ -452,8 +452,8 @@ class SpikeSimif : public simif_t
 
         auto csr = top->Top->soc->core->csr;
         // If ENABLE_FP is defined in Config.sv, these should be uncommented too
-        //processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
-        //processor->put_csr(CSR_FRM, csr->__PVT__frm);
+        // processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
+        // processor->put_csr(CSR_FRM, csr->__PVT__frm);
 
         processor->put_csr(CSR_INSTRET, csr->minstret & 0xFFFFFFFF);
         processor->put_csr(CSR_INSTRETH, csr->minstret >> 32);
@@ -1036,6 +1036,7 @@ void LogCommit(Inst& inst)
     }
 }
 
+static uint64_t hpm4offset = 0;
 void LogPredec(Inst& inst)
 {
 #ifdef KONATA

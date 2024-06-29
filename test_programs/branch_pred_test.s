@@ -13,4 +13,4 @@ main:
         
         bnez a0, .loop
     
-    ebreak
+    jr ra

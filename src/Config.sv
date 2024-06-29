@@ -23,7 +23,7 @@
 // Memory
 `define SQ_SIZE 16
 `define LB_SIZE 16
-`define LD_MISS_QUEUE_SIZE 4
+`define LRB_SIZE 4
 
 `define ITLB_SIZE 8
 `define ITLB_ASSOC 4

@@ -16,8 +16,7 @@ module Load
     input wire IN_wbHasResult[NUM_WBS-1:0],
     input RES_UOp IN_wbUOp[NUM_WBS-1:0],
     
-    input wire IN_invalidate,
-    input SqN IN_invalidateSqN,
+    input BranchProv IN_branch,
     
     input wire IN_stall[NUM_UOPS-1:0],
     
@@ -91,7 +90,7 @@ always_ff@(posedge clk) begin
     end
     else begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            if (!IN_stall[i] && IN_uop[i].valid && (!IN_invalidate || ($signed(IN_uop[i].sqN - IN_invalidateSqN) <= 0))) begin       
+            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || ($signed(IN_uop[i].sqN - IN_branch.sqN) <= 0))) begin       
                 
                 outUOpReg[i].imm <= IN_uop[i].imm;
                 
@@ -175,7 +174,7 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-            else if (!IN_stall[i] || (outUOpReg[i].valid && IN_invalidate && $signed(outUOpReg[i].sqN - IN_invalidateSqN) > 0)) begin
+            else if (!IN_stall[i] || (outUOpReg[i].valid && IN_branch.taken && $signed(outUOpReg[i].sqN - IN_branch.sqN) > 0)) begin
                 outUOpReg[i] <= 'x;
                 outUOpReg[i].valid <= 0;
             end

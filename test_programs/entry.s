@@ -182,28 +182,46 @@ strcpy:
 .globl strcmp
 strcmp:
     
-    li t2, -1
+    li a4, -1
+    .align 4
     .loop_strcmp:
-        lw t0, 0(a0)
-        lw t1, 0(a1)
-        bne t0, t1, .final_strcmp
-        orc.b t0, t0
-        bne t0, t2, .final_strcmp
-        addi a0, a0, 4
-        addi a1, a1, 4
+        lw a2, 0(a0)
+        lw a3, 0(a1)
+        bne a2, a3, .final_strcmp
+        orc.b a2, a2
+        bne a2, a4, .final_strcmp
+
+        lw a2, 4(a0)
+        lw a3, 4(a1)
+        bne a2, a3, .final_strcmp
+        orc.b a2, a2
+        bne a2, a4, .final_strcmp
+
+        addi a0, a0, 8
+        addi a1, a1, 8
         j .loop_strcmp
     
     .final_strcmp:
-        lb t0, 0(a0)
-        lb t1, 0(a1)
-        bne t0, t1, .return_strcmp
-        beqz t0, .return_strcmp
-        addi a0, a0, 1
-        addi a1, a1, 1
-        j .final_strcmp
+        lb a2, 0(a0)
+        lb a3, 0(a1)
+        bne a2, a3, .return_strcmp
+        beqz a2, .return_strcmp
+
+        lb a2, 1(a0)
+        lb a3, 1(a1)
+        bne a2, a3, .return_strcmp
+        beqz a2, .return_strcmp
+
+        lb a2, 2(a0)
+        lb a3, 2(a1)
+        bne a2, a3, .return_strcmp
+        beqz a2, .return_strcmp
+
+        lb a2, 3(a0)
+        lb a3, 3(a1)
         
     .return_strcmp:
-    sub a0, t0, t1
+    sub a0, a2, a3
     ret
 
 .globl printdecu

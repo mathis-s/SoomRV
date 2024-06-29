@@ -386,11 +386,19 @@ TOP.Top.soc.core.ifetch.bp.IN_btUpdates[2].multiple
 -
 -BTB
 @28
-TOP.Top.soc.core.ifetch.bp.IN_mispr
+TOP.Top.soc.core.ifetch.bp.BTB_br.valid
 @22
-TOP.Top.soc.core.ifetch.bp.IN_misprFetchID[4:0]
+TOP.Top.soc.core.ifetch.bp.BTB_br.dst[30:0]
+@28
+TOP.Top.soc.core.ifetch.bp.BTB_br.offs[2:0]
 @200
 -
+@22
+TOP.Top.soc.core.ifetch.bp.OUT_pc[30:0]
+@201
+-
+@200
+-BTB
 @22
 TOP.Top.soc.core.ifetch.bp.bpFile.IN_raddr[0][4:0]
 TOP.Top.soc.core.ifetch.bp.bpFile.IN_waddr[0][4:0]
@@ -920,7 +928,6 @@ TOP.Top.soc.core.ifetch.pc[30:0]
 -
 @28
 TOP.Top.soc.core.ifetch.icacheStall
-TOP.Top.soc.core.ifetch.icacheMiss
 @200
 -
 @28
@@ -2176,6 +2183,7 @@ TOP.Top.soc.core.sq.baseIndex[6:0]
 @201
 -
 @200
+-
 -
 @28
 TOP.Top.soc.core.sq.entries[0].addrAvail

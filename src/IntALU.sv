@@ -5,8 +5,8 @@ module IntALU
 
     input wire IN_wbStall,
     input EX_UOp IN_uop,
-    input wire IN_invalidate,
-    input SqN IN_invalidateSqN,
+
+    input BranchProv IN_branch,
 
     output BranchProv OUT_branch,
     output BTUpdate OUT_btUpdate,
@@ -171,7 +171,7 @@ always_comb begin
     btUpdate_c.valid = 0;
 
     if (rst) ;
-    else if (IN_uop.valid && (IN_uop.fu == FU_INT) && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+    else if (IN_uop.valid && (IN_uop.fu == FU_INT) && !IN_wbStall && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         branch_c.sqN = IN_uop.sqN;
         branch_c.loadSqN = IN_uop.loadSqN;
         branch_c.storeSqN = IN_uop.storeSqN;
@@ -260,7 +260,7 @@ always_ff@(posedge clk) begin
     OUT_amoData.valid <= 0;
 
     if (rst) ;
-    else if (IN_uop.valid && IN_uop.fu == FU_INT && !IN_wbStall && (!IN_invalidate || $signed(IN_uop.sqN - IN_invalidateSqN) <= 0)) begin
+    else if (IN_uop.valid && IN_uop.fu == FU_INT && !IN_wbStall && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
         OUT_uop.result <= resC;
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.doNotCommit <= IN_uop.fu == FU_AGU;

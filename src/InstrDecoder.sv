@@ -199,7 +199,7 @@ module InstrDecoder
     input wire clk,
     input wire rst,
     input wire en,
-    input wire IN_invalidate,
+    input BranchProv IN_branch,
 
     input DecodeState IN_dec,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
@@ -1565,7 +1565,7 @@ end
 
 always_ff@(posedge clk) begin   
 
-    if (rst || IN_invalidate) begin
+    if (rst || IN_branch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;

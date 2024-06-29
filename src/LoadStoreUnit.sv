@@ -575,7 +575,7 @@ end
 // Load Result Buffering
 wire LRB_ready[`NUM_AGUS-1:0];
 LoadResUOp LRB_uop[`NUM_AGUS-1:0];
-LoadResultBuffer loadResBuf[1:0]
+LoadResultBuffer#(`LRB_SIZE) loadResBuf[1:0]
 (
     .clk(clk),
     .rst(rst),

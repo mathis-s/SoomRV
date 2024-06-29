@@ -127,11 +127,11 @@ PreDecode preDec
 (
     .clk(clk),
     .rst(rst),
-    .outEn(!RN_stall && frontendEn),
 
+    .IN_en(!RN_stall && frontendEn),
+    .IN_invalidate(branch.taken),
     .OUT_full(PD_full),
-    
-    .mispred(branch.taken),
+
     .IN_instrs(IF_instrs),
     .OUT_instrs(PD_instrs)
 );
@@ -142,7 +142,7 @@ InstrDecoder idec
     .clk(clk),
     .rst(rst),
     .en(!RN_stall && frontendEn),
-    .IN_invalidate(branch.taken),
+    .IN_branch(branch),
 
     .IN_dec(CSR_dec),
     .IN_instrs(PD_instrs),
@@ -391,8 +391,7 @@ Load ld
     .IN_wbHasResult(wbHasResult),
     .IN_wbUOp(wbUOp[3:0]),
     
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
+    .IN_branch(branch),
     .IN_stall(stall),
     
     .IN_zcFwd(LD_zcFwd),
@@ -436,8 +435,7 @@ IntALU ialu
     
     .IN_wbStall(1'b0),
     .IN_uop(LD_uop[0]),
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
+    .IN_branch(branch),
     
     .OUT_branch(branchProvs[0]),
     .OUT_btUpdate(BP_btUpdates[0]),
@@ -801,8 +799,7 @@ IntALU ialu1
     
     .IN_wbStall(1'b0),
     .IN_uop(LD_uop[1]),
-    .IN_invalidate(branch.taken),
-    .IN_invalidateSqN(branch.sqN),
+    .IN_branch(branch),
     
     .OUT_branch(branchProvs[1]),
     .OUT_btUpdate(BP_btUpdates[1]),
@@ -874,8 +871,6 @@ always_comb begin
 
     if (INT1_uop.valid)
         wbUOp[1] = INT1_uop;
-    //else if (AGU_resUOp.valid && aguUOpPort_r == 1)
-    //    wbUOp[1] = AGU_resUOp;
 
     `ifdef ENABLE_INT_MUL
     else if (MUL_uop.valid)
