@@ -141,51 +141,50 @@ Core core
 );
 
 logic[`CWIDTH*32-1:0] DC_dataOut;
+// R/W port
+CacheIF[`CBANKS-1:0] bankIFs;
+always_comb begin
+    for (integer i = 0; i < `CBANKS; i=i+1)
+        bankIFs[i] = CacheIF'{ce: 1, we: 1, default: 'x};
+    IF_cache.busy[0] = 0;
+    IF_cache.rbusyBank[0] = 'x;
+    
+    if (!IF_cache.re[0]) begin
+        bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[0];
+        bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[0];
+        bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[0];
+        bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[0]};
+        bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[0], IF_cache.addr[0][11:2]};
+    end
+    
+    if (!MC_DC_wr.ce) begin
+        bankIFs[MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_wr;
+        IF_cache.busy[0] = 1;
+        IF_cache.rbusyBank[0] = MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
+    end
+end
+
 // R port
 CacheIF[`CBANKS-1:0] bankIFs_1;
 always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         bankIFs_1[i] = CacheIF'{ce: 1, we: 1, default: 'x};
-    IF_cache.busy[0] = 0;
-    IF_cache.rbusyBank[0] = 'x;
-    
-    if (!IF_cache.re[0]) begin
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[0];
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[0];
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[0];
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[0]};
-        bankIFs_1[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[0], IF_cache.addr[0][11:2]};
-    end
-    if (!MC_DC_rd.ce) begin
-        bankIFs_1[MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_rd;
-        IF_cache.busy[0] = 1;
-        IF_cache.rbusyBank[0] = MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
-    end
-end
-
-// W port
-CacheIF[`CBANKS-1:0] bankIFs;
-always_comb begin
-    for (integer i = 0; i < `CBANKS; i=i+1)
-        bankIFs[i] = CacheIF'{ce: 1, default: 'x};
 
     IF_cache.busy[1] = 0;
     IF_cache.rbusyBank[1] = 'x;
 
     if (!IF_cache.re[1]) begin
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[1];
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[1];
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[1];
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[1]};
-        bankIFs[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[1], IF_cache.addr[1][11:2]};
+        bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[1];
+        bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[1];
+        bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].wm = IF_cache.wmask[1];
+        bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[1]};
+        bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[1], IF_cache.addr[1][11:2]};
     end
-    if (!MC_DC_wr.ce) begin
-        bankIFs[MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_wr;
+    if (!MC_DC_rd.ce) begin
+        bankIFs_1[MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_rd;
         IF_cache.busy[1] = 1;
-        IF_cache.rbusyBank[1] = MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
+        IF_cache.rbusyBank[1] = MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
     end
-
-    
 end
 // Read Address Shift Registers
 logic[9:0] CORE_raddr_0[1:0];
@@ -201,7 +200,7 @@ logic[`CASSOC-1:0][`CWIDTH-1:0][31:0] dcacheOut0[`CBANKS-1:0];
 logic[`CASSOC-1:0][`CWIDTH-1:0][31:0] dcacheOut1[`CBANKS-1:0];
 generate
 for (genvar i = 0; i < `CBANKS; i=i+1)
-    MemRTL2W#(32 * `CASSOC * `CWIDTH, (1 << (`CACHE_SIZE_E - 2 - $clog2(`CASSOC) - $clog2(`CWIDTH) - $clog2(`CBANKS)))) dcache
+    MemRTL#(32 * `CASSOC * `CWIDTH, (1 << (`CACHE_SIZE_E - 2 - $clog2(`CASSOC) - $clog2(`CWIDTH) - $clog2(`CBANKS)))) dcache
     (
         .clk(clk),
         .IN_nce(bankIFs[i].ce),
@@ -212,10 +211,10 @@ for (genvar i = 0; i < `CBANKS; i=i+1)
         .OUT_data(dcacheOut0[i]),
         
         .IN_nce1(bankIFs_1[i].ce),
-        .IN_nwe1(bankIFs_1[i].we),
+        //.IN_nwe1(bankIFs_1[i].we),
         .IN_addr1(bankIFs_1[i].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):$clog2(`CWIDTH)+$clog2(`CBANKS)]),
-        .IN_data1({`CASSOC{bankIFs_1[i].data[`CWIDTH*32-1:0]}}),
-        .IN_wm1((4 * `CASSOC * `CWIDTH)'(bankIFs_1[i].wm[`CWIDTH*4-1:0]) << (bankIFs_1[i].addr[`CACHE_SIZE_E-3-:$clog2(`CASSOC)] * `CWIDTH * 4)),
+        //.IN_data1({`CASSOC{bankIFs_1[i].data[`CWIDTH*32-1:0]}}),
+        //.IN_wm1((4 * `CASSOC * `CWIDTH)'(bankIFs_1[i].wm[`CWIDTH*4-1:0]) << (bankIFs_1[i].addr[`CACHE_SIZE_E-3-:$clog2(`CASSOC)] * `CWIDTH * 4)),
         .OUT_data1(dcacheOut1[i])
     );
 endgenerate
@@ -240,10 +239,10 @@ always_comb begin
     DC_dataOut = 'x;
     DC_dataOut[`CWIDTH*32-1:0] = dcacheOut1 [MEMC_raddr[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [MEMC_raddr[1][`CACHE_SIZE_E-3 -: $clog2(`CASSOC)]];
 end
-if (`CWIDTH == 1) assign IF_cache.rdata[0] = dcacheOut1_t [CORE_raddr_0[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
-else              assign IF_cache.rdata[0] = dcacheOut1_t [CORE_raddr_0[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr_0[1][0 +: $clog2(`CWIDTH)]];
-if (`CWIDTH == 1) assign IF_cache.rdata[1] = dcacheOut0_t [CORE_raddr_1[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
-else              assign IF_cache.rdata[1] = dcacheOut0_t [CORE_raddr_1[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr_1[1][0 +: $clog2(`CWIDTH)]];
+if (`CWIDTH == 1) assign IF_cache.rdata[0] = dcacheOut0_t [CORE_raddr_0[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
+else              assign IF_cache.rdata[0] = dcacheOut0_t [CORE_raddr_0[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr_0[1][0 +: $clog2(`CWIDTH)]];
+if (`CWIDTH == 1) assign IF_cache.rdata[1] = dcacheOut1_t [CORE_raddr_1[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]];
+else              assign IF_cache.rdata[1] = dcacheOut1_t [CORE_raddr_1[1][$clog2(`CWIDTH) +: $clog2(`CBANKS)]] [CORE_raddr_1[1][0 +: $clog2(`CWIDTH)]];
 
 
 wire[11:0] dctAddr = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1];

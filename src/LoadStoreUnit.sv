@@ -692,7 +692,9 @@ wire redoStore = stOps[1].valid &&
            miss[stOpPort[1]].mtype == MGMT_INVAL) && 
           (!forwardMiss[stOpPort[1]] || missEvictConflict[stOpPort[1]]))
     ) : 
-        (!stOps[1].isMMIO && IF_cache.busy[stOpPort[1]]));
+        (!stOps[1].isMMIO && 
+         IF_cache.busy[stOpPort[1]] &&
+         IF_cache.rbusyBank[stOpPort[1]] == stOps[1].addr[2 + $clog2(`CWIDTH) +: $clog2(`CBANKS)]));
 
 wire fuseStoreMiss = !missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT) && forwardMiss[stOpPort[1]] && miss[stOpPort[1]].valid;
 
