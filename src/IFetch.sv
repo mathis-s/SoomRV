@@ -23,8 +23,10 @@ module IFetch
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate IN_bpUpdate,
     
-    input FetchID_t IN_pcReadAddr[4:0],
-    output PCFileEntry OUT_pcReadData[4:0],
+    input PCFileReadReq IN_pcRead[`NUM_ALUS-1:0],
+    output PCFileEntry OUT_pcReadData[`NUM_ALUS-1:0],
+    input PCFileReadReqTH IN_pcReadTH,
+    output PCFileEntry OUT_pcReadDataTH,
     
     input wire IN_ready,
     output IF_Instr OUT_instrs,
@@ -48,12 +50,8 @@ wire BP_stall;
 wire[30:0] BP_curRetAddr;
 RetStackIdx_t BP_rIdx;
 
-wire BP_pcFileRE;
-FetchID_t BP_pcFileRAddr;
-PCFileEntry BP_pcFileRData_r;
-PCFileEntry BP_pcFileRData_c;
-always_ff@(posedge clk)
-    if (!rst && BP_pcFileRE) BP_pcFileRData_r <= BP_pcFileRData_c;
+PCFileReadReq BP_pcFileRead;
+PCFileEntry BP_pcFileRData;
 
 DecodeBranchProv BP_mispr;
 always_comb begin
@@ -98,9 +96,8 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 
     .IN_retDecUpd(BH_retDecUpd),
     
-    .OUT_pcFileRE(BP_pcFileRE),
-    .OUT_pcFileRAddr(BP_pcFileRAddr),
-    .IN_pcFileRData(BP_pcFileRData_r),
+    .OUT_pcFileRead(BP_pcFileRead),
+    .IN_pcFileRData(BP_pcFileRData),
 
     .IN_btUpdates('{BH_btUpdate, IN_btUpdates[1], IN_btUpdates[0]}),
     .IN_bpUpdate(IN_bpUpdate)
@@ -172,20 +169,24 @@ FetchID_t BPF_writeAddr /* verilator public */;
 FetchID_t PCF_writeAddr /* verilator public */;
 PCFileEntry PCF_writeData;
 wire pcFileWriteEn;
-PCFile#($bits(PCFileEntry), $bits(FetchID_t)) pcFile
+
+
+wire PCFileReadReq sharedReq =
+    (IN_pcReadTH.valid && IN_pcReadTH.prio) ? PCFileReadReq'(IN_pcReadTH) : IN_pcRead[0];
+PCFileEntry sharedData;
+assign OUT_pcReadData[0] = sharedData;
+assign OUT_pcReadDataTH = sharedData;
+RegFile#($bits(PCFileEntry), 1<<$bits(FetchID_t), 3, 1) pcFile
 (
     .clk(clk),
     
-    .wen0(pcFileWriteEn),
-    .waddr0(PCF_writeAddr),
-    .wdata0(PCF_writeData),
-    
-    .raddr0(IN_pcReadAddr[0]), .rdata0(OUT_pcReadData[0]),
-    .raddr1(IN_pcReadAddr[1]), .rdata1(OUT_pcReadData[1]),
-    .raddr2(IN_pcReadAddr[2]), .rdata2(OUT_pcReadData[2]),
-    .raddr3(IN_pcReadAddr[3]), .rdata3(OUT_pcReadData[3]),
-    .raddr4(IN_pcReadAddr[4]), .rdata4(OUT_pcReadData[4]),
-    .raddr5(BP_pcFileRAddr),   .rdata5(BP_pcFileRData_c)
+    .IN_we({pcFileWriteEn}),
+    .IN_waddr({PCF_writeAddr}),
+    .IN_wdata({PCF_writeData}),
+
+    .IN_re({BP_pcFileRead.valid, IN_pcRead[1].valid, sharedReq.valid}),
+    .IN_raddr({BP_pcFileRead.addr, IN_pcRead[1].addr, sharedReq.addr}),
+    .OUT_rdata({BP_pcFileRData, OUT_pcReadData[1], sharedData})
 );
 
 IFetchOp ifetchOp;

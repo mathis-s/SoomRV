@@ -83,6 +83,7 @@
 //`define ENABLE_FP
 
 `define NUM_AGUS 2
+`define NUM_ALUS 2
 `define NUM_TAGS 64
 
 `define ENABLE_INT_DIV

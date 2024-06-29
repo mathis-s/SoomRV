@@ -29,8 +29,7 @@ module BranchPredictor
     input ReturnDecUpdate IN_retDecUpd,
 
     // PC File read interface
-    output logic OUT_pcFileRE,
-    output FetchID_t OUT_pcFileRAddr,
+    output PCFileReadReq OUT_pcFileRead,
     input PCFileEntry IN_pcFileRData,
     
     // Branch XU interface
@@ -317,8 +316,8 @@ end
 // for mispredict recovery and branch direction updates.
 // Mispredicts always have priority, updates are buffered. 
 always_comb begin
-    OUT_pcFileRAddr = 'x;
-    OUT_pcFileRE = 0;
+    OUT_pcFileRead.addr = 'x;
+    OUT_pcFileRead.valid = 0;
     
     bpFileRAddr = 'x;
     bpFileRE = 0;
@@ -332,16 +331,16 @@ always_comb begin
         bpFileRE = 1;
         // Read PC of instruction we revert to
         if (IN_mispr.tgtSpec != BR_TGT_MANUAL) begin
-            OUT_pcFileRAddr = IN_mispr.fetchID;
-            OUT_pcFileRE = 1;
+            OUT_pcFileRead.addr = IN_mispr.fetchID;
+            OUT_pcFileRead.valid = 1;
         end
     end
     else if (bpUpdate.valid) begin
         updFIFO_deq = 1;
         bpFileRAddr = bpUpdate.fetchID;
         bpFileRE = 1;
-        OUT_pcFileRAddr = bpUpdate.fetchID;
-        OUT_pcFileRE = 1;
+        OUT_pcFileRead.addr = bpUpdate.fetchID;
+        OUT_pcFileRead.valid = 1;
     end
 end
 

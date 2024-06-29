@@ -5,7 +5,7 @@ module TrapHandler
     
     input Trap_UOp IN_trapInstr,
 
-    output FetchID_t OUT_pcReadAddr,
+    output PCFileReadReqTH OUT_pcRead,
     input PCFileEntry IN_pcReadData,
 
     input TrapControlState IN_trapControl,
@@ -27,21 +27,41 @@ reg memoryWait;
 
 assign OUT_disableIFetch = memoryWait;
 
-assign OUT_pcReadAddr = IN_trapInstr.fetchID;
-wire[30:0] baseIndexPC = {IN_pcReadData.pc[30:$bits(FetchOff_t)], IN_trapInstr.fetchOffs} - (IN_trapInstr.compressed ? 0 : 1);
-wire[31:0] nextInstr = {baseIndexPC + (IN_trapInstr.compressed ? 31'd1 : 31'd2), 1'b0};
+assign OUT_pcRead.prio = IN_trapInstr.flags != FLAGS_NX;
+assign OUT_pcRead.addr = IN_trapInstr.fetchID;
+assign OUT_pcRead.valid = IN_trapInstr.valid;
+
+FetchOff_t fetchOffs;
+always_ff@(posedge clk)
+    fetchOffs <= IN_trapInstr.fetchOffs;
+
+wire[30:0] finalHalfwPC = {IN_pcReadData.pc[30:$bits(FetchOff_t)], fetchOffs};
+always_comb begin
+    OUT_trapInfo = trapInfo_r;
+    case (trapPCSpec_r)
+        BR_TGT_MANUAL: ;
+        BR_TGT_NEXT: OUT_trapInfo.trapPC = {finalHalfwPC, 1'b0} + 2;
+        BR_TGT_CUR16: OUT_trapInfo.trapPC = {finalHalfwPC, 1'b0};
+        BR_TGT_CUR32: OUT_trapInfo.trapPC = {finalHalfwPC, 1'b0} - 2;
+    endcase
+end
 
 logic[31:0] OUT_dbgStallPC_c;
 logic OUT_fence_c;
 logic OUT_clearICache_c;
 BranchProv OUT_branch_c;
-TrapInfoUpdate OUT_trapInfo_c;
+TrapInfoUpdate trapInfo_r;
+TrapInfoUpdate trapInfo_c;
+BranchTargetSpec trapPCSpec_c;
+BranchTargetSpec trapPCSpec_r;
+
 logic OUT_flushTLB_c;
 logic setMemoryWait;
 always_ff@(posedge clk) begin
     OUT_fence <= OUT_fence_c;
     OUT_clearICache <= OUT_clearICache_c;
-    OUT_trapInfo <= OUT_trapInfo_c;
+    trapInfo_r <= trapInfo_c;
+    trapPCSpec_r <= trapPCSpec_c;
     OUT_flushTLB <= OUT_flushTLB_c;
     OUT_dbgStallPC <= OUT_dbgStallPC_c;
     
@@ -55,15 +75,16 @@ always_ff@(posedge clk) begin
 end
 
 assign OUT_branch = OUT_branch_c;
-
 always_comb begin
     OUT_fence_c = 0;
     OUT_clearICache_c = 0;
 
     OUT_branch_c = 'x;
     OUT_branch_c.taken = 0;
-    OUT_trapInfo_c = 'x;
-    OUT_trapInfo_c.valid = 0;
+    trapInfo_c = 'x;
+    trapInfo_c.valid = 0;
+    trapPCSpec_c = '0;
+
     OUT_flushTLB_c = 0;
 
     setMemoryWait = 0;
@@ -106,11 +127,20 @@ always_comb begin
                 // When an interrupt is pending after mret/sret or FLAGS_ORDERING (includes CSR write), execute it immediately
                 if (IN_trapInstr.flags == FLAGS_XRET || IN_trapInstr.flags == FLAGS_ORDERING)
                     if (IN_trapControl.interruptPending) begin
-                        OUT_trapInfo_c.valid = 1;
-                        OUT_trapInfo_c.trapPC = IN_trapInstr.flags == FLAGS_XRET ? {IN_trapControl.retvec, 1'b0} : nextInstr;
-                        OUT_trapInfo_c.cause = IN_trapControl.interruptCause;
-                        OUT_trapInfo_c.delegate = IN_trapControl.interruptDelegate;
-                        OUT_trapInfo_c.isInterrupt = 1;
+                        trapInfo_c.valid = 1;
+
+                        if (IN_trapInstr.flags == FLAGS_XRET) begin
+                            trapInfo_c.trapPC = {IN_trapControl.retvec, 1'b0};
+                            trapPCSpec_c = BR_TGT_MANUAL;
+                        end
+                        else begin
+                            trapInfo_c.trapPC = 'x;
+                            trapPCSpec_c = BR_TGT_NEXT;
+                        end
+
+                        trapInfo_c.cause = IN_trapControl.interruptCause;
+                        trapInfo_c.delegate = IN_trapControl.interruptDelegate;
+                        trapInfo_c.isInterrupt = 1;
 
                         OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                         OUT_branch_c.dstPC = {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
@@ -168,11 +198,12 @@ always_comb begin
                 delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
                     (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
                 
-                OUT_trapInfo_c.valid = 1;
-                OUT_trapInfo_c.trapPC = {baseIndexPC, 1'b0};
-                OUT_trapInfo_c.cause = trapCause;
-                OUT_trapInfo_c.delegate = delegate;
-                OUT_trapInfo_c.isInterrupt = isInterrupt;
+                trapInfo_c.valid = 1;
+                trapInfo_c.trapPC = 'x;
+                trapPCSpec_c = IN_trapInstr.compressed ? BR_TGT_CUR16 : BR_TGT_CUR32;
+                trapInfo_c.cause = trapCause;
+                trapInfo_c.delegate = delegate;
+                trapInfo_c.isInterrupt = isInterrupt;
 
                 OUT_branch_c.taken = 1;
                 OUT_branch_c.dstPC = {delegate ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
@@ -197,7 +228,7 @@ always_comb begin
                 // If the not-executed flag is still set, this is not a trap uop but a request to look up the PC
                 // of the instruction we're stalled on. This is only used for debugging.
                 assert(IN_trapInstr.flags == FLAGS_NX);
-                OUT_dbgStallPC_c = {baseIndexPC, 1'b0};
+                OUT_dbgStallPC_c = {finalHalfwPC, 1'b0};
             end
         end
     end

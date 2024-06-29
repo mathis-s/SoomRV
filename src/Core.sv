@@ -73,9 +73,10 @@ BranchSelector#(4) bsel
 IF_Instr IF_instrs /*verilator public*/;
 BTUpdate BP_btUpdates[1:0];
 
-FetchID_t PC_readAddress[4:0];
-PCFileEntry PC_readData[4:0];
-wire PC_stall;
+PCFileReadReq PC_readReq[`NUM_ALUS-1:0];
+PCFileEntry PC_readData[`NUM_ALUS-1:0];
+PCFileReadReqTH PC_readReqTH;
+PCFileEntry PC_readDataTH;
 
 MemController_Req PC_MC_if;
 PageWalk_Req PC_PW_rq;
@@ -100,8 +101,10 @@ IFetch ifetch
     .IN_btUpdates(BP_btUpdates),
     .IN_bpUpdate(ROB_bpUpdate),
     
-    .IN_pcReadAddr(PC_readAddress),
+    .IN_pcRead(PC_readReq),
     .OUT_pcReadData(PC_readData),
+    .IN_pcReadTH(PC_readReqTH),
+    .OUT_pcReadDataTH(PC_readDataTH),
     
     .IN_ready(!PD_full),
     .OUT_instrs(IF_instrs),
@@ -394,8 +397,8 @@ Load ld
     
     .IN_zcFwd(LD_zcFwd),
     
-    .OUT_pcReadAddr(PC_readAddress[3:0]),
-    .IN_pcReadData(PC_readData[3:0]),
+    .OUT_pcRead(PC_readReq),
+    .IN_pcReadData(PC_readData),
     
     .OUT_rfReadAddr(RF_readAddress),
     .IN_rfReadData(RF_readData),
@@ -940,8 +943,8 @@ TrapHandler trapHandler
     .rst(rst),
 
     .IN_trapInstr(ROB_trapUOp),
-    .OUT_pcReadAddr(PC_readAddress[4]),
-    .IN_pcReadData(PC_readData[4]),
+    .OUT_pcRead(PC_readReqTH),
+    .IN_pcReadData(PC_readDataTH),
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(TH_trapInfo),
     .OUT_branch(branchProvs[3]),

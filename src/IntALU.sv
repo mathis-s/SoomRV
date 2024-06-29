@@ -5,7 +5,7 @@ module IntALU
 
     input wire IN_wbStall,
     input EX_UOp IN_uop,
-    input IN_invalidate,
+    input wire IN_invalidate,
     input SqN IN_invalidateSqN,
 
     output BranchProv OUT_branch,
@@ -50,12 +50,13 @@ PopCnt popc
 wire lessThan = ($signed(srcA) < $signed(srcB));
 wire lessThanU = (srcA < srcB);
 
-wire[31:0] pcPlus2 = IN_uop.pc + 2;
-wire[31:0] pcPlus4 = IN_uop.pc + 4;
+wire[31:0] finalHalfwPC = IN_uop.pc;
+wire[31:0] nextInstrPC = finalHalfwPC + 2;
+wire[31:0] firstHalfwPC = finalHalfwPC - (IN_uop.compressed ? 0 : 2);
 
 always_comb begin
     case (IN_uop.opcode)
-        INT_AUIPC: resC = IN_uop.pc + imm;
+        INT_AUIPC: resC = firstHalfwPC + imm;
         LSU_SB_PREINC,
         LSU_SH_PREINC,
         LSU_SW_PREINC,
@@ -80,7 +81,7 @@ always_comb begin
         INT_V_JR,
         INT_V_RET,
         INT_V_JALR,
-        INT_JAL: resC = (IN_uop.compressed ? pcPlus2 : pcPlus4);
+        INT_JAL: resC = nextInstrPC;
         INT_SYS: resC = 32'bx;
         INT_SH1ADD: resC = srcB + (srcA << 1);
         INT_SH2ADD: resC = srcB + (srcA << 2);
@@ -156,9 +157,6 @@ always_comb begin
     endcase
 end
 
-wire[31:0] finalHalfwPC = IN_uop.compressed ? IN_uop.pc : pcPlus2;
-
-
 BranchProv branch_c;
 BTUpdate btUpdate_c;
 
@@ -178,7 +176,6 @@ always_comb begin
         branch_c.loadSqN = IN_uop.loadSqN;
         branch_c.storeSqN = IN_uop.storeSqN;
         
-        btUpdate_c.valid = 0;
         branch_c.taken = 0;
         branch_c.flush = 0;
         
@@ -205,17 +202,13 @@ always_comb begin
             end
             if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL) begin
                 if (branchTaken) begin
-                    branch_c.dstPC = (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                    btUpdate_c.dst = (IN_uop.pc + {{19{imm[12]}}, imm[12:0]});
-                end
-                else if (IN_uop.compressed) begin
-                    branch_c.dstPC = pcPlus2;
-                    btUpdate_c.dst = pcPlus2;
+                    branch_c.dstPC = (firstHalfwPC + {{19{imm[12]}}, imm[12:0]});
+                    btUpdate_c.dst = (firstHalfwPC + {{19{imm[12]}}, imm[12:0]});
                 end
                 else begin
-                    branch_c.dstPC = pcPlus4;
-                    btUpdate_c.dst = pcPlus4;
+                    branch_c.dstPC = nextInstrPC;
                 end
+
                 branch_c.cause = branchTaken ? FLUSH_BRANCH_TK : FLUSH_BRANCH_NT;
                 branch_c.taken = 1;
                 

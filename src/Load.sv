@@ -3,7 +3,8 @@ module Load
     parameter NUM_UOPS=4,
     parameter NUM_WBS=4,
     parameter NUM_XUS=8,
-    parameter NUM_ZC_FWDS=2
+    parameter NUM_ZC_FWDS=2,
+    parameter NUM_PC_READS=2
 )
 (
     input wire clk,
@@ -24,8 +25,8 @@ module Load
     input ZCForward IN_zcFwd[NUM_ZC_FWDS-1:0],
     
     // PC File read
-    output FetchID_t OUT_pcReadAddr[NUM_UOPS-1:0],
-    input PCFileEntry IN_pcReadData[NUM_UOPS-1:0],
+    output PCFileReadReq OUT_pcRead[NUM_PC_READS-1:0],
+    input PCFileEntry IN_pcReadData[NUM_PC_READS-1:0],
     
     // Register File read
     output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
@@ -41,7 +42,10 @@ always_comb begin
         OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
         OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
         
-        OUT_pcReadAddr[i] = IN_uop[i].fetchID;
+        if (i < NUM_PC_READS) begin
+            OUT_pcRead[i].valid = IN_uop[i].valid;
+            OUT_pcRead[i].addr = IN_uop[i].fetchID;
+        end
     end
     
     // LD/ST only use one register read port
@@ -61,9 +65,18 @@ always_comb begin
         if (outUOpReg[i].valid) begin
             OUT_uop[i] = outUOpReg[i];
             
-            // forward values from register file combinatorially
+            // forward values from register file and pc file combinationally
             if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
             if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
+            
+            OUT_uop[i].bpi = '0;
+            if (i < NUM_PC_READS) begin
+                OUT_uop[i].pc = {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], outUOpReg[i].fetchOffs, 1'b0};
+                OUT_uop[i].fetchStartOffs = IN_pcReadData[i].pc[$bits(FetchOff_t)-1:0];
+                OUT_uop[i].fetchPredOffs = IN_pcReadData[i].branchPos;
+                if (outUOpReg[i].fetchOffs == IN_pcReadData[i].branchPos)
+                    OUT_uop[i].bpi = IN_pcReadData[i].bpi;
+            end
         end
 
     end
@@ -100,16 +113,6 @@ always_ff@(posedge clk) begin
                 outUOpReg[i].opcode <= IN_uop[i].opcode;
                 outUOpReg[i].fu <= IN_uop[i].fu;
                 outUOpReg[i].valid <= 1;
-                
-                outUOpReg[i].pc <= {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], IN_uop[i].fetchOffs, 1'b0} - (IN_uop[i].compressed ? 0 : 2);
-                outUOpReg[i].fetchStartOffs <= IN_pcReadData[i].pc[$bits(FetchOff_t)-1:0];
-                outUOpReg[i].fetchPredOffs <= IN_pcReadData[i].branchPos;
-                outUOpReg[i].bpi <= IN_pcReadData[i].bpi;
-
-                if (IN_uop[i].fetchOffs != IN_pcReadData[i].branchPos) begin
-                    outUOpReg[i].bpi.predicted <= 0;
-                    outUOpReg[i].bpi.taken <= 0;
-                end
 
                 operandIsReg[i] <= 2'b00;
                 

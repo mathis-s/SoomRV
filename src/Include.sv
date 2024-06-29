@@ -417,6 +417,8 @@ typedef enum logic[1:0]
 
 typedef enum logic[1:0]
 {
+    // We generally store the PC of the last instruction halfword,
+    // so next is always +1 while offset to current may be 0 or -1.
     BR_TGT_MANUAL, BR_TGT_NEXT, BR_TGT_CUR16, BR_TGT_CUR32
 } BranchTargetSpec;
 
@@ -466,6 +468,19 @@ typedef struct packed
     FetchOff_t branchPos;
     BranchPredInfo bpi;
 } PCFileEntry;
+
+typedef struct packed
+{
+    FetchID_t addr;
+    logic valid;
+} PCFileReadReq;
+
+typedef struct packed
+{
+    logic prio;
+    FetchID_t addr;
+    logic valid;
+} PCFileReadReqTH;
 
 typedef struct packed
 {

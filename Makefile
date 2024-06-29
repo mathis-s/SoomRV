@@ -45,7 +45,6 @@ SRC_FILES = \
 	src/BranchPredictionTable.sv \
 	src/ReturnStack.sv \
 	src/TageTable.sv \
-	src/PCFile.sv \
 	src/TagePredictor.sv \
 	src/LoadStoreUnit.sv \
 	src/ICacheTable.sv \
