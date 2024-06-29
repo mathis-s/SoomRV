@@ -1259,9 +1259,9 @@ void LogInstructions()
         for (size_t i = 0; i < 4; i++)
             if (core->RN_uop[i][0] & 1)
             {
-                int sqn = ExtractField<4>(core->RN_uop[i], 46 + 4, 7);
-                int fu = ExtractField<4>(core->RN_uop[i], 2 + 4, 4);
-                uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 + 4 - 7, 7);
+                int sqn = ExtractField<4>(core->RN_uop[i], 46 + 6, 7);
+                int fu = ExtractField<4>(core->RN_uop[i], 2 + 6, 4);
+                uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 + 6 - 7, 7);
 
                 state.insts[sqn].valid = 1;
                 state.insts[sqn] = state.de[i];

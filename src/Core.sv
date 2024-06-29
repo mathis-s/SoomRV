@@ -196,7 +196,7 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire[3:0][`DEC_WIDTH-1:0] IQ_stalls;
+wire[5:0][`DEC_WIDTH-1:0] IQ_stalls;
 //wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
 //wire IQ0_full;
 IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,
@@ -272,7 +272,7 @@ IssueQueue#(`IQ_2_SIZE,2,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     .clk(clk),
     .rst(rst),
 
-    .IN_defer(stLookupIQStall[0]),
+    .IN_defer(IQ_stalls[2+2]),
     .OUT_stall(IQ_stalls[2]),
     
     .IN_stall(stall[2]),
@@ -300,7 +300,7 @@ IssueQueue#(`IQ_3_SIZE,2,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
     .clk(clk),
     .rst(rst),
 
-    .IN_defer(stLookupIQStall[1]),
+    .IN_defer(IQ_stalls[3+2]),
     .OUT_stall(IQ_stalls[3]),
     
     .IN_stall(stall[3]),
@@ -326,7 +326,6 @@ IssueQueue#(`IQ_3_SIZE,2,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,
 
 StDataLookupUOp stLookupUOp[`NUM_AGUS-1:0];
 wire stLookupUOp_ready[`NUM_AGUS-1:0];
-wire[`DEC_WIDTH-1:0] stLookupIQStall[`NUM_AGUS-1:0];
 ComLimit stCommitLimit[`NUM_AGUS-1:0];
 
 generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
@@ -335,7 +334,7 @@ generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
         .clk(clk),
         .rst(rst),
 
-        .OUT_stall(stLookupIQStall[i]),
+        .OUT_stall(IQ_stalls[4+i]),
         .IN_uop(RN_uop),
 
         .IN_resultValid(wbHasResult),

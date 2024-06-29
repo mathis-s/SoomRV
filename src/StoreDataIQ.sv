@@ -117,7 +117,7 @@ always_comb begin
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_stall[i] = 0;
         // check if this is a candidate to enqueue
-        if (IN_uop[i].validIQ[2+PORT_IDX] && (IN_uop[i].storeSqN[0] == PORT_IDX[0]) &&
+        if (IN_uop[i].validIQ[4+PORT_IDX] && (IN_uop[i].storeSqN[0] == PORT_IDX[0]) &&
             ((IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) ||
              (IN_uop[i].fu == FU_ATOMIC && IN_uop[i].opcode == ATOMIC_AMOSWAP_W)
             )
@@ -215,7 +215,7 @@ always_ff@(posedge clk) begin
         
         // Enqueue
         for (integer i = 0; i < NUM_ENQUEUE; i=i+1) begin
-            if (enqCandidates[i].validIQ[2+PORT_IDX]) begin
+            if (enqCandidates[i].validIQ[4+PORT_IDX]) begin
                 R_ST_UOp temp;
                 
                 temp.avail[0] = enqCandidates[i].availB;

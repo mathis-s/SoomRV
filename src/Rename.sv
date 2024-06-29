@@ -9,7 +9,7 @@ module Rename
     input wire frontEn,
     input wire rst,
     
-    input wire[3:0][WIDTH_ISSUE-1:0] IN_stalls,
+    input wire[5:0][WIDTH_ISSUE-1:0] IN_stalls,
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
@@ -307,7 +307,7 @@ always_ff@(posedge clk) begin
                 failSc <= 0;
                 
                 OUT_uop[i].valid <= 1;
-                OUT_uop[i].validIQ <= 4'b1111;
+                OUT_uop[i].validIQ <= 6'b111111;
                 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
@@ -368,7 +368,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_ISSUE; i++) begin
             OUT_uop[i].valid <= 0;
 
-            for (integer j = 0; j < 4; j=j+1) begin
+            for (integer j = 0; j < 6; j=j+1) begin
                 if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
             end
         end
