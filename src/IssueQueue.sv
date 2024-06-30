@@ -106,6 +106,16 @@ always_comb begin
     end
 end
 
+// If store data queues wish to defer any op,
+// we must defer all following ones as well to
+// maintain ordering.
+reg defer[NUM_UOPS-1:0];
+always_comb begin
+    defer[0] = IN_defer[0];
+    for (integer i = 1; i < NUM_UOPS; i=i+1)
+        defer[i] = defer[i-1] | IN_defer[i];
+end
+
 R_UOp enqCandidates[NUM_ENQUEUE-1:0];
 always_comb begin
     logic[$clog2(NUM_ENQUEUE)-1:0] idx = 0;
@@ -131,7 +141,7 @@ always_comb begin
             (PORT_IDX >= 2 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
             // check if we have capacity to enqueue this op now
-            if (!limit && qIdx != SIZE && !IN_branch.taken && !IN_defer[i]) begin
+            if (!limit && qIdx != SIZE && !IN_branch.taken && !defer[i]) begin
                 
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];
@@ -329,7 +339,9 @@ always_ff@(posedge clk) begin
                 
                 // Special handling for jalr
                 // verilator lint_off SELRANGE
-                if (enqCandidates[i].fu == FU_INT && (enqCandidates[i].opcode == INT_V_JALR || enqCandidates[i].opcode == INT_V_JR)) begin
+                if (enqCandidates[i].fu == FU_INT && 
+                    (enqCandidates[i].opcode == INT_V_JALR || enqCandidates[i].opcode == INT_V_JR)
+                ) begin
                     assert(IMM_BITS == 36);
                     
                     // Use {imm[0], tags[1]} to encode 8 bits of imm12
@@ -351,5 +363,15 @@ always_ff@(posedge clk) begin
         insertIndex <= newInsertIndex;
     end
 end
+
+`ifdef DEBUG
+always_ff@(posedge clk) begin
+    for (integer i = 1; i < SIZE; i=i+1) begin
+        if (i[$clog2(SIZE):0] < insertIndex) begin
+            assert($signed(queue[i].sqN - queue[i-1].sqN) > 0);
+        end
+    end
+end
+`endif
 
 endmodule
