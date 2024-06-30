@@ -651,17 +651,16 @@ typedef struct packed
     logic isLoad;
     logic isLrSc;
     logic earlyLoadFailed;
-    logic[31:0] pc;
     Tag tagDst;
     SqN sqN;
-    SqN storeSqN; // 7
-    SqN loadSqN; // 7
+    SqN storeSqN;
+    SqN loadSqN;
     FetchOff_t fetchOffs;
-    FetchID_t fetchID; // 5
-    logic doNotCommit; // 1
-    AGU_Exception exception; // 2
-    logic compressed; // 1
-    logic valid; // 1
+    FetchID_t fetchID;
+    logic doNotCommit;
+    AGU_Exception exception;
+    logic compressed;
+    logic valid;
 } AGU_UOp;
 
 typedef struct packed

@@ -55,7 +55,6 @@ always_comb begin
     tvalProv_c.valid = 0;
 
     aguUOp_c.addr = addr;
-    aguUOp_c.pc = IN_uop.pc;
     aguUOp_c.tagDst = IN_uop.tagDst;
     aguUOp_c.sqN = IN_uop.sqN;
     aguUOp_c.storeSqN = IN_uop.storeSqN;
