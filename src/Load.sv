@@ -2,7 +2,6 @@ module Load
 #(
     parameter NUM_UOPS=4,
     parameter NUM_WBS=4,
-    parameter NUM_XUS=8,
     parameter NUM_ZC_FWDS=2,
     parameter NUM_PC_READS=2
 )
@@ -28,8 +27,9 @@ module Load
     input PCFileEntry IN_pcReadData[NUM_PC_READS-1:0],
     
     // Register File read
-    output reg[5:0] OUT_rfReadAddr[2*NUM_UOPS-1:0],
-    input wire[31:0] IN_rfReadData[2*NUM_UOPS-1:0],
+    output reg[6-1:0] OUT_rfReadEnable,
+    output reg[6-1:0][5:0] OUT_rfReadAddr,
+    input wire[6-1:0][31:0] IN_rfReadData,
 
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
@@ -39,17 +39,19 @@ always_comb begin
     // All ports get to read from integer rf and pc rf
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
-        OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
+        OUT_rfReadEnable[i] = IN_uop[i].valid && !IN_uop[i].tagA[$bits(Tag)-1];
+
+        // LD/ST only use one register read port
+        if (i < 2) begin
+            OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
+            OUT_rfReadEnable[i+NUM_UOPS] = IN_uop[i].valid && !IN_uop[i].tagB[$bits(Tag)-1];
+        end
         
         if (i < NUM_PC_READS) begin
             OUT_pcRead[i].valid = IN_uop[i].valid;
             OUT_pcRead[i].addr = IN_uop[i].fetchID;
         end
     end
-    
-    // LD/ST only use one register read port
-    OUT_rfReadAddr[2+NUM_UOPS] = 'x;
-    OUT_rfReadAddr[3+NUM_UOPS] = 'x;
 end
 
 FuncUnit outFU[NUM_UOPS-1:0];
@@ -66,7 +68,8 @@ always_comb begin
             
             // forward values from register file and pc file combinationally
             if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
-            if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
+            if (i < 2)
+                if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
             
             OUT_uop[i].bpi = '0;
             if (i < NUM_PC_READS) begin

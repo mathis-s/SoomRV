@@ -18,7 +18,7 @@
 #include "VTop_IF_Cache.h"
 #include "VTop_IFetch.h"
 #include "VTop_MemRTL__W54_N40_WB15.h"
-#include "VTop_RF.h"
+#include "VTop_RegFile__A1.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
 #include "VTop_RenameTable.h"

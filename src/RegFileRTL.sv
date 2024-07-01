@@ -3,7 +3,8 @@ module RegFile
     parameter WIDTH = 32,
     parameter SIZE = 64,
     parameter NUM_READ = 8,
-    parameter NUM_WRITE = 4
+    parameter NUM_WRITE = 4,
+    parameter ALLOW_COLLISION=0
 )
 (
     input wire clk,
@@ -17,7 +18,7 @@ module RegFile
     input wire[NUM_WRITE-1:0][WIDTH-1:0] IN_wdata
 );
 
-reg[WIDTH-1:0] mem[SIZE-1:0];
+reg[WIDTH-1:0] mem[SIZE-1:0] /* verilator public */;
 
 always_ff@(posedge clk) begin
     for (integer i = 0; i < NUM_READ; i=i+1) begin
@@ -28,12 +29,14 @@ always_ff@(posedge clk) begin
         if (IN_we[i]) mem[IN_waddr[i]] <= IN_wdata[i];
     end
     
-    for (integer i = 0; i < NUM_READ; i=i+1)
-        for (integer j = 0; j < NUM_WRITE; j=j+1)
-            if (IN_re[i] && IN_we[j] && IN_raddr[i] == IN_waddr[j]) begin
-                $display("write collision: %x", IN_waddr[j]);
-                assert(0);
-            end
+    if (!ALLOW_COLLISION) begin
+        for (integer i = 0; i < NUM_READ; i=i+1)
+            for (integer j = 0; j < NUM_WRITE; j=j+1)
+                if (IN_re[i] && IN_we[j] && IN_raddr[i] == IN_waddr[j]) begin
+                    $display("write collision: %x", IN_waddr[j]);
+                    assert(0);
+                end
+    end
 end
 
 endmodule

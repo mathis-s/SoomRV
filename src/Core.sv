@@ -354,26 +354,38 @@ generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
     );
 end endgenerate
 
-RFTag RF_readAddress[7:0];
-RegT RF_readData[7:0];
 
-RF rf
+logic[7:0] RF_readEnable;
+RFTag[7:0] RF_readAddress;
+RegT[7:0] RF_readData;
+for (genvar i = 0; i < 2; i=i+1) begin
+    assign RF_readEnable[i+6] = SDL_readEnable[i];
+    assign RF_readAddress[i+6] = SDL_readTag[i];
+    assign SDL_readData[i] = RF_readData[i+6];
+end
+
+logic[3:0] RF_writeEnable;
+RFTag[3:0] RF_writeAddress;
+RegT[3:0] RF_writeData;
+always_comb begin
+    for (integer i = 0; i < 4; i=i+1) begin
+        RF_writeAddress[i] = wbUOp[i].tagDst[5:0];
+        RF_writeData[i] = wbUOp[i].result;
+        RF_writeEnable[i] = wbHasResult[i];
+    end
+end
+
+RegFile#(32, 64, 8, 4, 1) rf
 (
     .clk(clk),
-    
-    .waddr0(wbUOp[0].tagDst[5:0]), .wdata0(wbUOp[0].result), .wen0(wbHasResult[0]),
-    .waddr1(wbUOp[1].tagDst[5:0]), .wdata1(wbUOp[1].result), .wen1(wbHasResult[1]),
-    .waddr2(wbUOp[2].tagDst[5:0]), .wdata2(wbUOp[2].result), .wen2(wbHasResult[2]),
-    .waddr3(wbUOp[3].tagDst[5:0]), .wdata3(wbUOp[3].result), .wen3(wbHasResult[3]),
-    
-    .raddr0(RF_readAddress[0]), .rdata0(RF_readData[0]),
-    .raddr1(RF_readAddress[1]), .rdata1(RF_readData[1]),
-    .raddr2(RF_readAddress[2]), .rdata2(RF_readData[2]),
-    .raddr3(RF_readAddress[3]), .rdata3(RF_readData[3]),
-    .raddr4(RF_readAddress[4]), .rdata4(RF_readData[4]),
-    .raddr5(RF_readAddress[5]), .rdata5(RF_readData[5]),
-    .raddr6(SDL_readTag[0]), .rdata6(SDL_readData[0]),
-    .raddr7(SDL_readTag[1]), .rdata7(SDL_readData[1])
+
+    .IN_re(RF_readEnable),
+    .IN_raddr(RF_readAddress),
+    .OUT_rdata(RF_readData),
+
+    .IN_we(RF_writeEnable),
+    .IN_waddr(RF_writeAddress),
+    .IN_wdata(RF_writeData)
 );
 
 EX_UOp LD_uop[3:0] /*verilator public*/;
@@ -398,13 +410,15 @@ Load ld
     .OUT_pcRead(PC_readReq),
     .IN_pcReadData(PC_readData),
     
-    .OUT_rfReadAddr(RF_readAddress),
-    .IN_rfReadData(RF_readData),
+    .OUT_rfReadEnable(RF_readEnable[5:0]),
+    .OUT_rfReadAddr(RF_readAddress[5:0]),
+    .IN_rfReadData(RF_readData[5:0]),
     
     .OUT_uop(LD_uop)
 );
 
 AMO_Data_UOp SDL_amoData[`NUM_AGUS-1:0];
+logic SDL_readEnable[`NUM_AGUS-1:0];
 RFTag SDL_readTag[`NUM_AGUS-1:0];
 RegT SDL_readData[`NUM_AGUS-1:0];
 StDataUOp SDL_stDataUOp[`NUM_AGUS-1:0];
@@ -420,6 +434,7 @@ StoreDataLoad stDataLd
 
     .IN_atomicUOp(SDL_amoData),
 
+    .OUT_readEnable(SDL_readEnable),
     .OUT_readTag(SDL_readTag),
     .IN_readData(SDL_readData),
 

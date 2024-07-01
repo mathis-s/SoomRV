@@ -18,7 +18,6 @@ SRC_FILES = \
 	src/IssueQueue.sv  \
 	src/IntALU.sv  \
 	src/IFetch.sv \
-	src/RF.sv \
 	src/Load.sv \
 	src/ROB.sv \
 	src/AGU.sv \
