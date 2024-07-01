@@ -30,8 +30,7 @@ module IFetch
     
     input wire IN_ready,
     output IF_Instr OUT_instrs,
-    output wire[30:0] OUT_lateRetAddr,
-    
+
     input VirtMemState IN_vmem,
     output PageWalk_Req OUT_pw,
     input PageWalk_Res IN_pw,
@@ -70,6 +69,7 @@ always_comb begin
     end
 end
 
+wire[30:0] BP_lateRetAddr;
 FetchLimit BP_fetchLimit;
 BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 (
@@ -89,7 +89,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .OUT_lastOffs(BP_lastOffs),
 
     .OUT_curRetAddr(BP_curRetAddr),
-    .OUT_lateRetAddr(OUT_lateRetAddr),
+    .OUT_lateRetAddr(BP_lateRetAddr),
     .OUT_rIdx(BP_rIdx),
 
     .OUT_predBr(predBr),
@@ -146,7 +146,7 @@ ICacheTable ict
     .OUT_btUpdate(BH_btUpdate),
     .OUT_retUpdate(BH_retDecUpd),
 
-    .IN_lateRetAddr(OUT_lateRetAddr),
+    .IN_lateRetAddr(BP_lateRetAddr),
     
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),

@@ -203,7 +203,6 @@ module InstrDecoder
 
     input DecodeState IN_dec,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
-    input wire[30:0] IN_lateRetAddr,
     
     input wire IN_enCustom,
 

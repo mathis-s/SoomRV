@@ -33,7 +33,50 @@ module Load
 
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
+localparam NUM_FWD = NUM_ZC_FWDS + NUM_WBS;
+localparam NUM_LOOKUP = 6;
 
+// Forwarding
+ZCForward forwards[NUM_FWD-1:0];
+always_comb begin
+    for (integer i = 0; i < NUM_ZC_FWDS; i=i+1) begin
+        forwards[i] = IN_zcFwd[i]; 
+    end
+    for (integer i = 0; i < NUM_WBS; i=i+1) begin
+        forwards[i+NUM_ZC_FWDS].valid = IN_wbHasResult[i];
+        forwards[i+NUM_ZC_FWDS].tag = IN_wbUOp[i].tagDst;
+        forwards[i+NUM_ZC_FWDS].result = IN_wbUOp[i].result;
+    end
+end
+
+logic[NUM_FWD-1:0] match[NUM_LOOKUP-1:0];
+always_comb begin
+    Tag lookups[NUM_LOOKUP-1:0];
+    
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+        lookups[i] = IN_uop[i].tagA;
+        if (i < 2)
+            lookups[i+NUM_UOPS] = IN_uop[i].tagB;
+    end
+    
+    for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
+        for (integer j = 0; j < NUM_FWD; j=j+1) begin
+            match[i][j] = (forwards[j].valid && forwards[j].tag == lookups[i]);
+        end
+    end
+end
+
+logic[$clog2(NUM_FWD)-1:0] matchIdx[NUM_LOOKUP-1:0];
+logic matchValid[NUM_LOOKUP-1:0];
+OHEncoder#(NUM_LOOKUP, 1) lookupEnc[NUM_LOOKUP-1:0]
+(
+    .IN_idxOH(match),
+    .OUT_idx(matchIdx),
+    .OUT_valid(matchValid)
+);
+
+
+// Reads from RF and PC File
 always_comb begin
 
     // All ports get to read from integer rf and pc rf
@@ -80,7 +123,6 @@ always_comb begin
                     OUT_uop[i].bpi = IN_pcReadData[i].bpi;
             end
         end
-
     end
 end
 
@@ -122,29 +164,11 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].tagA[6]) begin
                     outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
                 end
-                else begin 
-                    reg found = 0;
-                    
-                    // Try to forward from wbs
-                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: one-hot
-                        if (IN_wbHasResult[j] && IN_uop[i].tagA == IN_wbUOp[j].tagDst) begin
-                            outUOpReg[i].srcA <= IN_wbUOp[j].result;
-                            found = 1;
-                        end
-                    end
-                    
-                    // Try to forward zero cycle (TODO: one hot too)
-                    for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagA) begin
-                            outUOpReg[i].srcA <= IN_zcFwd[j].result;
-                            found = 1;
-                        end
-                    end
-                
-                    if (!found) begin
-                        operandIsReg[i][0] <= 1;
-                    end
+                else if (matchValid[i]) begin
+                    outUOpReg[i].srcA <= forwards[matchIdx[i]].result;
+                end
+                else begin
+                    operandIsReg[i][0] <= 1;
                 end
                 
                 outUOpReg[i].srcB <= 'x;
@@ -154,27 +178,11 @@ always_ff@(posedge clk) begin
                 else if (IN_uop[i].tagB[6]) begin
                     outUOpReg[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
                 end
+                else if (matchValid[NUM_UOPS+i]) begin
+                    outUOpReg[i].srcB <= forwards[matchIdx[NUM_UOPS+i]].result;
+                end
                 else begin
-                    reg found = 0;
-                    for (integer j = 0; j < NUM_WBS; j=j+1) begin
-                        // TODO: one-hot
-                        if (IN_wbHasResult[j] && IN_uop[i].tagB == IN_wbUOp[j].tagDst) begin
-                            outUOpReg[i].srcB <= IN_wbUOp[j].result;
-                            found = 1;
-                        end
-                    end
-                    
-                    // Try to forward zero cycle (TODO: one hot too)
-                    for (integer j = 0; j < NUM_ZC_FWDS; j=j+1) begin
-                        if (IN_zcFwd[j].valid && IN_zcFwd[j].tag == IN_uop[i].tagB) begin
-                            outUOpReg[i].srcB <= IN_zcFwd[j].result;
-                            found = 1;
-                        end
-                    end
-                    
-                    if (!found) begin
-                        operandIsReg[i][1] <= 1;
-                    end
+                    operandIsReg[i][1] <= 1;
                 end
             end
             else if (!IN_stall[i] || (outUOpReg[i].valid && IN_branch.taken && $signed(outUOpReg[i].sqN - IN_branch.sqN) > 0)) begin
