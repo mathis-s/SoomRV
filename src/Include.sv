@@ -5,7 +5,7 @@ typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[31:0] RegT;
 typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
-typedef logic[1:0] RetStackIdx_t;
+typedef logic[$clog2(`RETURN_SIZE)-1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
 typedef logic[1:0] StOff_t;
@@ -506,7 +506,6 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    RetStackIdx_t rIdx;
     logic[7:0][15:0] instrs;
     
     logic valid;
@@ -520,7 +519,6 @@ typedef struct packed
     FetchOff_t fetchPredOffs;
     logic[30:0] predTarget;
     logic targetIsRetAddr;
-    RetStackIdx_t rIdx;
     logic predTaken;
     logic predInvalid;
     FetchID_t fetchID;

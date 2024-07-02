@@ -1,7 +1,7 @@
 module ReturnStack
 #(
-    parameter SIZE=4,
-    parameter RQSIZE=4,
+    parameter SIZE=`RETURN_SIZE,
+    parameter RQSIZE=`RETURN_RQ_SIZE,
     parameter RET_PRED_SIZE=64,
     parameter RET_PRED_ASSOC=2,
     parameter RET_PRED_TAG_LEN=10

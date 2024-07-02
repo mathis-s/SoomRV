@@ -240,7 +240,6 @@ always_comb begin
             packet.predPos = {$bits(FetchOff_t){1'b1}};
             packet.predTaken = 0;
             packet.predTarget = 'x;
-            packet.rIdx = fetch1.rIdx;
             packet.fetchID = fetch1.fetchID;
             packet.instrs = '0;
             packet.valid = 1;
@@ -252,7 +251,6 @@ always_comb begin
             packet.predPos = fetch1.predPos;
             packet.predTaken = fetch1.bpi.taken;
             packet.predTarget = fetch1.predTarget;
-            packet.rIdx = fetch1.rIdx;
             packet.fetchID = fetch1.fetchID;
             packet.valid = 1;
         end

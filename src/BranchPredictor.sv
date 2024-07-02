@@ -57,7 +57,7 @@ typedef struct packed
 BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;
-    bpBackup.rIdx = OUT_rIdx;
+    bpBackup.rIdx = RET_idx;
     bpBackup.isJump = OUT_predBr.isJump;
     bpBackup.predTaken = OUT_predBr.taken;
     bpBackup.predOffs = OUT_predBr.offs;
@@ -143,7 +143,7 @@ always_comb begin
     //    // direction prediction.
     //    OUT_predBr.valid = 1;
     //    OUT_predBr.dirOnly = 1;
-    //    OUT_predBr.taken = 1;
+    //    OUT_predBr.taken = TAGE_taken;
     //end
 end
 
@@ -262,7 +262,7 @@ always_comb begin
     lookupHistory = history;
     if (recovery.valid)
         lookupHistory = recHistory;
-    else if (OUT_predBr.valid && !OUT_predBr.isJump && !OUT_predBr.dirOnly)
+    else if (OUT_predBr.valid && !OUT_predBr.isJump)
         lookupHistory = {lookupHistory[$bits(BHist_t)-2:0], OUT_predBr.taken};
 end
 
