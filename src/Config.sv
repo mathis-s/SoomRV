@@ -7,6 +7,9 @@
 `define BP_BASEP_ID_LEN 10
 `define TAGE_CLEAR_ENABLE
 `define TAGE_CLEAR_INTERVAL 20
+`define TAGE_BASE 4
+`define TAGE_STAGES 6
+`define TAGE_TABLE_SIZE 256
 
 // IFetch
 `define FSIZE_E 4
@@ -76,8 +79,6 @@
     (`IS_MEM_PMA(addr) || \
     (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000))
 
-
-//`define SQ_LINEAR
 
 // Enable floating point (zfinx) support
 //`define ENABLE_FP

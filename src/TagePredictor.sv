@@ -1,9 +1,9 @@
 module TagePredictor
 #(
-    parameter NUM_STAGES=3,
+    parameter NUM_STAGES=`TAGE_STAGES,
     parameter FACTOR=2,
-    parameter BASE=6,
-    parameter TABLE_SIZE=64,
+    parameter BASE=`TAGE_BASE,
+    parameter TABLE_SIZE=`TAGE_TABLE_SIZE,
     parameter TAG_SIZE=9
 )
 (
