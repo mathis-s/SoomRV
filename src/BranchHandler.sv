@@ -271,10 +271,15 @@ always_comb begin
 
         logic isIndirBranch = curBr.valid &&
             (curBr.btype == IJUMP || curBr.btype == ICALL || curBr.btype == RETURN/* || curBr.btype == RETICALL*/);
+        
+        logic[30:0] curPC = {IN_op.pc[31:$bits(FetchOff_t)+1], FetchOff_t'(i)};
+        logic[30:0] nextPC = curPC + 1;
+
+        logic predicted = IN_op.bpi.predicted && IN_op.predPos == FetchOff_t'(i) && !IN_op.predDirOnly;
     
         if (decBranch_c.taken) ;
         else if (i > IN_op.lastValid || i < IN_op.pc[1+:$bits(FetchOff_t)]) ;
-        else if (IN_op.bpi.predicted && IN_op.bpi.taken && !IN_op.predDirOnly && IN_op.predPos == FetchOff_t'(i)) begin
+        else if (predicted && IN_op.bpi.taken) begin
             // A taken prediction was made by the BP, check if correct.
 
             if (// Branch was predicted, but there is none in the package
@@ -344,8 +349,9 @@ always_comb begin
                 end
                 else begin
                     if (predIllegal) begin
-                        // On illegal prediction, we need to re-fetch the entire 32-bit instruction (not just first half)
-                        decBranch_c.dst = {IN_op.pc[31:$bits(FetchOff_t)+1], IN_op.predPos};
+                        // On illegal prediction, we need to re-fetch the entire 32-bit instruction
+                        // (not just first half)
+                        decBranch_c.dst = curPC;
                         newPredTaken_c = 0;
                         newPredPos_c = '1;
 
@@ -355,7 +361,7 @@ always_comb begin
                     else begin
                         // The prediction was wrong but preserved instruction boundaries, so we only need to start
                         // re-fetching post-branch instructions;
-                        decBranch_c.dst = {IN_op.pc[31:$bits(FetchOff_t)+1], IN_op.predPos} + 1;
+                        decBranch_c.dst = nextPC;
                         newPredTaken_c = 0;
                         newPredPos_c = '1;
                         
@@ -389,14 +395,37 @@ always_comb begin
         // Handle non-predicted taken jumps or taken-only predicted branches
         else if (curBr.valid) begin
             FetchOff_t actualOffs = curBr.fhPC[1+:$bits(FetchOff_t)];
-            reg dirOnlyBranch = (curBr.btype == BRANCH && IN_op.bpi.taken && IN_op.predDirOnly);
             
-            if (curBr.btype == JUMP || curBr.btype == CALL || curBr.btype == RETURN || dirOnlyBranch) begin
+            reg dirOnly = (curBr.btype == BRANCH && IN_op.predDirOnly);
+            reg dirOnlyTaken = (curBr.btype == BRANCH && IN_op.bpi.taken && IN_op.predDirOnly);
+            
+            // Direction only not-taken prediction
+            // We need to flush the IFetch pipeline to correct branch history bits
+            if (!predicted) begin
                 decBranch_c.taken = 1;
                 decBranch_c.fetchID = IN_op.fetchID;
+                decBranch_c.fetchOffs = FetchOff_t'(i);
+                decBranch_c.dst = nextPC;
+                decBranch_c.retAct = RET_NONE;
+                decBranch_c.histAct = HIST_APPEND_0;
+                decBranch_c.wfi = 0;
+
+                newPredTaken_c = 0;
+                newPredPos_c = actualOffs;
+
+                if (actualOffs != {$bits(FetchOff_t) {1'b1}}) begin
+                    endOffsValid = 1;
+                    endOffs = actualOffs + 1;
+                end
+            end
+            
+            if (curBr.btype == JUMP || curBr.btype == CALL || curBr.btype == RETURN || dirOnlyTaken) begin
+                decBranch_c.taken = 1;
+                decBranch_c.fetchID = IN_op.fetchID;
+                decBranch_c.fetchOffs = FetchOff_t'(i);
                 decBranch_c.dst = curBr.target[31:1];
                 decBranch_c.retAct = RET_NONE;
-                decBranch_c.histAct = dirOnlyBranch ? HIST_APPEND_1 : HIST_NONE;
+                decBranch_c.histAct = dirOnlyTaken ? HIST_APPEND_1 : HIST_NONE;
                 decBranch_c.wfi = 0;
                 
                 newPredTaken_c = 1;
@@ -408,7 +437,7 @@ always_comb begin
                 end
             end
 
-            if (curBr.btype == JUMP || curBr.btype == CALL || dirOnlyBranch) begin     
+            if (curBr.btype == JUMP || curBr.btype == CALL || dirOnlyTaken || !predicted) begin     
                 // Register branch target
                 btUpdate_c.valid = 1;
                 btUpdate_c.clean = 0;
@@ -436,6 +465,7 @@ always_comb begin
                 if (curBr.btype == ICALL) begin
                     decBranch_c.taken = 1;
                     decBranch_c.fetchID = IN_op.fetchID;
+                    decBranch_c.fetchOffs = FetchOff_t'(i);
                     decBranch_c.dst = curBr.fhPC[31:1] + 1;
 
                     if (actualOffs != {$bits(FetchOff_t) {1'b1}}) begin

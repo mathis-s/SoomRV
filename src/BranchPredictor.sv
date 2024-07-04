@@ -138,9 +138,8 @@ always_comb begin
         OUT_pc = OUT_predBr.dst;
         OUT_lastOffs = OUT_predBr.offs;
     end
-    //else if (TAGE_taken) begin
-    //    // No target found, but we still output the taken
-    //    // direction prediction.
+    //else if (TAGE_tageID > 0) begin
+    //    // No target found, but we still output the direction prediction.
     //    OUT_predBr.valid = 1;
     //    OUT_predBr.dirOnly = 1;
     //    OUT_predBr.taken = TAGE_taken;
@@ -232,18 +231,15 @@ ReturnStack retStack
 BHist_t recHistory;
 always_comb begin
     recHistory = bpFileRData.history;
-
-    case (recovery.histAct)
-        HIST_WRITE_0,
-        HIST_WRITE_1: recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_WRITE_1 ? 1'b1 : 1'b0};
-        default: begin
-            if (bpFileRData.pred && recovery.fetchOffs > bpFileRData.predOffs)
-                recHistory = {recHistory[$bits(BHist_t)-2:0], bpFileRData.predTaken};
-        end
-    endcase
-
-    if (recovery.histAct == HIST_APPEND_1)
-        recHistory = {recHistory[$bits(BHist_t)-2:0], 1'b1};
+    
+    // Restore prediction of earlier instruction in same packet
+    if (bpFileRData.pred && recovery.fetchOffs > bpFileRData.predOffs)
+        recHistory = {recHistory[$bits(BHist_t)-2:0], bpFileRData.predTaken};
+    
+    if (recovery.histAct == HIST_WRITE_0 || recovery.histAct == HIST_WRITE_1)
+        recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_WRITE_1};
+    if (recovery.histAct == HIST_APPEND_1 || recovery.histAct == HIST_APPEND_0)
+        recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_APPEND_1};
 end
 
 RetStackIdx_t recRIdx;
@@ -371,9 +367,12 @@ always_ff@(posedge clk) begin
             pcReg <= {OUT_pc[30:$bits(FetchOff_t)] + 1'b1, $bits(FetchOff_t)'(1'b0)};
             pcRegNoInc <= OUT_pc;
             ignorePred <= 0;
+            history <= lookupHistory;
         end
-        else if (recovery.valid && recovery.tgtSpec != BR_TGT_MANUAL) begin
-            pcReg <= recoveredPC;
+        else if (recovery.valid) begin
+            history <= recHistory;
+            if (recovery.tgtSpec != BR_TGT_MANUAL)
+                pcReg <= recoveredPC;
         end
 
         if (IN_mispr.taken) begin
@@ -387,8 +386,6 @@ always_ff@(posedge clk) begin
             pcReg <= IN_mispr.tgtSpec == BR_TGT_MANUAL ? IN_mispr.dst : 'x;
             ignorePred <= 1;
         end
-
-        history <= lookupHistory;
     end
 end
 

@@ -409,9 +409,9 @@ typedef enum logic[1:0]
     RET_NONE, RET_PUSH, RET_POP
 } RetStackAction;
 
-typedef enum logic[1:0]
+typedef enum logic[2:0]
 {
-    HIST_NONE, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
+    HIST_NONE, HIST_APPEND_0, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
 } HistoryAction;
 
 typedef enum logic[1:0]

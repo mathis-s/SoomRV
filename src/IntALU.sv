@@ -213,13 +213,13 @@ always_comb begin
                 branch_c.taken = 1;
                 
                 // if predicted but wrong, correct existing history bit
-                if (IN_uop.bpi.predicted)
-                    branch_c.histAct = branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
+                //if (IN_uop.bpi.predicted)
+                branch_c.histAct = branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
                 // else append to history
-                else begin
-                    assert(branchTaken);
-                    branch_c.histAct = HIST_APPEND_1;
-                end
+                //else begin
+                //    assert(branchTaken);
+                //    branch_c.histAct = HIST_APPEND_1;
+                //end
             end
         end
         // Check speculated return address
@@ -273,7 +273,7 @@ always_ff@(posedge clk) begin
             OUT_amoData.sqN <= IN_uop.sqN;
         end
         
-        if (isBranch && (IN_uop.bpi.predicted || branchTaken != IN_uop.bpi.taken))
+        if (isBranch)
             OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
         else if (isBranch || IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR)
             OUT_uop.flags <= FLAGS_BRANCH;
