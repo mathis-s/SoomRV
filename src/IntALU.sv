@@ -194,8 +194,7 @@ always_comb begin
                 btUpdate_c.fetchStartOffs = IN_uop.fetchStartOffs;
                 btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
                 btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
-                btUpdate_c.isJump = 0;
-                btUpdate_c.isCall = 0;
+                btUpdate_c.btype = BT_BRANCH;
                 btUpdate_c.compressed = IN_uop.compressed;
                 btUpdate_c.clean = 0;
                 btUpdate_c.valid = 1;
@@ -240,8 +239,7 @@ always_comb begin
                     btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
                     btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
                     btUpdate_c.dst = indBranchDst;
-                    btUpdate_c.isJump = 1;
-                    btUpdate_c.isCall = (IN_uop.opcode == INT_V_JALR);
+                    btUpdate_c.btype = (IN_uop.opcode == INT_V_JALR) ? BT_CALL : BT_JUMP;
                     btUpdate_c.compressed = IN_uop.compressed;
                     btUpdate_c.clean = 0;
                     btUpdate_c.valid = 1;

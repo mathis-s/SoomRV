@@ -108,15 +108,19 @@ end
 // Find Branches
 typedef enum logic[2:0]
 {
-    JUMP, IJUMP, CALL, ICALL, BRANCH, RETURN//, RETICALL
-} BranchType;
+    // This enum is not to be confused with Include.sv/BranchType, which does not
+    // distinguish between direct and indirect branches. Indirect-ness is stored
+    // in the least significant bit, i.e. when divided by two, this enum is in the
+    // same order as the regular BranchType type.
+    JUMP, IJUMP, CALL, ICALL, BRANCH, PAD0___, PAD1___, RETURN
+} BH_BranchType;
 
 typedef struct packed 
 {
     logic[31:0] target;
     logic[31:0] pc;
     logic[31:0] fhPC; // final halfword pc
-    BranchType btype;
+    BH_BranchType btype;
     logic compr;
     logic valid;
 } Branch;
@@ -226,7 +230,7 @@ logic newPredTaken_c;
 always_comb begin
     OUT_decBranch = DecodeBranchProv'{taken: 0, default: 'x};
     //OUT_btUpdate = BTUpdate'{valid: 0, default: 'x};
-    //OUT_retUpdate = ReturnDecUpdate'{valid: 0, default: 'x};
+    OUT_retUpdate = ReturnDecUpdate'{valid: 0, default: 'x};
     OUT_endOffsValid = 0;
     OUT_endOffs = 'x;
     OUT_newPredPos = 'x;
@@ -234,7 +238,7 @@ always_comb begin
     if (IN_accept) begin
         OUT_decBranch = decBranch_c;
         //OUT_btUpdate = btUpdate_c;
-        //OUT_retUpdate = retUpd_c;
+        OUT_retUpdate = retUpd_c;
         OUT_endOffsValid = endOffsValid;
         OUT_endOffs = endOffs;
         OUT_newPredPos = newPredPos_c;
@@ -244,30 +248,30 @@ end
 
 always_ff@(posedge clk) begin
     OUT_btUpdate <= BTUpdate'{valid: 0, default: 'x};
-    OUT_retUpdate <= ReturnDecUpdate'{valid: 0, default: 'x};
+    //OUT_retUpdate <= ReturnDecUpdate'{valid: 0, default: 'x};
     if (IN_accept && !IN_clear) begin
         OUT_btUpdate <= btUpdate_c;
-        OUT_retUpdate <= retUpd_c;
+        //OUT_retUpdate <= retUpd_c;
     end
 end
 
 always_comb begin
-    
 
     decBranch_c = DecodeBranchProv'{taken: 0, default: 'x};
     btUpdate_c = BTUpdate'{valid: 0, default: 'x};
     retUpd_c = ReturnDecUpdate'{valid: 0, default: 'x};
-    
 
     endOffs = 'x;
     endOffsValid = 0;
 
-    newPredTaken_c = IN_op.bpi.taken;
-    newPredPos_c = IN_op.predPos;
+    newPredTaken_c = IN_op.predBr.valid && IN_op.predBr.taken;
+    newPredPos_c = IN_op.predBr.offs;
 
     for (integer i = 0; i < NUM_INST; i=i+1) begin
-
         Branch curBr = branch[i];
+        
+        // convert BH_BranchType to regular BranchType
+        BranchType curBr_btypeSimple = curBr.btype[1+:$bits(BranchType)];
 
         logic isIndirBranch = curBr.valid &&
             (curBr.btype == IJUMP || curBr.btype == ICALL || curBr.btype == RETURN/* || curBr.btype == RETICALL*/);
@@ -275,31 +279,35 @@ always_comb begin
         logic[30:0] curPC = {IN_op.pc[31:$bits(FetchOff_t)+1], FetchOff_t'(i)};
         logic[30:0] nextPC = curPC + 1;
 
-        logic predicted = IN_op.bpi.predicted && IN_op.predPos == FetchOff_t'(i) && !IN_op.predDirOnly;
+        logic predicted = IN_op.predBr.valid && IN_op.predBr.offs == FetchOff_t'(i) && !IN_op.predBr.dirOnly;
     
         if (decBranch_c.taken) ;
         else if (i > IN_op.lastValid || i < IN_op.pc[1+:$bits(FetchOff_t)]) ;
-        else if (predicted && IN_op.bpi.taken) begin
+        else if (predicted && IN_op.predBr.taken) begin
             // A taken prediction was made by the BP, check if correct.
 
             if (// Branch was predicted, but there is none in the package
-                !curBr.valid || 
+                !curBr.valid ||
+                
+                // Invalid branch type was predicted
+                curBr_btypeSimple != IN_op.predBr.btype ||
+
                 // Invalid target
-                (!isIndirBranch && curBr.target[31:1] != IN_op.predTarget)
+                (!isIndirBranch && curBr.target[31:1] != IN_op.predBr.dst)
             ) begin
                 // Prediction is not just wrong but illegal, i.e. no actual instruction exists
                 // at supposed source. This is the case if a branch was predicted at the first
                 // halfword of a 32-bit instruction.
                 // Legal predictions are always in the final halfword, such that the entire
                 // 32-bit instruction can be fetched before the prediction is made.
-                logic predIllegal = is32bit[IN_op.predPos + ($bits(FetchOff_t)+1)'(1)];
-                logic predOnCompr = is16bit[IN_op.predPos + ($bits(FetchOff_t)+1)'(1)];
+                logic predIllegal = is32bit[IN_op.predBr.offs + ($bits(FetchOff_t)+1)'(1)];
+                logic predOnCompr = is16bit[IN_op.predBr.offs + ($bits(FetchOff_t)+1)'(1)];
                 
                 decBranch_c.taken = 1;
                 decBranch_c.fetchID = IN_op.fetchID;
                 decBranch_c.fetchOffs = FetchOff_t'(i);
                 decBranch_c.retAct = RET_NONE;
-                decBranch_c.histAct = HIST_NONE;
+                decBranch_c.histAct = curBr.btype == BRANCH ? HIST_APPEND_1 : HIST_NONE;
                 decBranch_c.tgtSpec = BR_TGT_MANUAL;
                 decBranch_c.wfi = 0;
                 
@@ -327,16 +335,15 @@ always_comb begin
                     btUpdate_c.clean = 0;
                     btUpdate_c.multiple = 0;
                     btUpdate_c.multipleOffs = 'x;
-                    btUpdate_c.isCall = curBr.btype == CALL;
+                    btUpdate_c.btype = curBr_btypeSimple;
                     btUpdate_c.src = curBr.fhPC;
                     btUpdate_c.fetchStartOffs = IN_op.pc[1+:$bits(FetchOff_t)];
                     btUpdate_c.dst = curBr.target;
                     btUpdate_c.compressed = curBr.compr;
-                    btUpdate_c.isJump = curBr.btype == JUMP;
                     
                     if (curBr.btype == RETURN) begin
                         decBranch_c.retAct = RET_POP;
-                        decBranch_c.dst = (!IN_op.bpi.taken ? IN_op.predTarget : IN_lateRetAddr[31:1]);
+                        decBranch_c.dst = IN_op.predRetAddr;
 
                         retUpd_c.valid = 1;
                         retUpd_c.cleanRet = 0;
@@ -353,22 +360,22 @@ always_comb begin
                         // (not just first half)
                         decBranch_c.dst = curPC;
                         newPredTaken_c = 0;
-                        newPredPos_c = '1;
+                        newPredPos_c = {$bits(FetchOff_t){1'b1}};;
 
                         endOffsValid = 1;
-                        endOffs = IN_op.predPos;
+                        endOffs = IN_op.predBr.offs;
                     end
                     else begin
                         // The prediction was wrong but preserved instruction boundaries, so we only need to start
                         // re-fetching post-branch instructions;
                         decBranch_c.dst = nextPC;
                         newPredTaken_c = 0;
-                        newPredPos_c = '1;
+                        newPredPos_c = {$bits(FetchOff_t){1'b1}};;
                         
                         // unless this was the final halfword, all following are invalid
-                        if (IN_op.predPos != {$bits(FetchOff_t) {1'b1}}) begin
+                        if (IN_op.predBr.offs != {$bits(FetchOff_t) {1'b1}}) begin
                             endOffsValid = 1;
-                            endOffs = IN_op.predPos + 1;
+                            endOffs = IN_op.predBr.offs + 1;
                         end
                     end
                     
@@ -378,7 +385,7 @@ always_comb begin
                     btUpdate_c.multiple = 0;
                     btUpdate_c.multipleOffs = 'x;
                     btUpdate_c.fetchStartOffs = IN_op.pc[1+:$bits(FetchOff_t)];
-                    btUpdate_c.src = {IN_op.pc[31:$bits(FetchOff_t)], IN_op.predPos};
+                    btUpdate_c.src = {IN_op.pc[31:$bits(FetchOff_t)], IN_op.predBr.offs};
                 end
 
                 // Delete matching return prediction entries
@@ -396,8 +403,8 @@ always_comb begin
         else if (curBr.valid) begin
             FetchOff_t actualOffs = curBr.fhPC[1+:$bits(FetchOff_t)];
             
-            reg dirOnly = (curBr.btype == BRANCH && IN_op.predDirOnly);
-            reg dirOnlyTaken = (curBr.btype == BRANCH && IN_op.bpi.taken && IN_op.predDirOnly);
+            reg dirOnly = (curBr.btype == BRANCH && IN_op.predBr.valid && IN_op.predBr.dirOnly);
+            reg dirOnlyTaken = (dirOnly && IN_op.predBr.taken);
             
             // Direction only not-taken prediction
             // We need to flush the IFetch pipeline to correct branch history bits
@@ -441,14 +448,13 @@ always_comb begin
                 // Register branch target
                 btUpdate_c.valid = 1;
                 btUpdate_c.clean = 0;
-                btUpdate_c.multiple = actualOffs > IN_op.predPos;
-                btUpdate_c.multipleOffs = IN_op.predPos + 1;
-                btUpdate_c.isCall = curBr.btype == CALL;
+                btUpdate_c.multiple = actualOffs > IN_op.predBr.offs;
+                btUpdate_c.multipleOffs = IN_op.predBr.offs + 1;
+                btUpdate_c.btype = curBr_btypeSimple;
                 btUpdate_c.src = curBr.fhPC;
                 btUpdate_c.fetchStartOffs = IN_op.pc[1+:$bits(FetchOff_t)];
                 btUpdate_c.dst = curBr.target;
                 btUpdate_c.compressed = curBr.compr;
-                btUpdate_c.isJump = curBr.btype == JUMP || curBr.btype == CALL;
             end
 
             if (curBr.btype == CALL || curBr.btype == ICALL) begin
@@ -477,7 +483,7 @@ always_comb begin
 
             if (curBr.btype == RETURN) begin
                 decBranch_c.retAct = RET_POP;
-                decBranch_c.dst = (!IN_op.bpi.taken ? IN_op.predTarget : IN_lateRetAddr[31:1]);
+                decBranch_c.dst = IN_op.predRetAddr;
 
                 retUpd_c.valid = 1;
                 retUpd_c.cleanRet = 0;
@@ -487,6 +493,42 @@ always_comb begin
                 retUpd_c.idx = IN_op.rIdx - 1;
                 retUpd_c.addr = {IN_op.pc[31:1+$bits(FetchOff_t)], actualOffs};
             end
+        end
+        else if (predicted) begin
+            // A not-taken prediction was made, but there's no branch
+            logic predIllegal = is32bit[IN_op.predBr.offs + ($bits(FetchOff_t)+1)'(1)];
+            
+            // branch to next instruction to correct history
+            decBranch_c.taken = 1;
+            decBranch_c.fetchID = IN_op.fetchID;
+            decBranch_c.fetchOffs = FetchOff_t'(i);
+            decBranch_c.dst = nextPC;
+            decBranch_c.retAct = RET_NONE;
+            decBranch_c.histAct = HIST_NONE;
+            decBranch_c.wfi = 0;
+
+            newPredTaken_c = 0;
+            newPredPos_c = {$bits(FetchOff_t){1'b1}};
+
+            if (FetchOff_t'(i) != {$bits(FetchOff_t) {1'b1}}) begin
+                endOffsValid = 1;
+                endOffs = FetchOff_t'(i) + 1;
+            end
+
+            if (predIllegal) begin
+                endOffsValid = 1;
+                endOffs = FetchOff_t'(i);
+
+                decBranch_c.dst = curPC;
+            end
+
+            // Delete matching regular branch prediction entries
+            btUpdate_c.valid = 1;
+            btUpdate_c.clean = 1;
+            btUpdate_c.multiple = 0;
+            btUpdate_c.multipleOffs = 'x;
+            btUpdate_c.fetchStartOffs = IN_op.pc[1+:$bits(FetchOff_t)];
+            btUpdate_c.src = {IN_op.pc[31:$bits(FetchOff_t)], IN_op.predBr.offs};
         end
     end
 end

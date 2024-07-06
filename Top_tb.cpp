@@ -1,5 +1,5 @@
 // #define TRACE
-#define KONATA
+//#define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -67,6 +67,7 @@ struct Inst
     uint32_t result;
     uint32_t memAddr;
     uint32_t memData;
+    uint32_t predTarget;
     uint8_t fetchID;
     uint8_t sqn;
     uint8_t fu;
@@ -147,6 +148,8 @@ class SpikeSimif : public simif_t
   public:
     bool doRestore = false;
     uint64_t bhist;
+    uint32_t returnStack[16];
+    int returnIdx;
 
   private:
     std::unique_ptr<isa_parser_t> isa_parser;
@@ -353,6 +356,35 @@ class SpikeSimif : public simif_t
         return std::make_pair(branch, taken);
     }
 
+    bool check_return_stack(uint32_t instSIM, uint32_t pc, uint32_t predTarget)
+    {
+        uint32_t nextPC = ((instSIM & 3) == 3) ? pc + 4 : pc + 2;
+        if ((instSIM & 0b1111111111111111) == 0b1000000010000010)
+            return returnStack[(returnIdx--)%16] == predTarget;
+        if ((instSIM & 0b1111000001111111) == 0b1001000000000010)
+            returnStack[(++returnIdx)%16] = nextPC;
+        if ((instSIM & 0b1110000000000011) == 0b0010000000000001)
+            returnStack[(++returnIdx)%16] = nextPC;
+
+        if ((instSIM & 0b1111111) == 0b1101111)
+        {
+            int rd = (instSIM >> 7) & 31;
+            if (rd == 1 || rd == 5)
+                returnStack[(++returnIdx)%16] = nextPC;
+        }
+
+        if ((instSIM & 0b111'00000'1111111) == 0b000'00000'1100111)
+        {
+            int rd = (instSIM >> 7) & 31;
+            int rs1 = (instSIM >> 15) & 31;
+            if (((rd == 1 || rd == 5) && !(rs1 == 1 || rs1 == 5)) || ((rd == 1 || rd == 5) && rd == rs1))
+                returnStack[(++returnIdx)%16] = nextPC;
+            if (!(rd == 1 || rd == 5) && (rs1 == 1 || rs1 == 5))
+                return returnStack[(returnIdx--)%16] == predTarget;
+        }
+        return true;
+    }
+
     void write_reg(int i, uint32_t data)
     {
         // this NEEDS to be sign-extended!
@@ -383,6 +415,10 @@ class SpikeSimif : public simif_t
         }
 
         bool historyEqual = compare_history(inst);
+        bool returnEqual = check_return_stack(instSIM, initialSpikePC, inst.predTarget);
+        if (!returnEqual)
+            fprintf(stderr, "target %.8x, expected %.8x\n", inst.predTarget, returnStack[(returnIdx+1)%16]);
+        
 
         processor->step(1);
         
@@ -449,6 +485,8 @@ class SpikeSimif : public simif_t
             return -4;
         if (!historyEqual)
             return -6;
+        if (!returnEqual)
+            return -7;
         // if (processor->get_state()->minstret->read() != (top->Top->soc->core->csr->minstret + curCycInstRet))
         //     return -5;
         return 0;
@@ -604,13 +642,13 @@ uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs)
     bool pred = ExtractField(bpFile[fetchID], 0, 1);
     uint8_t predOffs = ExtractField(bpFile[fetchID], 1, 3);
     bool predTaken = ExtractField(bpFile[fetchID], 4, 1);
-    bool isJump = ExtractField(bpFile[fetchID], 5, 1);
+    bool isRegularBranch = ExtractField(bpFile[fetchID], 5, 1);
     uint64_t history = ExtractField(bpFile[fetchID], 10, 32) | 
         ((uint64_t)ExtractField(bpFile[fetchID], 10+32, 32) << 32);
 
     //fprintf(stderr, "fetch offs=%u, pred offs=%u, pred=%u, isJump=%u, predTaken=%u\n", fetchOffs, predOffs, pred, isJump, predTaken);
     
-    if (pred && !isJump && fetchOffs > predOffs)
+    if (pred && isRegularBranch && fetchOffs > predOffs)
         return (history << 1) | predTaken;
     return history;
 }
@@ -802,7 +840,7 @@ void LogCommit(Inst& inst)
         uint32_t startPC = simif.get_pc();
         if (int err = simif.cosim_instr(inst))
         {
-            fprintf(stdout, "ERROR %u (sqN=%.2x)\n", -err, inst.sqn);
+            fprintf(stdout, "ERROR %u (fetchID=%.2x, sqN=%.2x)\n", -err, inst.fetchID, inst.sqn);
             DumpState(stdout, inst);
 
             fprintf(stdout, "\nSHOULD BE\n");
@@ -1089,6 +1127,7 @@ void LogInstructions()
                     state.pd[i].pc = ExtractField(top->Top->soc->core->PD_instrs[i], 124 - 12 - 31 - 32, 31) << 1;
                     state.pd[i].inst = ExtractField(top->Top->soc->core->PD_instrs[i], 124 - 12 - 32, 32);
                     state.pd[i].fetchID = ExtractField(top->Top->soc->core->PD_instrs[i], 4, 5);
+                    state.pd[i].predTarget = ExtractField(top->Top->soc->core->PD_instrs[i], 4+5+3, 31) << 1;
                     //state.pd[i].retIdx =
                     //    ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
                     if ((state.pd[i].inst & 3) != 3)

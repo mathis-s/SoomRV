@@ -9,7 +9,7 @@ module ReturnStack
 (
     input wire clk,
     input wire rst,
-    output reg OUT_stall,
+    output wire OUT_stall,
     
     // IFetch time push/pop
     input wire IN_valid,
@@ -24,10 +24,8 @@ module ReturnStack
     // Low effort prediction for returns that are detected late, in decode.
     output wire[30:0] OUT_lateRetAddr,
 
-    input wire IN_mispr,
-    input RetStackAction IN_misprAct,
-    input RetStackIdx_t IN_misprIdx,
-    input FetchID_t IN_misprFetchID,
+    input RetStackIdx_t IN_recoveryIdx,
+    input DecodeBranchProv IN_mispr,
 
     output RetStackIdx_t OUT_curIdx,
     output PredBranch OUT_predBr,
@@ -84,6 +82,12 @@ always_comb begin
 end
 
 reg[30:0] rstack[SIZE-1:0] /* verilator public */;
+reg[31:0] rstack_dbg[SIZE-1:0];
+always_comb begin
+    for (integer i = 0; i < SIZE; i=i+1)
+        rstack_dbg[i] = {rstack[i], 1'b0};
+end
+
 
 reg[$clog2(RQSIZE)-1:0] qindex;
 reg[$clog2(RQSIZE)-1:0] qindexEnd;
@@ -102,12 +106,12 @@ RetStackIdx_t rindex;
 always_comb begin
     rindex = rindexReg;
     if (forwardRindex) begin
-        rindex = IN_misprIdx;
+        rindex = IN_recoveryIdx;
     end
-    else if (IN_branch.valid && IN_branch.isCall && lastValid) begin
+    else if (IN_branch.valid && IN_branch.btype == BT_CALL && lastValid) begin
         rindex = rindex + 1;
     end
-    else if (IN_branch.valid && IN_branch.isRet && lastValid) begin
+    else if (IN_branch.valid && IN_branch.btype == BT_RETURN && lastValid) begin
         rindex = rindex - 1;
     end
 end
@@ -117,7 +121,7 @@ always_ff@(posedge clk) begin
     if (IN_valid) begin
         OUT_curIdx <= rindex;
 
-        if (IN_branch.valid && IN_branch.isCall) begin
+        if (IN_branch.valid && IN_branch.btype == BT_CALL) begin
             // If the immediately preceeding prediction was a call,
             // we need to forward the return address.
             OUT_curRetAddr <= addrToPush;
@@ -130,9 +134,7 @@ always_ff@(posedge clk) begin
 
         OUT_predBr.taken <= 1;
         OUT_predBr.dirOnly <= 0;
-        OUT_predBr.isJump <= 1;
-        OUT_predBr.isCall <= 0;
-        OUT_predBr.isRet <= 1;
+        OUT_predBr.btype <= BT_RETURN;
         OUT_predBr.valid <= 0;
         OUT_predBr.offs <= 'x;
         OUT_predBr.compr <= 'x;
@@ -157,11 +159,21 @@ end
 assign OUT_lateRetAddr = OUT_curRetAddr;
 
 reg recoveryInProgress;
+assign OUT_stall = recoveryInProgress;
 FetchID_t recoveryID;
 FetchID_t recoveryBase;
 FetchID_t lastInvalComFetchID;
 
 reg lastValid;
+
+typedef struct packed
+{
+    RetStackIdx_t rIdx;
+    FetchID_t fetchID;
+    logic valid;
+} PostRecSave;
+
+PostRecSave postRecSave;
 
 always_ff@(posedge clk) begin
     
@@ -174,52 +186,72 @@ always_ff@(posedge clk) begin
 
         qindex <= 0;
         qindexEnd <= 0;
-        recoveryInProgress = 0;
-        OUT_stall <= 0;
+        recoveryInProgress <= 0;
         lastInvalComFetchID <= 0;
         lastValid <= 0;
+
+        postRecSave <= PostRecSave'{valid: 0, default: 'x};
     end
     else begin
         
         lastValid <= IN_valid;
 
-        if (IN_mispr) begin
+        if (IN_mispr.taken) begin
             forwardRindex <= 1;
-            recAct <= IN_misprAct;
-            recoveryInProgress = 1;
-            recoveryID = IN_misprFetchID;
-            recoveryBase = lastInvalComFetchID;
-            OUT_stall <= 1;
+            recAct <= IN_mispr.retAct;
+            recoveryInProgress <= qindex != qindexEnd;
+            recoveryID <= IN_mispr.fetchID;
+            recoveryBase <= lastInvalComFetchID;
             lastValid <= 0;
-        end
-        else rindexReg <= rindex;
-        
-        // Recover entries by copying from rrqueue back to stack after mispredict
-        if (recoveryInProgress) begin
-            if (qindex == qindexEnd) begin
-                recoveryInProgress = 0;
-                OUT_stall <= 0;
-            end
-            else begin
-                if (((rrqueue[qindex-1].fetchID - recoveryBase)) >= ((recoveryID - recoveryBase))) begin
-                    rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
-                    rrqueue[qindex-1] <= 'x;
-                    qindex <= qindex - 1; // entry restored, ok to overwrite
+
+            if (IN_returnUpd.isRet && IN_returnUpd.valid) begin
+
+                if (qindex != qindexEnd) begin
+                    postRecSave.valid <= 1;
+                    postRecSave.fetchID <= IN_mispr.fetchID;
+                    postRecSave.rIdx <= IN_returnUpd.idx + RetStackIdx_t'(1);
                 end
                 else begin
-                    recoveryInProgress = 0;
-                    OUT_stall <= 0;
+                    rrqueue[qindex].fetchID <= IN_mispr.fetchID;
+                    rrqueue[qindex].idx <= IN_returnUpd.idx + RetStackIdx_t'(1);
+                    rrqueue[qindex].addr <= rstack[rindex];
+                    qindex <= qindex + 1;
+                end
+            end
+        end
+        else rindexReg <= rindex;
+
+        // Recover entries by copying from rrqueue back to stack after mispredict
+        if (recoveryInProgress && !IN_mispr.taken) begin
+            if (qindex != qindexEnd &&
+                // todo: add fine-grained compare based on fetch offs
+                (rrqueue[qindex-1].fetchID - recoveryBase) >= (recoveryID - recoveryBase)
+            ) begin
+                rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
+                rrqueue[qindex-1] <= 'x;
+                qindex <= qindex - 1; // entry restored, ok to overwrite
+            end
+            else begin
+                recoveryInProgress <= 0;
+                if (postRecSave.valid) begin
+                    postRecSave <= PostRecSave'{valid: 0, default: 'x};
+
+                    rrqueue[qindex].fetchID <= postRecSave.fetchID;
+                    rrqueue[qindex].idx <= postRecSave.rIdx;
+                    rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
+                    qindex <= qindex + 1;
                 end
             end
         end
         
         // Delete committed (ie correctly speculated) entries from rrqueue
-        if (!recoveryInProgress && lastInvalComFetchID != IN_comFetchID) begin
+        if (!IN_mispr.taken && !recoveryInProgress && lastInvalComFetchID != IN_comFetchID) begin
             
             // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
             // of easy ordering comparison. Thus, we have to do all comparisons relative
             // to some base. We use the last checked fetchID as the base.
-            if (((rrqueue[qindexEnd].fetchID - lastInvalComFetchID)) < ((IN_comFetchID - lastInvalComFetchID))
+            if (qindex != qindexEnd &&
+                (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
             ) begin
                 lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
                 rrqueue[qindexEnd] <= 'x;
@@ -257,8 +289,8 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        else if (!IN_mispr && lastValid) begin
-            if (IN_branch.valid && IN_branch.isRet) begin
+        else if (!IN_mispr.taken && lastValid) begin
+            if (IN_branch.valid && IN_branch.btype == BT_RETURN) begin
                 
                 rtable[lookupIdx][lookupAssocIdx].used <= 1;
                 
@@ -273,7 +305,7 @@ always_ff@(posedge clk) begin
                 if (qindexEnd == qindex + 1'b1)
                     qindexEnd <= qindexEnd + 1;
             end
-            else if (IN_branch.valid && IN_branch.isCall) begin
+            else if (IN_branch.valid && IN_branch.btype == BT_CALL) begin
                 rstack[rindex] <= addrToPush;
             end
         end

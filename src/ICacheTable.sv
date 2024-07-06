@@ -92,7 +92,7 @@ always_ff@(posedge clk) begin
         OUT_pcFileAddr <= fetch1.fetchID;
         OUT_pcFileEntry.pc <= fetch1.pc[31:1];
         OUT_pcFileEntry.branchPos <= packetRePred.predPos;
-        OUT_pcFileEntry.bpi.predicted <= fetch1.bpi.predicted; // todo: set if late pred?
+        OUT_pcFileEntry.bpi.predicted <= fetch1.predBr.valid; // todo: set if late pred?
         OUT_pcFileEntry.bpi.taken <= packetRePred.predTaken;
     end
 end
@@ -248,9 +248,11 @@ always_comb begin
             packet.pc = fetch1.pc[31:`FSIZE_E];
             packet.firstValid = fetch1.pc[1+:$bits(FetchOff_t)];
             packet.lastValid = fetch1.lastValid;
-            packet.predPos = fetch1.predPos;
-            packet.predTaken = fetch1.bpi.taken;
-            packet.predTarget = fetch1.predTarget;
+            
+            packet.predPos = fetch1.predBr.offs;
+            packet.predTaken = fetch1.predBr.valid && fetch1.predBr.taken;
+            packet.predTarget = fetch1.predBr.dst;
+            
             packet.fetchID = fetch1.fetchID;
             packet.valid = 1;
         end
@@ -444,11 +446,8 @@ always_ff@(posedge clk) begin
                 fetch1 <= fetch0;
                 fetch1.fetchID <= fetchID;
                 fetch1.lastValid <= IN_lastValid;
-                fetch1.predPos <= IN_predBranch.valid ? IN_predBranch.offs : {$bits(FetchOff_t){1'b1}};
-                fetch1.predDirOnly <= IN_predBranch.dirOnly;
-                fetch1.bpi.predicted <= IN_predBranch.valid;
-                fetch1.bpi.taken <= IN_predBranch.taken;
-                fetch1.predTarget <= IN_predBranch.dst;
+                fetch1.predBr <= IN_predBranch;
+                fetch1.predRetAddr <= IN_lateRetAddr;
                 fetch1.rIdx <= IN_rIdx;
 
                 fetchID <= fetchID + 1;

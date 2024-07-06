@@ -48,7 +48,7 @@ typedef struct packed
 
     BHist_t history;
     RetStackIdx_t rIdx;
-    logic isJump;
+    logic isRegularBranch;
     logic predTaken;
     FetchOff_t predOffs;
     logic pred;
@@ -58,7 +58,7 @@ BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;
     bpBackup.rIdx = RET_idx;
-    bpBackup.isJump = OUT_predBr.isJump;
+    bpBackup.isRegularBranch = OUT_predBr.btype == BT_BRANCH;
     bpBackup.predTaken = OUT_predBr.taken;
     bpBackup.predOffs = OUT_predBr.offs;
     bpBackup.pred = OUT_predBr.valid;
@@ -121,7 +121,7 @@ always_comb begin
     end
     else if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
         OUT_predBr = BTB_br;
-        OUT_predBr.taken = BTB_br.isJump || TAGE_taken;
+        OUT_predBr.taken |= TAGE_taken;
         OUT_predBr.multiple = !OUT_predBr.taken && (BTB_br.multiple || RET_br.valid);
 
         if (OUT_predBr.taken) begin
@@ -147,25 +147,13 @@ always_comb begin
 end
 
 PredBranch BTB_br;
-assign BTB_br.taken = 'x;
-assign BTB_br.isRet = 0;
-assign BTB_br.dirOnly = 0;
-
-wire BTB_multipleBranches;
 BranchTargetBuffer btb
 (
     .clk(clk),
     .rst(rst),
     .IN_pcValid(IN_pcValid),
     .IN_pc(OUT_pc),
-    .OUT_branchFound(BTB_br.valid),
-    .OUT_branchDst(BTB_br.dst),
-    .OUT_branchSrcOffs(BTB_br.offs),
-    .OUT_branchIsJump(BTB_br.isJump),
-    .OUT_branchIsCall(BTB_br.isCall),
-    .OUT_branchCompr(BTB_br.compr),
-
-    .OUT_multipleBranches(BTB_br.multiple),
+    .OUT_branch(BTB_br),
     .IN_btUpdate(btUpdate)
 );
 
@@ -216,10 +204,8 @@ ReturnStack retStack
     .OUT_curRetAddr(OUT_curRetAddr),
     .OUT_lateRetAddr(OUT_lateRetAddr),
 
-    .IN_mispr(IN_mispr.taken),
-    .IN_misprAct(IN_mispr.retAct),
-    .IN_misprIdx(recRIdx),
-    .IN_misprFetchID(IN_mispr.fetchID),
+    .IN_mispr(IN_mispr),
+    .IN_recoveryIdx(recRIdx),
     
     .OUT_curIdx(RET_idx),
     .OUT_predBr(RET_br),
@@ -258,7 +244,7 @@ always_comb begin
     lookupHistory = history;
     if (recovery.valid)
         lookupHistory = recHistory;
-    else if (OUT_predBr.valid && !OUT_predBr.isJump)
+    else if (OUT_predBr.valid && OUT_predBr.btype == BT_BRANCH)
         lookupHistory = {lookupHistory[$bits(BHist_t)-2:0], OUT_predBr.taken};
 end
 
@@ -266,7 +252,7 @@ end
 BHist_t updHistory;
 always_comb begin
     updHistory = bpFileRData.history;
-    if (bpFileRData.pred && !bpFileRData.isJump && bpUpdateActive.fetchOffs > bpFileRData.predOffs)
+    if (bpFileRData.pred && bpFileRData.isRegularBranch && bpUpdateActive.fetchOffs > bpFileRData.predOffs)
         updHistory = {updHistory[$bits(BHist_t)-2:0], bpFileRData.predTaken};
 end
 

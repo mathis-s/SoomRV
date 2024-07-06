@@ -370,14 +370,17 @@ typedef struct packed
     logic busy;
 } MemController_Res;
 
+typedef enum logic[1:0] 
+{
+    BT_JUMP, BT_CALL, BT_BRANCH, BT_RETURN 
+} BranchType;
+
 typedef struct packed
 {
     logic[30:0] dst;
     FetchOff_t offs;
     logic compr;
-    logic isCall;
-    logic isJump;
-    logic isRet;
+    BranchType btype;
     logic multiple;
     logic taken;
     logic dirOnly;
@@ -395,8 +398,7 @@ typedef struct packed
     logic[31:0] src;
     logic[31:0] dst;
     FetchOff_t fetchStartOffs;
-    logic isJump;
-    logic isCall;
+    BranchType btype;
     FetchOff_t multipleOffs;
     logic multiple;
     logic compressed;
@@ -487,10 +489,14 @@ typedef struct packed
     FetchID_t fetchID;
     IFetchFault fetchFault;
     FetchOff_t lastValid;
-    FetchOff_t predPos;
-    BranchPredInfo bpi;
-    logic predDirOnly;
-    logic[30:0] predTarget;
+
+    PredBranch predBr;
+    //FetchOff_t predPos;
+    //BranchPredInfo bpi;
+    //logic predDirOnly;
+    //logic[30:0] predTarget;
+
+    logic[30:0] predRetAddr;
     RetStackIdx_t rIdx;
 
     logic valid;
