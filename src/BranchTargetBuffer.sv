@@ -79,7 +79,7 @@ always_ff@(posedge clk) begin
         setMult <= SetMultiple'{valid: 0, default: 'x};
     end
     else begin
-        if (IN_btUpdate.valid && IN_btUpdate.btype != BT_RETURN) begin
+        if (IN_btUpdate.valid) begin
             reg[$clog2(LENGTH)-1:0] idx = {IN_btUpdate.src[$clog2(LENGTH):$bits(FetchOff_t)+1], IN_btUpdate.fetchStartOffs};
             if (IN_btUpdate.clean) begin
                 entries[idx] <= 'x;

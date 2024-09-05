@@ -87,8 +87,8 @@ typedef enum logic[5:0]
 
 typedef enum logic[5:0]
 {
-    LSU_LB, 
-    LSU_LH, 
+    LSU_LB,
+    LSU_LH,
     LSU_LW,
 
     LSU_LBU,
@@ -99,7 +99,7 @@ typedef enum logic[5:0]
     LSU_SB,
     LSU_SH,
     LSU_SW,
-    
+
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
     LSU_CBO_FLUSH,
@@ -127,7 +127,7 @@ typedef enum logic[2:0]
     FPU_FCVTWUS,
     FPU_FCVTSW,
     FPU_FCVTSWU
-    
+
 } OPCode_FPU;
 
 typedef enum logic[5:0]
@@ -141,7 +141,7 @@ typedef enum logic[5:0]
     FPU_FMIN_S,
     FPU_FMAX_S,
     FPU_FCLASS_S
-    
+
 } OPCode_FPU2;
 
 
@@ -167,7 +167,7 @@ typedef enum logic[5:0]
     ATOMIC_AMOMAX_W,
     ATOMIC_AMOMINU_W,
     ATOMIC_AMOMAXU_W
-    
+
 } OPCode_FU_ATOMIC;
 
 typedef enum logic[5:0]
@@ -176,14 +176,14 @@ typedef enum logic[5:0]
     CSR_RW,
     CSR_RS,
     CSR_RC,
-    
+
     CSR_RW_I,
     CSR_RS_I,
     CSR_RC_I,
-    
+
     CSR_SRET,
     CSR_MRET
-    
+
 } OPCode_FU_CSR;
 
 // Trap Cause Encodings straight from Privilege Spec
@@ -221,54 +221,54 @@ typedef enum logic[5:0]
     TRAP_ECALL_S = 9,
     TRAP_ECALL_M = 11,
     TRAP_I_PAGE_FAULT = 12,
-    
+
     // These are not (regular) traps
     TRAP_V_SFENCE_VMA = 15,
     TRAP_V_INTERRUPT = 16
-    
+
 } OPCode_FU_TRAP;
 
 typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 
-typedef enum logic[3:0] 
+typedef enum logic[3:0]
 {
     // Flags that do not cause a flush or trap
     FLAGS_NONE, FLAGS_BRANCH,
-    
+
     // Flags for sending direction prediction updates
-    FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN, 
-    
+    FLAGS_PRED_TAKEN, FLAGS_PRED_NTAKEN,
+
     // Flags that cause a flush
     FLAGS_FENCE, FLAGS_ORDERING,
-    
+
     // Flags that cause a trap
-    FLAGS_ILLEGAL_INSTR, FLAGS_TRAP, 
-    
+    FLAGS_ILLEGAL_INSTR, FLAGS_TRAP,
+
     // Memory Exceptions
     FLAGS_LD_MA, FLAGS_LD_AF, FLAGS_LD_PF,
     FLAGS_ST_MA, FLAGS_ST_AF, FLAGS_ST_PF,
-    
+
     // Return from exception
     FLAGS_XRET,
-    
+
     // Invalid (or not-yet-executed) flag
     FLAGS_NX = 4'b1111
-    
+
 } Flags;
 
 // Floating Point Ops use a different flag encoding to store
 // floating point exceptions
-typedef enum logic[3:0] 
+typedef enum logic[3:0]
 {
-    FLAGS_FP_NX = FLAGS_LD_MA, 
-    FLAGS_FP_UF = FLAGS_LD_AF, 
-    FLAGS_FP_OF = FLAGS_LD_PF, 
-    FLAGS_FP_DZ = FLAGS_ST_MA, 
-    FLAGS_FP_NV = FLAGS_ST_AF 
+    FLAGS_FP_NX = FLAGS_LD_MA,
+    FLAGS_FP_UF = FLAGS_LD_AF,
+    FLAGS_FP_OF = FLAGS_LD_PF,
+    FLAGS_FP_DZ = FLAGS_ST_MA,
+    FLAGS_FP_NV = FLAGS_ST_AF
 
 } FlagsFP;
 
-typedef enum logic[1:0] 
+typedef enum logic[1:0]
 {
     PRIV_USER=0, PRIV_SUPERVISOR=1, PRIV_MACHINE=3
 } PrivLevel;
@@ -352,7 +352,7 @@ typedef struct packed
     logic[`AXI_WIDTH/8-1:0] mask;
     logic[`AXI_WIDTH-1:0] data;
 
-    logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO 
+    logic[`CACHE_SIZE_E-3:0] cacheAddr; // instead used as ID for MMIO
     logic[31:0] readAddr;
     logic[31:0] writeAddr;
     CacheID_t cacheID;
@@ -365,14 +365,14 @@ typedef struct packed
     MemController_Transf[`AXI_NUM_TRANS-1:0] transfers;
     MemController_SglLdRes sglLdRes;
     MemController_SglStRes sglStRes;
-    
+
     logic[2:0] stall;
     logic busy;
 } MemController_Res;
 
-typedef enum logic[1:0] 
+typedef enum logic[1:0]
 {
-    BT_JUMP, BT_CALL, BT_BRANCH, BT_RETURN 
+    BT_JUMP, BT_CALL, BT_BRANCH, BT_RETURN
 } BranchType;
 
 typedef struct packed
@@ -389,7 +389,6 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic predicted;
     logic taken;
 } BranchPredInfo;
 
@@ -442,6 +441,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic isFetchBranch;
     BranchTargetSpec tgtSpec;
     FetchOff_t fetchOffs;
     RetStackAction retAct;
@@ -456,10 +456,6 @@ typedef struct packed
 {
     logic[30:0] addr;
     RetStackIdx_t idx;
-    logic isCall;
-    logic isRet;
-    logic compr;
-    logic cleanRet;
     logic valid;
 } ReturnDecUpdate;
 
@@ -491,10 +487,6 @@ typedef struct packed
     FetchOff_t lastValid;
 
     PredBranch predBr;
-    //FetchOff_t predPos;
-    //BranchPredInfo bpi;
-    //logic predDirOnly;
-    //logic[30:0] predTarget;
 
     logic[30:0] predRetAddr;
     RetStackIdx_t rIdx;
@@ -513,7 +505,7 @@ typedef struct packed
     logic predTaken;
     logic[30:0] predTarget;
     logic[7:0][15:0] instrs;
-    
+
     logic valid;
 } IF_Instr;
 
@@ -595,6 +587,26 @@ typedef struct packed
     logic valid;
 } IS_UOp;
 
+typedef struct packed
+{
+    SqN sqN;
+    logic valid;
+} OpFile_Req;
+typedef struct packed
+{
+    // imm size varies per port
+    logic[11:0] imm12;
+    logic[31:0] imm;
+
+    // only int ports store ld/st sqn in op file
+    SqN storeSqN;
+    SqN loadSqN;
+
+    logic[5:0] opcode;
+    logic immB;
+    logic compressed;
+    FetchOff_t fetchOffs;
+} OpFile_Res;
 
 typedef struct packed
 {
@@ -635,7 +647,7 @@ typedef struct packed
     logic valid;
 } AMO_Data_UOp;
 
-typedef enum logic[1:0] 
+typedef enum logic[1:0]
 {
     AGU_NO_EXCEPTION,
     AGU_ADDR_MISALIGN,
@@ -689,7 +701,7 @@ typedef struct packed
     logic[1:0] size;
     logic sext;
     logic dataAvail;
-    
+
     AGU_Exception exception;
     Tag tagDst;
     SqN sqN;
@@ -712,7 +724,7 @@ typedef struct packed
 
     logic pageFault;
     logic isSuperPage;
-    
+
     logic globl;
     logic user;
 
@@ -844,7 +856,7 @@ typedef struct packed
     FetchID_t fetchID;
     logic compressed;
     logic valid;
-    
+
 } Trap_UOp;
 
 typedef struct packed
@@ -872,11 +884,11 @@ typedef struct packed
     logic[15:0] medeleg;
     logic[15:0] mideleg;
     PrivLevel priv;
-    
+
     logic interruptPending;
     logic[3:0] interruptCause;
     logic interruptDelegate;
-    
+
 } TrapControlState;
 
 typedef struct packed
@@ -953,7 +965,7 @@ typedef struct packed
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
     logic[63:0] mtimecmp;
-    
+
     modport CSR
     (
         input mtime,
@@ -967,27 +979,27 @@ interface IF_CSR_MMIO;
 endinterface
 
 interface IF_Mem();
-    
+
     localparam ADDR_LEN=30;
-    
+
     logic we;
     logic[ADDR_LEN-1:0] waddr;
     logic[31:0] wdata;
     logic[3:0] wmask;
-    
+
     logic re;
     logic[ADDR_LEN-1:0] raddr;
     logic[31:0] rdata;
-    
+
     logic rbusy;
     logic wbusy;
-    
+
     modport HOST
     (
         output we, waddr, wdata, wmask, re, raddr,
         input rdata, rbusy, wbusy
     );
-    
+
     modport MEM
     (
         input we, waddr, wdata, wmask, re, raddr,
@@ -996,7 +1008,7 @@ interface IF_Mem();
 endinterface
 
 interface IF_Cache();
-    
+
     logic[`NUM_AGUS-1:0] re;
     logic[`NUM_AGUS-1:0] we;
     logic[`NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
@@ -1006,13 +1018,13 @@ interface IF_Cache();
     logic[`NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
     logic[`NUM_AGUS-1:0] busy;
     logic[`NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
-    
+
     modport HOST
     (
         output we, wassoc, wdata, wmask, re, addr,
         input rdata, busy, rbusyBank
     );
-    
+
     modport MEM
     (
         input we, wassoc, wdata, wmask, re, addr,
@@ -1035,22 +1047,22 @@ typedef struct packed
 } StFwdResult;
 
 interface IF_CTable();
-    
+
     logic we;
     logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
-    
+
     logic re[1:0];
     logic[`VIRT_IDX_LEN-1:0] raddr[1:0];
     CTEntry[1:0][`CASSOC-1:0] rdata;
-    
+
     modport HOST
     (
         output we, waddr, wassoc, wdata, re, raddr,
         input rdata
     );
-    
+
     modport MEM
     (
         input we, waddr, wassoc, wdata, re, raddr,
@@ -1059,28 +1071,28 @@ interface IF_CTable();
 endinterface
 
 interface IF_MMIO();
-    
+
     localparam ADDR_LEN=32;
-    
+
     logic we;
     logic[ADDR_LEN-1:0] waddr;
     logic[31:0] wdata;
     logic[3:0] wmask;
-    
+
     logic re;
     logic[ADDR_LEN-1:0] raddr;
     logic[1:0] rsize;
     logic[31:0] rdata;
-    
+
     logic rbusy;
     logic wbusy;
-    
+
     modport HOST
     (
         output we, waddr, wdata, wmask, re, raddr, rsize,
         input rdata, rbusy, wbusy
     );
-    
+
     modport MEM
     (
         input we, waddr, wdata, wmask, re, raddr, rsize,
@@ -1089,22 +1101,22 @@ interface IF_MMIO();
 endinterface
 
 interface IF_ICTable();
-    
+
     logic we;
     logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
-    
+
     logic re;
     logic[`VIRT_IDX_LEN-1:0] raddr;
     CTEntry[`CASSOC-1:0] rdata;
-    
+
     modport HOST
     (
         output we, waddr, wassoc, wdata, re, raddr,
         input rdata
     );
-    
+
     modport MEM
     (
         input we, waddr, wassoc, wdata, re, raddr,
@@ -1113,18 +1125,18 @@ interface IF_ICTable();
 endinterface
 
 interface IF_ICache();
-    
+
     logic re;
     logic[11:0] raddr;
     logic[`CASSOC-1:0][127:0] rdata;
     logic busy;
-    
+
     modport HOST
     (
         output re, raddr,
         input rdata, busy
     );
-    
+
     modport MEM
     (
         input re, raddr,
@@ -1135,7 +1147,7 @@ endinterface
 typedef struct packed
 {
     logic[31:0] stallPC;
-    
+
     logic sqNStall;
     logic stSqNStall;
 
@@ -1146,7 +1158,7 @@ typedef struct packed
     logic lsuBusy;
     logic ldNack;
     logic stNack;
-    
+
 } DebugInfo;
 
 typedef struct packed

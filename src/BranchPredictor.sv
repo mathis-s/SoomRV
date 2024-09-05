@@ -9,10 +9,10 @@ module BranchPredictor
 
     output wire OUT_stall,
     input DecodeBranchProv IN_mispr,
-    
+
     // IF interface
     input wire IN_pcValid,
-    
+
     output FetchLimit OUT_fetchLimit,
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
@@ -23,7 +23,7 @@ module BranchPredictor
     output wire[30:0] OUT_curRetAddr,
     output wire[30:0] OUT_lateRetAddr,
     output RetStackIdx_t OUT_rIdx,
-    
+
     output PredBranch OUT_predBr,
 
     input ReturnDecUpdate IN_retDecUpd,
@@ -31,10 +31,10 @@ module BranchPredictor
     // PC File read interface
     output PCFileReadReq OUT_pcFileRead,
     input PCFileEntry IN_pcFileRData,
-    
+
     // Branch XU interface
     input BTUpdate IN_btUpdates[NUM_IN-1:0],
-    
+
     // Branch ROB Interface
     input BPUpdate IN_bpUpdate
 );
@@ -73,11 +73,11 @@ logic bpFileRE;
 RegFile#($bits(BPBackup), 1 << $bits(FetchID_t), 1, 1) bpFile
 (
     .clk(clk),
-    
+
     .IN_re({bpFileRE}),
     .IN_raddr({bpFileRAddr}),
     .OUT_rdata({bpFileRData}),
-    
+
     .IN_we(en1),
     .IN_waddr(IN_fetchID),
     .IN_wdata(bpBackup)
@@ -114,15 +114,15 @@ always_comb begin
 
     OUT_pc = pcReg; // current cycle's PC
     OUT_lastOffs = {$bits(FetchOff_t){1'b1}};; // last valid offset for last cycle's PC
-    
+
     if (ignorePred) begin
         if (recovery.tgtSpec != BR_TGT_MANUAL)
             OUT_pc = recoveredPC;
     end
-    else if (BTB_br.valid && (!RET_br.valid || RET_br.offs > BTB_br.offs)) begin
+    else if (BTB_br.valid && BTB_br.btype != BT_RETURN) begin
         OUT_predBr = BTB_br;
         OUT_predBr.taken |= TAGE_taken;
-        OUT_predBr.multiple = !OUT_predBr.taken && (BTB_br.multiple || RET_br.valid);
+        OUT_predBr.multiple = !OUT_predBr.taken && BTB_br.multiple;
 
         if (OUT_predBr.taken) begin
             OUT_pc = OUT_predBr.dst;
@@ -133,17 +133,22 @@ always_comb begin
             OUT_pc = {pcRegNoInc[30:$bits(FetchOff_t)], OUT_predBr.offs + 1'b1};
         end
     end
-    else if (RET_br.valid) begin
-        OUT_predBr = RET_br;
+    else if (BTB_br.valid && BTB_br.btype == BT_RETURN && RET_br.valid) begin
+        OUT_predBr = BTB_br;
+        OUT_predBr.taken = 1;
+        OUT_predBr.multiple = 0;
+        OUT_predBr.dst = OUT_curRetAddr;
+
         OUT_pc = OUT_predBr.dst;
         OUT_lastOffs = OUT_predBr.offs;
     end
-    //else if (TAGE_tageID > 0) begin
-    //    // No target found, but we still output the direction prediction.
-    //    OUT_predBr.valid = 1;
-    //    OUT_predBr.dirOnly = 1;
-    //    OUT_predBr.taken = TAGE_taken;
-    //end
+    else if (TAGE_tageID > 0) begin
+        // No target found, but we still output the direction prediction.
+        OUT_predBr.valid = 1;
+        OUT_predBr.btype = BT_BRANCH;
+        OUT_predBr.dirOnly = 1;
+        OUT_predBr.taken = TAGE_taken;
+    end
 end
 
 PredBranch BTB_br;
@@ -164,14 +169,14 @@ TagePredictor tagePredictor
 (
     .clk(clk),
     .rst(rst),
-    
+
     .IN_predValid(IN_pcValid),
     .IN_predAddr(branchAddr),
     .IN_predHistory(lookupHistory),
     .OUT_predTageID(TAGE_tageID),
     .OUT_altPred(TAGE_altPred),
     .OUT_predTaken(TAGE_taken),
-    
+
     .IN_writeValid(bpUpdateActive.valid),
     // we use the fetch PC rather than the actual PC as the update
     // address, as this is where the prediction will be made next time.
@@ -197,7 +202,7 @@ ReturnStack retStack
     .IN_pc(OUT_pc),
     .IN_fetchID(IN_fetchID),
     .IN_comFetchID(IN_comFetchID),
-    
+
     .IN_lastPC(pcRegNoInc),
     .IN_branch(OUT_predBr),
 
@@ -206,7 +211,7 @@ ReturnStack retStack
 
     .IN_mispr(IN_mispr),
     .IN_recoveryIdx(recRIdx),
-    
+
     .OUT_curIdx(RET_idx),
     .OUT_predBr(RET_br),
 
@@ -217,11 +222,11 @@ ReturnStack retStack
 BHist_t recHistory;
 always_comb begin
     recHistory = bpFileRData.history;
-    
+
     // Restore prediction of earlier instruction in same packet
     if (bpFileRData.pred && recovery.fetchOffs > bpFileRData.predOffs)
         recHistory = {recHistory[$bits(BHist_t)-2:0], bpFileRData.predTaken};
-    
+
     if (recovery.histAct == HIST_WRITE_0 || recovery.histAct == HIST_WRITE_1)
         recHistory = {recHistory[$bits(BHist_t)-2:0], recovery.histAct == HIST_WRITE_1};
     if (recovery.histAct == HIST_APPEND_1 || recovery.histAct == HIST_APPEND_0)
@@ -244,7 +249,7 @@ always_comb begin
     lookupHistory = history;
     if (recovery.valid)
         lookupHistory = recHistory;
-    else if (OUT_predBr.valid && OUT_predBr.btype == BT_BRANCH)
+    else if (OUT_predBr.valid && OUT_predBr.btype == BT_BRANCH && !OUT_predBr.dirOnly)
         lookupHistory = {lookupHistory[$bits(BHist_t)-2:0], OUT_predBr.taken};
 end
 
@@ -276,7 +281,7 @@ FIFO#($bits(BPUpdate)-1, 4, 1, 0) updFIFO
 BPUpdate bpUpdateActive;
 always_ff@(posedge clk) begin
     bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
-    if (!rst && updFIFO_deq) 
+    if (!rst && updFIFO_deq)
         bpUpdateActive <= bpUpdate;
 end
 always_comb begin
@@ -296,16 +301,16 @@ end
 // Reads from BP File and the frontend's PC File Port
 // These two reads are always from the same address, used
 // for mispredict recovery and branch direction updates.
-// Mispredicts always have priority, updates are buffered. 
+// Mispredicts always have priority, updates are buffered.
 always_comb begin
     OUT_pcFileRead.addr = 'x;
     OUT_pcFileRead.valid = 0;
-    
+
     bpFileRAddr = 'x;
     bpFileRE = 0;
 
     updFIFO_deq = 0;
-    
+
     // On mispredict, read history of instruction to revert to.
     // If not manually specified, we also read the PC.
     if (IN_mispr.taken) begin
@@ -343,7 +348,7 @@ reg[30:0] pcRegNoInc;
 reg ignorePred;
 always_ff@(posedge clk) begin
     recovery <= Recovery'{valid: 0, default: 'x};
-    
+
     if (rst) begin
         pcReg <= 31'(`ENTRY_POINT >> 1);
         ignorePred <= 1;
@@ -368,7 +373,7 @@ always_ff@(posedge clk) begin
             recovery.retAct <= IN_mispr.retAct;
             recovery.histAct <= IN_mispr.histAct;
             recovery.fetchOffs <= IN_mispr.fetchOffs;
-            
+
             pcReg <= IN_mispr.tgtSpec == BR_TGT_MANUAL ? IN_mispr.dst : 'x;
             ignorePred <= 1;
         end

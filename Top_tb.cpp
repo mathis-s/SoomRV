@@ -1,5 +1,5 @@
 // #define TRACE
-//#define KONATA
+// #define KONATA
 #define COSIM
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
@@ -18,7 +18,7 @@
 #include "VTop_IF_Cache.h"
 #include "VTop_IFetch.h"
 #include "VTop_MemRTL__W54_N40_WB15.h"
-#include "VTop_RegFile__W4f_S20_N1_NB1.h"
+#include "VTop_RegFile__W53_S20_N1_NB1.h"
 #include "VTop_RegFile__A1.h"
 #include "VTop_ROB.h"
 #include "VTop_Rename.h"
@@ -136,7 +136,7 @@ double sc_time_stamp()
 uint32_t ReadRegister(uint32_t rid);
 uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs);
 
-static void PrintHex (FILE* stream, uint64_t n)
+static void PrintBin (FILE* stream, uint64_t n)
 {
     for (int i = 63; i >= 0; i=i-1)
         putc((n & (1UL << i)) ? '1' : '0', stream);
@@ -148,7 +148,8 @@ class SpikeSimif : public simif_t
   public:
     bool doRestore = false;
     uint64_t bhist;
-    uint32_t returnStack[16];
+    const static size_t returnStackSize = 256;
+    uint32_t returnStack[returnStackSize];
     int returnIdx;
 
   private:
@@ -159,7 +160,7 @@ class SpikeSimif : public simif_t
     std::vector<std::string> errors;
     cfg_t* cfg;
     std::map<size_t, processor_t*> harts;
-    
+
 
     bool compare_state()
     {
@@ -339,7 +340,7 @@ class SpikeSimif : public simif_t
         }
         if ((instSIM & 0b1111111) == 0b1100011)
         {
-            uint32_t rs1 = X[(instSIM >> 15) & 31]; 
+            uint32_t rs1 = X[(instSIM >> 15) & 31];
             uint32_t rs2 = X[(instSIM >> 20) & 31];
 
             switch ((instSIM >> 12) & 7)
@@ -360,17 +361,17 @@ class SpikeSimif : public simif_t
     {
         uint32_t nextPC = ((instSIM & 3) == 3) ? pc + 4 : pc + 2;
         if ((instSIM & 0b1111111111111111) == 0b1000000010000010)
-            return returnStack[(returnIdx--)%16] == predTarget;
+            return returnStack[(returnIdx--)%returnStackSize] == predTarget;
         if ((instSIM & 0b1111000001111111) == 0b1001000000000010)
-            returnStack[(++returnIdx)%16] = nextPC;
+            returnStack[(++returnIdx)%returnStackSize] = nextPC;
         if ((instSIM & 0b1110000000000011) == 0b0010000000000001)
-            returnStack[(++returnIdx)%16] = nextPC;
+            returnStack[(++returnIdx)%returnStackSize] = nextPC;
 
         if ((instSIM & 0b1111111) == 0b1101111)
         {
             int rd = (instSIM >> 7) & 31;
             if (rd == 1 || rd == 5)
-                returnStack[(++returnIdx)%16] = nextPC;
+                returnStack[(++returnIdx)%returnStackSize] = nextPC;
         }
 
         if ((instSIM & 0b111'00000'1111111) == 0b000'00000'1100111)
@@ -378,9 +379,9 @@ class SpikeSimif : public simif_t
             int rd = (instSIM >> 7) & 31;
             int rs1 = (instSIM >> 15) & 31;
             if (((rd == 1 || rd == 5) && !(rs1 == 1 || rs1 == 5)) || ((rd == 1 || rd == 5) && rd == rs1))
-                returnStack[(++returnIdx)%16] = nextPC;
+                returnStack[(++returnIdx)%returnStackSize] = nextPC;
             if (!(rd == 1 || rd == 5) && (rs1 == 1 || rs1 == 5))
-                return returnStack[(returnIdx--)%16] == predTarget;
+                return returnStack[(returnIdx--)%returnStackSize] == predTarget;
         }
         return true;
     }
@@ -417,17 +418,17 @@ class SpikeSimif : public simif_t
         bool historyEqual = compare_history(inst);
         bool returnEqual = check_return_stack(instSIM, initialSpikePC, inst.predTarget);
         if (!returnEqual)
-            fprintf(stderr, "target %.8x, expected %.8x\n", inst.predTarget, returnStack[(returnIdx+1)%16]);
-        
+            fprintf(stderr, "target %.8x, expected %.8x\n", inst.predTarget, returnStack[(returnIdx+1)%returnStackSize]);
+
 
         processor->step(1);
-        
+
         auto [branch, taken] = is_branch_taken(instSIM);
-        if (branch && historyEqual) 
+        if (branch && historyEqual)
         {
             bhist = (bhist << 1) | (taken ? 1 : 0);
             if (processor->debug)
-                PrintHex(stderr, bhist);
+                PrintBin(stderr, bhist);
         }
 
         // interrupts are handled by SoomRV
@@ -444,10 +445,10 @@ class SpikeSimif : public simif_t
         {
             uint32_t phy = get_phy_addr(std::get<0>(read), LOAD);
             //if (phy == 0x83ff5c00) printf("[%lu] load sqn = %x\n", main_time, inst.sqn);
-            
+
             if (processor->debug) fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
 
-            
+
             phy &= ~3;
             // MMIO is passed through
             if (phy >= 0x10000000 && phy < 0x12000000)
@@ -512,7 +513,7 @@ class SpikeSimif : public simif_t
                 fprintf(stream, "x%.2zu=%.8x ", j * 8 + k, (uint32_t)processor->get_state()->XPR[j * 8 + k]);
             fprintf(stream, "\n");
         }
-        PrintHex(stream, bhist);
+        PrintBin(stream, bhist);
     }
 
     uint32_t get_pc() const
@@ -643,11 +644,11 @@ uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs)
     uint8_t predOffs = ExtractField(bpFile[fetchID], 1, 3);
     bool predTaken = ExtractField(bpFile[fetchID], 4, 1);
     bool isRegularBranch = ExtractField(bpFile[fetchID], 5, 1);
-    uint64_t history = ExtractField(bpFile[fetchID], 10, 32) | 
-        ((uint64_t)ExtractField(bpFile[fetchID], 10+32, 32) << 32);
+    uint64_t history = ExtractField(bpFile[fetchID], 14, 32) |
+        ((uint64_t)ExtractField(bpFile[fetchID], 14+32, 32) << 32);
 
     //fprintf(stderr, "fetch offs=%u, pred offs=%u, pred=%u, isJump=%u, predTaken=%u\n", fetchOffs, predOffs, pred, isJump, predTaken);
-    
+
     if (pred && isRegularBranch && fetchOffs > predOffs)
         return (history << 1) | predTaken;
     return history;
@@ -713,7 +714,7 @@ void DumpState(FILE* stream, Inst inst)
         fprintf(stream, "\n");
     }
     auto fetchOffset = (((inst.pc & 15) >> 1) + (((inst.inst & 3) == 3) ? 1 : 0)) & 7;
-    PrintHex(stream, ReadBrHistory(inst.fetchID, fetchOffset));
+    PrintBin(stream, ReadBrHistory(inst.fetchID, fetchOffset));
     fprintf(stream, "\n");
 }
 
@@ -732,7 +733,7 @@ void Exit(int code)
     exit(code);
 }
 
-// Check writes to cache, 
+// Check writes to cache,
 // (reverse) translate the address via CT lookup,
 // delete in-flight store entry on match
 struct CacheWrite
@@ -754,7 +755,7 @@ std::array<CacheWrite, 3> GetCurrentWrites()
         ports[i].we = !((ifCache->__PVT__we >> i) & 1) && !((ifCache->__PVT__busy >> i) & 1);
         ports[i].addr = (ifCache->__PVT__addr >> i * 12) & 4095 & (~0xf);
         ports[i].wassoc = (ifCache->__PVT__wassoc >> i * 2) & 3;
-        
+
         ports[i].wmask = (ifCache->__PVT__wmask >> i * 16) & 0xffff;
 
         for (int j = 0; j < 16; j++)
@@ -776,13 +777,13 @@ std::array<CacheWrite, 3> GetCurrentWrites()
         port.addr = ((entry >> 1) << 12) | (port.addr & -16);
         // printf("[%.8x] = %x\n", port.addr, port.wdata);
     }
-    
+
     // Writes fused into cache line load request
     auto memcReq = top->Top->soc->MemC_ctrl[1];
     auto memcStat = top->Top->soc->MemC_stat;
-    
+
     auto cmd = ExtractField(memcReq, 0, 4);
-    
+
     static bool allow = 1;
     if (allow && (cmd == 1 /*MEMC_REPLACE*/ || cmd == 3 /*MEMC_CP_EXT_TO_CACHE*/))
     {
@@ -802,7 +803,7 @@ std::array<CacheWrite, 3> GetCurrentWrites()
                                     .wmask = (uint16_t)mask};
         }
     }
-    
+
     // Allow memc extract in next cycle if not stalled
     allow = (cmd == 0) || !ExtractField(memcStat, 2, 1);
     return ports;
@@ -873,27 +874,29 @@ void LogPredec(Inst& inst)
         state.fetches[inst.fetchID].returnAddr[1] * 2 & 0xfff,
         state.fetches[inst.fetchID].returnAddr[2] * 2 & 0xfff,
         state.fetches[inst.fetchID].returnAddr[3] * 2 & 0xfff);*/
-
-    fprintf(konataFile, "L\t%u\t%u\t%.8x (%.8x): %s\n", inst.id, 0, inst.pc, inst.inst,
-            simif.disasm(inst.inst).c_str());
-
-    fprintf(konataFile, "C\t-%lu\n",
-        (main_time-state.fetches[inst.fetchID].fetchTime)/2);
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
-    if ((state.fetches[inst.fetchID].pdTime < state.fetches[inst.fetchID].fetchTime))
+    if (main_time > DEBUG_TIME)
     {
-        printf("%li %li\n", state.fetches[inst.fetchID].fetchTime, state.fetches[inst.fetchID].pdTime);
-        Exit(1);
+        fprintf(konataFile, "L\t%u\t%u\t[%.5lu]%.8x (%.8x): %s\n", inst.id, 0, main_time, inst.pc, inst.inst,
+                simif.disasm(inst.inst).c_str());
+
+        fprintf(konataFile, "C\t-%lu\n",
+            (main_time-state.fetches[inst.fetchID].fetchTime)/2);
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
+        if ((state.fetches[inst.fetchID].pdTime < state.fetches[inst.fetchID].fetchTime))
+        {
+            printf("%li %li\n", state.fetches[inst.fetchID].fetchTime, state.fetches[inst.fetchID].pdTime);
+            Exit(1);
+        }
+        fprintf(konataFile, "C\t%lu\n",
+            (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime)/2);
+
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "PD");
+        fprintf(konataFile, "C\t%lu\n",
+            (main_time - state.fetches[inst.fetchID].pdTime)/2);
+
+
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
     }
-    fprintf(konataFile, "C\t%lu\n",
-        (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime)/2);
-
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "PD");
-    fprintf(konataFile, "C\t%lu\n",
-        (main_time - state.fetches[inst.fetchID].pdTime)/2);
-
-    
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
 #endif
 }
 
@@ -914,29 +917,38 @@ void LogFlush(Inst& inst)
 void LogRename(Inst& inst)
 {
 #ifdef KONATA
-    if (inst.fu == 8 || inst.fu == 11)
-        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
-    else
-        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IS");
+    if (main_time > DEBUG_TIME)
+    {
+        if (inst.fu == 8 || inst.fu == 11)
+            fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
+        else
+            fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IS");
+    }
 #endif
 }
 
 void LogResult(Inst& inst)
 {
 #ifdef KONATA
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
-    if (!(inst.tag & 0x40))
-        fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
+    if (main_time > DEBUG_TIME)
+    {
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
+        if (!(inst.tag & 0x40))
+            fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
+    }
 #endif
 }
 
 void LogExec(Inst& inst)
 {
 #ifdef KONATA
-    fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "EX");
-    fprintf(konataFile, "L\t%u\t%u\topA=%.8x \n", inst.id, 1, inst.srcA);
-    fprintf(konataFile, "L\t%u\t%u\topB=%.8x \n", inst.id, 1, inst.srcB);
-    fprintf(konataFile, "L\t%u\t%u\timm=%.8x \n", inst.id, 1, inst.imm);
+    if (main_time > DEBUG_TIME)
+    {
+        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "EX");
+        fprintf(konataFile, "L\t%u\t%u\topA=%.8x \n", inst.id, 1, inst.srcA);
+        fprintf(konataFile, "L\t%u\t%u\topB=%.8x \n", inst.id, 1, inst.srcB);
+        fprintf(konataFile, "L\t%u\t%u\timm=%.8x \n", inst.id, 1, inst.imm);
+    }
 #endif
 }
 
@@ -984,10 +996,10 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 1 + 1 + 4 + 7 + 7 + 2 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 184 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 184 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 184 - 32 - 32 - 32 - 3 - 3 - 32, 32);
+            uint32_t sqn = ExtractField(core->LD_uop[i], 1 + 1 + 4 + 7 + 7 + 1 + 5, 7);
+            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 183 - 32, 32);
+            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 183 - 32 - 32, 32);
+            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 183 - 32 - 32 - 32 - 3 - 3 - 32, 32);
             LogExec(state.insts[sqn]);
         }
     }
@@ -1336,8 +1348,8 @@ void LogPerf(VTop_Core* core)
 
         core->csr->mhpmcounter[12], core->csr->mhpmcounter[13],
         core->csr->mhpmcounter[14], core->csr->mhpmcounter[15],
-        core->csr->mhpmcounter[16], 
-        
+        core->csr->mhpmcounter[16],
+
     };
     static std::array<uint64_t, 16> lastCounters;
 
@@ -1360,7 +1372,7 @@ void LogPerf(VTop_Core* core)
     fprintf(stderr, "load stalled:       %lu # %f%%\n", current[15-1], 100.*current[15-1]/(4*current[0]));
     fprintf(stderr, "ROB stalled:        %lu # %f%%\n", current[16-1], 100.*current[16-1]/(4*current[0]));
 
-    fprintf(stderr, 
+    fprintf(stderr,
         "%7lu # %2.0f ORD | %7lu # %2.0f BTK | %7lu # %2.0f BNT\n"
         "%7lu # %2.0f RET | %7lu # %2.0f IBR | %7lu # %2.0f MEM\n",
         current[5], 100.*current[5] / current[4],

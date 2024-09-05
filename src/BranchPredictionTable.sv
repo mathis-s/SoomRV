@@ -50,6 +50,7 @@ always_ff@(posedge clk) begin
     else begin
         write_r <= write_c;
         if (write_c.valid) begin
+            // todo: forwarding?
             writeTempReg <= {pred[write_c.addr], hist[write_c.addr]};
         end
         if (write_r.valid) begin

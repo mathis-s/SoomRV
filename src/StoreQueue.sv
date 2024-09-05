@@ -11,23 +11,23 @@ module StoreQueue
 
     output reg OUT_empty,
     output wire OUT_done,
-    
+
     input LD_UOp IN_uopLd[`NUM_AGUS-1:0],
     output StFwdResult OUT_fwd[`NUM_AGUS-1:0],
 
     input AGU_UOp IN_uopSt[`NUM_AGUS-1:0],
-    
+
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
     input StDataUOp IN_stDataUOp[`NUM_AGUS-1:0],
-    
+
     input SqN IN_curSqN,
     input SqN IN_comStSqN,
-    
+
     input BranchProv IN_branch,
-    
+
     output SQ_UOp OUT_uop[NUM_OUT-1:0],
     input wire IN_stall[NUM_OUT-1:0],
-    
+
     output wire OUT_flush,
     output SqN OUT_maxStoreSqN
 );
@@ -42,7 +42,6 @@ typedef struct packed
 
     // wmask == 0 is escape sequence for special operations
     logic[3:0] wmask;
-    
     SqN sqN;
     logic loaded;
     logic addrAvail;
@@ -65,7 +64,7 @@ always_comb begin
             active = 0;
         else if (baseIndexOneHot[i])
             active = 1;
-        
+
         entryReady_c[i] = active;
     end
 end
@@ -74,14 +73,14 @@ reg[NUM_ENTRIES-1:0] invalRange_c;
 always_comb begin
     reg active = baseIndex[IDX_LEN-1:0] <= (IN_branch.storeSqN[IDX_LEN-1:0] + IDX_LEN'(1));
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        
+
         if ($signed(IN_branch.storeSqN - baseIndex) >= NUM_ENTRIES-1)
             active = 0;
         else if (branchStSqNOneHot[(i-1) % NUM_ENTRIES])
             active = 1;
         else if (baseIndexOneHot[i])
             active = 0;
-        
+
         invalRange_c[i] = active;
     end
 end
@@ -136,7 +135,7 @@ reg[NUM_ENTRIES-1:0] lookupFuse[`NUM_AGUS-1:0];
 // Store queue lookup
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
-    
+
     reg[AXI_BWIDTH_E-3:0] shift = lookupAddr[h][2+:AXI_BWIDTH_E-2];
     reg[31:0] data = 'x;
     reg[3:0] mask = 'x;
@@ -147,10 +146,10 @@ always_comb begin
     lookupData[h] = 32'bx;
     lookupConflict[h] = 0;
     lookupFuse[h] = '0;
-    
+
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
         if (OUT_uop[i].valid &&
-            OUT_uop[i].addr[31:2] == lookupAddr[h][31:2] && 
+            OUT_uop[i].addr[31:2] == lookupAddr[h][31:2] &&
             !`IS_MMIO_PMA(OUT_uop[i].addr)
         ) begin
             for (integer j = 0; j < 4; j=j+1)
@@ -164,7 +163,7 @@ always_comb begin
         if (lookupMaskIter[h][outputIdx][i])
             lookupData[h][i*8 +: 8] = lookupDataIter[h][outputIdx][i*8 +: 8];
 
-    lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];    
+    lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];
     lookupConflict[h] = |lookupConflictList[h];
 end
 
@@ -197,12 +196,12 @@ always_comb begin
     lookupConflictList[h][i] = 0;
     lookupFuse[h][i] = 0;
     if (entries[i].addrAvail &&
-        entries[i].addr == lookupAddr[h][31:2] && 
-        ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) || 
+        entries[i].addr == lookupAddr[h][31:2] &&
+        ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) ||
             entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
-        
+
         if (entries[i].loaded) begin
             lookupFuse[h][i] = 1;
             for (integer j = 0; j < 4; j=j+1)
@@ -227,7 +226,7 @@ always_comb begin
     for (integer i = 0; i < `DEC_WIDTH; i=i+1) begin
         rnUOpSorted[i] = 'x;
         rnUOpSorted[i].valid = 0;
-        
+
         for (integer j = 0; j < `DEC_WIDTH; j=j+1) begin
             // This could be one-hot...
             if (IN_rnUOp[j].valid && IN_rnUOp[j].storeSqN[$clog2(`DEC_WIDTH)-1:0] == i[$clog2(`DEC_WIDTH)-1:0] &&
@@ -255,7 +254,7 @@ logic[IDX_LEN-1:0] deqAddrs[NUM_OUT-1:0];
 always_comb begin
     for (integer i = 0; i < NUM_OUT; i=i+1)
         deqAddrs[i] = baseIndexI + i[IDX_LEN-1:0];
-    
+
     for (integer i = 0; i < NUM_OUT; i=i+1)
         deqAddrsSorted[i] = 'x;
 
@@ -266,7 +265,7 @@ SQ_UOp deqPorts[NUM_OUT-1:0];
 always_comb begin
 
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
-        logic[IDX_LEN-1:0] addr = 
+        logic[IDX_LEN-1:0] addr =
             {deqAddrsSorted[i][IDX_LEN-1:$clog2(NUM_OUT)], i[$clog2(NUM_OUT)-1:0]};
         SQEntry entry = entries[addr];
         logic ready = entryReady_r[addr] && entry.loaded;
@@ -284,7 +283,7 @@ SQ_UOp deqEntries[NUM_OUT-1:0];
 always_comb begin
     logic prevValid = 1;
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
-        deqEntries[i] = prevValid ? 
+        deqEntries[i] = prevValid ?
             deqPorts[deqAddrs[i][$clog2(NUM_OUT)-1:0]] :
             SQ_UOp'{valid: 0, default: 'x};
         prevValid = deqEntries[i].valid;
@@ -319,7 +318,7 @@ PriorityEncoder#(2*NUM_OUT, NUM_OUT) penc
 reg flushing;
 assign OUT_flush = flushing;
 always_ff@(posedge clk) begin
-    
+
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
         OUT_fwd[i].valid <= 0;
@@ -327,13 +326,13 @@ always_ff@(posedge clk) begin
 
     if (rst) begin
         entryFused <= 0;
-        
+
         baseIndex <= 0;
-        
+
         OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
         OUT_empty <= 1;
         flushing <= 0;
-        
+
         for (integer i = 0; i < NUM_OUT; i=i+1)
             OUT_uop[i] <= SQ_UOp'{valid: 0, default: 'x};
 
@@ -341,10 +340,10 @@ always_ff@(posedge clk) begin
             entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
     end
     else begin
-    
+
         SqN nextBaseIndex = baseIndex;
         reg modified = 0;
-        
+
         // Dequeue
         for (integer i = 0; i < NUM_OUT; i=i+1) begin
             reg[$clog2(NUM_OUT):0] idx = srcIdx[i];
@@ -352,7 +351,7 @@ always_ff@(posedge clk) begin
             if (outDeqView[idx].valid && idx >= NUM_OUT) begin
 
                 // todo: infer sequential writes
-                reg[$clog2(NUM_ENTRIES)-1:0] idxSQ = 
+                reg[$clog2(NUM_ENTRIES)-1:0] idxSQ =
                     baseIndexI + $clog2(NUM_ENTRIES)'(idx) - $clog2(NUM_ENTRIES)'(NUM_OUT);
                 entries[idxSQ].loaded <= 0;
                 entries[idxSQ].addrAvail <= 0;
@@ -367,7 +366,7 @@ always_ff@(posedge clk) begin
                 (!IN_branch.flush && $signed(IN_stDataUOp[i].storeSqN - IN_branch.storeSqN) <= 0))
             ) begin
                 logic[IDX_LEN-1:0] idx = IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
-                
+
                 assert(idx[0] == i[0]); idx[0] = i[0];
 
                 entries[idx].loaded <= 1;
@@ -381,6 +380,8 @@ always_ff@(posedge clk) begin
 
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
                 if (entries[i].addrAvail)
+
+                    `ifdef DEBUG
                     if(!entryReady_c[i] &&
                         invalRange_c[i] !=
                         $signed(entries[i].sqN - IN_branch.sqN) > 0
@@ -388,11 +389,13 @@ always_ff@(posedge clk) begin
                         $display("got %x, baseIndex=%x, storeSqN=%x, %d\n", invalRange_c[i], baseIndex, IN_branch.storeSqN, i);
                         assert(0);
                     end
+                    `endif
+
                 if (invalRange_c[i] || (IN_branch.flush && !entryReady_r[i]))
                     entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
             end
         end
-    
+
         // Set Address
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
             if (IN_uopSt[i].valid && IN_uopSt[i].isStore &&
@@ -401,8 +404,7 @@ always_ff@(posedge clk) begin
                 reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 assert(!entries[index].addrAvail);
-                
-                
+
                 if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
                     entries[index].sqN <= IN_uopSt[i].sqN;
                     entries[index].addr <= IN_uopSt[i].addr[31:2];
@@ -419,7 +421,7 @@ always_ff@(posedge clk) begin
             flushing <= 0;
         end
         OUT_maxStoreSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
-        
+
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
             if (IN_uopLd[i].valid) begin
                 OUT_fwd[i].valid <= 1;

@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.118 (w)1999-2023 BSI
-[*] Sat Jul  6 11:44:45 2024
+[*] GTKWave Analyzer v3.3.120 (w)1999-2024 BSI
+[*] Thu Sep  5 21:52:29 2024
 [*]
 [dumpfile] "Top_tb.vcd"
-[dumpfile_mtime] "Sat Jul  6 11:15:01 2024"
-[dumpfile_size] 368139075
+[dumpfile_mtime] "Thu Sep  5 21:30:58 2024"
+[dumpfile_size] 360982658
 [savefile] "view.gtkw"
-[timestart] 698898
-[size] 1920 2081
+[timestart] 501216128
+[size] 3840 2113
 [pos] -1 -1
-*-5.567864 699098 9230 9288 9250 75576 50964 36160 35932 36000 35990 698328 699032 698970 699026 699112 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-3.000000 501216182 501215661 501216235 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.Top.
 [treeopen] TOP.Top.extMem.
@@ -59,6 +59,7 @@
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.deq.
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.IN_issueUOps[0].
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.IN_issueUOps[2].
+[treeopen] TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[0].
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[1].
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[3].
 [treeopen] TOP.Top.soc.core.genblk1[1].iqStD.OUT_uop.
@@ -96,21 +97,26 @@
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.OUT_predBr.
+[treeopen] TOP.Top.soc.core.ifetch.bp.retStack.postRecSave.
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[2].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[3].
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[4].
+[treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[7].
 [treeopen] TOP.Top.soc.core.ifetch.bp.tagePredictor.
+[treeopen] TOP.Top.soc.core.ifetch.bp.tagePredictor.basePredictor.
 [treeopen] TOP.Top.soc.core.ifetch.ict.
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[1].
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[2].
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].
+[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[5].
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.
 [treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.
+[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.
 [treeopen] TOP.Top.soc.core.ifetch.ict.IF_icache.
 [treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.
 [treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[3].
@@ -261,6 +267,7 @@
 [treeopen] TOP.Top.soc.core.sq.IN_branch.
 [treeopen] TOP.Top.soc.core.sq.IN_rnUOp[0].
 [treeopen] TOP.Top.soc.core.sq.IN_rnUOp[1].
+[treeopen] TOP.Top.soc.core.sq.IN_stDataUOp[0].
 [treeopen] TOP.Top.soc.core.sq.IN_stDataUOp[1].
 [treeopen] TOP.Top.soc.core.sq.IN_uopLd[0].
 [treeopen] TOP.Top.soc.core.sq.IN_uopLd[1].
@@ -321,9 +328,9 @@
 [treeopen] TOP.Top.soc.OUT_dbg.
 [treeopen] TOP.Top.soc.unnamedblk3.
 [sst_width] 315
-[signals_width] 371
+[signals_width] 552
 [sst_expanded] 1
-[sst_vpaned_height] 1396
+[sst_vpaned_height] 1424
 @28
 TOP.Top.soc.clk
 TOP.Top.soc.en
@@ -439,6 +446,17 @@ TOP.Top.soc.core.ifetch.bp.recovery.fetchID[4:0]
 @28
 TOP.Top.soc.core.ifetch.bp.recHistory[63:0]
 @200
+-
+@28
+TOP.Top.soc.core.ifetch.bp.OUT_predBr.btype[1:0]
+@200
+-
+@28
+TOP.Top.soc.core.ifetch.bp.BTB_br.btype[1:0]
+TOP.Top.soc.core.ifetch.bp.RET_br.valid
+TOP.Top.soc.core.ifetch.bp.retStack.IN_valid
+TOP.Top.soc.core.ifetch.bp.retStack.OUT_predBr.valid
+@200
 -BTB
 @22
 TOP.Top.soc.core.ifetch.bp.bpFile.IN_raddr[0][4:0]
@@ -476,7 +494,40 @@ TOP.Top.soc.core.ifetch.bp.tagePredictor.IN_writeValid
 @200
 -RetStack
 @22
-TOP.Top.soc.core.ifetch.bp.retStack.rindex[3:0]
+TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.dst[30:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.taken
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.addr[30:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.valid
+TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.isFetchBranch
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.idx[7:0]
+TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.fetchID[4:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.valid
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.IN_recoveryIdx[7:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.bpFileRData.rIdx[7:0]
+@28
+TOP.Top.soc.core.ifetch.bp.recovery.retAct[1:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.IN_branch.dst[30:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.IN_branch.btype[1:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.IN_comFetchID[4:0]
+TOP.Top.soc.core.ifetch.bp.retStack.lastInvalComFetchID[4:0]
+@200
+-
 @28
 TOP.Top.soc.core.ifetch.bp.retStack.IN_valid
 @22
@@ -498,6 +549,8 @@ TOP.Top.soc.core.ifetch.bp.retStack.OUT_curRetAddr[30:0]
 @200
 -
 @22
+TOP.Top.soc.core.ifetch.bp.retStack.rindex[7:0]
+TOP.Top.soc.core.ifetch.bp.retStack.IN_fetchID[4:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[0][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[1][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[2][31:0]
@@ -505,8 +558,26 @@ TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[3][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[4][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[5][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[6][31:0]
+[color] 2
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[7][31:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[8][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[9][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[10][31:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[244][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[245][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[246][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[247][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[248][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[249][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[250][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[251][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[252][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[253][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[254][31:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rstack_dbg[255][31:0]
 @200
 -
 @28
@@ -519,18 +590,32 @@ TOP.Top.soc.core.ifetch.bp.retStack.recoveryID[4:0]
 @22
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[7].addr[30:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[7].fetchID[4:0]
-TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[7].idx[3:0]
 @200
 -
 @22
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].addr[30:0]
 TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].fetchID[4:0]
-TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[0].idx[3:0]
 @200
 -
 @24
 TOP.Top.soc.core.ifetch.bp.retStack.qindex[2:0]
 TOP.Top.soc.core.ifetch.bp.retStack.qindexEnd[2:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[4].addr[30:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[4].fetchID[4:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[4].idx[7:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[4].offs[2:0]
+@200
+-
+@22
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[5].addr[30:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[5].fetchID[4:0]
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[5].idx[7:0]
+@28
+TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[5].offs[2:0]
 @200
 -
 @28
@@ -542,18 +627,10 @@ TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.fetchOffs[2:0]
 TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.retAct[1:0]
 @22
 TOP.Top.soc.core.ifetch.bp.retStack.IN_mispr.dst[30:0]
-TOP.Top.soc.core.ifetch.bp.retStack.IN_recoveryIdx[3:0]
 @200
 -
 @28
 TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.valid
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.isRet
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.isCall
-@22
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.idx[3:0]
-@28
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.compr
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.cleanRet
 @22
 TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.addr[30:0]
 @200
@@ -561,15 +638,13 @@ TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.addr[30:0]
 @28
 TOP.Top.soc.core.ifetch.bp.retStack.postRecSave.valid
 @22
-TOP.Top.soc.core.ifetch.bp.retStack.postRecSave.rIdx[3:0]
 TOP.Top.soc.core.ifetch.bp.retStack.postRecSave.fetchID[4:0]
+TOP.Top.soc.core.ifetch.bp.retStack.postRecSave.rIdx[7:0]
 @200
 -
-@22
-TOP.Top.soc.core.ifetch.bp.bpBackup.rIdx[3:0]
 @28
 TOP.Top.soc.core.ifetch.bp.bpFile.IN_we[0]
-@23
+@22
 TOP.Top.soc.core.ifetch.bp.bpFile.IN_waddr[0][4:0]
 @200
 -MemC
@@ -895,56 +970,36 @@ TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.fetchID[4:0]
 @28
 TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.fetchOffs[2:0]
 TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.histAct[2:0]
+@22
+TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.addr[30:0]
+TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.idx[7:0]
+@28
+TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.valid
 @200
+-
 -
 @28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].btype[2:0]
-@22
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].pc[31:0]
-@28
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[1].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[1].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[2].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[2].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].btype[2:0]
-@22
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].pc[31:0]
-@28
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[4].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[4].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[5].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[5].valid
-@200
--
-@28
 TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].valid
-@22
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].fhPC[31:0]
-@28
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].compr
+TOP.Top.soc.core.ifetch.ict.branchHandler.branch[7].btype[2:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[7].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[7].valid
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.btype[1:0]
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.compr
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dirOnly
+@22
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dst[30:0]
+@28
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.multiple
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.offs[2:0]
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.taken
+TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.valid
 @200
 -ifetch
 @22
@@ -1080,13 +1135,6 @@ TOP.Top.soc.core.ifetch.bp.retStack.rstack[3][30:0]
 -
 @28
 TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.valid
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.isRet
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.isCall
-@22
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.idx[3:0]
-@28
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.compr
-TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.cleanRet
 @22
 TOP.Top.soc.core.ifetch.bp.retStack.IN_returnUpd.addr[30:0]
 @200
@@ -2438,79 +2486,31 @@ TOP.Top.soc.core.div.OUT_uop.result[31:0]
 TOP.Top.soc.core.div.OUT_uop.sqN[6:0]
 @200
 -
+@201
 -StoreData
-@22
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[0].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[1].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[2].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[3].storeSqN[6:0]
-@200
--
-@22
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[0].fu[3:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[1].fu[3:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[2].fu[3:0]
-TOP.Top.soc.core.genblk1[1].iqStD.IN_uop[3].fu[3:0]
-@200
--
--
-@22
-TOP.Top.soc.core.iq3.OUT_stall[3:0]
-TOP.Top.soc.core.genblk1[1].iqStD.OUT_stall[3:0]
-@200
--
-@22
-TOP.Top.soc.core.genblk1[1].iqStD.queue[0].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[1].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[2].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[3].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[4].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[5].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[6].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.queue[7].storeSqN[6:0]
-TOP.Top.soc.core.genblk1[1].iqStD.insertIndex[3:0]
-@200
--
-@28
-TOP.Top.soc.core.genblk1[1].iqStD.IN_ready
-@200
--
-@22
-TOP.Top.soc.core.genblk1[1].iqStD.OUT_uop.storeSqN[6:0]
-@200
--
-@28
-TOP.Top.soc.core.genblk1[1].iqStD.deq.valid
-@c00024
-TOP.Top.soc.core.genblk1[1].iqStD.deq.idx[2:0]
-@28
-(0)TOP.Top.soc.core.genblk1[1].iqStD.deq.idx[2:0]
-(1)TOP.Top.soc.core.genblk1[1].iqStD.deq.idx[2:0]
-(2)TOP.Top.soc.core.genblk1[1].iqStD.deq.idx[2:0]
-@1401200
--group_end
-@200
--
-@28
-TOP.Top.soc.core.stDataLd.IN_uop[0].valid
-@22
-TOP.Top.soc.core.stDataLd.IN_uop[0].tag[6:0]
-TOP.Top.soc.core.stDataLd.IN_uop[0].storeSqN[6:0]
-@28
-TOP.Top.soc.core.stDataLd.IN_uop[0].offs[1:0]
-@200
--
-@28
-TOP.Top.soc.core.stDataLd.IN_uop[1].valid
-@22
-TOP.Top.soc.core.stDataLd.IN_uop[1].tag[6:0]
-TOP.Top.soc.core.stDataLd.IN_uop[1].storeSqN[6:0]
-@28
-TOP.Top.soc.core.stDataLd.IN_uop[1].offs[1:0]
 @200
 -SQ
 @22
 TOP.Top.soc.core.sq.baseIndex[6:0]
+@200
+-
+@22
+TOP.Top.soc.core.sq.IN_uopSt[0].addr[31:0]
+TOP.Top.soc.core.sq.IN_uopSt[0].sqN[6:0]
+TOP.Top.soc.core.sq.IN_uopSt[0].storeSqN[6:0]
+@200
+-
+@22
+TOP.Top.soc.core.sq.IN_uopSt[1].addr[31:0]
+TOP.Top.soc.core.sq.IN_uopSt[1].sqN[6:0]
+TOP.Top.soc.core.sq.IN_uopSt[1].storeSqN[6:0]
+@200
+-
+@22
+TOP.Top.soc.core.sq.IN_stDataUOp[0].data[31:0]
+TOP.Top.soc.core.sq.IN_stDataUOp[0].storeSqN[6:0]
+@28
+TOP.Top.soc.core.sq.IN_stDataUOp[0].valid
 @200
 -
 @22
@@ -2520,45 +2520,30 @@ TOP.Top.soc.core.sq.IN_stDataUOp[1].storeSqN[6:0]
 TOP.Top.soc.core.sq.IN_stDataUOp[1].valid
 @200
 -
--
 @28
-TOP.Top.soc.core.sq.entries[0].addrAvail
-TOP.Top.soc.core.sq.entries[0].loaded
+TOP.Top.soc.core.sq.entries[9].addrAvail
+@22
+TOP.Top.soc.core.sq.entries[9].addr[29:0]
+TOP.Top.soc.core.sq.entries[9].data[31:0]
+@28
+TOP.Top.soc.core.sq.entries[9].highStSqN[2:0]
+TOP.Top.soc.core.sq.entries[9].loaded
+@22
+TOP.Top.soc.core.sq.entries[9].sqN[6:0]
+TOP.Top.soc.core.sq.entries[9].wmask[3:0]
 @200
 -
 @28
-TOP.Top.soc.core.sq.entries[1].addrAvail
-TOP.Top.soc.core.sq.entries[1].loaded
-@200
--
+TOP.Top.soc.core.sq.entries[10].addrAvail
+@22
+TOP.Top.soc.core.sq.entries[10].addr[29:0]
+TOP.Top.soc.core.sq.entries[10].data[31:0]
 @28
-TOP.Top.soc.core.sq.entries[2].addrAvail
-TOP.Top.soc.core.sq.entries[2].loaded
-@200
--
-@28
-TOP.Top.soc.core.sq.entries[3].addrAvail
-TOP.Top.soc.core.sq.entries[3].loaded
-@200
--
-@28
-TOP.Top.soc.core.sq.entries[4].addrAvail
-TOP.Top.soc.core.sq.entries[4].loaded
-@200
--
-@28
-TOP.Top.soc.core.sq.entries[5].addrAvail
-TOP.Top.soc.core.sq.entries[5].loaded
-@200
--
-@28
-TOP.Top.soc.core.sq.entries[6].addrAvail
-TOP.Top.soc.core.sq.entries[6].loaded
-@200
--
-@28
-TOP.Top.soc.core.sq.entries[7].addrAvail
-TOP.Top.soc.core.sq.entries[7].loaded
+TOP.Top.soc.core.sq.entries[10].highStSqN[2:0]
+TOP.Top.soc.core.sq.entries[10].loaded
+@22
+TOP.Top.soc.core.sq.entries[10].sqN[6:0]
+TOP.Top.soc.core.sq.entries[10].wmask[3:0]
 @200
 -
 -

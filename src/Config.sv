@@ -10,7 +10,7 @@
 `define TAGE_BASE 4
 `define TAGE_STAGES 6
 `define TAGE_TABLE_SIZE 256
-`define RETURN_SIZE 16
+`define RETURN_SIZE 256
 `define RETURN_RQ_SIZE 8
 
 // IFetch
