@@ -7,7 +7,7 @@
 !sim/**
 
 !test_programs
-!test_programs/*
+!test_programs/**
 
 !test_programs/linux/extra
 !test_programs/linux/extra/**
@@ -25,3 +25,4 @@
 !view.gtkw
 !docs
 !docs/*
+!Dockerfile
