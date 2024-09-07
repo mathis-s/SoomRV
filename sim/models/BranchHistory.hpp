@@ -11,7 +11,7 @@
 #include "VTop_Core.h"
 #include "VTop_IFetch.h"
 #include "VTop_BranchPredictor__N3.h"
-#include "VTop_RegFile__W53_S20_N1_NB1.h"
+#include "VTop_RegFile__W50_S20_N1_NB1.h"
 #include "riscv/processor.h"
 
 
@@ -29,8 +29,8 @@ class BranchHistory : public Model
         uint8_t predOffs = ExtractField(bpFile[fetchID], 1, 3);
         bool predTaken = ExtractField(bpFile[fetchID], 4, 1);
         bool isRegularBranch = ExtractField(bpFile[fetchID], 5, 1);
-        uint64_t history = ExtractField(bpFile[fetchID], 14, 32) |
-            ((uint64_t)ExtractField(bpFile[fetchID], 14+32, 32) << 32);
+        uint64_t history = ExtractField(bpFile[fetchID], 11, 32) |
+            ((uint64_t)ExtractField(bpFile[fetchID], 11+32, 32) << 32);
 
         if (pred && isRegularBranch && fetchOffs > predOffs)
             return (history << 1) | predTaken;

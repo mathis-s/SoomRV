@@ -10,7 +10,7 @@
 `define TAGE_BASE 4
 `define TAGE_STAGES 6
 `define TAGE_TABLE_SIZE 256
-`define RETURN_SIZE 256
+`define RETURN_SIZE 32
 `define RETURN_RQ_SIZE 8
 
 // IFetch
@@ -48,7 +48,7 @@
 // PMAs
 `define IS_MMIO_PMA(addr) \
     ((addr) < 32'h8000_0000)
-    
+
 `define IS_MMIO_PMA_W(addr) \
     `IS_MMIO_PMA({(addr), 2'b0})
 
