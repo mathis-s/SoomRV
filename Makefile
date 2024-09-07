@@ -101,7 +101,7 @@ trace: soomrv
 .PHONY: setup
 setup:
 	git submodule update --init --recursive
-	cd riscv-isa-sim && ./configure --with-boost=no --with-boost-asio=no --with-boost-regex=no
+	cd riscv-isa-sim && ./configure CFLAGS="-Os -g0" CXXFLAGS="-Os -g0" --with-boost=no --with-boost-asio=no --with-boost-regex=no
 	make -j $(nproc) -C riscv-isa-sim
 .PHONY: clean
 clean:
