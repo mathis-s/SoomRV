@@ -1,13 +1,17 @@
 VERILATOR_FLAGS = \
 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE -Wno-GENUNNAMED --x-assign unique --x-initial unique -O3 -sv \
+	$(VFLAGS) \
 	-CFLAGS "-march=native" \
 	-LDFLAGS "-ldl" \
-	-MAKEFLAGS -j $(nproc)
+	-MAKEFLAGS -j$(nproc) \
+	-CFLAGS -DDEBUG_TIME=-1 \
+	-CFLAGS -DNOKONATA \
+	-CFLAGS -DCOSIM \
 
-VERILATOR_CFG = --exe Top_tb.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
+VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
-VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 64 -CFLAGS -DTRACE
+VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 256 -CFLAGS -DTRACE
 
 SRC_FILES = \
 	src/Config.sv \

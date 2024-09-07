@@ -6,21 +6,14 @@ module BranchTargetBuffer
     input wire IN_pcValid,
     input wire[30:0] IN_pc,
     
-    output reg OUT_branchFound,
-    output reg[30:0] OUT_branchDst,
-    output FetchOff_t OUT_branchSrcOffs,
-    output reg OUT_branchIsJump,
-    output reg OUT_branchIsCall,
-    output reg OUT_branchCompr,
-    output reg OUT_multipleBranches,
+    output PredBranch OUT_branch,
     
     input BTUpdate IN_btUpdate
 );
 
 typedef struct packed
 {
-    logic isJump;
-    logic isCall;
+    BranchType btype;
     logic compr;
     logic valid;
     logic[30:0] dst;
@@ -53,26 +46,22 @@ always_ff@(posedge clk) begin
 end
 // Do the tag check after the register such that a synchronous memory can be inferred.
 always_comb begin
-    OUT_branchFound = 0;
-    OUT_multipleBranches = 'x;
-    OUT_branchDst = 'x;
-    OUT_branchIsJump = 0;
-    OUT_branchIsCall = 0;
-    OUT_branchCompr = 0;
-    OUT_branchSrcOffs = 'x;
+
+    OUT_branch = PredBranch'{valid: 0, default: 'x};
     
     if (fetched.entry.valid && 
         fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE] &&
         // ignore predictions in the same line but before the current PC
         fetched.entry.offs >= fetched.pc[0+:$bits(FetchOff_t)]
     ) begin
-        OUT_branchFound = 1;
-        OUT_multipleBranches = fetched.multiple;
-        OUT_branchDst = fetched.entry.dst;
-        OUT_branchIsJump = fetched.entry.isJump;
-        OUT_branchIsCall = fetched.entry.isCall;
-        OUT_branchCompr = fetched.entry.compr;
-        OUT_branchSrcOffs = fetched.entry.offs;
+        OUT_branch.valid = 1;
+        OUT_branch.multiple = fetched.multiple;
+        OUT_branch.dst = fetched.entry.dst;
+        OUT_branch.btype = fetched.entry.btype;
+        OUT_branch.compr = fetched.entry.compr;
+        OUT_branch.offs = fetched.entry.offs;
+        OUT_branch.taken = fetched.entry.btype == BT_CALL || fetched.entry.btype == BT_JUMP;
+        OUT_branch.dirOnly = 0;
     end
 end
 
@@ -113,8 +102,7 @@ always_ff@(posedge clk) begin
 
                 entries[idx].valid <= 1;
                 entries[idx].compr <= IN_btUpdate.compressed;
-                entries[idx].isJump <= IN_btUpdate.isJump;
-                entries[idx].isCall <= IN_btUpdate.isCall;
+                entries[idx].btype <= IN_btUpdate.btype;
                 entries[idx].dst <= IN_btUpdate.dst[31:1];
                 entries[idx].src <= IN_btUpdate.src[$clog2(LENGTH)+1 +: `BTB_TAG_SIZE];
                 entries[idx].offs <= IN_btUpdate.src[1 +: $bits(FetchOff_t)];

@@ -10,9 +10,9 @@ module IntALU
 
     output BranchProv OUT_branch,
     output BTUpdate OUT_btUpdate,
-    
+
     output ZCForward OUT_zcFwd,
-    
+
     output AMO_Data_UOp OUT_amoData,
     output RES_UOp OUT_uop
 );
@@ -92,7 +92,7 @@ always_comb begin
         INT_SE_B: resC = {{24{srcA[7]}}, srcA[7:0]};
         INT_SE_H: resC = {{16{srcA[15]}}, srcA[15:0]};
         INT_ZE_H: resC = {16'b0, srcA[15:0]};
-        INT_CLZ, 
+        INT_CLZ,
         INT_CTZ: resC = {26'b0, resLzTz};
         INT_CPOP: resC = {26'b0, resPopCnt};
         INT_ORC_B: resC = {{{4'd8}{|srcA[31:24]}}, {{4'd8}{|srcA[23:16]}}, {{4'd8}{|srcA[15:8]}}, {{4'd8}{|srcA[7:0]}}};
@@ -104,12 +104,12 @@ always_comb begin
 `endif
         default: resC = 32'bx;
     endcase
-    
+
     case (IN_uop.opcode)
         INT_SYS: flags = Flags'(imm[3:0]);
         default: flags = FLAGS_NONE;
     endcase
-end 
+end
 
 
 reg isBranch;
@@ -126,7 +126,7 @@ always_comb begin
         INT_BGEU: branchTaken = !lessThanU;
         default: branchTaken = 0;
     endcase
-    
+
     isBranch =
         (IN_uop.opcode == INT_BEQ ||
         IN_uop.opcode == INT_BNE ||
@@ -164,7 +164,7 @@ always_ff@(posedge clk) OUT_btUpdate <= btUpdate_c;
 assign OUT_branch = branch_c;
 
 always_comb begin
-    
+
     branch_c = 'x;
     branch_c.taken = 0;
     btUpdate_c = 'x;
@@ -175,31 +175,18 @@ always_comb begin
         branch_c.sqN = IN_uop.sqN;
         branch_c.loadSqN = IN_uop.loadSqN;
         branch_c.storeSqN = IN_uop.storeSqN;
-        
+
         branch_c.taken = 0;
         branch_c.flush = 0;
-        
+
         branch_c.fetchID = IN_uop.fetchID;
         branch_c.fetchOffs = IN_uop.fetchOffs;
         branch_c.histAct = HIST_NONE;
         branch_c.retAct = RET_NONE;
         branch_c.isSCFail = 0;
         branch_c.tgtSpec = BR_TGT_MANUAL;
-        
+
         if (isBranch) begin
-            // Send branch target to BTB if unknown.
-            if (branchTaken && !IN_uop.bpi.predicted) begin
-                // Uncompressed branches are predicted only when their second halfword is fetched
-                btUpdate_c.src = finalHalfwPC;
-                btUpdate_c.fetchStartOffs = IN_uop.fetchStartOffs;
-                btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
-                btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
-                btUpdate_c.isJump = 0;
-                btUpdate_c.isCall = 0;
-                btUpdate_c.compressed = IN_uop.compressed;
-                btUpdate_c.clean = 0;
-                btUpdate_c.valid = 1;
-            end
             if (branchTaken != IN_uop.bpi.taken && IN_uop.opcode != INT_JAL) begin
                 if (branchTaken) begin
                     branch_c.dstPC = (firstHalfwPC + {{19{imm[12]}}, imm[12:0]});
@@ -209,17 +196,9 @@ always_comb begin
                     branch_c.dstPC = nextInstrPC;
                 end
 
-                branch_c.cause = branchTaken ? FLUSH_BRANCH_TK : FLUSH_BRANCH_NT;
                 branch_c.taken = 1;
-                
-                // if predicted but wrong, correct existing history bit
-                if (IN_uop.bpi.predicted)
-                    branch_c.histAct = branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
-                // else append to history
-                else begin
-                    assert(branchTaken);
-                    branch_c.histAct = HIST_APPEND_1;
-                end
+                branch_c.cause = branchTaken ? FLUSH_BRANCH_TK : FLUSH_BRANCH_NT;
+                branch_c.histAct = branchTaken ? HIST_WRITE_1 : HIST_WRITE_0;
             end
         end
         // Check speculated return address
@@ -228,20 +207,19 @@ always_comb begin
                 branch_c.dstPC = indBranchDst;
                 branch_c.cause = (IN_uop.opcode == INT_V_RET) ? FLUSH_RETURN : FLUSH_IBRANCH;
                 branch_c.taken = 1;
-                
+
                 if (IN_uop.opcode == INT_V_RET)
                     branch_c.retAct = RET_POP;
                 if (IN_uop.opcode == INT_V_JALR)
                     branch_c.retAct = RET_PUSH;
-                
+
                 if (IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR) begin
                     btUpdate_c.src = finalHalfwPC;
                     btUpdate_c.fetchStartOffs = IN_uop.fetchStartOffs;
                     btUpdate_c.multiple = (finalHalfwPC[1+:$bits(FetchOff_t)] > IN_uop.fetchPredOffs);
                     btUpdate_c.multipleOffs = IN_uop.fetchPredOffs + 1;
                     btUpdate_c.dst = indBranchDst;
-                    btUpdate_c.isJump = 1;
-                    btUpdate_c.isCall = (IN_uop.opcode == INT_V_JALR);
+                    btUpdate_c.btype = (IN_uop.opcode == INT_V_JALR) ? BT_CALL : BT_JUMP;
                     btUpdate_c.compressed = IN_uop.compressed;
                     btUpdate_c.clean = 0;
                     btUpdate_c.valid = 1;
@@ -253,7 +231,7 @@ end
 
 
 always_ff@(posedge clk) begin
-    
+
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;
     OUT_amoData <= 'x;
@@ -272,14 +250,14 @@ always_ff@(posedge clk) begin
             OUT_amoData.storeSqN <= IN_uop.storeSqN;
             OUT_amoData.sqN <= IN_uop.sqN;
         end
-        
-        if (isBranch && (IN_uop.bpi.predicted || branchTaken != IN_uop.bpi.taken))
+
+        if (isBranch)
             OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
         else if (isBranch || IN_uop.opcode == INT_V_RET || IN_uop.opcode == INT_V_JALR || IN_uop.opcode == INT_V_JR)
             OUT_uop.flags <= FLAGS_BRANCH;
         else
             OUT_uop.flags <= flags;
-        
+
         OUT_uop.valid <= 1;
     end
 end

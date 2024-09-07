@@ -12,16 +12,16 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
 
     input FetchID_t IN_ROB_curFetchID,
     input FetchLimit IN_BP_fetchLimit,
-    
+
     // first cycle
     input IFetchOp IN_ifetchOp,
     output logic OUT_stall,
-    
+
     // second cycle
     input PredBranch IN_predBranch,
     input RetStackIdx_t IN_rIdx,
     input FetchOff_t IN_lastValid,
-    
+
     // bp file write (data to write is in BP,
     // we only provide the address)
     output logic OUT_bpFileWE,
@@ -44,7 +44,7 @@ module ICacheTable#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CA
 
     input logic IN_ready,
     output IF_Instr OUT_instrs,
-    
+
     input wire IN_clearICache,
     input wire IN_flushTLB,
     input VirtMemState IN_vmem,
@@ -65,8 +65,6 @@ BranchHandler branchHandler
 (
     .clk(clk),
     .rst(rst),
-
-    .IN_lateRetAddr({IN_lateRetAddr, 1'b0}),
 
     .IN_clear(IN_mispr),
     .IN_accept(packet.valid),
@@ -92,7 +90,6 @@ always_ff@(posedge clk) begin
         OUT_pcFileAddr <= fetch1.fetchID;
         OUT_pcFileEntry.pc <= fetch1.pc[31:1];
         OUT_pcFileEntry.branchPos <= packetRePred.predPos;
-        OUT_pcFileEntry.bpi.predicted <= fetch1.bpi.predicted; // todo: set if late pred?
         OUT_pcFileEntry.bpi.taken <= packetRePred.predTaken;
     end
 end
@@ -127,7 +124,7 @@ end
 
 // Read ICache at current PC
 always_comb begin
-    
+
     IF_icache.re = 0;
     IF_icache.raddr = 'x;
 
@@ -180,7 +177,7 @@ always_comb begin
 
     packet = IF_Instr'{valid: 0, default: 'x};
     packet.fetchFault = fetch1.fetchFault;
-    
+
     tlbMiss = 0;
     cacheHit = 0;
     cacheMiss = 0;
@@ -192,8 +189,8 @@ always_comb begin
         // Check TLB
         if (IN_vmem.sv32en_ifetch && packet.fetchFault == IF_FAULT_NONE) begin
             if (TLB_res.hit) begin
-                if ((TLB_res.pageFault) || 
-                    (!TLB_res.rwx[0]) || 
+                if ((TLB_res.pageFault) ||
+                    (!TLB_res.rwx[0]) ||
                     (IN_vmem.priv == PRIV_USER && !TLB_res.user) ||
                     (IN_vmem.priv == PRIV_SUPERVISOR && TLB_res.user && !IN_vmem.supervUserMemory)
                 ) begin
@@ -204,7 +201,7 @@ always_comb begin
             else tlbMiss = 1;
         end
         else phyPC = fetch1.pc;
-        
+
         // Check PMAs
         if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
             if (!`IS_LEGAL_ADDR(phyPC) || `IS_MMIO_PMA(phyPC))
@@ -232,7 +229,7 @@ always_comb begin
 
             cacheMiss = !cacheHit;
         end
-        
+
         if (packet.fetchFault != IF_FAULT_NONE) begin
             packet.pc = fetch1.pc[31:`FSIZE_E];
             packet.firstValid = fetch1.pc[1+:$bits(FetchOff_t)];
@@ -248,9 +245,11 @@ always_comb begin
             packet.pc = fetch1.pc[31:`FSIZE_E];
             packet.firstValid = fetch1.pc[1+:$bits(FetchOff_t)];
             packet.lastValid = fetch1.lastValid;
-            packet.predPos = fetch1.predPos;
-            packet.predTaken = fetch1.bpi.taken;
-            packet.predTarget = fetch1.predTarget;
+
+            packet.predPos = fetch1.predBr.offs;
+            packet.predTaken = fetch1.predBr.valid && fetch1.predBr.taken;
+            packet.predTarget = fetch1.predBr.dst;
+
             packet.fetchID = fetch1.fetchID;
             packet.valid = 1;
         end
@@ -262,7 +261,7 @@ end
 IF_Instr packetRePred /*verilator public*/;
 always_comb begin
     packetRePred = packet;
-    
+
     if (packetRePred.fetchFault != IF_FAULT_NONE) ;
     else begin
         if (BH_endOffsetValid) begin
@@ -292,7 +291,7 @@ end
 PageWalk_Req OUT_pw_c;
 always_comb begin
     OUT_pw_c = PageWalk_Req'{valid: 0, default: 'x};
-    
+
     if (rst) begin
     end
     else if (OUT_pw.valid && IN_pw.busy) begin
@@ -313,7 +312,7 @@ always_comb begin
     OUT_memc_c = 'x;
     OUT_memc_c.cmd = MEMC_NONE;
     handlingMiss = 0;
-    
+
     if (rst) begin
     end
     else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
@@ -334,7 +333,7 @@ always_comb begin
     IF_ict.wassoc = 'x;
     IF_ict.waddr = 'x;
     IF_ict.we = 0;
-    
+
     if (flushState == FLUSH_ACTIVE) begin
         IF_ict.wdata.valid = 0;
         IF_ict.wdata.addr = '0;
@@ -363,6 +362,7 @@ always_comb begin
             fetchOffs: fetch1.pc[1+:$bits(FetchOff_t)],
             dst: fetch1.pc[31:1],
             tgtSpec: BR_TGT_MANUAL,
+            isFetchBranch: 1,
             default: '0
         };
     end
@@ -444,11 +444,8 @@ always_ff@(posedge clk) begin
                 fetch1 <= fetch0;
                 fetch1.fetchID <= fetchID;
                 fetch1.lastValid <= IN_lastValid;
-                fetch1.predPos <= IN_predBranch.valid ? IN_predBranch.offs : {$bits(FetchOff_t){1'b1}};
-                fetch1.predDirOnly <= IN_predBranch.dirOnly;
-                fetch1.bpi.predicted <= IN_predBranch.valid;
-                fetch1.bpi.taken <= IN_predBranch.taken;
-                fetch1.predTarget <= IN_predBranch.dst;
+                fetch1.predBr <= IN_predBranch;
+                fetch1.predRetAddr <= IN_lateRetAddr;
                 fetch1.rIdx <= IN_rIdx;
 
                 fetchID <= fetchID + 1;
@@ -480,7 +477,7 @@ always_ff@(posedge clk) begin
                 reg[$bits(flushAssocIter)-1:0] nextFlushAssoc;
                 reg[$bits(flushAddrIter)-1:0] nextFlushAddr;
                 {flushDone, nextFlushAssoc, nextFlushAddr} = {flushAssocIter, flushAddrIter} + 1;
-                
+
                 flushAssocIter <= nextFlushAssoc;
                 flushAddrIter <= nextFlushAddr;
                 if (flushDone) flushState <= IN_MEM_busy ? FLUSH_FINALIZE : FLUSH_IDLE;

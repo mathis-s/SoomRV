@@ -3,6 +3,9 @@
 !src
 !src/*
 
+!sim
+!sim/**
+
 !test_programs
 !test_programs/*
 

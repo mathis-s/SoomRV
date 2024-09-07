@@ -27,7 +27,7 @@
 
 typedef struct packed
 {
-    logic[6:0] funct7; 
+    logic[6:0] funct7;
     logic[4:0] rs2;
     logic[4:0] rs1;
     logic[2:0] funct3;
@@ -203,7 +203,7 @@ module InstrDecoder
 
     input DecodeState IN_dec,
     input PD_Instr IN_instrs[NUM_UOPS-1:0],
-    
+
     input wire IN_enCustom,
 
     output D_UOp OUT_uop[NUM_UOPS-1:0]
@@ -221,24 +221,24 @@ D_UOp uopsComb[NUM_UOPS-1:0];
 always_comb begin
 
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        
+
         instr = IN_instrs[i].instr;
         i32 = IN_instrs[i].instr;
         i16 = IN_instrs[i].instr[15:0];
-        
+
         uop = 0;
         invalidEnc = 1;
         //uop.pc = {IN_instrs[i].pc, 1'b0};
         uop.valid = IN_instrs[i].valid && en;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[$bits(FetchOff_t)-1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
-        
+
         case (instr.opcode)
             `OPC_LUI,
             `OPC_AUIPC:      uop.imm = {instr[31:12], 12'b0};
             `OPC_JAL:        uop.imm = $signed({{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0});
             `OPC_ENV,
-            `OPC_JALR,          
+            `OPC_JALR,
             `OPC_LOAD,
             `OPC_REG_IMM:    uop.imm = $signed({{20{instr[31]}}, instr[31:20]});
             `OPC_BRANCH:     uop.imm = $signed({{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0});
@@ -247,25 +247,20 @@ always_comb begin
             //`OPC_REG_REG,
             default:      uop.imm = 0;
         endcase
-        
+
         if (IN_instrs[i].valid && en) begin
-            
-            reg isBranch = 0;
-            reg isIndirBranch = 0;
-            reg isReturn = 0;
-            reg isCall = 0;
-            reg isJump = 0;
+
             reg isWFI = 0;
-            
+
             if (IN_instrs[i].predInvalid) begin
                 // A branch was predicted that is impossible considering actual instruction boundaries
                 assert(IN_instrs[i].predTaken);
             end
             else if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
-                
+
                 uop.fu = FU_TRAP;
                 invalidEnc = 0;
-                
+
                 case (IN_instrs[i].fetchFault)
                     IF_INTERRUPT: uop.opcode = TRAP_V_INTERRUPT;
                     IF_ACCESS_FAULT: uop.opcode = TRAP_I_ACC_FAULT;
@@ -336,7 +331,7 @@ always_comb begin
                                     //invalidEnc = 0;
                                 end
                             end
-                            
+
                             1: begin // csrrw
                                 uop.fu = FU_CSR;
                                 uop.rs1 = instr.rs1;
@@ -345,7 +340,7 @@ always_comb begin
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                            
+
                             2: begin // csrrs
                                 uop.fu = FU_CSR;
                                 uop.rs1 = instr.rs1;
@@ -354,7 +349,7 @@ always_comb begin
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                            
+
                             3: begin // csrrc
                                 uop.fu = FU_CSR;
                                 uop.rs1 = instr.rs1;
@@ -363,7 +358,7 @@ always_comb begin
                                 uop.imm = {20'bx, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                            
+
                             5: begin // csrrwi
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
@@ -371,7 +366,7 @@ always_comb begin
                                 uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                            
+
                             6: begin // csrrsi
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
@@ -379,7 +374,7 @@ always_comb begin
                                 uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                            
+
                             7: begin // csrrci
                                 uop.fu = FU_CSR;
                                 uop.rd = instr.rd;
@@ -387,7 +382,7 @@ always_comb begin
                                 uop.imm = {15'bx, instr.rs1, instr[31:20]};
                                 invalidEnc = 0;
                             end
-                        
+
                         endcase
                     end
                     `OPC_LUI: begin
@@ -415,21 +410,11 @@ always_comb begin
                         uop.rd = instr.rd;
                         uop.opcode = INT_JAL;
                         invalidEnc = 0;
-                        
-                        isBranch = 1;
-                        isJump = 1;
-                        
-                        // there is the slim chance that this jump's dst was predicted, but it being a call wasn't...
-                        isCall = (uop.rd == 1);      
-                        
+
                         // No need to execute jumps that don't write to a register
                         if (uop.rd == 0) uop.fu = FU_RN;
                     end
                     `OPC_JALR: begin
-
-                        reg rdIsLink = (instr.rd == 1 || instr.rd == 5);
-                        reg rs1IsLink = (instr.rs1 == 1 || instr.rs1 == 5);
-                        
                         uop.fu = FU_INT;
                         uop.rs1 = instr.rs1;
                         uop.immB = 1;
@@ -437,18 +422,21 @@ always_comb begin
                         // actual RISC-V instr immediate is encoded in imm12
                         uop.imm12 = instr[31:20];
 
-                        isIndirBranch = 1;
-                        isReturn = (uop.rs1 == 1 && uop.imm12 == 0);
-                        isCall = rdIsLink;
-                        uop.opcode = isReturn ? INT_V_RET : (uop.rd == 1 ? INT_V_JALR : INT_V_JR);
-                        
+                        unique casez ({instr.rd==1 || instr.rd==5, instr.rs1==1 || instr.rs1==5, instr.rd==instr.rs1})
+                            3'b00?: uop.opcode = INT_V_JR;
+                            3'b01?: uop.opcode = INT_V_RET;
+                            3'b10?: uop.opcode = INT_V_JALR;
+                            3'b110: uop.opcode = INT_V_JR;
+                            3'b111: uop.opcode = INT_V_JALR;
+                        endcase
+
                         // the regular imm field is used to pass the speculated
                         // destination (for the ALU to check)
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                        else 
+                        else
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        
+
                         invalidEnc = 0;
                     end
                     `OPC_LOAD: begin
@@ -465,7 +453,7 @@ always_comb begin
                             4: uop.opcode = LSU_LBU;
                             5: uop.opcode = LSU_LHU;
                         endcase
-                        invalidEnc = 
+                        invalidEnc =
                             instr.funct3 != 0 && instr.funct3 != 1 &&
                             instr.funct3 != 2 && instr.funct3 != 4 &&
                             instr.funct3 != 5;
@@ -526,11 +514,9 @@ always_comb begin
                         uop.immB = 0;
                         uop.rd = 0;
                         uop.fu = FU_INT;
-                        
-                        invalidEnc =
-                            (uop.opcode == 2) || (uop.opcode == 3);
-                        
-                        isBranch = 1;
+
+                        invalidEnc = (uop.opcode == 2) || (uop.opcode == 3);
+
                         case (instr.funct3)
                             0: uop.opcode = INT_BEQ;
                             1: uop.opcode = INT_BNE;
@@ -584,8 +570,8 @@ always_comb begin
                         uop.immB = 1;
                         uop.rd = instr.rd;
                         uop.fu = FU_INT;
-                        
-                        if (!((instr.funct3 == 1 && instr.funct7 != 0) || 
+
+                        if (!((instr.funct3 == 1 && instr.funct7 != 0) ||
                                     (instr.funct3 == 5 && (instr.funct7 != 7'h20 && instr.funct7 != 0)))) begin
                             case (instr.funct3)
                                 0: uop.opcode = INT_ADD;
@@ -597,7 +583,7 @@ always_comb begin
                                 6: uop.opcode = INT_OR;
                                 7: uop.opcode = INT_AND;
                             endcase
-                            
+
                             invalidEnc = 0;
                         end
                         else if (instr.funct7 == 7'b0110000) begin
@@ -667,9 +653,9 @@ always_comb begin
                                 uop.imm = {27'b0, instr.rs2};
                             end
                         end
-                        
+
                         // li rd, 0 is eliminated during rename
-                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs1 == 0 && 
+                        if (uop.fu == FU_INT && uop.opcode == INT_ADD && uop.rs1 == 0 &&
                             uop.imm[11] == uop.imm[10] &&
                             uop.imm[11] == uop.imm[9] &&
                             uop.imm[11] == uop.imm[8] &&
@@ -685,7 +671,7 @@ always_comb begin
                         uop.immB = 0;
                         uop.rd = instr.rd;
                         uop.fu = FU_INT;
-                        
+
                         if (instr.funct7 == 0) begin
                             invalidEnc = 0;
                             case (instr.funct3)
@@ -697,7 +683,7 @@ always_comb begin
                                 5: uop.opcode = INT_SRL;
                                 6: uop.opcode = INT_OR;
                                 7: uop.opcode = INT_AND;
-                            endcase 
+                            endcase
                         end
                         else if (instr.funct7 == 7'h01) begin
                             invalidEnc = 0;
@@ -731,7 +717,7 @@ always_comb begin
                                 5: uop.opcode = INT_SRA;
                             endcase
                         end
-                        
+
                         if (instr.funct7 == 7'b0010000) begin
                             if (instr.funct3 == 3'b010) begin
                                 invalidEnc = 0;
@@ -833,9 +819,9 @@ always_comb begin
                             end
                         end
                         /*else if (IN_enCustom && instr.funct7 == 7'b1000000) begin
-                            
+
                             invalidEnc = 0;
-                            
+
                             uop.fu = FU_AGU;
                             case (instr.funct3)
                                 0: uop.opcode = LSU_LB_RR;
@@ -848,7 +834,7 @@ always_comb begin
                             endcase
                         end*/
                     end
-                    
+
                     /*`OPC_FLW: begin
                         if (i32.flw.width == 3'b010) begin
                             uop.fu = FU_AGU;
@@ -935,7 +921,7 @@ always_comb begin
                     `OPC_FP: begin
                         // single precision
                         if (i32.fp.fmt == 2'b00) begin
-                            
+
                             uop.fu = FU_FPU;
                             uop.rs1 = i32.fp.rs1;
                             //uop.rs0_fp = 1;
@@ -944,9 +930,9 @@ always_comb begin
                             uop.rd = i32.fp.rd;
                             // uop.rd_fp = 1;
                             invalidEnc = 0;
-                            
+
                             case (i32.fp.funct5)
-                                
+
                                 5'b00000: begin
                                     uop.opcode = {i32.fp.rm, FPU_FADD_S};
                                     invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
@@ -960,7 +946,7 @@ always_comb begin
                                     invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
                                     uop.fu = FU_FMUL;
                                 end
-                                5'b00011: begin 
+                                5'b00011: begin
                                     uop.opcode = {i32.fp.rm, FDIV_FDIV_S};
                                     invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
                                     uop.fu = FU_FDIV;
@@ -974,7 +960,7 @@ always_comb begin
                                 end
                                 5'b00100: begin
                                     uop.fu = FU_INT;
-                                    
+
                                     if (i32.fp.rm == 3'b000)
                                         uop.opcode = INT_FSGNJ_S;
                                     else if (i32.fp.rm == 3'b001)
@@ -1021,8 +1007,8 @@ always_comb begin
                                         uop.opcode = FPU_FLE_S;
                                     else invalidEnc = 1;
                                 end
-                                5'b11010: begin   
-                                    
+                                5'b11010: begin
+
                                     if (i32.fp.rs2 == 5'b00000) begin
                                         uop.opcode = {i32.fp.rm, FPU_FCVTSW};
                                         invalidEnc = (i32.fp.rm >= 3'b101) && (i32.fp.rm != 3'b111);
@@ -1048,12 +1034,12 @@ always_comb begin
 `endif // ENABLE_FP
                     `OPC_ATOMIC: begin
                         if (instr.funct3 == 3'b010) begin
-                            
+
                             uop.rd = instr.rd;
                             uop.rs1 = instr.rs1;
                             uop.rs2 = instr.rs2;
                             uop.fu = FU_ATOMIC;
-                            
+
                             case (instr.funct7[6:2])
                                 5'b00010: begin // lr.w
                                     if (instr.rs2 == 5'b0) begin
@@ -1106,12 +1092,12 @@ always_comb begin
                                     uop.opcode = ATOMIC_AMOMAXU_W;
                                     invalidEnc = 0;
                                 end
-                                
+
                                 default: invalidEnc = 1;
                             endcase
                         end
                     end
-                    
+
                     default: invalidEnc = 1;
                 endcase
             end
@@ -1252,13 +1238,11 @@ always_comb begin
                         uop.opcode = INT_JAL;
                         uop.fu = FU_INT;
                         // certainly one of the encodings of all time
-                        uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4], 
+                        uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4],
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
-                        
-                        isBranch = 1;
-                        isJump = 1;
+
                         uop.fu = FU_RN;
-                        
+
                         uop.immB = 1;
                         invalidEnc = 0;
                     end
@@ -1266,41 +1250,33 @@ always_comb begin
                     else if (i16.cj.funct3 == 3'b001) begin
                         uop.opcode = INT_JAL;
                         uop.fu = FU_INT;
-                        uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4], 
+                        uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4],
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                         uop.immB = 1;
                         uop.rd = 1; // ra
-                        
-                        isBranch = 1;
-                        isJump = 1;
-                        isCall = 1;
                         invalidEnc = 0;
                     end
                     // c.beqz
                     else if (i16.cb.funct3 == 3'b110) begin
                         uop.opcode = INT_BEQ;
                         uop.fu = FU_INT;
-                        uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3], 
+                        uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3],
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
-                        
+
                         uop.rs1 = {2'b01, i16.cb.rd_rs1};
-                        
-                        isBranch = 1;
                         invalidEnc = 0;
                     end
                     // c.bnez
                     else if (i16.cb.funct3 == 3'b111) begin
                         uop.opcode = INT_BNE;
                         uop.fu = FU_INT;
-                        uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3], 
+                        uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3],
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
-                        
+
                         uop.rs1 = {2'b01, i16.cb.rd_rs1};
-                        
-                        isBranch = 1;
                         invalidEnc = 0;
                     end
-                    // c.li 
+                    // c.li
                     else if (i16.ci.funct3 == 3'b010 && !(i16.ci.rd_rs1 == 0)) begin
                         uop.fu = FU_RN; // eliminated during rename
                         uop.imm = {{26{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm};
@@ -1311,18 +1287,18 @@ always_comb begin
                     // c.lui / c.addi16sp
                     else if (i16.ci.funct3 == 3'b011 && i16.ci.rd_rs1 != 0 && {i16.ci.imm2, i16.ci.imm} != 0) begin
                         uop.fu = FU_INT;
-                        
+
                         if (i16.ci.rd_rs1 == 2) begin
                             uop.opcode = INT_ADD;
                             uop.rs1 = 2;
-                            uop.imm = {{22{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm[2:1], 
+                            uop.imm = {{22{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm[2:1],
                                 i16.ci.imm[3], i16.ci.imm[0], i16.ci.imm[4], 4'b0};
                         end
                         else begin
                             uop.opcode = INT_LUI;
                             uop.imm = {{14{i16.ci.imm2}}, i16.ci.imm2, i16.ci.imm, 12'b0};
                         end
-                        
+
                         uop.immB = 1;
                         uop.rd = i16.ci.rd_rs1;
                         invalidEnc = 0;
@@ -1335,7 +1311,7 @@ always_comb begin
                         uop.immB = 1;
                         uop.rs1 = i16.ci.rd_rs1;
                         uop.rd = i16.ci.rd_rs1;
-                        
+
                         invalidEnc = 0;
                     end
                     // c.srli
@@ -1390,7 +1366,7 @@ always_comb begin
                     `ifdef ENABLE_ZCB
                     // c.zext.b
                     else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b000) begin
-                        
+
                         uop.rs1 = {2'b01, i16.raw[9:7]};
                         uop.rd = {2'b01, i16.raw[9:7]};
 
@@ -1402,7 +1378,7 @@ always_comb begin
                     end
                     // c.sext.b
                     else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b001) begin
-                        
+
                         uop.rs1 = {2'b01, i16.raw[9:7]};
                         uop.rd = {2'b01, i16.raw[9:7]};
 
@@ -1413,7 +1389,7 @@ always_comb begin
                     end
                     // c.zext.h
                     else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b010) begin
-                        
+
                         uop.rs1 = {2'b01, i16.raw[9:7]};
                         uop.rd = {2'b01, i16.raw[9:7]};
 
@@ -1424,7 +1400,7 @@ always_comb begin
                     end
                     // c.sext.h
                     else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b011) begin
-                        
+
                         uop.rs1 = {2'b01, i16.raw[9:7]};
                         uop.rd = {2'b01, i16.raw[9:7]};
 
@@ -1435,7 +1411,7 @@ always_comb begin
                     end
                     // c.not
                     else if (i16.raw[15:13] == 3'b100 && i16.raw[12:10] == 3'b111 && i16.raw[6:5] == 2'b11 && i16.raw[4:2] == 3'b101) begin
-                        
+
                         uop.rs1 = {2'b01, i16.raw[9:7]};
                         uop.rd = {2'b01, i16.raw[9:7]};
 
@@ -1485,16 +1461,14 @@ always_comb begin
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
                         uop.fu = FU_INT;
                         uop.rs1 = i16.cr.rd_rs1;
-                        
-                        isIndirBranch = 1;
-                        isReturn = (i16.cr.rd_rs1 == 1);
+
                         uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JR;
                         uop.immB = 1;
                         uop.imm12 = 0;
-                        
+
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
-                        else 
+                        else
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
 
                         invalidEnc = 0;
@@ -1504,18 +1478,16 @@ always_comb begin
                         uop.fu = FU_INT;
                         uop.rs1 = i16.cr.rd_rs1;
                         uop.rd = 1;
-                        
-                        isIndirBranch = 1;
-                        isCall = 1;
+
                         uop.opcode = INT_V_JALR;
                         uop.immB = 1;
                         uop.imm12 = 0;
-                        
+
                         if (IN_instrs[i].predTaken)
                             uop.imm = {IN_instrs[i].predTarget, 1'b0};
                         else
                             uop.imm = {(IN_instrs[i].pc + (uop.compressed ? 31'd1 : 31'd2)), 1'b0};
-                        
+
                         invalidEnc = 0;
                     end
                     // c.slli
@@ -1553,7 +1525,7 @@ always_comb begin
                 end
             end
         end
-        
+
         if (invalidEnc) begin
             uop.opcode = TRAP_ILLEGAL_INSTR;
             uop.fu = FU_TRAP;
@@ -1562,7 +1534,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin   
+always_ff@(posedge clk) begin
 
     if (rst || IN_branch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin

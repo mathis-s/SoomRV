@@ -8,12 +8,12 @@ module StoreDataLoad#(parameter WIDTH=2)
     input StDataLookupUOp IN_uop[WIDTH-1:0],
     output logic OUT_ready[WIDTH-1:0],
 
-    input AMO_Data_UOp IN_atomicUOp[WIDTH-1:0], 
+    input AMO_Data_UOp IN_atomicUOp[WIDTH-1:0],
 
     output logic OUT_readEnable[WIDTH-1:0],
     output RFTag OUT_readTag[WIDTH-1:0],
     input RegT IN_readData[WIDTH-1:0],
-    
+
     output StDataUOp OUT_uop[WIDTH-1:0]
 );
 
@@ -37,10 +37,29 @@ always_comb begin
 end
 
 
+// Cache Block Ops special handling
+/*if (rnUOpSorted[i].fu == FU_AGU) begin
+    case (rnUOpSorted[i].opcode)
+        LSU_CBO_CLEAN: begin
+            entries[index].data <= {30'bx, 2'd0};
+            entries[index].loaded <= 1;
+        end
+        LSU_CBO_INVAL: begin
+            entries[index].data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
+            entries[index].loaded <= 1;
+        end
+        LSU_CBO_FLUSH: begin
+            entries[index].data <= {30'bx, 2'd2};
+            entries[index].loaded <= 1;
+        end
+        default: ;
+    endcase
+end*/
+
 generate for (genvar i = 0; i < WIDTH; i=i+1) begin
-    
+
     assign OUT_ready[i] = !(uopATO.valid && uopIQ.valid);
-    
+
     StOff_t offs;
     StDataUOp uopIQ;
     StDataUOp uopATO;
@@ -57,7 +76,7 @@ generate for (genvar i = 0; i < WIDTH; i=i+1) begin
     always_ff@(posedge clk) begin
         regFileLookup <= 0;
         offs <= 'x;
-        
+
         if (rst) begin
             uopIQ <= StDataUOp'{valid: 0, default: 'x};
         end
@@ -67,8 +86,11 @@ generate for (genvar i = 0; i < WIDTH; i=i+1) begin
                 uopIQ.data <= readDataShifted;
             end
 
-            if (!uopATO.valid)
+            if (!uopATO.valid ||
+                (IN_branch.taken && (IN_branch.flush || $signed(uopIQ.storeSqN - IN_branch.storeSqN) > 0))
+            ) begin
                 uopIQ <= StDataUOp'{valid: 0, default: 'x};
+            end
 
             if (IN_uop[i].valid && OUT_ready[i] && (!IN_branch.taken ||
                 (!IN_branch.flush && $signed(IN_uop[i].storeSqN - IN_branch.storeSqN) <= 0))
@@ -79,7 +101,7 @@ generate for (genvar i = 0; i < WIDTH; i=i+1) begin
                 if (IN_uop[i].tag[$bits(Tag)-1]) begin
                     uopIQ.data <= ShiftData({{26{IN_uop[i].tag[5]}}, IN_uop[i].tag[5:0]}, IN_uop[i].offs);
                 end
-                else begin 
+                else begin
                     regFileLookup <= 1;
                     offs <= IN_uop[i].offs;
                 end
