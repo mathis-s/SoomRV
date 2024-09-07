@@ -15,6 +15,9 @@
 !hardfloat
 !hardfloat/*
 
+!.github
+!.github/*
+
 !.gitignore
 !.gitmodules
 !LICENSE
