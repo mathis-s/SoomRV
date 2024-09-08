@@ -20,3 +20,9 @@ jobs:
 
     - name: Run Docker Image
       run: docker run -v .:/workspace mathissalmen/soomrv-build-env:latest
+
+    - name: Archive Performance Logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-logs
+        path: logs.tar.gz

@@ -43,5 +43,12 @@ CMD ["-c", \
     git submodule init && \
     git submodule update && \
     make setup && \
-    make trace && \
-    ./obj_dir/VTop test_programs/coremark.elf"]
+    make && \
+    mkdir logs && \
+    ./obj_dir/VTop test_programs/coremark.elf > logs/coremark.out 2> logs/coremark.err && \
+    ./obj_dir/VTop test_programs/dhry_1_O3_no_inline.s > logs/dhry_O3_no_inline.out 2> logs/dhry_O3_no_inline.err && \
+    ./obj_dir/VTop test_programs/dhry_1_O3.s > logs/dhry_O3.out 2> logs/dhry_O3.err && \
+    ./obj_dir/VTop test_programs/dhry_1_O3_inline.s > logs/dhry_O3_inline.out 2> logs/dhry_O3_inline.err && \
+    timeout 300 ./obj_dir/VTop test_programs/linux/linux_image.elf --device-tree=test_programs/linux/device_tree.dtb --perfc > logs/linux.out 2> logs/linux.err && \
+    tar -czf logs.tar.gz logs \
+    " ]
