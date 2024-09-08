@@ -183,11 +183,6 @@ void LogPredec(Inst& inst)
         fprintf(konataFile, "C\t-%lu\n",
             (wrap->main_time-state.fetches[inst.fetchID].fetchTime)/2);
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
-        if ((state.fetches[inst.fetchID].pdTime < state.fetches[inst.fetchID].fetchTime))
-        {
-            printf("%li %li\n", state.fetches[inst.fetchID].fetchTime, state.fetches[inst.fetchID].pdTime);
-            Exit(1);
-        }
         fprintf(konataFile, "C\t%lu\n",
             (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime)/2);
 
@@ -530,7 +525,7 @@ void Initialize(int argc, char** argv, Args& args)
                     args.progFile)
                        .c_str()) != 0)
             abort();
-        if (system(TOOLCHAIN "ld --no-warn-rwx-segments -Tlinker.ld test_programs/entry.o temp.o") != 0)
+        if (system(TOOLCHAIN "ld --no-warn-rwx-segments --no-eh-frame-hdr -Tlinker.ld test_programs/entry.o temp.o") != 0)
             abort();
         args.progFile = "a.out";
     }
