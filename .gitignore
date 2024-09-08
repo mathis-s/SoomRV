@@ -7,13 +7,16 @@
 !sim/**
 
 !test_programs
-!test_programs/*
+!test_programs/**
 
 !test_programs/linux/extra
 !test_programs/linux/extra/**
 
 !hardfloat
 !hardfloat/*
+
+!.github
+!.github/*
 
 !.gitignore
 !.gitmodules
@@ -25,3 +28,4 @@
 !view.gtkw
 !docs
 !docs/*
+!Dockerfile

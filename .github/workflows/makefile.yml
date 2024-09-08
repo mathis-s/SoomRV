@@ -2,8 +2,10 @@ name: Makefile CI
 
 on:
   workflow_dispatch:
-  #pull_request:
-  #  branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  push:
+    branches: [ "master" ]
 
 jobs:
   build:
@@ -12,43 +14,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Fetch Submodules
       run: git submodule update --init --recursive
 
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install device-tree-compiler libfl2 libfl-dev zlib1g zlib1g-dev numactl git help2man perl python3 make
-        
-    - name: Install RISC-V Toolchain
-      run: |
-        wget -qO riscv_gcc.tar.gz https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.03.14/riscv32-glibc-ubuntu-22.04-nightly-2023.03.14-nightly.tar.gz
-        tar -xf riscv_gcc.tar.gz
-        sudo cp -rlf ./riscv/* /usr
-        
-    # Verilator in Ubuntu repos is very old, so build it manually. Replace this once github uses Ubuntu 23.
-    - name: Build Verilator 5
-      run: |
-        wget https://github.com/verilator/verilator/archive/refs/tags/v5.008.tar.gz
-        tar -xf v5.008.tar.gz
-        cd verilator-5.008
-        CXXFLAGS="-Os" autoconf
-        ./configure
-        make
-        sudo make install
-        
-    - name: Build Spike
-      run: make setup
-        
-    - name: Compile
-      run: make -j `nproc`
+    - name: Run Docker Image
+      run: docker run -v .:/workspace mathissalmen/soomrv-build-env:latest
 
-    - name: Run Hello World
-      run: ./obj_dir/VTop test_programs/hello_world_spi.s +verilator+rand+reset+2 2>/dev/null
-
-    - name: Run Dhrystone
-      run: ./obj_dir/VTop test_programs/dhry_1.s +verilator+rand+reset+2 2>/dev/null
-      
-    - name: Run sort.s
-      run: ./obj_dir/VTop test_programs/sort.s +verilator+rand+reset+2 2>/dev/null
+    - name: Archive Performance Logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-logs
+        path: logs.tar.gz

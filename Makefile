@@ -9,7 +9,7 @@ VERILATOR_FLAGS = \
 	-CFLAGS -DNOKONATA \
 	-CFLAGS -DCOSIM \
 
-VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -g -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
+VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
 VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 256 -CFLAGS -DTRACE
 
@@ -101,7 +101,7 @@ trace: soomrv
 .PHONY: setup
 setup:
 	git submodule update --init --recursive
-	cd riscv-isa-sim && ./configure --with-boost=no --with-boost-asio=no --with-boost-regex=no
+	cd riscv-isa-sim && ./configure CFLAGS="-Os -g0" CXXFLAGS="-Os -g0" --with-boost=no --with-boost-asio=no --with-boost-regex=no
 	make -j $(nproc) -C riscv-isa-sim
 .PHONY: clean
 clean:
