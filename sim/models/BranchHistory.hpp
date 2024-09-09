@@ -101,5 +101,15 @@ class BranchHistory : public Model
         return true;
     }
 
+    void Save(FILE* f)
+    {
+        if (fwrite(&bhist, sizeof(bhist), 1, f) != 1) abort();
+    }
+
+    void Restore(FILE* f)
+    {
+        if (fread(&bhist, sizeof(bhist), 1, f) != 1) abort();
+    }
+
     BranchHistory(VTop* top, processor_t* processor) : Model(top, processor) {}
 };

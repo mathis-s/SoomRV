@@ -14,7 +14,7 @@ class TopWrapper
 #ifdef TRACE
     std::unique_ptr<VerilatedVcdC> tfp = std::make_unique<VerilatedVcdC>();
 #endif
-    uint64_t main_time;
+    uint64_t main_time = 0;
 
     void HalfCycle()
     {

@@ -639,6 +639,10 @@ void Save(std::string fileName)
             abort();
         if (fwrite(&state, sizeof(state), 1, f) != 1)
             abort();
+
+        for (auto* model : simif.models)
+            model->Save(f);
+
         fclose(f);
     #endif
 }
@@ -652,6 +656,10 @@ void Restore(std::string fileName)
             abort();
         if (fread(&state, sizeof(state), 1, f) != 1)
             abort();
+
+        for (auto* model : simif.models)
+            model->Restore(f);
+
         fclose(f);
 
         long offset = state.insts[state.lastComSqN].id;
@@ -693,7 +701,7 @@ int main(int argc, char** argv)
 
     if (args.restoreSave)
     {
-        wrap->restore_model(args.progFile);
+        Restore(args.progFile);
         simif.doRestore = true;
     }
     else
@@ -752,10 +760,9 @@ int main(int argc, char** argv)
         if ((wrap->main_time & 0xffffff) == 0)
         {
             if (!args.backupFile.empty())
-                wrap->save_model(args.backupFile);
+                Save(args.backupFile);
         }
         args.restoreSave = 0;
-        wrap->main_time++;
     }
 
     // Run a few more cycles ...
