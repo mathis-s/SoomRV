@@ -149,11 +149,12 @@ always_ff@(posedge clk) begin
             recoveryID <= IN_mispr.fetchID;
             recoveryBase <= lastInvalComFetchID;
             recoveryOffs <= IN_mispr.fetchOffs;
+            recoveryOverwOwn <= IN_mispr.isFetchBranch && !IN_returnUpd.valid;
+
             lastValid <= 0;
 
             postRecSave <= PostRecSave'{valid: 0, default: 'x};
             if (IN_mispr.isFetchBranch && IN_returnUpd.valid) begin
-
                 if (startRecovery) begin
                     postRecSave.valid <= 1;
                     postRecSave.fetchID <= IN_mispr.fetchID;
@@ -182,7 +183,9 @@ always_ff@(posedge clk) begin
                     // fine-grained compare based on fetch offs
                     ( ((rrqueue[qindex-1].fetchID - recoveryBase) > (recoveryID - recoveryBase)) ||
                     ((rrqueue[qindex-1].fetchID - recoveryBase) == (recoveryID - recoveryBase) &&
-                        (rrqueue[qindex-1].offs) > (recoveryOffs)
+                        (recoveryOverwOwn ?
+                            (rrqueue[qindex-1].offs >= recoveryOffs) :
+                            (rrqueue[qindex-1].offs >  recoveryOffs))
                     ))
                 ) begin
                     rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
