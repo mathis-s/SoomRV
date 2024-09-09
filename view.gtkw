@@ -105,24 +105,24 @@
 [treeopen] TOP.Top.soc.core.ifetch.bp.retStack.rrqueue[7].
 [treeopen] TOP.Top.soc.core.ifetch.bp.tagePredictor.
 [treeopen] TOP.Top.soc.core.ifetch.bp.tagePredictor.basePredictor.
-[treeopen] TOP.Top.soc.core.ifetch.ict.
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[1].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[2].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[5].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.
-[treeopen] TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.
-[treeopen] TOP.Top.soc.core.ifetch.ict.IF_icache.
-[treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.
-[treeopen] TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[3].
-[treeopen] TOP.Top.soc.core.ifetch.ict.IN_pw.
-[treeopen] TOP.Top.soc.core.ifetch.ict.OUT_pcFileEntry.
-[treeopen] TOP.Top.soc.core.ifetch.ict.outFIFO.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[0].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[1].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[2].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[3].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[5].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[6].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_retUpdate.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.IF_icache.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.IF_ict.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[3].
+[treeopen] TOP.Top.soc.core.ifetch.ifp.IN_pw.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.OUT_pcFileEntry.
+[treeopen] TOP.Top.soc.core.ifetch.ifp.outFIFO.
 [treeopen] TOP.Top.soc.core.ifetch.IN_memc.
 [treeopen] TOP.Top.soc.core.ifetch.IN_pw.
 [treeopen] TOP.Top.soc.core.ifetch.OUT_instrs.
@@ -790,7 +790,7 @@ TOP.Top.soc.memc.OUT_stat.sglStRes.valid
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.doCacheLoad
+TOP.Top.soc.core.ifetch.ifp.doCacheLoad
 @200
 -icache
 @22
@@ -808,48 +808,48 @@ TOP.Top.soc.icache.OUT_data1[511:0]
 @200
 -icacheCont
 @28
-TOP.Top.soc.core.ifetch.ict.fetch0.valid
+TOP.Top.soc.core.ifetch.ifp.fetch0.valid
 @22
-TOP.Top.soc.core.ifetch.ict.fetch0.pc[31:0]
+TOP.Top.soc.core.ifetch.ifp.fetch0.pc[31:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.fetch1.valid
+TOP.Top.soc.core.ifetch.ifp.fetch1.valid
 @22
-TOP.Top.soc.core.ifetch.ict.fetch1.pc[31:0]
+TOP.Top.soc.core.ifetch.ifp.fetch1.pc[31:0]
 @200
 -
 @22
-TOP.Top.soc.core.ifetch.ict.OUT_pcFileEntry.pc[30:0]
+TOP.Top.soc.core.ifetch.ifp.OUT_pcFileEntry.pc[30:0]
 @28
-TOP.Top.soc.core.ifetch.ict.OUT_pcFileWE
+TOP.Top.soc.core.ifetch.ifp.OUT_pcFileWE
 @200
 -
 @22
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[0].addr[19:0]
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[0].addr[19:0]
 @28
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[0].valid
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[0].valid
 @22
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[1].addr[19:0]
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[1].addr[19:0]
 @28
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[1].valid
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[1].valid
 @22
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[2].addr[19:0]
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[2].addr[19:0]
 @28
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[2].valid
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[2].valid
 @22
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[3].addr[19:0]
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[3].addr[19:0]
 @28
-TOP.Top.soc.core.ifetch.ict.IF_ict.rdata[3].valid
+TOP.Top.soc.core.ifetch.ifp.IF_ict.rdata[3].valid
 @22
-TOP.Top.soc.core.ifetch.ict.IF_icache.rdata[0][127:0]
-TOP.Top.soc.core.ifetch.ict.IF_icache.rdata[1][127:0]
-TOP.Top.soc.core.ifetch.ict.IF_icache.rdata[2][127:0]
-TOP.Top.soc.core.ifetch.ict.IF_icache.rdata[3][127:0]
+TOP.Top.soc.core.ifetch.ifp.IF_icache.rdata[0][127:0]
+TOP.Top.soc.core.ifetch.ifp.IF_icache.rdata[1][127:0]
+TOP.Top.soc.core.ifetch.ifp.IF_icache.rdata[2][127:0]
+TOP.Top.soc.core.ifetch.ifp.IF_icache.rdata[3][127:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.OUT_stall
+TOP.Top.soc.core.ifetch.ifp.OUT_stall
 @200
 -
 @22
@@ -870,136 +870,136 @@ TOP.Top.soc.memc.s_axi_rdata[127:0]
 @200
 -BranchHandler
 @28
-TOP.Top.soc.core.ifetch.ict.outFIFO.free[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.lastValid[2:0]
+TOP.Top.soc.core.ifetch.ifp.outFIFO.free[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.lastValid[2:0]
 @200
 -
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.fetchID[4:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[0][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[1][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[2][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[3][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[4][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[5][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[6][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[7][15:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.instrsView[8][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.fetchID[4:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[0][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[1][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[2][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[3][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[4][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[5][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[6][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[7][15:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.instrsView[8][15:0]
 @200
 -
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.pc[31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predRetAddr[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.pc[31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predRetAddr[30:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.lastValid[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.lastValid[2:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.valid
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.taken
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.offs[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.multiple
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.valid
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.taken
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.offs[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.multiple
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dst[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.dst[30:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dirOnly
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.compr
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.dirOnly
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.compr
 @c00028
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.btype[1:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.btype[1:0]
 @28
-(0)TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.btype[1:0]
-(1)TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.btype[1:0]
+(0)TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.btype[1:0]
+(1)TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.btype[1:0]
 @1401200
 -group_end
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predRetAddr[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predRetAddr[30:0]
 @200
 -
 @c00028
-TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
 @28
-(0)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(1)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(2)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(3)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(4)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(5)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(6)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(7)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
-(8)TOP.Top.soc.core.ifetch.ict.branchHandler.is16bit[8:0]
+(0)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(1)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(2)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(3)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(4)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(5)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(6)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(7)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
+(8)TOP.Top.soc.core.ifetch.ifp.branchHandler.is16bit[8:0]
 @1401200
 -group_end
 @c00028
-TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
 @28
-(0)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(1)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(2)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(3)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(4)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(5)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(6)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(7)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
-(8)TOP.Top.soc.core.ifetch.ict.branchHandler.is32bit[8:0]
+(0)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(1)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(2)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(3)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(4)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(5)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(6)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(7)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
+(8)TOP.Top.soc.core.ifetch.ifp.branchHandler.is32bit[8:0]
 @1401200
 -group_end
 @200
 -
 -
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[0][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[1][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[2][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[3][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[4][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[5][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[6][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[7][31:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.pc[8][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[0][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[1][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[2][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[3][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[4][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[5][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[6][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[7][31:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.pc[8][31:0]
 @200
 -
 -
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.taken
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.taken
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.dst[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.dst[30:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.retAct[1:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.retAct[1:0]
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.fetchID[4:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.fetchID[4:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.fetchOffs[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_decBranch.histAct[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.fetchOffs[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_decBranch.histAct[2:0]
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.addr[30:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.idx[7:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_retUpdate.addr[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_retUpdate.idx[7:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.OUT_retUpdate.valid
+TOP.Top.soc.core.ifetch.ifp.branchHandler.OUT_retUpdate.valid
 @200
 -
 -
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[0].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[1].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[2].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[3].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[4].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[5].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[6].btype[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.branch[7].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[0].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[1].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[2].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[3].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[4].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[5].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[6].btype[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.branch[7].btype[2:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.btype[1:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.compr
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dirOnly
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.btype[1:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.compr
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.dirOnly
 @22
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.dst[30:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.dst[30:0]
 @28
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.multiple
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.offs[2:0]
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.taken
-TOP.Top.soc.core.ifetch.ict.branchHandler.IN_op.predBr.valid
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.multiple
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.offs[2:0]
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.taken
+TOP.Top.soc.core.ifetch.ifp.branchHandler.IN_op.predBr.valid
 @200
 -ifetch
 @22
@@ -1047,13 +1047,13 @@ TOP.Top.soc.core.ifetch.pc[30:0]
 @28
 TOP.Top.soc.core.ifetch.icacheStall
 @22
-TOP.Top.soc.core.ifetch.ict.OUT_memc.cmd[3:0]
+TOP.Top.soc.core.ifetch.ifp.OUT_memc.cmd[3:0]
 @200
 -
 @28
-TOP.Top.soc.core.ifetch.ict.IF_icache.busy
-TOP.Top.soc.core.ifetch.ict.flushState[1:0]
-TOP.Top.soc.core.ifetch.ict.IN_pw.busy
+TOP.Top.soc.core.ifetch.ifp.IF_icache.busy
+TOP.Top.soc.core.ifetch.ifp.flushState[1:0]
+TOP.Top.soc.core.ifetch.ifp.IN_pw.busy
 @200
 -
 @22

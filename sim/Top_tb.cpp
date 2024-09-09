@@ -1,5 +1,5 @@
 #include "TopWrapper.hpp"
-#include "VTop_ICacheTable.h"
+#include "VTop_IFetchPipeline.h"
 #include "VTop_ROB.h"
 #include "VTop_ReturnStack.h"
 #include "models/BranchHistory.hpp"
@@ -438,17 +438,17 @@ void LogInstructions()
                     state.pd[i].valid = false;
         }
 
-        if (core->ifetch->ict->fetch0[0] & 1)
+        if (core->ifetch->ifp->fetch0[0] & 1)
         {
             for (int i = 0; i < 4; i++)
-                state.fetches[core->ifetch->ict->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
+                state.fetches[core->ifetch->ifp->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
 
-            state.fetches[core->ifetch->ict->fetchID].fetchTime = wrap->main_time;
+            state.fetches[core->ifetch->ifp->fetchID].fetchTime = wrap->main_time;
         }
 
         if ((core->IF_instrs[0] & 1))
         {
-            int fetchID = ExtractField(core->ifetch->ict->packetRePred, 1 + 128 + 31 + 1 + 3 + 3 + 3 + 2, 5);
+            int fetchID = ExtractField(core->ifetch->ifp->packetRePred, 1 + 128 + 31 + 1 + 3 + 3 + 3 + 2, 5);
             state.fetches[fetchID].pdTime = wrap->main_time + 2;
         }
     }

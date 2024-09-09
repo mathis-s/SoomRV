@@ -11,30 +11,30 @@ module IFetch
 
     input wire IN_interruptPending,
     input wire IN_MEM_busy,
-    
+
     IF_ICTable.HOST IF_ict,
     IF_ICache.HOST IF_icache,
 
     input FetchID_t IN_ROB_curFetchID,
     input BranchProv IN_branch,
-    
+
     input wire IN_clearICache,
     input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate IN_bpUpdate,
-    
+
     input PCFileReadReq IN_pcRead[`NUM_ALUS-1:0],
     output PCFileEntry OUT_pcReadData[`NUM_ALUS-1:0],
     input PCFileReadReqTH IN_pcReadTH,
     output PCFileEntry OUT_pcReadDataTH,
-    
+
     input wire IN_ready,
     output IF_Instr OUT_instrs,
 
     input VirtMemState IN_vmem,
     output PageWalk_Req OUT_pw,
     input PageWalk_Res IN_pw,
-    
+
     output MemController_Req OUT_memc,
     input MemController_Res IN_memc
 );
@@ -79,12 +79,12 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
 
     .OUT_stall(BP_stall),
     .IN_mispr(BP_mispr),
-    
+
     .IN_pcValid(ifetchEn),
     .OUT_fetchLimit(BP_fetchLimit),
     .IN_fetchID(BPF_writeAddr),
     .IN_comFetchID(IN_ROB_curFetchID),
-    
+
     .OUT_pc(pc),
     .OUT_lastOffs(BP_lastOffs),
 
@@ -95,7 +95,7 @@ BranchPredictor#(.NUM_IN(NUM_BP_UPD+1)) bp
     .OUT_predBr(predBr),
 
     .IN_retDecUpd(BH_retDecUpd),
-    
+
     .OUT_pcFileRead(BP_pcFileRead),
     .IN_pcFileRData(BP_pcFileRData),
 
@@ -107,7 +107,7 @@ wire baseEn = IN_en && !waitForInterrupt && !issuedInterrupt && !BP_stall;
 
 // When first encountering a fault, we output a single fake fault instruction.
 // Thus ifetch is still enabled during this first fault cycle.
-wire ifetchEn /* verilator public */ = 
+wire ifetchEn /* verilator public */ =
     baseEn && !icacheStall;
 
 wire icacheStall;
@@ -116,7 +116,7 @@ DecodeBranchProv BH_decBranch;
 BTUpdate BH_btUpdate;
 ReturnDecUpdate BH_retDecUpd;
 
-ICacheTable ict
+IFetchPipeline ifp
 (
     .clk(clk),
     .rst(rst),
@@ -124,7 +124,7 @@ ICacheTable ict
 
     .IN_mispr(IN_branch.taken),
     .IN_misprFetchID(IN_branch.fetchID),
-    
+
     .IN_ROB_curFetchID(IN_ROB_curFetchID),
     .IN_BP_fetchLimit(BP_fetchLimit),
 
@@ -147,10 +147,10 @@ ICacheTable ict
     .OUT_retUpdate(BH_retDecUpd),
 
     .IN_lateRetAddr(BP_lateRetAddr),
-    
+
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),
-    
+
     .IN_ready(IN_ready),
     .OUT_instrs(OUT_instrs),
 
@@ -159,7 +159,7 @@ ICacheTable ict
     .IN_vmem(IN_vmem),
     .OUT_pw(OUT_pw),
     .IN_pw(IN_pw),
-    
+
     .OUT_memc(OUT_memc),
     .IN_memc(IN_memc)
 );
@@ -179,7 +179,7 @@ assign OUT_pcReadDataTH = sharedData;
 RegFile#($bits(PCFileEntry), 1<<$bits(FetchID_t), 3, 1) pcFile
 (
     .clk(clk),
-    
+
     .IN_we({pcFileWriteEn}),
     .IN_waddr({PCF_writeAddr}),
     .IN_wdata({PCF_writeData}),
@@ -207,13 +207,13 @@ reg[$clog2(`WFI_DELAY)-1:0] wfiCount;
 reg issuedInterrupt;
 
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         waitForInterrupt <= 0;
         issuedInterrupt <= 0;
     end
     else begin
-        
+
         if (waitForInterrupt) begin
             reg[$clog2(`WFI_DELAY)-1:0] wfiCount_next;
             reg wfiDone;
@@ -223,7 +223,7 @@ always_ff@(posedge clk) begin
             if (IN_interruptPending || wfiDone)
                 waitForInterrupt <= 0;
         end
-    
+
         if (IN_branch.taken || BH_decBranch.taken) begin
             if (IN_branch.taken) begin
                 waitForInterrupt <= 0;
@@ -244,7 +244,7 @@ always_ff@(posedge clk) begin
             end
             // Valid Fetch
             else begin
-                
+
             end
         end
     end

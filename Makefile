@@ -50,7 +50,7 @@ SRC_FILES = \
 	src/TageTable.sv \
 	src/TagePredictor.sv \
 	src/LoadStoreUnit.sv \
-	src/ICacheTable.sv \
+	src/IFetchPipeline.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
 	src/CacheInterface.sv \
