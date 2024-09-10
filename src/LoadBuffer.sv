@@ -43,7 +43,6 @@ typedef struct packed
     logic signExtend;
     logic doNotCommit;
     logic nonSpec;
-    logic noReIssue;
     logic issued;
     logic hasRsv; // also set if not valid
     logic valid;
@@ -71,7 +70,6 @@ wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 LD_UOp lateLoadUOp[`NUM_AGUS-1:0];
 reg delayLoad[`NUM_AGUS-1:0];
 reg nonSpeculative[`NUM_AGUS-1:0];
-reg doNotReIssue[`NUM_AGUS-1:0];
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         OUT_uopAGULd[h] = 'x;
@@ -79,23 +77,8 @@ always_comb begin
         OUT_uopLd[h] = 'x;
         OUT_uopLd[h].valid = 0;
 
-        doNotReIssue[h] = 0;
-        for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
-            if (IN_memc.transfers[i].valid &&
-                IN_memc.transfers[i].readAddr[31:`CLSIZE_E] == IN_uop[h].addr[31:`CLSIZE_E] &&
-                IN_memc.transfers[i].progress < {1'b0, IN_uop[h].addr[`CLSIZE_E-1:2]} - {1'b0, IN_memc.transfers[i].readAddr[`CLSIZE_E-1:2]}
-            ) begin
-                doNotReIssue[h] = 1;
-            end
-        if ((IN_LSU_memc.cmd == MEMC_REPLACE || IN_LSU_memc.cmd == MEMC_CP_EXT_TO_CACHE) &&
-            (IN_LSU_memc.readAddr[31:`CLSIZE_E] == IN_uop[h].addr[31:`CLSIZE_E])
-        ) begin
-            doNotReIssue[h] = 1;
-        end
-
-
         nonSpeculative[h] = IN_uop[h].valid && `IS_MMIO_PMA(IN_uop[h].addr) && IN_uop[h].exception == AGU_NO_EXCEPTION;
-        delayLoad[h] = doNotReIssue[h] || nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
+        delayLoad[h] = nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
 
         // If it needs forwarding from current cycle's store, we also delay the load.
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
@@ -237,8 +220,7 @@ always_comb begin
         // Out-of-order late ltIssue (regular loads)
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             issueCandidates[i] =
-                entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec &&
-                    (!entries[i].noReIssue || (addrCompT[h] == LD_FWD && wAddrMatch[h][i]) || memcNotBusy);
+                entries[i].valid && (!entries[i].issued) && !entries[i].nonSpec;
         end
 
         for (integer i = 0; i < h; i=i+1) begin
@@ -421,17 +403,9 @@ always_ff@(posedge clk) begin
 
         // Process negative load acks
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-
-            if (addrCompT[i] == LD_NACK) begin
-                for (integer j = 0; j < NUM_ENTRIES; j=j+1) begin
-                    if (wAddrMatch[i][j]) entries[j].noReIssue <= 1;
-                end
-            end
-
             if (IN_ldAck[i].valid && IN_ldAck[i].fail && !IN_ldAck[i].external) begin
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
                 entries[index].issued <= 0;
-                entries[index].noReIssue <= IN_ldAck[i].doNotReIssue;
             end
         end
 
@@ -509,7 +483,7 @@ always_ff@(posedge clk) begin
                         end
 
                         // Try to pass through ops for which early lookup failed
-                        if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i] && !doNotReIssue[i]) begin
+                        if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i]) begin
                             lateLoadUOp[i].data <= 'x;
                             lateLoadUOp[i].dataValid <= 0;
 
@@ -553,7 +527,6 @@ always_ff@(posedge clk) begin
                 entries[index].doNotCommit <= IN_uop[i].doNotCommit;
                 entries[index].highLdSqN <= IN_uop[i].loadSqN[$bits(SqN)-1:$clog2(NUM_ENTRIES)];
                 entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
-                entries[index].noReIssue <= doNotReIssue[i];
                 entries[index].nonSpec <= nonSpeculative[i];
                 entries[index].valid <= 1;
             end
