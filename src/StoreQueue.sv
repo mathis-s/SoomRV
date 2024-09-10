@@ -88,8 +88,6 @@ end
 SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
 SqN baseIndex /* verilator public */;
 
-reg[NUM_ENTRIES-1:0] entryFused /* verilator public */;
-
 reg empty;
 always_comb begin
     empty = 1;
@@ -106,13 +104,6 @@ for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
     lookupAddr[h] = IN_uopLd[h].addr;
     lookupType[h] = LOAD;
-    //if (!IN_uopLd[h].valid && OUT_uop.valid) begin
-    //    case (h)
-    //        0: lookupAddr[h] = {OUT_uop.addr[29:2], OUT_uop.addr[1:0] + 2'd2, 2'b0};
-    //        1: lookupAddr[h] = {OUT_uop.addr[29:2], (&OUT_uop.wmask) ? (OUT_uop.addr[1:0] + 2'd3) : OUT_uop.addr[1:0], 2'b0};
-    //    endcase
-    //    lookupType[h] = STORE_FUSE;
-    //end
 end
 
 reg[3:0] readMask[`NUM_AGUS-1:0];
@@ -131,7 +122,6 @@ end
 reg[3:0] lookupMask[`NUM_AGUS-1:0];
 reg[31:0] lookupData[`NUM_AGUS-1:0];
 reg lookupConflict[`NUM_AGUS-1:0];
-reg[NUM_ENTRIES-1:0] lookupFuse[`NUM_AGUS-1:0];
 // Store queue lookup
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
@@ -145,7 +135,6 @@ always_comb begin
     lookupMask[h] = ~readMask[h];
     lookupData[h] = 32'bx;
     lookupConflict[h] = 0;
-    lookupFuse[h] = '0;
 
     for (integer i = 0; i < NUM_OUT; i=i+1) begin
         if (OUT_uop[i].valid &&
@@ -194,7 +183,6 @@ always_comb begin
 
     // actual forwarding
     lookupConflictList[h][i] = 0;
-    lookupFuse[h][i] = 0;
     if (entries[i].addrAvail &&
         entries[i].addr == lookupAddr[h][31:2] &&
         ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) ||
@@ -203,7 +191,6 @@ always_comb begin
     ) begin
 
         if (entries[i].loaded) begin
-            lookupFuse[h][i] = 1;
             for (integer j = 0; j < 4; j=j+1)
                 if (entries[i].wmask[j]) begin
                     lookupDataIter[h][i][j*8 +: 8] = entries[i].data[j*8 +: 8];
@@ -236,16 +223,6 @@ always_comb begin
             end
         end
     end
-end
-
-reg[NUM_ENTRIES-1:0] entryFused_c;
-always_comb begin
-    entryFused_c = entryFused;
-    //if (OUT_uop.loaded && evInsert.valid)
-    //    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-    //        if (lookupType[i] == STORE_FUSE)
-    //            entryFused_c = entryFused_c | lookupFuse[i];
-    //    end
 end
 
 // Dequeue logic to infer sequential reads from SQ
@@ -314,6 +291,28 @@ PriorityEncoder#(2*NUM_OUT, NUM_OUT) penc
     .OUT_idxValid()
 );
 
+logic[NUM_OUT-1:0] entryWasDeqd;
+logic[NUM_OUT-1:0] deqCountUnary;
+always_comb begin
+    entryWasDeqd = '0;
+
+    for (integer i = 0; i < NUM_OUT; i=i+1) begin
+        reg[$clog2(NUM_OUT):0] idx = srcIdx[i];
+        reg[$clog2(NUM_ENTRIES)-1:0] idxSQ =
+                baseIndexI + $clog2(NUM_ENTRIES)'(idx) - $clog2(NUM_ENTRIES)'(NUM_OUT);
+
+        deqCountUnary[i] = 0;
+        if (outDeqView[idx].valid && idx >= NUM_OUT) begin
+            entryWasDeqd[idxSQ[$clog2(NUM_OUT)-1:0]] = 1;
+            deqCountUnary[i] = 1;
+        end
+    end
+end
+
+logic[$clog2(NUM_OUT):0] deqCount;
+PopCnt#(NUM_OUT) popc(.in(deqCountUnary), .res(deqCount));
+wire SqN nextBaseIndex = baseIndex + SqN'(deqCount);
+
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
@@ -325,8 +324,6 @@ always_ff@(posedge clk) begin
     end
 
     if (rst) begin
-        entryFused <= 0;
-
         baseIndex <= 0;
 
         OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
@@ -340,23 +337,20 @@ always_ff@(posedge clk) begin
             entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
     end
     else begin
-
-        SqN nextBaseIndex = baseIndex;
         reg modified = 0;
 
         // Dequeue
         for (integer i = 0; i < NUM_OUT; i=i+1) begin
             reg[$clog2(NUM_OUT):0] idx = srcIdx[i];
             OUT_uop[i] <= outDeqView[idx];
-            if (outDeqView[idx].valid && idx >= NUM_OUT) begin
+        end
+        for (integer i = 0; i < NUM_OUT; i=i+1) begin
+            reg[$clog2(NUM_OUT)-1:0] offs = i[$clog2(NUM_OUT)-1:0];
+            reg[$clog2(NUM_ENTRIES)-1:0] addr = {deqAddrsSorted[offs][$clog2(NUM_ENTRIES)-1:$clog2(NUM_OUT)], offs};
 
-                // todo: infer sequential writes
-                reg[$clog2(NUM_ENTRIES)-1:0] idxSQ =
-                    baseIndexI + $clog2(NUM_ENTRIES)'(idx) - $clog2(NUM_ENTRIES)'(NUM_OUT);
-                entries[idxSQ].loaded <= 0;
-                entries[idxSQ].addrAvail <= 0;
-
-                nextBaseIndex = nextBaseIndex + 1;
+            if (entryWasDeqd[i]) begin
+                entries[addr].loaded <= 0;
+                entries[addr].addrAvail <= 0;
             end
         end
 
@@ -402,6 +396,8 @@ always_ff@(posedge clk) begin
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
                 reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
+                assert(index[0] == i[0]); index[0] = i[0];
+
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 assert(!entries[index].addrAvail);
 

@@ -43,7 +43,7 @@ LZCnt lzc (
 wire[5:0] resPopCnt;
 PopCnt popc
 (
-    .a(IN_uop.srcA),
+    .in(IN_uop.srcA),
     .res(resPopCnt)
 );
 

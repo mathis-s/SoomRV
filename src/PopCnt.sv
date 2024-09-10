@@ -1,33 +1,31 @@
-module PopCnt(
-    
-    input wire[31:0] a,
-    output reg[5:0] res
+
+
+module PopCnt#(parameter SIZE = 32)
+(
+    input wire[SIZE-1:0] in,
+    output wire[$clog2(SIZE):0] res
 );
 
-reg[5:0] resPopCnt;
+localparam SIZE_POW2 = 1 << $clog2(SIZE);
+localparam NUM_STAGES = $clog2(SIZE_POW2);
 
-reg[1:0] resStage0[15:0]; // max 2
-reg[2:0] resStage1[7:0]; // max 4
-reg[3:0] resStage2[3:0]; // max 8
-reg[4:0] resStage3[1:0]; // max 16
+wire[SIZE_POW2-1:0] inPadded = {{(SIZE_POW2 - SIZE){1'b0}}, in};
 
-always_comb begin
 
-    resPopCnt = 0;
-    for (integer i = 0; i < 16; i=i+1)
-        resStage0[i] = {1'b0, a[2*i]} + {1'b0, a[2*i+1]};
-    
-    for (integer i = 0; i < 8; i=i+1)
-        resStage1[i] = {1'b0, resStage0[2*i]} + {1'b0, resStage0[2*i+1]};
-        
-    for (integer i = 0; i < 4; i=i+1)
-        resStage2[i] = {1'b0, resStage1[2*i]} + {1'b0, resStage1[2*i+1]};
+generate
+for (genvar i = 0; i <= NUM_STAGES; i=i+1) begin : tree
+    logic[(SIZE_POW2 >> i)-1:0][i:0] iSums;
 
-    for (integer i = 0; i < 2; i=i+1)
-        resStage3[i] = {1'b0, resStage2[2*i]} + {1'b0, resStage2[2*i+1]};
-
-    
-    res = {1'b0, resStage3[0]} + {1'b0, resStage3[1]};
+    if (i == 0)
+        always_comb iSums = in;
+    else
+        always_comb begin
+            for (integer j = 0; j < (SIZE_POW2 >> i); j=j+1)
+                iSums[j] = tree[i-1].iSums[2*j] + tree[i-1].iSums[2*j+1];
+        end
 end
+endgenerate
+
+assign res = tree[NUM_STAGES].iSums;
 
 endmodule
