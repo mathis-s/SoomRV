@@ -5,12 +5,12 @@ module FPU
     input wire clk,
     input wire rst,
     input wire en,
-    
+
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
-    
+
     input wire[2:0] IN_fRoundMode,
-    
+
     output RES_UOp OUT_uop
 );
 
@@ -92,35 +92,35 @@ recFNToFN#(8, 24) recode
 wire srcAIsNaN = IN_uop.srcA[30:23] == 8'hFF && IN_uop.srcA[22:0] != 0;
 wire srcBIsNaN = IN_uop.srcB[30:23] == 8'hFF && IN_uop.srcB[22:0] != 0;
 
-wire minChooseA = 
-    srcBIsNaN || 
+wire minChooseA =
+    srcBIsNaN ||
     lessThan ||
     (equal && IN_uop.srcA[31] && !IN_uop.srcB[31]);
-    
-wire maxChooseA = 
-    srcBIsNaN || 
+
+wire maxChooseA =
+    srcBIsNaN ||
     greaterThan ||
     (equal && !IN_uop.srcA[31] && IN_uop.srcB[31]);
-    
+
 wire minMaxCanonicalNaN = srcAIsNaN && srcBIsNaN;
 
 always@(posedge clk) begin
-    
+
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;
 
     if (!rst && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-        
+
         reg[4:0] except = 0;
-        
+
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.valid <= 1;
         OUT_uop.doNotCommit <= 0;
-        
+
         if (IN_uop.opcode[5:3] == 3'b101) begin
             case (IN_uop.opcode)
-                
+
                 FPU_FEQ_S: begin
                     OUT_uop.result <= {31'b0, equal};
                     except = compareFlags;
@@ -133,7 +133,7 @@ always@(posedge clk) begin
                     OUT_uop.result <= {31'b0, lessThan};
                     except = compareFlags;
                 end
-                            
+
                 FPU_FMIN_S: begin
                     if (minMaxCanonicalNaN)
                         OUT_uop.result <= 32'h7FC00000;
@@ -167,7 +167,7 @@ always@(posedge clk) begin
                     except = fromIntFlags;
                     OUT_uop.result <= fpResult;
                 end
-    
+
                 FPU_FCVTWS,
                 FPU_FCVTWUS: begin
                     except = {intFlags[2] | intFlags[1], 3'b0, intFlags[0]};
@@ -176,7 +176,7 @@ always@(posedge clk) begin
                 default: begin end
             endcase
         end
-        
+
         /* verilator lint_off CASEOVERLAP */
         casez (except)
             5'b00000: OUT_uop.flags <= FLAGS_NONE;
@@ -187,11 +187,11 @@ always@(posedge clk) begin
             5'b????1: OUT_uop.flags <= Flags'(FLAGS_FP_NX);
         endcase
         /* verilator lint_on CASEOVERLAP */
-        
+
         if (IN_uop.opcode[5:3] == 3'b111 && IN_fRoundMode >= 3'b101)
             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
 
-        
+
     end
 end
 

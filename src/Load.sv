@@ -8,24 +8,24 @@ module Load
 (
     input wire clk,
     input wire rst,
-    
+
     input IS_UOp IN_uop[NUM_UOPS-1:0],
 
     // Writeback Port (snoop) read
     input wire IN_wbHasResult[NUM_WBS-1:0],
     input RES_UOp IN_wbUOp[NUM_WBS-1:0],
-    
+
     input BranchProv IN_branch,
-    
+
     input wire IN_stall[NUM_UOPS-1:0],
-    
+
     // Zero cycle forward inputs
     input ZCForward IN_zcFwd[NUM_ZC_FWDS-1:0],
-    
+
     // PC File read
     output PCFileReadReq OUT_pcRead[NUM_PC_READS-1:0],
     input PCFileEntry IN_pcReadData[NUM_PC_READS-1:0],
-    
+
     // Register File read
     output reg[6-1:0] OUT_rfReadEnable,
     output reg[6-1:0][5:0] OUT_rfReadAddr,
@@ -40,7 +40,7 @@ localparam NUM_LOOKUP = 6;
 ZCForward forwards[NUM_FWD-1:0];
 always_comb begin
     for (integer i = 0; i < NUM_ZC_FWDS; i=i+1) begin
-        forwards[i] = IN_zcFwd[i]; 
+        forwards[i] = IN_zcFwd[i];
     end
     for (integer i = 0; i < NUM_WBS; i=i+1) begin
         forwards[i+NUM_ZC_FWDS].valid = IN_wbHasResult[i];
@@ -52,13 +52,13 @@ end
 logic[NUM_FWD-1:0] match[NUM_LOOKUP-1:0];
 always_comb begin
     Tag lookups[NUM_LOOKUP-1:0];
-    
+
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         lookups[i] = IN_uop[i].tagA;
         if (i < 2)
             lookups[i+NUM_UOPS] = IN_uop[i].tagB;
     end
-    
+
     for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
         for (integer j = 0; j < NUM_FWD; j=j+1) begin
             match[i][j] = (forwards[j].valid && forwards[j].tag == lookups[i]);
@@ -89,7 +89,7 @@ always_comb begin
             OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
             OUT_rfReadEnable[i+NUM_UOPS] = IN_uop[i].valid && !IN_uop[i].tagB[$bits(Tag)-1];
         end
-        
+
         if (i < NUM_PC_READS) begin
             OUT_pcRead[i].valid = IN_uop[i].valid;
             OUT_pcRead[i].addr = IN_uop[i].fetchID;
@@ -108,12 +108,12 @@ always_comb begin
         OUT_uop[i] = EX_UOp'{valid: 0, default: 'x};
         if (outUOpReg[i].valid) begin
             OUT_uop[i] = outUOpReg[i];
-            
+
             // forward values from register file and pc file combinationally
             if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
             if (i < 2)
                 if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
-            
+
             OUT_uop[i].bpi = '0;
             if (i < NUM_PC_READS) begin
                 OUT_uop[i].pc = {IN_pcReadData[i].pc[30:$bits(FetchOff_t)], outUOpReg[i].fetchOffs, 1'b0};
@@ -135,12 +135,12 @@ always_ff@(posedge clk) begin
     end
     else begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || ($signed(IN_uop[i].sqN - IN_branch.sqN) <= 0))) begin       
-                
+            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || ($signed(IN_uop[i].sqN - IN_branch.sqN) <= 0))) begin
+
                 outUOpReg[i].imm <= IN_uop[i].imm;
-                
+
                 // jalr uses a different encoding
-                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT && 
+                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT &&
                     (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)
                 ) begin
                     outUOpReg[i].imm <= 'x;
@@ -159,7 +159,7 @@ always_ff@(posedge clk) begin
                 outUOpReg[i].valid <= 1;
 
                 operandIsReg[i] <= 2'b00;
-                
+
                 outUOpReg[i].srcA <= 'x;
                 if (IN_uop[i].tagA[6]) begin
                     outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
@@ -170,7 +170,7 @@ always_ff@(posedge clk) begin
                 else begin
                     operandIsReg[i][0] <= 1;
                 end
-                
+
                 outUOpReg[i].srcB <= 'x;
                 if (IN_uop[i].immB || i == 2 || i == 3) begin
                     outUOpReg[i].srcB <= IN_uop[i].imm;
@@ -194,8 +194,8 @@ always_ff@(posedge clk) begin
                 if (operandIsReg[i][1]) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
                 operandIsReg[i] <= 2'b00;
             end
-        
-        end 
+
+        end
     end
 end
 

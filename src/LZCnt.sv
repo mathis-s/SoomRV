@@ -1,4 +1,4 @@
- 
+
 module LZCnt
 (
     input wire[31:0] in,
@@ -20,9 +20,9 @@ always_comb begin
             2'b11: s0[15-i] = 2'b00;
         endcase
     end
-    
+
     for (integer i = 0; i < 8; i=i+1) begin
-        
+
         if (s0[2*i+0][1] && s0[2*i+1][1])
             s1[i] = 3'b100;
         else if (s0[2*i][1] == 1'b0)
@@ -30,9 +30,9 @@ always_comb begin
         else //if (s0[i][1] == 1'b1)
             s1[i] = {2'b01, s0[2*i+1][0]};
     end
-    
+
     for (integer i = 0; i < 4; i=i+1) begin
-        
+
         if (s1[2*i+0][2] && s1[2*i+1][2])
             s2[i] = 4'b1000;
         else if (s1[2*i][2] == 1'b0)
@@ -40,9 +40,9 @@ always_comb begin
         else //if (s1[2*i][2] == 1'b1)
             s2[i] = {2'b01, s1[2*i+1][1:0]};
     end
-    
+
     for (integer i = 0; i < 2; i=i+1) begin
-    
+
         if (s2[2*i+0][3] && s2[2*i+1][3])
             s3[i] = 5'b10000;
         else if (s2[2*i][3] == 1'b0)
@@ -50,7 +50,7 @@ always_comb begin
         else //if (s2[2*i][3] == 1'b1)
             s3[i] = {2'b01, s2[2*i+1][2:0]};
     end
-    
+
     if (s3[0][4] && s3[1][4])
         out = 6'b100000;
     else if (s3[0][4] == 1'b0)

@@ -11,12 +11,12 @@ module TagBuffer
     input wire rst,
     input wire IN_mispr,
     input wire IN_mispredFlush,
-    
+
     input wire IN_issueValid[NUM_ISSUE-1:0],
     output reg[5:0] OUT_issueTags[NUM_ISSUE-1:0],
     output reg OUT_issueTagsValid[NUM_ISSUE-1:0],
-    
-    
+
+
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire IN_commitNewest[NUM_COMMIT-1:0],
     input wire[6:0] IN_RAT_commitPrevTags[NUM_COMMIT-1:0],
@@ -42,7 +42,7 @@ PriorityEncoder#(NUM_TAGS, NUM_ISSUE) penc
 );
 
 always_ff@(posedge clk) begin
-    
+
     mispredWait <= 0;
 
     if (rst) begin
@@ -68,7 +68,7 @@ always_ff@(posedge clk) begin
             end
         end
         else begin
-            
+
             // Invalidate current tags if they're used
             for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i]) begin
@@ -90,11 +90,11 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        
+
         // Commit
         for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
             if (IN_commitValid[i]) begin
-                
+
                 if (IN_mispredFlush) begin
                     if (!IN_mispr && !IN_commitTagDst[i][6]) begin
                         free[IN_commitTagDst[i][5:0]] <= 0;
@@ -106,7 +106,7 @@ always_ff@(posedge clk) begin
                             freeCom[IN_RAT_commitPrevTags[i][5:0]] <= 1;
                             free[IN_RAT_commitPrevTags[i][5:0]] <= 1;
                         end
-                        
+
                         if (!IN_commitTagDst[i][6]) begin
                             freeCom[IN_commitTagDst[i][5:0]] <= 0;
                             free[IN_commitTagDst[i][5:0]] <= 0;

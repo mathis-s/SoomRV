@@ -16,7 +16,7 @@ module ACLINT
 
     output wire[63:0] OUT_mtime,
     output wire[63:0] OUT_mtimecmp
-    
+
 );
 
 `define WRITE(x) \
@@ -42,7 +42,7 @@ module ACLINT
         if (IN_wmask[2]) x[55:48] <= IN_wdata[23:16]; \
         if (IN_wmask[3]) x[63:56] <= IN_wdata[31:24]; \
     end
-    
+
 `define READ(x) \
     begin \
         OUT_rdata <= x; \
@@ -62,14 +62,14 @@ assign OUT_mtimecmp = mtimecmp;
 
 always_ff@(posedge clk) begin
     OUT_rvalid <= 0;
-    
+
     if (rst) begin
         mtime <= 0;
         mtimecmp <= 0;
     end
     else begin
         mtime <= mtime + 1;
-        
+
         if (IN_re) begin
             case ({IN_raddr, 2'b0})
                 `MTIME_ADDR + 0: `READ(mtime[31:0])
@@ -78,7 +78,7 @@ always_ff@(posedge clk) begin
                 `MTIMECMP_ADDR + 4: `READ(mtimecmp[63:32])
             endcase
         end
-        
+
         if (IN_we) begin
             case ({IN_waddr, 2'b0})
                 `MTIME_ADDR + 0: `WRITE_L32(mtime)
@@ -109,7 +109,7 @@ module SysCon#(ADDR=32'hFF000004)
 
     output reg OUT_powerOff,
     output reg OUT_reboot
-    
+
 );
 
 assign OUT_rbusy = 0;
@@ -117,12 +117,12 @@ assign OUT_rdata = 0;
 assign OUT_rvalid = 0;
 
 always_ff@(posedge clk) begin
-    
+
     OUT_powerOff <= 0;
     OUT_reboot <= 0;
-    
+
     if (rst) begin
-        
+
     end
     else begin
         if (IN_we) begin

@@ -2,13 +2,13 @@ module LoadResultBuffer#(parameter SIZE=8)
 (
     input wire clk,
     input wire rst,
-    
+
     input BranchProv IN_branch,
     input MemController_Res IN_memc,
-    
+
     input LoadResUOp IN_uop,
     output wire OUT_ready,
-    
+
     input wire IN_ready,
     output RES_UOp OUT_uop
 );
@@ -30,7 +30,7 @@ always_comb begin
     outLMQ_c = LoadResUOp'{valid: 0, default: 'x};
     deq_c = IdxN'{valid: 0, default: 'x};
     enqLMQ_c = IN_uop;
-    
+
     // Select load result op to output
     if (IN_ready) begin
         // TODO: build compare tree manually
@@ -43,7 +43,7 @@ always_comb begin
                 deq_c.idx = i[$clog2(SIZE)-1:0];
             end
         end
-        
+
         // immediately pass through incoming load if older
         if (IN_uop.valid && IN_uop.dataAvail &&
             (!outLMQ_c.valid || outLMQ_c.external || $signed(IN_uop.sqN - outLMQ_c.sqN) <= 0)
@@ -80,11 +80,11 @@ always_ff@(posedge clk) begin
         end
     end
     else begin
-        
+
         // Invalidate
         if (IN_branch.taken)
             for (integer i = 0; i < SIZE; i=i+1) begin
-                if (entries[i].valid && !entries[i].external && 
+                if (entries[i].valid && !entries[i].external &&
                     $signed(entries[i].sqN - IN_branch.sqN) > 0
                 ) begin
                     entries[i] <= LoadResUOp'{valid: 0, default: 'x};
@@ -107,8 +107,8 @@ always_ff@(posedge clk) begin
     if (rst) ;
     else begin
         for (integer i = 0; i < SIZE; i=i+1) begin
-            if (entries[i].valid && !entries[i].dataAvail && 
-                entries[i].addr[31:$clog2(`AXI_WIDTH/8)] == 
+            if (entries[i].valid && !entries[i].dataAvail &&
+                entries[i].addr[31:$clog2(`AXI_WIDTH/8)] ==
                     IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
             ) begin
                 entries[i].dataAvail <= 1;
@@ -129,7 +129,7 @@ always_comb begin
         OUT_uop.doNotCommit = outLMQ_c.doNotCommit;
         OUT_uop.tagDst = outLMQ_c.tagDst;
         OUT_uop.sqN = outLMQ_c.sqN;
-        
+
         case (outLMQ_c.exception)
             AGU_NO_EXCEPTION: OUT_uop.flags = FLAGS_NONE;
             AGU_ADDR_MISALIGN: OUT_uop.flags = FLAGS_LD_MA;
@@ -138,11 +138,11 @@ always_comb begin
         endcase
 
         case (outLMQ_c.size)
-            0: OUT_uop.result = 
+            0: OUT_uop.result =
                 {{24{outLMQ_c.sext ? outLMQ_c.data[8*(outLMQ_c.addr[1:0])+7] : 1'b0}},
                 outLMQ_c.data[8*(outLMQ_c.addr[1:0])+:8]};
 
-            1: OUT_uop.result = 
+            1: OUT_uop.result =
                 {{16{outLMQ_c.sext ? outLMQ_c.data[16*(outLMQ_c.addr[1])+15] : 1'b0}},
                 outLMQ_c.data[16*(outLMQ_c.addr[1])+:16]};
 

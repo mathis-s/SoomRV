@@ -7,18 +7,18 @@ module AGU
     output wire OUT_stall,
 
     output wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] OUT_TMQ_free,
-    
+
     input BranchProv IN_branch,
-    
+
     input VirtMemState IN_vmem,
     output PageWalk_Req OUT_pw,
     input PageWalk_Res IN_pw,
 
     output TLB_Req OUT_tlb,
     input TLB_Res IN_tlb,
-    
+
     output TValProv OUT_tvalProv,
-    
+
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
     output ELD_UOp OUT_eldOp,
@@ -65,12 +65,12 @@ always_comb begin
     aguUOp_c.compressed = IN_uop.compressed;
     aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);
-    
+
     if (IN_uop.opcode < LSU_SC_W) begin // is load
         aguUOp_c.isLoad = 1;
         aguUOp_c.isStore = 0;
         aguUOp_c.doNotCommit = 0;
-        
+
         case (IN_uop.opcode)
             LSU_LB: begin
                 aguUOp_c.size = 0;
@@ -104,55 +104,55 @@ always_comb begin
         aguUOp_c.isLoad = 0;
         aguUOp_c.isStore = 1;
         aguUOp_c.doNotCommit = 0;
-        
+
         resUOp_c.tagDst = 7'h40;
         resUOp_c.sqN = IN_uop.sqN;
         resUOp_c.result = 'x;
         resUOp_c.doNotCommit = 0;
         resUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);;
-        
+
         // default
         aguUOp_c.wmask = 4'b1111;
         aguUOp_c.size = 2;
-        
+
         resUOp_c.flags = FLAGS_NONE;
-        
+
         case (IN_uop.opcode)
-            
+
             LSU_SB_PREINC,
             LSU_SB_POSTINC,
             LSU_SB: begin
                 aguUOp_c.size = 0;
-                case (addr[1:0]) 
+                case (addr[1:0])
                     0: begin
                         aguUOp_c.wmask = 4'b0001;
                     end
-                    1: begin 
+                    1: begin
                         aguUOp_c.wmask = 4'b0010;
                     end
                     2: begin
                         aguUOp_c.wmask = 4'b0100;
-                    end 
+                    end
                     3: begin
                         aguUOp_c.wmask = 4'b1000;
-                    end 
+                    end
                 endcase
             end
-            
+
             LSU_SH_PREINC,
             LSU_SH_POSTINC,
             LSU_SH: begin
                 aguUOp_c.size = 1;
-                case (addr[1]) 
+                case (addr[1])
                     0: begin
                         aguUOp_c.wmask = 4'b0011;
                     end
-                    1: begin 
+                    1: begin
                         aguUOp_c.wmask = 4'b1100;
                     end
                 endcase
             end
-            
+
             LSU_SC_W: begin
                 aguUOp_c.isLrSc = 1;
                 aguUOp_c.wmask = 4'b1111;
@@ -164,28 +164,28 @@ always_comb begin
             LSU_SW: begin
                 aguUOp_c.wmask = 4'b1111;
             end
-            
+
             LSU_CBO_CLEAN: begin
                 aguUOp_c.wmask = 0;
                 if (!IN_vmem.cbcfe) begin
                     resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
                 end
             end
-            
+
             LSU_CBO_INVAL: begin
                 aguUOp_c.wmask = 0;
                 if (IN_vmem.cbie == 2'b00) begin
                     resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
                 end
             end
-            
+
             LSU_CBO_FLUSH: begin
                 aguUOp_c.wmask = 0;
                 if (!IN_vmem.cbcfe) begin
                     resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
                 end
             end
-            
+
             ATOMIC_AMOSWAP_W,
             ATOMIC_AMOADD_W,
             ATOMIC_AMOXOR_W,
@@ -197,12 +197,12 @@ always_comb begin
             ATOMIC_AMOMAXU_W: begin
                 resUOp_c.doNotCommit = 1;
                 resUOp_c.tagDst = 7'h40;
-                
+
                 // The integer uop commits atomics,
                 // except for amoswap where there isn't one.
                 if (IN_uop.opcode != ATOMIC_AMOSWAP_W)
                     aguUOp_c.doNotCommit = 1;
-                
+
                 aguUOp_c.isLoad = 1;
                 aguUOp_c.size = 2;
                 aguUOp_c.signExtend = 0;
@@ -225,7 +225,7 @@ TLBMissQueue#(`DTLB_MISS_QUEUE_SIZE) tmq
 
     .OUT_free(OUT_TMQ_free),
     .OUT_ready(TMQ_ready),
-    
+
     .IN_branch(IN_branch),
     .IN_vmem(IN_vmem),
     .IN_pw(IN_pw),
@@ -250,13 +250,13 @@ always_comb begin
     issResUOp_c.valid = 0;
 
     TMQ_dequeue = 0;
-    
+
     if (aguUOp_c.valid && !OUT_stall) begin
         issUOp_c = aguUOp_c;
         issResUOp_c = resUOp_c;
     end
     else if (TMQ_uop.valid) begin
-        
+
         TMQ_dequeue = 1;
 
         issUOp_c = TMQ_uop;
@@ -277,18 +277,18 @@ always_comb begin
     OUT_eldOp = 'x;
     OUT_eldOp.valid =
         !rst && issUOp_c.valid && issUOp_c.isLoad && (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0);
-    
+
     if (OUT_eldOp.valid)
         OUT_eldOp.addr = issUOp_c.addr[11:0];
 end
 
 // TLB Request
 always_comb begin
-    OUT_tlb.valid = 
+    OUT_tlb.valid =
         (IN_vmem.sv32en) &&
-        !(rst) && 
+        !(rst) &&
         (issUOp_c.valid);
-    
+
     OUT_tlb.vpn = issUOp_c.addr[31:12];
 end
 
@@ -299,13 +299,13 @@ AGU_Exception except;
 always_comb begin
     except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
-    
+
     // Cache Management Ops are encoded with wmask 0 and
     // are ordering
     if (issUOp_c.isStore && issUOp_c.wmask == 0)
         exceptFlags = FLAGS_ORDERING;
-    
-    if (IN_vmem.sv32en && IN_tlb.hit && 
+
+    if (IN_vmem.sv32en && IN_tlb.hit &&
         (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad, issUOp_c.isStore))
     ) begin
         except = AGU_PAGE_FAULT;
@@ -377,12 +377,12 @@ always_ff@(posedge clk) begin
     OUT_uop.valid <= 0;
     OUT_aguOp <= 'x;
     OUT_aguOp.valid <= 0;
-    
+
     if (rst) begin
         pageWalkActive <= 0;
     end
     else begin
-        
+
         // Page Walk Request Logic
         if (pageWalkActive) begin
             if (!pageWalkAccepted) begin
@@ -405,7 +405,7 @@ always_ff@(posedge clk) begin
         if (issUOp_c.valid &&
             (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0)
         ) begin
-            
+
             reg doIssue = 1;
             if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
                 if (tlbMiss) begin
@@ -425,12 +425,12 @@ always_ff@(posedge clk) begin
             end
 
             if (doIssue) begin
-                
+
                 OUT_uop <= issResUOp_c;
                 if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
                     OUT_aguOp <= issUOp_c;
                     OUT_aguOp.earlyLoadFailed <= IN_stall;
-                    
+
                     OUT_aguOp.exception <= except;
                     OUT_uop.flags <= exceptFlags;
 

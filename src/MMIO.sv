@@ -3,12 +3,12 @@ module MMIO
 (
     input wire clk,
     input wire rst,
-    
+
     IF_MMIO.MEM IF_mem,
-    
+
     output reg OUT_powerOff,
     output reg OUT_reboot,
-    
+
     IF_CSR_MMIO.MMIO OUT_csrIf
 );
 
@@ -22,18 +22,18 @@ ACLINT aclint
 (
     .clk(clk),
     .rst(rst),
-    
+
     .IN_re(!IF_mem.re),
     .IN_raddr(IF_mem.raddr[31:2]),
     .OUT_rdata(aclintData),
     .OUT_rbusy(aclintBusy),
     .OUT_rvalid(aclintRValid),
-    
+
     .IN_we(!IF_mem.we),
     .IN_wmask(IF_mem.wmask),
     .IN_waddr(IF_mem.waddr[31:2]),
     .IN_wdata(IF_mem.wdata),
-    
+
     .OUT_mtime(OUT_csrIf.mtime),
     .OUT_mtimecmp(OUT_csrIf.mtimecmp)
 );
@@ -45,18 +45,18 @@ SysCon#(.ADDR(`SYSCON_ADDR)) sysCon
 (
     .clk(clk),
     .rst(rst),
-    
+
     .IN_re(!IF_mem.re),
     .IN_raddr(IF_mem.raddr[31:2]),
     .OUT_rdata(sysConData),
     .OUT_rbusy(sysConBusy),
     .OUT_rvalid(sysConRValid),
-    
+
     .IN_we(!IF_mem.we),
     .IN_wmask(IF_mem.wmask),
     .IN_waddr(IF_mem.waddr[31:2]),
     .IN_wdata(IF_mem.wdata),
-    
+
     .OUT_powerOff(OUT_powerOff),
     .OUT_reboot(OUT_reboot)
 );

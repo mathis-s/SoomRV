@@ -8,7 +8,7 @@ module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
 
     output wire OUT_powerOff,
     output wire OUT_reboot,
-    
+
     // write request
     output[`AXI_ID_LEN-1:0]  s_axi_awid,
     output[ADDR_LEN-1:0] s_axi_awaddr,
@@ -19,19 +19,19 @@ module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
     output[3:0] s_axi_awcache,
     output s_axi_awvalid,
     input s_axi_awready,
-    
+
     // write stream
     output[WIDTH-1:0] s_axi_wdata,
     output[(WIDTH/8)-1:0] s_axi_wstrb,
     output s_axi_wlast,
     output s_axi_wvalid,
     input s_axi_wready,
-    
+
     // write response
     output s_axi_bready,
     input[`AXI_ID_LEN-1:0] s_axi_bid,
     input s_axi_bvalid,
-    
+
     // read request
     output[`AXI_ID_LEN-1:0] s_axi_arid,
     output[ADDR_LEN-1:0] s_axi_araddr,
@@ -42,7 +42,7 @@ module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
     output[3:0] s_axi_arcache,
     output s_axi_arvalid,
     input s_axi_arready,
-    
+
     // read stream
     output s_axi_rready,
     input[`AXI_ID_LEN-1:0] s_axi_rid,
@@ -65,16 +65,16 @@ MemoryController memc
 (
     .clk(clk),
     .rst(rst),
-    
+
     .IN_ctrl(MemC_ctrl),
     .OUT_stat(MemC_stat),
-    
+
     .OUT_icacheW(MC_IC_wr),
     .OUT_dcacheW(MC_DC_wr),
 
     .OUT_dcacheR(MC_DC_rd),
     .IN_dcacheR(DC_dataOut),
-    
+
     .s_axi_awid(s_axi_awid),
     .s_axi_awaddr(s_axi_awaddr),
     .s_axi_awlen(s_axi_awlen),
@@ -123,9 +123,9 @@ Core core
     .clk(clk),
     .rst(rst),
     .en(en),
-    
+
     .IN_irq(IN_irq),
-    
+
     .IF_cache(IF_cache),
     .IF_ct(IF_ct),
     .IF_mmio(IF_mmio),
@@ -133,7 +133,7 @@ Core core
 
     .IF_icache(IF_icache),
     .IF_ict(IF_ict),
-    
+
     .OUT_memc(MemC_ctrl),
     .IN_memc(MemC_stat),
 
@@ -148,7 +148,7 @@ always_comb begin
         bankIFs[i] = CacheIF'{ce: 1, we: 1, default: 'x};
     IF_cache.busy[0] = 0;
     IF_cache.rbusyBank[0] = 'x;
-    
+
     if (!IF_cache.re[0]) begin
         bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[0];
         bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[0];
@@ -156,7 +156,7 @@ always_comb begin
         bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[0]};
         bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[0], IF_cache.addr[0][11:2]};
     end
-    
+
     if (!MC_DC_wr.ce) begin
         bankIFs[MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_wr;
         IF_cache.busy[0] = 1;
@@ -209,7 +209,7 @@ for (genvar i = 0; i < `CBANKS; i=i+1)
         .IN_data({`CASSOC{bankIFs[i].data[`CWIDTH*32-1:0]}}),
         .IN_wm((4 * `CASSOC * `CWIDTH)'(bankIFs[i].wm[`CWIDTH*4-1:0]) << (bankIFs[i].addr[`CACHE_SIZE_E-3-:$clog2(`CASSOC)] * `CWIDTH * 4)),
         .OUT_data(dcacheOut0[i]),
-        
+
         .IN_nce1(bankIFs_1[i].ce),
         //.IN_nwe1(bankIFs_1[i].we),
         .IN_addr1(bankIFs_1[i].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):$clog2(`CWIDTH)+$clog2(`CBANKS)]),
@@ -224,7 +224,7 @@ always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         for (integer a = 0; a < `CASSOC; a=a+1)
             for (integer w = 0; w < `CWIDTH; w=w+1)
-                dcacheOut0_t[i][w][a] = dcacheOut0[i][a][w];  
+                dcacheOut0_t[i][w][a] = dcacheOut0[i][a][w];
 end
 
 logic[`CWIDTH-1:0][`CASSOC-1:0][31:0] dcacheOut1_t[`CBANKS-1:0];
@@ -232,7 +232,7 @@ always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         for (integer a = 0; a < `CASSOC; a=a+1)
             for (integer w = 0; w < `CWIDTH; w=w+1)
-                dcacheOut1_t[i][w][a] = dcacheOut1[i][a][w];  
+                dcacheOut1_t[i][w][a] = dcacheOut1[i][a][w];
 end
 
 always_comb begin
@@ -255,7 +255,7 @@ MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASS
     .IN_data({`CASSOC{IF_ct.wdata}}),
     .IN_wm(1 << IF_ct.wassoc),
     .OUT_data(IF_ct.rdata[1]),
-    
+
     .IN_nce1(!IF_ct.re[0]),
     .IN_addr1(IF_ct.raddr[0][11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
     .OUT_data1(IF_ct.rdata[0])
@@ -271,7 +271,7 @@ MemRTL#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASS
     .IN_data({`CASSOC{IF_ict.wdata}}),
     .IN_wm(1 << IF_ict.wassoc),
     .OUT_data(),
-    
+
     .IN_nce1(!IF_ict.re),
     .IN_addr1(IF_ict.raddr[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
     .OUT_data1(IF_ict.rdata)
@@ -286,7 +286,7 @@ MemRTL#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 128) icache
     .IN_data({`CASSOC{MC_IC_wr.data}}),
     .IN_wm(1 << (MC_IC_wr.addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])),
     .OUT_data(),
-    
+
     .IN_nce1(!IF_icache.re),
     .IN_addr1(IF_icache.raddr[11:4]),
     .OUT_data1(IF_icache.rdata)
@@ -299,10 +299,10 @@ MMIO mmio
     .rst(rst),
 
     .IF_mem(IF_mmio),
-    
+
     .OUT_powerOff(OUT_powerOff),
     .OUT_reboot(OUT_reboot),
-    
+
     .OUT_csrIf(IF_csr_mmio.MMIO)
 );
 

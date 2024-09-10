@@ -8,7 +8,7 @@ module Rename
     input wire clk,
     input wire frontEn,
     input wire rst,
-    
+
     input wire[5:0][WIDTH_ISSUE-1:0] IN_stalls,
     output reg OUT_stall,
 
@@ -25,7 +25,7 @@ module Rename
     // Taken branch
     input BranchProv IN_branch,
     input wire IN_mispredFlush,
-    
+
     output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
     // This is just an alternating bit that switches with each regular int op,
     // for assignment to issue queues.
@@ -78,7 +78,7 @@ reg isSc[3:0];
 reg scSuccessful[3:0];
 
 always_comb begin
-    
+
     OUT_stall = |portStall;
     nextCounterSqN = counterSqN;
 
@@ -87,47 +87,47 @@ always_comb begin
 
         if (IN_mispredFlush && IN_uop[i].valid)
             OUT_stall = 1;
-        
+
         isSc[i] = IN_uop[i].fu == FU_AGU && IN_uop[i].opcode == LSU_SC_W;
         scSuccessful[i] = !(i == 0 && failSc);
-        
+
         // Only need new tag if instruction writes to a register.
         // FU_ATOMIC always gets a register (even when rd is x0) as it is used for storing the intermediate result.
         TB_tagNeeded[i] = (IN_uop[i].rd != 0 || IN_uop[i].fu == FU_ATOMIC) &&
             // these don't write or writes are eliminated
             IN_uop[i].fu != FU_RN && IN_uop[i].fu != FU_TRAP && !isSc[i];
-        
+
         if ((!TB_tagsValid[i]) && IN_uop[i].valid && frontEn && TB_tagNeeded[i])
             OUT_stall = 1;
     end
-        
+
     // Issue/Lookup
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-    
+
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs1;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs2;
-        
+
         RAT_issueIDs[i] = IN_uop[i].rd;
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branch.taken && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
-            
+
         TB_issueValid[i] = RAT_issueValid[i] && TB_tagNeeded[i];
-        
+
         if (RAT_issueValid[i])
             nextCounterSqN = nextCounterSqN + 1;
     end
-    
+
     // Writeback
     for (integer i = 0; i < WIDTH_WR; i=i+1) begin
         RAT_wbTags[i] = IN_wbUOp[i].tagDst;
     end
-    
+
     // Commit
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
         RAT_commitValid[i] = (IN_comUOp[i].valid && (IN_comUOp[i].rd != 0));
         TB_commitValid[i] = IN_comUOp[i].valid;
-        
+
         RAT_commitIDs[i] = IN_comUOp[i].rd;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
@@ -149,22 +149,22 @@ rt
     .rst(rst),
     .IN_mispred(IN_branch.taken),
     .IN_mispredFlush(IN_mispredFlush),
-    
+
     .IN_lookupIDs(RAT_lookupIDs),
     .OUT_lookupAvail(RAT_lookupAvail),
     .OUT_lookupSpecTag(RAT_lookupSpecTag),
-    
+
     .IN_issueValid(RAT_issueValid),
     .IN_issueIDs(RAT_issueIDs),
     .IN_issueTags(newTags),
     .IN_issueAvail(RAT_issueAvail),
-    
+
     .IN_commitValid(RAT_commitValid),
     .IN_commitIDs(RAT_commitIDs),
     .IN_commitTags(RAT_commitTags),
     .IN_commitAvail(RAT_commitAvail),
     .OUT_commitPrevTags(RAT_commitPrevTags),
-    
+
     .IN_wbValid(IN_wbHasResult),
     .IN_wbTag(RAT_wbTags)
 );
@@ -187,11 +187,11 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
     .rst(rst),
     .IN_mispr(IN_branch.taken),
     .IN_mispredFlush(IN_mispredFlush),
-    
+
     .IN_issueValid(TB_issueValid),
     .OUT_issueTags(TB_tags),
     .OUT_issueTagsValid(TB_tagsValid),
-    
+
     .IN_commitValid(TB_commitValid),
     .IN_commitNewest(isNewestCommit),
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
@@ -207,7 +207,7 @@ assign OUT_nextSqN = counterSqN;
 reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
-        
+
         // When rd == 0, the register is (also) discarded immediately instead of being committed.
         // This is currently only used for rmw atomics with rd=x0.
         isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].rd != 0;
@@ -228,7 +228,7 @@ always_ff@(posedge clk) begin
         OUT_nextStoreSqN <= counterStoreSqN + 1;
         intOrder = 0;
         failSc <= 0;
-    
+
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;
@@ -236,13 +236,13 @@ always_ff@(posedge clk) begin
         end
     end
     else if (IN_branch.taken) begin
-        
+
         counterSqN <= IN_branch.sqN + 1;
-        
+
         counterLoadSqN = IN_branch.loadSqN;
         counterStoreSqN = IN_branch.storeSqN;
         failSc <= IN_branch.isSCFail;
-        
+
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if ($signed(OUT_uop[i].sqN - IN_branch.sqN) > 0) begin
                 OUT_uop[i] <= 'x;
@@ -253,7 +253,7 @@ always_ff@(posedge clk) begin
     end
 
     if (!rst && |portStall) begin
-        // If frontend is stalled right now we need to make sure 
+        // If frontend is stalled right now we need to make sure
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
         for (integer i = 0; i < WIDTH_WR; i=i+1) begin
@@ -274,14 +274,14 @@ always_ff@(posedge clk) begin
 
     if (rst) ;
     else if (!IN_branch.taken && frontEn && !OUT_stall) begin
-        
+
         // Look up tags and availability of operands for new instructions
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i].imm <= IN_uop[i].imm;
             OUT_uop[i].imm12 <= IN_uop[i].imm12;
             OUT_uop[i].opcode <= IN_uop[i].opcode;
             OUT_uop[i].fu <= IN_uop[i].fu;
-            
+
             // The cause for decode-time pure traps is encoded
             // in rd. This saves encoding space, as these instructions
             // have no result anyways.
@@ -289,42 +289,42 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
             else
                 OUT_uop[i].rd <= IN_uop[i].rd;
-                
+
             // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
             if (isSc[i] && !scSuccessful[i])
                 OUT_uop[i].fu <= FU_RN;
-            
+
             OUT_uop[i].fetchID <= IN_uop[i].fetchID;
             OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
             OUT_uop[i].immB <= IN_uop[i].immB;
             OUT_uop[i].compressed <= IN_uop[i].compressed;
         end
-        
+
         // Set seqnum/tags for next instruction(s)
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             if (IN_uop[i].valid) begin
 
                 failSc <= 0;
-                
+
                 OUT_uop[i].valid <= 1;
                 OUT_uop[i].validIQ <= 6'b111111;
-                
+
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
-                
+
                 if (!(isSc[i] && !scSuccessful[i]))
                     case (IN_uop[i].fu)
                         FU_INT: intOrder = !intOrder;
                         FU_DIV, FU_FPU:  intOrder = 1;
                         FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
-                        
+
                         FU_AGU: begin
                             if (IN_uop[i].opcode < LSU_SC_W)
                                 counterLoadSqN = counterLoadSqN + 1;
                             else
                                 counterStoreSqN = counterStoreSqN + 1;
                         end
-                                
+
                         FU_ATOMIC: begin
                             counterStoreSqN = counterStoreSqN + 1;
                             counterLoadSqN = counterLoadSqN + 1;
@@ -332,16 +332,16 @@ always_ff@(posedge clk) begin
                         end
                         default: begin end
                     endcase
-                
+
                 OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;
-                
+
                 OUT_uop[i].tagA <= RAT_lookupSpecTag[2*i+0];
                 OUT_uop[i].tagB <= RAT_lookupSpecTag[2*i+1];
                 OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
                 OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
                 OUT_uop[i].tagDst <= newTags[i];
-                
+
                 // Atomics need a total of three source tags (addr, reg operand, mem operand).
                 // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
                 if (IN_uop[i].fu == FU_ATOMIC) begin
@@ -373,10 +373,10 @@ always_ff@(posedge clk) begin
             end
         end
     end
-    
+
     OUT_nextLoadSqN <= counterLoadSqN;
     OUT_nextStoreSqN <= counterStoreSqN + 1;
 
-    
+
 end
 endmodule

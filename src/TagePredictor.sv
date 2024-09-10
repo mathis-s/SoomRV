@@ -9,7 +9,7 @@ module TagePredictor
 (
     input wire clk,
     input wire rst,
-    
+
     input wire IN_predValid,
     input wire[30:0] IN_predAddr,
     input BHist_t IN_predHistory,
@@ -17,7 +17,7 @@ module TagePredictor
     output TageID_t OUT_predTageID,
     output reg OUT_altPred,
     output reg OUT_predTaken,
-    
+
     input wire IN_writeValid,
     input wire[30:0] IN_writeAddr,
     input BHist_t IN_writeHistory,
@@ -41,7 +41,7 @@ BranchPredictionTable basePredictor
     .IN_readValid(IN_predValid),
     .IN_readAddr(IN_predAddr[`BP_BASEP_ID_LEN-1:0]),
     .OUT_taken(predictions[0]),
-    
+
     .IN_writeEn(IN_writeValid),
     .IN_writeAddr(IN_writeAddr[`BP_BASEP_ID_LEN-1:0]),
     .IN_writeInit(1'b0), // base predictor does not use explicit allocation
@@ -56,12 +56,12 @@ reg[TAG_SIZE-1:0] predTags[NUM_STAGES-2:0];
 reg[TAG_SIZE-1:0] writeTags[NUM_STAGES-2:0];
 
 always_comb begin
-    
+
     for (integer i = 0; i < NUM_STAGES-1; i=i+1) begin
-        
+
         predTags[i] = IN_predAddr[TAG_SIZE-1:0];
         writeTags[i] = IN_writeAddr[TAG_SIZE-1:0];
-        
+
         predHashes[i] = 0;
         writeHashes[i] = 0;
 
@@ -69,7 +69,7 @@ always_comb begin
             predHashes[i] = predHashes[i] ^ IN_predAddr[j*HASH_SIZE+:HASH_SIZE];
             writeHashes[i] = writeHashes[i] ^ IN_writeAddr[j*HASH_SIZE+:HASH_SIZE];
         end
-        
+
 
         for (integer j = 0; j < (BASE * (FACTOR ** i)); j=j+1) begin
             predHashes[i][j % HASH_SIZE] = predHashes[i][j % HASH_SIZE] ^ IN_predHistory[j];
@@ -117,9 +117,9 @@ always_comb begin
     end
 end
 
-generate 
+generate
     for (genvar i = 1; i < NUM_STAGES; i=i+1) begin
-        
+
         TageTable#(.SIZE(TABLE_SIZE), .TAG_SIZE(TAG_SIZE)) tage
         (
             .clk(clk),
@@ -131,18 +131,18 @@ generate
             .IN_readTag(predTags[i-1]),
             .OUT_readValid(valid[i]),
             .OUT_readTaken(predictions[i]),
-            
+
             // General info of current update
             .IN_writeValid(IN_writeValid),
             .IN_writeAddr(writeHashes[i-1]),
             .IN_writeTag(writeTags[i-1]),
             .IN_writeTaken(IN_writeTaken),
-            
+
             // Update existing entries
             .IN_writeUpdate(i == IN_writeTageID),
             .IN_writeUseful(IN_writePred != IN_writeAltPred),
             .IN_writeCorrect(IN_writePred == IN_writeTaken),
-                        
+
             // New entry allocation
             .OUT_allocAvail(avail[i]),
             .IN_doAlloc(doAlloc[i]),
@@ -155,7 +155,7 @@ always_comb begin
     OUT_altPred = predictions[0];
     OUT_predTaken = predictions[0];
     OUT_predTageID = 0;
-    
+
     for (integer i = 0; i < NUM_STAGES; i=i+1) begin
         if (valid[i]) begin
             OUT_predTageID = i[$bits(TageID_t)-1:0];

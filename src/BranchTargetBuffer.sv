@@ -2,12 +2,12 @@ module BranchTargetBuffer
 (
     input wire clk,
     input wire rst,
-    
+
     input wire IN_pcValid,
     input wire[30:0] IN_pc,
-    
+
     output PredBranch OUT_branch,
-    
+
     input BTUpdate IN_btUpdate
 );
 
@@ -48,8 +48,8 @@ end
 always_comb begin
 
     OUT_branch = PredBranch'{valid: 0, default: 'x};
-    
-    if (fetched.entry.valid && 
+
+    if (fetched.entry.valid &&
         fetched.entry.src == fetched.pc[$clog2(LENGTH)+:`BTB_TAG_SIZE] &&
         // ignore predictions in the same line but before the current PC
         fetched.entry.offs >= fetched.pc[0+:$bits(FetchOff_t)]
@@ -74,7 +74,7 @@ SetMultiple setMult;
 
 // Update
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         setMult <= SetMultiple'{valid: 0, default: 'x};
     end
@@ -86,11 +86,11 @@ always_ff@(posedge clk) begin
                 entries[idx].valid <= 0;
             end
             else begin
-                
+
                 if (IN_btUpdate.multiple) begin
                     // Special handling for multiple branches in the same fetch package:
                     // For previous branch, set "multiple" to end fetch package after not-taken prediction.
-                    
+
                     // To avoid two writes to multiple in a single cycle, we cache the write instead of performing it right away.
                     //multiple[idx] <= 1;
                     setMult.valid <= 1;

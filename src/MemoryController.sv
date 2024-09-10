@@ -3,10 +3,10 @@ module MemoryController
 (
     input wire clk,
     input wire rst,
-    
+
     input MemController_Req IN_ctrl[NUM_TFS_IN-1:0],
     output MemController_Res OUT_stat,
-    
+
     output ICacheIF OUT_icacheW,
     output CacheIF OUT_dcacheW,
     output CacheIF OUT_dcacheR,
@@ -21,20 +21,20 @@ module MemoryController
     output logic[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
     output logic s_axi_awvalid,
     input logic s_axi_awready,
-    
+
     // write stream
     output logic [WIDTH-1:0] s_axi_wdata,
     output logic [(WIDTH/8)-1:0] s_axi_wstrb,
     output logic s_axi_wlast,
     output logic s_axi_wvalid,
     input logic s_axi_wready,
-    
+
     // write response
     output logic s_axi_bready,
     input logic[`AXI_ID_LEN-1:0] s_axi_bid,
     //input[1:0] s_axi_bresp,
     input logic s_axi_bvalid,
-    
+
     // read request
     output logic[`AXI_ID_LEN-1:0] s_axi_arid,
     output logic[ADDR_LEN-1:0] s_axi_araddr,
@@ -45,7 +45,7 @@ module MemoryController
     output logic[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
     output logic s_axi_arvalid,
     input logic s_axi_arready,
-    
+
     // read stream
     output logic s_axi_rready,
     input logic[`AXI_ID_LEN-1:0] s_axi_rid,
@@ -72,7 +72,7 @@ typedef struct packed
     // store into the cache line read
     logic[`AXI_WIDTH-1:0] storeData;
     logic[(`AXI_WIDTH/8)-1:0] storeMask;
-    
+
 
     logic[`CLSIZE_E-2:0] evictProgress;
     logic[`CLSIZE_E-2:0] progress;
@@ -88,7 +88,7 @@ typedef struct packed
 
     logic readDone;
     logic writeDone;
-    
+
     CacheID_t cacheID;
     MemC_Cmd cmd;
     logic valid;
@@ -144,7 +144,7 @@ always_comb begin
             if (selReq.cmd == MEMC_NONE && IN_ctrl[i].cmd != MEMC_NONE) begin
                 cacheAddrColl = 0;
                 for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1)
-                    cacheAddrColl |= 
+                    cacheAddrColl |=
                         transfers[j].valid &&
                         IsCacheOp(IN_ctrl[i].cmd) &&
                         IsCacheOp(transfers[j].cmd) &&
@@ -184,7 +184,7 @@ FIFO#($bits(AXI_AR)-1, 2, 1, 0) arFIFO
     .IN_valid(axiAR.arvalid),
     .IN_data(axiAR[1+:$bits(AXI_AR)-1]),
     .OUT_ready(arFIFO_ready),
-    
+
     .OUT_valid(arFIFO_outValid),
     .IN_ready(s_axi_arready),
     .OUT_data({s_axi_arid, s_axi_araddr, s_axi_arlen, s_axi_arsize, s_axi_arburst, s_axi_arlock, s_axi_arcache})
@@ -193,10 +193,10 @@ reg[$clog2(`AXI_NUM_TRANS)-1:0] arIdx;
 reg arIdxValid;
 wire readReqSuccess = axiAR.arvalid && arFIFO_ready;
 always_comb begin
-    
+
     axiAR = 'x;
     axiAR.arvalid = 0;
-    
+
     // Find Op that requires read request
     arIdx = 'x;
     arIdxValid = 0;
@@ -228,12 +228,12 @@ end
 // Output status to clients
 always_comb begin
     OUT_stat.busy = 1; // make old clients stall
-    
+
     // Cache Line Transfer Status
     for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
         OUT_stat.transfers[i] = 'x;
         OUT_stat.transfers[i].valid = 0;
-        
+
         if (transfers[i].valid && !isMMIO[i]) begin
             OUT_stat.transfers[i].valid = 1;
             OUT_stat.transfers[i].cacheID = transfers[i].cacheID;
@@ -248,7 +248,7 @@ always_comb begin
                 (transfers[i].evictProgress != 0);
         end
     end
-    
+
     OUT_stat.ldDataFwd = ldDataFwd;
 
     // MMIO
@@ -360,7 +360,7 @@ FIFO#(R_LEN, 32, 1, 1) rFIFO
     .IN_valid(s_axi_rvalid),
     .IN_data({s_axi_rid, s_axi_rdata, s_axi_rlast}),
     .OUT_ready(s_axi_rready),
-    
+
     .OUT_valid(buf_rvalid),
     .IN_ready(buf_rready),
     .OUT_data({buf_rid, buf_rdata, buf_rlast})
@@ -374,12 +374,12 @@ always_comb begin
     ICW_addr = 'x;
     ICW_data = 'x;
     ICW_id = 'x;
-    
+
     DCW_valid = 0;
     DCW_addr = 'x;
     DCW_data = 'x;
     DCW_id = 'x;
-    
+
     if (buf_rvalid) begin
         if (isMMIO[buf_rid]) begin
             buf_rready = 1;
@@ -454,7 +454,7 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 32, `AXI_ID_LEN) dcac
     .OUT_id(DCR_dataTId),
     .OUT_data(DCR_data),
     .OUT_last(DCR_dataLast),
-    
+
     .IN_CACHE_ready(1'b1),
     .OUT_CACHE_ce(OUT_dcacheR.ce),
     .OUT_CACHE_we(OUT_dcacheR.we),
@@ -490,7 +490,7 @@ FIFO#($bits(AXI_AW)-1, 4, 1, 1) awFIFO
     .IN_valid(axiAW.awvalid),
     .IN_data(axiAW[1+:$bits(AXI_AW)-1]),
     .OUT_ready(awFIFO_ready),
-    
+
     .OUT_valid(awFIFO_outValid),
     .IN_ready(s_axi_awready),
     .OUT_data({s_axi_awid, s_axi_awaddr, s_axi_awlen, s_axi_awsize, s_axi_awburst, s_axi_awlock, s_axi_awcache})
@@ -499,17 +499,17 @@ logic[`AXI_ID_LEN-1:0] awIdx;
 logic awIdxValid;
 always_comb begin
     reg isExclusive = 0;
-    
+
     axiAW = 'x;
     axiAW.awvalid = 0;
-    
+
     DCR_reqAddr = 'x;
     DCR_reqLen = 'x;
     DCR_reqTId = 'x;
     DCR_reqMMIOData = 'x;
     DCR_reqMMIO = 0;
     DCR_reqValid = 0;
-    
+
     // Find Op that requires write request
     awIdx = 'x;
     awIdxValid = 0;
@@ -525,7 +525,7 @@ always_comb begin
             //else assert(transfers[i].needWriteRq != 2'b01 && transfers[i].needWriteRq != 2'b10);
         end
     end
-    
+
     // Request to AXI
     if (awIdxValid && transfers[awIdx].needWriteRq[1]) begin
         axiAW.awvalid = 1;
@@ -533,7 +533,7 @@ always_comb begin
         axiAW.awlen = isMMIO[awIdx] ? 0 : ((1 << (`CLSIZE_E - $clog2(WIDTH / 8))) - 1);
         axiAW.awaddr = transfers[awIdx].writeAddr;
         axiAW.awid = awIdx;
-        
+
         case (transfers[awIdx].cmd)
             MEMC_WRITE_BYTE: axiAW.awsize = 0;
             MEMC_WRITE_HALF: axiAW.awsize = 1;
@@ -541,7 +541,7 @@ always_comb begin
             default: axiAW.awsize = 3'($clog2(WIDTH/8));
         endcase
     end
-    
+
     // Request to dcache read interface
     if (awIdxValid && transfers[awIdx].needWriteRq[0]) begin
         DCR_reqValid = 1;
@@ -558,7 +558,7 @@ always_comb begin
     // Write requests are made in the same order on cache and AXI,
     // and write data has to be sent in-order on AXI4. As such,
     // we simply forward any data that the cache interface outputs.
-    
+
     s_axi_wdata = 'x;
     s_axi_wstrb = 'x;
     s_axi_wlast = 'x;
@@ -577,10 +577,10 @@ assign s_axi_bready = 1;
 
 // Input Transfers
 always_ff@(posedge clk) begin
-    
+
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};
-    
+
     ldDataFwd <= 'x;
     ldDataFwd.valid <= 0;
 
@@ -599,7 +599,7 @@ always_ff@(posedge clk) begin
                 transfers[i].valid <= 0;
             end
         end
-        
+
         // Enqueue
         if (selReq.cmd != MEMC_NONE) begin
             assert(enqIdxValid);
@@ -621,7 +621,7 @@ always_ff@(posedge clk) begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
-                
+
                 transfers[enqIdx].storeData <= selReq.data;
                 transfers[enqIdx].storeMask <= selReq.mask;
             end
@@ -629,7 +629,7 @@ always_ff@(posedge clk) begin
                 transfers[enqIdx].writeAddr <= selReq.writeAddr;
                 transfers[enqIdx].readAddr <= selReq.readAddr;
                 transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
-                
+
                 transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data);
                 transfers[enqIdx].storeMask <= '1; // unused
             end
@@ -672,17 +672,17 @@ always_ff@(posedge clk) begin
         if (buf_rvalid && buf_rready) begin
 
             transfers[buf_rid].addrCounter <= transfers[buf_rid].addrCounter + WIDTH_W;
-            
+
             if (isMMIO[buf_rid]) begin
                 transfers[buf_rid] <= 'x;
                 transfers[buf_rid].valid <= 0;
-                
+
                 sglLdRes.valid <= 1;
                 sglLdRes.id <= transfers[buf_rid].cacheAddr;
                 sglLdRes.data <= buf_rdata[31:0];
             end
         end
-        
+
         if (s_axi_rvalid && s_axi_rready) begin
             if (transfers[s_axi_rid].cacheID == 0) begin
                 transfers[s_axi_rid].fwdAddrCounter <= transfers[s_axi_rid].fwdAddrCounter + WIDTH_W;
@@ -732,7 +732,7 @@ always_ff@(posedge clk) begin
             transfers[DCR_cacheReadId].evictProgress <= transfers[DCR_cacheReadId].evictProgress + WIDTH_W;
         end
 
-        // Write ACK 
+        // Write ACK
         if (s_axi_bvalid) begin
             if (isMMIO[s_axi_bid]) begin
                 sglStRes.valid <= 1;

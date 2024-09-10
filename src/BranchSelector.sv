@@ -8,12 +8,12 @@ module BranchSelector
     input wire rst,
 
     input IS_UOp IN_isUOps[3:0],
-    
+
     input BranchProv IN_branches[NUM_BRANCHES-1:0],
     output BranchProv OUT_branch,
-    
+
     output reg OUT_PERFC_branchMispr,
-    
+
     input SqN IN_ROB_curSqN,
     input SqN IN_RN_nextSqN,
     input wire IN_mispredFlush
@@ -54,7 +54,7 @@ always_comb begin
     end
     else
         branch_c = compBranches[1];
-    
+
     if (IN_branches[3].taken) begin
         branch_c = IN_branches[3];
         OUT_PERFC_branchMispr_c = 0;

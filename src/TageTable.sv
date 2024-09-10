@@ -9,22 +9,22 @@ module TageTable
 (
     input wire clk,
     input wire rst,
-    
+
     input wire IN_readValid,
     input wire[$clog2(SIZE)-1:0] IN_readAddr,
     input wire[TAG_SIZE-1:0] IN_readTag,
     output reg OUT_readValid,
     output wire OUT_readTaken,
-    
+
     input wire IN_writeValid,
     input wire[$clog2(SIZE)-1:0] IN_writeAddr,
     input wire[TAG_SIZE-1:0] IN_writeTag,
     input wire IN_writeTaken,
-    
+
     input wire IN_writeUpdate,
     input wire IN_writeUseful,
     input wire IN_writeCorrect,
-    
+
     output reg OUT_allocAvail,
     input wire IN_doAlloc,
     input wire IN_allocFailed
@@ -38,7 +38,7 @@ BranchPredictionTable#($clog2(SIZE)) counters
     .IN_readValid(IN_readValid),
     .IN_readAddr(IN_readAddr),
     .OUT_taken(OUT_readTaken),
-    
+
     .IN_writeEn(IN_writeValid && (IN_writeUpdate || (IN_doAlloc && useful[IN_writeAddr] == 0))),
     .IN_writeAddr(IN_writeAddr),
     .IN_writeInit(!IN_writeUpdate),
@@ -69,7 +69,7 @@ end
 reg[INTERVAL-1:0] decrCnt;
 reg decrBit;
 always_ff@(posedge clk) begin
-         
+
     if (rst) begin
         decrCnt <= 0;
     end
@@ -94,7 +94,7 @@ always_ff@(posedge clk) begin
             useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
         end
     end
-    
+
 `ifdef TAGE_CLEAR_ENABLE
     // Clear low or high bit of useful counters alternatingly periodically
     if (decrCnt == 0) begin

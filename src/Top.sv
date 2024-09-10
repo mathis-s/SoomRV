@@ -89,7 +89,7 @@ SoC soc
     .en(en),
 
     .IN_irq(1'b0),
-    
+
     .OUT_powerOff(SOC_poweroff),
     .OUT_reboot(SOC_reboot),
 

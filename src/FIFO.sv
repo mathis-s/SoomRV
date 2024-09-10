@@ -41,7 +41,7 @@ always_comb begin
     OUT_valid = outValidReg;
     OUT_data = outDataReg;
     combPassthru = 0;
-    
+
     if (!OUT_valid && empty && FORWARD0) begin
         OUT_valid = IN_valid;
         OUT_data = IN_data;
@@ -63,7 +63,7 @@ always_ff@(posedge clk) begin
             outDataReg <= 'x;
         if (IN_ready)
             outValidReg <= 0;
-        
+
         if (combPassthru && IN_ready) begin
             // Nothing to do, purely comb
         end
@@ -92,7 +92,7 @@ always_ff@(posedge clk) begin
                 outDataReg <= mem[indexOut];
                 outValidReg <= 1;
             end
-            
+
             // When pointers equal: full if last action was insert,
             // empty if last action was extract
             if (doInsert != doExtract)

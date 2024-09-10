@@ -2,7 +2,7 @@ module TrapHandler
 (
     input wire clk,
     input wire rst,
-    
+
     input Trap_UOp IN_trapInstr,
 
     output PCFileReadReqTH OUT_pcRead,
@@ -14,7 +14,7 @@ module TrapHandler
     output BranchProv OUT_branch,
 
     input wire IN_MEM_busy,
-    
+
     output reg OUT_flushTLB,
     output reg OUT_fence,
     output reg OUT_clearICache,
@@ -64,7 +64,7 @@ always_ff@(posedge clk) begin
     trapPCSpec_r <= trapPCSpec_c;
     OUT_flushTLB <= OUT_flushTLB_c;
     OUT_dbgStallPC <= OUT_dbgStallPC_c;
-    
+
     if (rst)
         memoryWait <= 0;
     else if (setMemoryWait)
@@ -96,12 +96,12 @@ always_comb begin
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
             // Instructions requiring pipeline flush and MRET/SRET handling
-            if (IN_trapInstr.flags == FLAGS_FENCE || 
-                IN_trapInstr.flags == FLAGS_ORDERING || 
+            if (IN_trapInstr.flags == FLAGS_FENCE ||
+                IN_trapInstr.flags == FLAGS_ORDERING ||
                 IN_trapInstr.flags == FLAGS_XRET ||
-                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_SFENCE_VMA)) 
+                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_SFENCE_VMA))
             ) begin
-                
+
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
                         OUT_branch_c.tgtSpec = BR_TGT_NEXT;
@@ -123,7 +123,7 @@ always_comb begin
                     end
                     default: begin end
                 endcase
-                
+
                 // When an interrupt is pending after mret/sret or FLAGS_ORDERING (includes CSR write), execute it immediately
                 if (IN_trapInstr.flags == FLAGS_XRET || IN_trapInstr.flags == FLAGS_ORDERING)
                     if (IN_trapControl.interruptPending) begin
@@ -145,11 +145,11 @@ always_comb begin
                         OUT_branch_c.tgtSpec = BR_TGT_MANUAL;
                         OUT_branch_c.dstPC = {(IN_trapControl.interruptDelegate) ? IN_trapControl.stvec : IN_trapControl.mtvec, 2'b0};
                     end
-                
+
                 OUT_branch_c.taken = 1;
                 OUT_branch_c.sqN = IN_trapInstr.sqN;
                 OUT_branch_c.flush = 1;
-                
+
                 OUT_branch_c.storeSqN = IN_trapInstr.storeSqN;
                 OUT_branch_c.loadSqN = IN_trapInstr.loadSqN;
 
@@ -164,11 +164,11 @@ always_comb begin
 
             // Traps, Exceptions, Interrupts Handling
             else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)) begin
-                
+
                 reg[3:0] trapCause = RVP_TRAP_ILLEGAL;
                 reg delegate;
                 reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT);
-                        
+
                 if (isInterrupt) begin
                     trapCause = IN_trapControl.interruptCause;
                 end
@@ -184,7 +184,7 @@ always_comb begin
                         FLAGS_ILLEGAL_INSTR: trapCause = RVP_TRAP_ILLEGAL;
                         default: ;
                     endcase
-                    
+
                     // Distinguish between ecall in different priv levels
                     if (trapCause == 4'(TRAP_ECALL_M)) begin
                         case (IN_trapControl.priv)
@@ -194,10 +194,10 @@ always_comb begin
                         endcase
                     end
                 end
-                
-                delegate = (IN_trapControl.priv != PRIV_MACHINE) && 
+
+                delegate = (IN_trapControl.priv != PRIV_MACHINE) &&
                     (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
-                
+
                 trapInfo_c.valid = 1;
                 trapInfo_c.trapPC = 'x;
                 trapPCSpec_c = IN_trapInstr.compressed ? BR_TGT_CUR16 : BR_TGT_CUR32;

@@ -6,14 +6,14 @@ module MemRTL
 )
 (
     input wire clk,
-    
+
     input wire IN_nce,
     input wire IN_nwe,
     input wire[$clog2(NUM_WORDS)-1:0] IN_addr,
     input wire[WORD_SIZE-1:0] IN_data,
     input wire[(WORD_SIZE/WRITE_SIZE)-1:0] IN_wm,
     output reg[WORD_SIZE-1:0] OUT_data,
-    
+
     input wire IN_nce1,
     input wire[$clog2(NUM_WORDS)-1:0] IN_addr1,
     output reg[WORD_SIZE-1:0] OUT_data1
@@ -40,7 +40,7 @@ end
 always@(posedge clk) begin
 
     dbgMultiple <= 0;
-    
+
     ce_reg <= IN_nce;
     ce1_reg <= IN_nce1;
     we_reg <= IN_nwe;
@@ -48,7 +48,7 @@ always@(posedge clk) begin
     addr1_reg <= IN_addr1;
     data_reg <= IN_data;
     wm_reg <= IN_wm;
-    
+
     if (!ce_reg) begin
         if (!we_reg) begin
             for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
@@ -62,13 +62,13 @@ always@(posedge clk) begin
             OUT_data <= mem[addr_reg];
         end
     end
-    
+
     if (!ce1_reg) begin
         OUT_data1 <= mem[addr1_reg];
         //if (addr1_reg == {32'h0A0}[$clog2(NUM_WORDS)-1:0] && WORD_SIZE == 128)
         //    $display("[%d] %m: read %x from %x", $time(), mem[addr1_reg], addr1_reg);
     end
-    
+
     if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg) begin
         for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
             if (wm_reg[i])

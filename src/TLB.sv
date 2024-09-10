@@ -3,7 +3,7 @@ module TLB#(parameter NUM_RQ=1, parameter SIZE=8, parameter ASSOC=4, parameter I
     input wire clk,
     input wire rst,
     input wire clear,
-    
+
     input PageWalk_Res IN_pw,
     input TLB_Req IN_rqs[NUM_RQ-1:0],
     output TLB_Res OUT_res[NUM_RQ-1:0]
@@ -36,11 +36,11 @@ always_comb begin
         OUT_res[i].pageFault = 0;
         OUT_res[i].accessFault = 0;
         OUT_res[i].hit = 0;
-        
+
         if (IN_rqs[i].valid)
             for (integer j = 0; j < ASSOC; j=j+1)
-                if (tlb[idx][j].valid && 
-                    (tlb[idx][j].isSuper ? 
+                if (tlb[idx][j].valid &&
+                    (tlb[idx][j].isSuper ?
                         tlb[idx][j].vpn[19-$clog2(LEN):10-$clog2(LEN)] == IN_rqs[i].vpn[19:10] :
                         tlb[idx][j].vpn == IN_rqs[i].vpn[19:$clog2(LEN)])
                 ) begin
@@ -51,7 +51,7 @@ always_comb begin
                     OUT_res[i].isSuper = tlb[idx][j].isSuper;
                     OUT_res[i].hit = 1;
                     OUT_res[i].ppn = tlb[idx][j].isSuper ? {tlb[idx][j].ppn[19:10], IN_rqs[i].vpn[9:0]} : tlb[idx][j].ppn;
-                    
+
                     if (counters[idx] == j[$clog2(ASSOC)-1:0] ) inc[i] = 1;
                 end
     end
@@ -64,7 +64,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
                 tlb[i][j].valid <= 0;
-        
+
         // When an sfence.vma commits, the translation in progress
         // is also stale.
         if (clear) ignoreCur <= 1;
@@ -72,7 +72,7 @@ always_ff@(posedge clk) begin
         if (rst) ignoreCur <= 0;
     end
     else begin
-        
+
         if (ignoreCur && !IN_pw.busy)
             ignoreCur <= 0;
 
@@ -83,9 +83,9 @@ always_ff@(posedge clk) begin
         ) begin
             reg[$clog2(LEN)-1:0] idx = IN_pw.vpn[$clog2(LEN)-1:0];
             reg[$clog2(ASSOC)-1:0] assocIdx = counters[idx];
-            
+
             tlb[idx][assocIdx].rwx <= IN_pw.rwx;
-            
+
             tlb[idx][assocIdx].isSuper <= IN_pw.isSuperPage;
 
             tlb[idx][assocIdx].ppn <= IN_pw.ppn[19:0];

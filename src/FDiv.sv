@@ -5,15 +5,15 @@ module FDiv
     input wire clk,
     input wire rst,
     input wire en,
-    
+
     input wire IN_wbAvail,
     output wire OUT_busy,
-    
+
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
-    
+
     input wire[2:0] IN_fRoundMode,
-    
+
     output RES_UOp OUT_uop
 );
 
@@ -36,15 +36,15 @@ divSqrtRecFN_small#(8, 24, 0) fdiv
     .nReset(!rst),
     .clock(clk),
     .control(`flControl_tininessAfterRounding),
-    
+
     .inReady(ready),
     .inValid(en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)),
-    
+
     .sqrtOp(IN_uop.opcode[0]),
     .a(srcArec),
     .b(srcBrec),
     .roundingMode(rm),
-    
+
     .outValid(outValid),
     .sqrtOpOut(),
     .out(result),
@@ -60,27 +60,27 @@ recFNToFN#(8, 24) recode
 
 reg running;
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         OUT_uop <= 'x;
         OUT_uop.valid <= 0;
         running <= 0;
     end
     else if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-        
+
         // Store metadata in output uop (without setting it valid)
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.doNotCommit <= 0;
         if (rm >= 3'b101)
             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-            
+
         running <= 1;
     end
     else if (running && outValid && (!IN_branch.taken || $signed(OUT_uop.sqN - IN_branch.sqN) <= 0)) begin
         OUT_uop.valid <= 1;
         OUT_uop.result <= fpResult;
-        
+
         if (OUT_uop.flags != FLAGS_ILLEGAL_INSTR)
             /* verilator lint_off CASEOVERLAP */
             casez (flags)
@@ -92,19 +92,19 @@ always_ff@(posedge clk) begin
                 5'b????1: OUT_uop.flags <= Flags'(FLAGS_FP_NX);
             endcase
             /* verilator lint_on CASEOVERLAP */
-        
+
         running <= 0;
     end
     else begin
         if ((IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0) || IN_wbAvail) begin
             OUT_uop.valid <= 0;
         end
-        
+
         if (IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0) begin
             running <= 0;
         end
     end
-    
+
 
 end
 

@@ -5,7 +5,7 @@ module StoreDataIQ
     parameter PORT_IDX=0,
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4
-    
+
 )
 (
     input wire clk,
@@ -13,18 +13,18 @@ module StoreDataIQ
     output reg[NUM_UOPS-1:0] OUT_stall,
 
     input R_UOp IN_uop[NUM_UOPS-1:0],
-    
+
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
-    
+
     input BranchProv IN_branch,
     input IS_UOp IN_issueUOps[NUM_UOPS-1:0],
     input EX_UOp IN_aguUOps[`NUM_AGUS-1:0],
-    
+
     input SqN IN_maxStoreSqN,
 
     output ComLimit OUT_comLimit,
-    
+
     input wire IN_ready,
     output StDataLookupUOp OUT_uop
 );
@@ -61,17 +61,17 @@ end
 
 always_comb begin
     for (integer i = 0; i < SIZE; i=i+1) begin
-        
+
         for (integer k = 0; k < NUM_OPERANDS; k=k+1) begin
             newAvail[i][k] = 0;
             newAvail_dl[i][k] = 0;
         end
-        
+
         for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
             for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                 if (IN_resultValid[j] && queue[i].tags[k] == IN_resultUOp[j].tagDst) newAvail[i][k] = 1;
         end
-        
+
         /*for (integer j = 0; j < 2; j=j+1) begin
             if (IN_issueUOps[j].valid && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
                 if (IN_issueUOps[j].fu == FU_INT) begin
@@ -101,7 +101,7 @@ always_comb begin
                     newOffs[i] = StOff_t'(IN_aguUOps[j].srcA + IN_aguUOps[j].srcB);
                 end
             end
-        end  
+        end
     end
 end
 
@@ -124,14 +124,14 @@ always_comb begin
         ) begin
             // check if we have capacity to enqueue this op now
             if (!limit && qIdx != SIZE && !IN_branch.taken) begin
-                
+
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];
                 else begin
                     enqCandidates[idx] = IN_uop[i];
                     {limit, idx} = idx + 1;
                 end
-                
+
                 OUT_stall[i] = 0;
                 qIdx = qIdx + 1;
             end
@@ -150,13 +150,13 @@ end
 
 struct packed
 {
-    logic[$clog2(SIZE)-1:0] idx; 
+    logic[$clog2(SIZE)-1:0] idx;
     logic valid;
 } deq;
 PriorityEncoder #(SIZE) penc(deqCandidate_c, '{deq.idx}, '{deq.valid});
 
 always_ff@(posedge clk) begin
-    
+
     reg[ID_LEN:0] newInsertIndex = 'x;
 
     // Update availability
@@ -170,7 +170,7 @@ always_ff@(posedge clk) begin
         OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
     end
     else if (IN_branch.taken) begin
-        
+
         newInsertIndex = 0;
         // Set insert index to first invalid entry
         for (integer i = 0; i < SIZE; i=i+1) begin
@@ -180,18 +180,18 @@ always_ff@(posedge clk) begin
         end
         insertIndex <= newInsertIndex;
 
-        
+
         if (IN_ready || $signed(OUT_uop.storeSqN - IN_branch.storeSqN) > 0 || IN_branch.flush) begin
             OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
         end
     end
     else begin
         newInsertIndex = insertIndex;
-        
+
         // Issue
         if (IN_ready || !OUT_uop.valid) begin
             OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
-            
+
             if (deq.valid) begin
                 R_ST_UOp deqEntry = queue[deq.idx];
 
@@ -199,7 +199,7 @@ always_ff@(posedge clk) begin
                 OUT_uop.tag <= deqEntry.tags[0];
                 OUT_uop.storeSqN <= deqEntry.storeSqN;
                 OUT_uop.offs <= deqEntry.offs;
-                
+
                 newInsertIndex = newInsertIndex - 1;
 
                 // Shift other ops forward
@@ -212,12 +212,12 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        
+
         // Enqueue
         for (integer i = 0; i < NUM_ENQUEUE; i=i+1) begin
             if (enqCandidates[i].validIQ[4+PORT_IDX]) begin
                 R_ST_UOp temp;
-                
+
                 temp.avail[0] = enqCandidates[i].availB;
                 temp.tags[0] = enqCandidates[i].tagB;
                 temp.storeSqN = enqCandidates[i].storeSqN;
@@ -225,8 +225,8 @@ always_ff@(posedge clk) begin
                     enqCandidates[i].opcode == LSU_SB ||
                     enqCandidates[i].opcode == LSU_SH);
                 temp.offs = temp.avail[1] ? '0 : 'x;
-                
-                
+
+
                 // Check if the result for this op is being broadcast in the current cycle
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                     if (IN_resultValid[j]) begin
@@ -234,7 +234,7 @@ always_ff@(posedge clk) begin
                             if (temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                     end
                 end
-                
+
                 queue[newInsertIndex[ID_LEN-1:0]] <= temp;
                 newInsertIndex = newInsertIndex + 1;
             end

@@ -10,7 +10,7 @@ module StoreQueueBackend#(parameter NUM_IN = 2, parameter NUM_EVICTED = 4)
 
     input SQ_UOp IN_uop[NUM_IN-1:0],
     output logic OUT_stall[NUM_IN-1:0],
-    
+
     input wire IN_stallSt,
     output ST_UOp OUT_uopSt,
     input ST_Ack IN_stAck
@@ -23,7 +23,7 @@ typedef struct packed
     logic[`AXI_WIDTH-1:0] data;
     logic[29:0] addr;
     logic[`AXI_WIDTH/8-1:0] wmask;
-    
+
     logic issued;
     StNonce_t nonce;
     logic valid;
@@ -43,7 +43,7 @@ always_comb begin
         if (evicted[i].valid) OUT_busy = 1;
 
     if (fusedUOp_r.valid) OUT_busy = 1;
-    
+
     for (integer i = 0; i < NUM_IN; i=i+1)
         if (IN_uop[i].valid) OUT_busy = 1;
 end
@@ -58,18 +58,18 @@ always_comb begin
 
     if (evInsert.valid)
         fusedUOp_c = EQEntry'{valid: 0, default: 'x};
-    
+
     for (integer i = 0; i < NUM_IN; i=i+1)
         OUT_stall[i] = 1;
 
     if ((!fusedUOp_r.valid || evInsert.valid) && IN_uop[0].valid) begin
-        
+
         // Used the oldest store as base
         OUT_stall[0] = 0;
         fusedUOp_c.valid = 1;
         fusedUOp_c.nonce = 0;
         fusedUOp_c.issued = 0;
-        
+
         if (`IS_MMIO_PMA(IN_uop[0].addr)) begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask);
             fusedUOp_c.addr = IN_uop[0].addr[31:2];
@@ -82,8 +82,8 @@ always_comb begin
 
             // Try to fuse in younger stores
             for (integer i = 1; i < NUM_IN; i=i+1) begin
-                if (IN_uop[i].valid && 
-                    IN_uop[i].addr[31:AXI_BWIDTH_E] == fusedUOp_c.addr[29:AXI_BWIDTH_E-2] && 
+                if (IN_uop[i].valid &&
+                    IN_uop[i].addr[31:AXI_BWIDTH_E] == fusedUOp_c.addr[29:AXI_BWIDTH_E-2] &&
                     !`IS_MMIO_PMA(IN_uop[i].addr)
                 ) begin
                     OUT_stall[i] = 0;
@@ -113,21 +113,21 @@ reg[31:0] lookupData[`NUM_AGUS-1:0];
 // Store queue lookup
 for (genvar h = 0; h < `NUM_AGUS; h=h+1)
 always_comb begin
-    
+
     reg[AXI_BWIDTH_E-3:0] shift = IN_uopLd[h].addr[2+:AXI_BWIDTH_E-2];
     reg[31:0] data = 'x;
     reg[3:0] mask = 'x;
 
     lookupMask[h] = 0;
     lookupData[h] = 32'bx;
-    
+
     for (integer i = 0; i < NUM_EVICTED+1; i=i+1) begin
-        
+
         data = evictedV[i].data[32*shift+:32];
         mask = evictedV[i].wmask[4*shift+:4];
 
         if (evictedV[i].valid &&
-            evictedV[i].addr[29:AXI_BWIDTH_E-2] == IN_uopLd[h].addr[31:AXI_BWIDTH_E] && 
+            evictedV[i].addr[29:AXI_BWIDTH_E-2] == IN_uopLd[h].addr[31:AXI_BWIDTH_E] &&
             !`IS_MMIO_PMA_W(evictedV[i].addr)
         ) begin
             for (integer j = 0; j < 4; j=j+1)
@@ -158,7 +158,7 @@ always_comb begin
 
     if (!(mmioOpInEv && `IS_MMIO_PMA_W(fusedUOp_r.addr)))
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-            if ((evicted[i].valid && 
+            if ((evicted[i].valid &&
                  evicted[i].addr[29:AXI_BWIDTH_E-2] == fusedUOp_r.addr[29:AXI_BWIDTH_E-2]) ||
                 (!evicted[i].valid && !evInsert.valid)
             ) begin
@@ -190,7 +190,7 @@ always_ff@(posedge clk) begin
 end
 
 always_ff@(posedge clk) begin
-    
+
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
         OUT_fwd[i].valid <= 0;
@@ -233,26 +233,26 @@ always_ff@(posedge clk) begin
             OUT_uopSt.wmask <= evicted[reIssue.idx].wmask;
             OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssue.idx].addr);
         end
-        
+
         // Enqueue into evicted
         if (fusedUOp_r.valid && evInsert.valid) begin
             reg[`AXI_WIDTH-1:0] data = 'x;
             reg[`AXI_WIDTH/8-1:0] mask = 'x;
             StNonce_t newNonce = evicted[evInsert.idx].nonce + 1;
-            
+
             mask = evicted[evInsert.idx].wmask | fusedUOp_r.wmask;
             data = evicted[evInsert.idx].data;
             for (integer i = 0; i < AXI_BWIDTH; i=i+1)
                 if (fusedUOp_r.wmask[i])
                     data[i*8+:8] = fusedUOp_r.data[i*8+:8];
-            
+
             evicted[evInsert.idx].data <= data;
             evicted[evInsert.idx].wmask <= mask;
             evicted[evInsert.idx].addr <= fusedUOp_r.addr;
             evicted[evInsert.idx].issued <= 0;
             evicted[evInsert.idx].nonce <= newNonce;
             evicted[evInsert.idx].valid <= 1;
-            
+
             if (!reIssue.valid) begin
                 evicted[evInsert.idx].issued <= 1;
 
@@ -266,7 +266,7 @@ always_ff@(posedge clk) begin
             end
 
         end
-        
+
         for (integer i = 0; i < `NUM_AGUS; i=i+1)
             if (IN_uopLd[i].valid) begin
                 OUT_fwd[i].valid <= 1;

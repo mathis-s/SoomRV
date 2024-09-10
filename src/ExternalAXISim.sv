@@ -8,7 +8,7 @@ module ExternalAXISim
 (
     input wire clk,
     input wire rst,
-    
+
     // write request
     input[ID_LEN-1:0]  s_axi_awid, // write req id
     input[ADDR_LEN-1:0] s_axi_awaddr, // write addr
@@ -19,20 +19,20 @@ module ExternalAXISim
     input[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
     input s_axi_awvalid,
     output logic s_axi_awready,
-    
+
     // write stream
     input[WIDTH-1:0] s_axi_wdata,
     input[(WIDTH/8)-1:0] s_axi_wstrb,
     input s_axi_wlast,
     input s_axi_wvalid,
     output logic s_axi_wready,
-    
+
     // write response
     input s_axi_bready,
     output logic[ID_LEN-1:0] s_axi_bid,
     //output[1:0] s_axi_bresp,
     output logic s_axi_bvalid,
-    
+
     // read request
     input[ID_LEN-1:0] s_axi_arid,
     input[ADDR_LEN-1:0] s_axi_araddr,
@@ -43,7 +43,7 @@ module ExternalAXISim
     input[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
     input s_axi_arvalid,
     output logic s_axi_arready,
-    
+
     // read stream
     input s_axi_rready,
     output logic[ID_LEN-1:0] s_axi_rid,
@@ -103,7 +103,7 @@ logic[ID_LEN-1:0] readDataIdx;
 always_comb begin
     readDataIdxValid = 0;
     readDataIdx = 'x;
-    // could select index randomly to 
+    // could select index randomly to
     // simulate memory heterogeneity
     for (integer i = NUM_TFS - 1; i >= 0; i=i-1) begin
         if (reads[i].valid) begin
@@ -135,7 +135,7 @@ always_ff@(posedge clk) begin
             end
             else begin
                 // MMIO
-                
+
                 case (addr)
                     `SERIAL_ADDR: begin
                         s_axi_rdata <= 'x;
@@ -197,7 +197,7 @@ FIFO#(W_LEN, 2, 1, 1) wFIFO
     .IN_valid(s_axi_wvalid),
     .IN_data({s_axi_wdata, s_axi_wstrb, s_axi_wlast}),
     .OUT_ready(s_axi_wready),
-    
+
     .OUT_valid(buf_wvalid),
     .IN_ready(buf_wready),
     .OUT_data({buf_wdata, buf_wstrb, buf_wlast})
@@ -209,7 +209,7 @@ reg writeIdxValid;
 always_comb begin
     writeIdx = 'x;
     writeIdxValid = 0;
-    
+
     for (integer i = NUM_TFS-1; i >= 0; i=i-1) begin
         if (fifoAWValid[i] && !writeDone[fifoAW[i[ID_LEN-1:0]]]) begin
             writeIdxValid = 1;
@@ -260,13 +260,13 @@ end
 // Write Ack Output
 always_ff@(posedge clk) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
-    
+
     if (rst) ;
     else if (buf_awready && buf_awvalid) begin
         fifoAWValid[fifoAWInsIdx] <= 1;
         fifoAW[fifoAWInsIdx] <= buf_awid;
     end
-    
+
     if (rst) ;
     else if (!(s_axi_bvalid && !s_axi_bready)) begin
         s_axi_bid <= 'x;
@@ -275,7 +275,7 @@ always_ff@(posedge clk) begin
 
             s_axi_bid <= idx;
             s_axi_bvalid <= 1;
-            
+
             for (integer i = 0; i < NUM_TFS-1; i=i+1) begin
                 fifoAW[i] <= fifoAW[i+1];
                 fifoAWValid[i] <= fifoAWValid[i+1];
@@ -295,7 +295,7 @@ always_ff@(posedge clk) begin
 end
 
 // Write Request FIFO
-localparam AW_LEN = 
+localparam AW_LEN =
     $bits(s_axi_awid) + $bits(s_axi_awaddr) + $bits(s_axi_awsize) + $bits(s_axi_awlen) +
     $bits(s_axi_awburst) + $bits(s_axi_awlock) + $bits(s_axi_awcache);
 
@@ -317,14 +317,14 @@ FIFO#(AW_LEN, 2, 1, 1) awFIFO
     .IN_valid(s_axi_awvalid),
     .IN_data({s_axi_awid, s_axi_awaddr, s_axi_awsize, s_axi_awlen, s_axi_awburst, s_axi_awlock, s_axi_awcache}),
     .OUT_ready(s_axi_awready),
-    
+
     .OUT_valid(buf_awvalid),
     .IN_ready(buf_awready),
     .OUT_data({buf_awid, buf_awaddr, buf_awsize, buf_awlen, buf_awburst, buf_awlock, buf_awcache})
 );
 
 // Read Request FIFO
-localparam AR_LEN = 
+localparam AR_LEN =
     $bits(s_axi_arid) + $bits(s_axi_araddr) + $bits(s_axi_arsize) + $bits(s_axi_arlen) +
     $bits(s_axi_arburst) + $bits(s_axi_arlock) + $bits(s_axi_arcache);
 
@@ -346,7 +346,7 @@ FIFO#(AR_LEN, 2, 1, 1) arFIFO
     .IN_valid(s_axi_arvalid),
     .IN_data({s_axi_arid, s_axi_araddr, s_axi_arsize, s_axi_arlen, s_axi_arburst, s_axi_arlock, s_axi_arcache}),
     .OUT_ready(s_axi_arready),
-    
+
     .OUT_valid(buf_arvalid),
     .IN_ready(buf_arready),
     .OUT_data({buf_arid, buf_araddr, buf_arsize, buf_arlen, buf_arburst, buf_arlock, buf_arcache})

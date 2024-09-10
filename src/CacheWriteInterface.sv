@@ -3,7 +3,7 @@ module CacheWriteInterface
 (
     input wire clk,
     input wire rst,
-    
+
     output reg OUT_ready,
     input wire IN_valid,
     input wire[ADDR_BITS-1:0] IN_addr,
@@ -11,7 +11,7 @@ module CacheWriteInterface
     input wire[ID_LEN-1:0] IN_id,
 
     output reg OUT_ackValid,
-    output reg[ID_LEN-1:0] OUT_ackId, 
+    output reg[ID_LEN-1:0] OUT_ackId,
 
     // Cache Interface
     input wire IN_CACHE_ready,
@@ -57,7 +57,7 @@ always_comb begin
     OUT_CACHE_we = 'x;
     OUT_CACHE_addr = 'x;
     OUT_CACHE_data = 'x;
-    
+
     if (cur_c.valid && IN_CACHE_ready) begin
         OUT_CACHE_ce = 0;
         OUT_CACHE_we = 0;
@@ -74,7 +74,7 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    
+
     OUT_ackValid <= 0;
     OUT_ackId <= 'x;
 

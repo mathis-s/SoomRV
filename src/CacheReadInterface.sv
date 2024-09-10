@@ -3,7 +3,7 @@ module CacheReadInterface
 (
     input wire clk,
     input wire rst,
-    
+
     // Set at start of transaction
     output wire OUT_ready,
     input wire IN_valid,
@@ -19,7 +19,7 @@ module CacheReadInterface
     output logic[ID_LEN-1:0] OUT_id,
     output logic[IWIDTH-1:0] OUT_data,
     output logic OUT_last,
-    
+
     // Cache Interface
     input wire IN_CACHE_ready,
     output reg OUT_CACHE_ce,
@@ -152,7 +152,7 @@ always_comb begin
         OUT_CACHE_ce = 0;
         OUT_CACHE_we = 1;
         OUT_CACHE_addr = {cur.addr[ADDR_BITS-1:`CLSIZE_E-2], cur.addr[`CLSIZE_E-3:0] + cur.progress[`CLSIZE_E-3:0]};
-        
+
         readMeta.valid = 1;
         readMeta.id = cur.id;
         readMeta.last = (cur.progress[LEN_BITS-1:$clog2(CWIDTH_W)] == cur.len[LEN_BITS-1:$clog2(CWIDTH_W)]) || cur.mmio;
@@ -177,7 +177,7 @@ end
 
 ReadMeta[1:0] readMetaSR;
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         cur <= 'x;
         cur.valid <= 0;
@@ -194,13 +194,13 @@ always_ff@(posedge clk) begin
             incoming.addr = IN_addr;
             incoming.progress = 0;
             incoming.len = IN_len;
-            
+
             incoming.mmio = IN_mmio;
             incoming.mmioData = IN_mmioData;
         end
-        
+
         readMetaSR <= {readMetaSR[0], readSucc ? readMeta : '0};
-        
+
         if (readSucc) begin
             if (readMeta.last) begin
                 if (next.valid) begin
@@ -214,7 +214,7 @@ always_ff@(posedge clk) begin
             end
             else cur.progress <= cur.progress + CWIDTH_W;
         end
-        
+
         if (incoming.valid) begin
             if (!cur.valid) cur <= incoming;
             else next <= incoming;

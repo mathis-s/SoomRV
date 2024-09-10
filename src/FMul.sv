@@ -5,12 +5,12 @@ module FMul
     input wire clk,
     input wire rst,
     input wire en,
-    
+
     input BranchProv IN_branch,
     input EX_UOp IN_uop,
-    
+
     input wire[2:0] IN_fRoundMode,
-    
+
     output RES_UOp OUT_uop
 );
 
@@ -41,12 +41,12 @@ recFNToFN#(8, 24) recode
 );
 
 always@(posedge clk) begin
-    
+
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;
-    
+
     if (!rst && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-        
+
         OUT_uop.tagDst <= IN_uop.tagDst;
         OUT_uop.sqN <= IN_uop.sqN;
         OUT_uop.valid <= 1;

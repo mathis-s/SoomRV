@@ -10,7 +10,7 @@ module TLBMissQueue#(parameter SIZE=4)
     input VirtMemState IN_vmem,
     input PageWalk_Res IN_pw,
     input wire IN_pwActive,
-    
+
     input wire IN_enqueue,
     input wire IN_uopReady,
     input AGU_UOp IN_uop,

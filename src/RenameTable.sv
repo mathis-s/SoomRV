@@ -17,12 +17,12 @@ module RenameTable
     input wire[ID_SIZE-1:0] IN_lookupIDs[NUM_LOOKUP-1:0],
     output reg OUT_lookupAvail[NUM_LOOKUP-1:0],
     output reg[TAG_SIZE-1:0] OUT_lookupSpecTag[NUM_LOOKUP-1:0],
-    
+
     input wire IN_issueValid[NUM_ISSUE-1:0],
     input wire[ID_SIZE-1:0] IN_issueIDs[NUM_ISSUE-1:0],
     input wire[TAG_SIZE-1:0] IN_issueTags[NUM_ISSUE-1:0],
     input wire IN_issueAvail[NUM_ISSUE-1:0],
-    
+
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire[ID_SIZE-1:0] IN_commitIDs[NUM_COMMIT-1:0],
     input wire[TAG_SIZE-1:0] IN_commitTags[NUM_COMMIT-1:0],
@@ -44,7 +44,7 @@ always_comb begin
     for (integer i = 0; i < NUM_LOOKUP; i=i+1) begin
         OUT_lookupSpecTag[i] = specTag[IN_lookupIDs[i]];
         OUT_lookupAvail[i] = tagAvail[OUT_lookupSpecTag[i][TAG_SIZE-2:0]] | OUT_lookupSpecTag[i][TAG_SIZE-1];
-        
+
         // Results that are written back in the current cycle also need to be marked as available
         for (integer j = 0; j < NUM_WB; j=j+1) begin
             if (IN_wbValid[j] && IN_wbTag[j] == OUT_lookupSpecTag[i])
@@ -58,14 +58,14 @@ always_comb begin
             end
         end
     end
-    
+
     for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
         OUT_commitPrevTags[i] = comTag[IN_commitIDs[i]];
     end
 end
 
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         // Registers initialized with 0
         for (integer i = 0; i < NUM_REGS; i=i+1) begin
@@ -81,7 +81,7 @@ always_ff@(posedge clk) begin
                 tagAvail[IN_wbTag[i][TAG_SIZE-2:0]] <= 1;
             end
         end
-        
+
         if (IN_mispred) begin
             for (integer i = 1; i < NUM_REGS; i=i+1) begin
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
@@ -94,7 +94,7 @@ always_ff@(posedge clk) begin
             for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
                 if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
                     specTag[IN_issueIDs[i]] <= IN_issueTags[i];
-                    
+
                     if (!IN_issueTags[i][TAG_SIZE-1]) begin
                         tagAvail[IN_issueTags[i][TAG_SIZE-2:0]] <= 0;
                         assert(IN_issueAvail[i] == 0);
@@ -102,7 +102,7 @@ always_ff@(posedge clk) begin
                 end
             end
         end
-        
+
         for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
             if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
                 if (IN_mispredFlush) begin

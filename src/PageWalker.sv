@@ -2,10 +2,10 @@ module PageWalker#(parameter NUM_RQS=3)
 (
     input wire clk,
     input wire rst,
-    
+
     input PageWalk_Req IN_rqs[NUM_RQS-1:0],
     output PageWalk_Res OUT_res,
-    
+
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
     input LD_Ack IN_ldAck[`NUM_AGUS-1:0],
@@ -17,7 +17,7 @@ reg[0:0] pageWalkIter;
 reg[31:0] pageWalkAddr;
 reg[1:0] rqID;
 
-enum logic[1:0] 
+enum logic[1:0]
 {
     IDLE, WAIT_FOR_LOAD
 } state;
@@ -26,7 +26,7 @@ RES_UOp pwLdRes;
 always_comb begin
     pwLdRes = RES_UOp'{valid: 0, default: 'x};
     for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-        if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit && 
+        if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit &&
             IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == 7'h40
         ) begin
             pwLdRes = IN_ldResUOp[i];
@@ -48,7 +48,7 @@ always_comb begin
     ppn_c = pte[31:10];
     rwx_c = 'x;
     dagu_c = 'x;
-    
+
     // We can already do a few simple checks for
     // page faults here. Checks involving permissions
     // are done later though, as permissions might chance.
@@ -57,7 +57,7 @@ always_comb begin
     ) begin
         pageFault_c = 1;
     end
-    
+
     // misaligned super page
     if (isSuperPage_c && pte[19:10] != 0) begin
         pageFault_c = 1;
@@ -78,7 +78,7 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    
+
     OUT_res.valid <= 0;
 
     if (rst) begin
@@ -93,7 +93,7 @@ always_ff@(posedge clk) begin
                 OUT_res.busy <= 0;
                 for (integer i = 0; i < NUM_RQS; i=i+1) begin
                     if (IN_rqs[i].valid) begin
-                        
+
                         state <= WAIT_FOR_LOAD;
                         pageWalkIter <= 1;
                         pageWalkAddr <= IN_rqs[i].addr;
@@ -117,7 +117,7 @@ always_ff@(posedge clk) begin
                 else if (pwLdRes.valid) begin
                     // Pointer to next page
                     if (pwLdRes.result[3:0] == 4'b0001 && pwLdRes.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
-                        
+
                         OUT_ldUOp.valid <= 1;
                         OUT_ldUOp.addr <= nextLookup;
 

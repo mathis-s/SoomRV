@@ -4,7 +4,7 @@ module BypassLSU
     input wire rst,
 
     input BranchProv IN_branch,
-    
+
     input wire IN_uopLdEn,
     output reg OUT_ldStall,
     input LD_UOp IN_uopLd,
@@ -50,7 +50,7 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    
+
     if (rst) begin
         activeLd.valid <= 0;
         OUT_memc <= '0;
@@ -68,7 +68,7 @@ always_ff@(posedge clk) begin
             default: begin
                 state <= IDLE;
                 if (IN_uopSt.valid && IN_uopStEn && !OUT_stStall) begin
-                    
+
                     reg[1:0] addrLow;
                     for (integer i = 3; i >= 0; i=i-1)
                         if (IN_uopSt.wmask[i] == 1)
@@ -91,10 +91,10 @@ always_ff@(posedge clk) begin
 
                     state <= RQ_ST;
                 end
-                else if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall && 
+                else if (IN_uopLd.valid && IN_uopLdEn && !OUT_ldStall &&
                     (IN_uopLd.external || !IN_branch.taken || $signed(IN_uopLd.sqN - IN_branch.sqN) <= 0)
                 ) begin
-                    
+
                     case (IN_uopLd.size)
                         0: OUT_memc.cmd <= MEMC_READ_BYTE;
                         1: OUT_memc.cmd <= MEMC_READ_HALF;
@@ -120,8 +120,8 @@ always_ff@(posedge clk) begin
                 if (IN_memc.sglLdRes.valid) begin
                     state <= DONE_LD;
                     case (activeLd.size)
-                        0: OUT_ldData <= {4{IN_memc.sglLdRes.data[7:0]}}; 
-                        1: OUT_ldData <= {2{IN_memc.sglLdRes.data[15:0]}}; 
+                        0: OUT_ldData <= {4{IN_memc.sglLdRes.data[7:0]}};
+                        1: OUT_ldData <= {2{IN_memc.sglLdRes.data[15:0]}};
                         default: OUT_ldData <= IN_memc.sglLdRes.data;
                     endcase
                 end
