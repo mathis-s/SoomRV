@@ -120,13 +120,9 @@ end
 logic[31:0] wAddrToMatch[`NUM_AGUS-1:0];
 typedef enum logic[1:0]
 {
-    STORE,
-    LD_FWD,
-    LD_NACK
+    STORE
 } AddrCompareType;
-
 AddrCompareType addrCompT[`NUM_AGUS-1:0];
-
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         wAddrToMatch[h] = 'x;
@@ -134,14 +130,6 @@ always_comb begin
 
         if (IN_uop[h].valid && IN_uop[h].isStore) begin
             wAddrToMatch[h] = IN_uop[h].addr;
-        end
-        else if (IN_memc.ldDataFwd.valid) begin
-            addrCompT[h] = LD_FWD;
-            wAddrToMatch[h] = IN_memc.ldDataFwd.addr;
-        end
-        else if (IN_ldAck[h].valid) begin
-            addrCompT[h] = LD_NACK;
-            wAddrToMatch[h] = IN_ldAck[h].addr;
         end
     end
 end
@@ -151,12 +139,12 @@ always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             wAddrMatch[h][i] = ((entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E]) &&
-                                (addrCompT[h] != LD_FWD ||
-                                    entries[i].addr[`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)] ==
-                                    wAddrToMatch[h][`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)]) &&
-                                (addrCompT[h] != STORE  ||
-                                    entries[i].addr[`CLSIZE_E-1:2] ==
-                                    wAddrToMatch[h][`CLSIZE_E-1:2])
+
+                                (entries[i].addr[`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)] ==
+                                 wAddrToMatch[h][`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)]) &&
+
+                                (entries[i].addr[`CLSIZE_E-1:2] ==
+                                 wAddrToMatch[h][`CLSIZE_E-1:2])
                             );
         end
     end
@@ -230,9 +218,8 @@ always_comb begin
 
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             logic[$clog2(NUM_ENTRIES)-1:0] idx = i[$clog2(NUM_ENTRIES)-1:0] + deqIndex;
-            logic isLdDataFwd = (addrCompT[h] == LD_FWD) && wAddrMatch[h][idx];
-            if (issueCandidates[idx] && (!ltIssue[h].valid || isLdDataFwd)) begin
-                ltIssue[h].isLdFwd = isLdDataFwd;
+            if (issueCandidates[idx] && !ltIssue[h].valid) begin
+                ltIssue[h].isLdFwd = 0;
                 ltIssue[h].valid = 1;
                 ltIssue[h].idx = idx[$clog2(NUM_ENTRIES)-1:0];
             end
@@ -326,7 +313,7 @@ always_comb begin
                 // go back to the offending load. This way we don't need to keep a snapshot of IFetch state for every load
                 // in the buffer, we just use the store's snapshot.
                 OUT_branch.taken = 1;
-                OUT_branch.dstPC = 'x;//IN_uop[i].pc + (IN_uop[i].compressed ? 2 : 4);
+                OUT_branch.dstPC = 'x;
                 OUT_branch.sqN = IN_uop[i].sqN;
                 OUT_branch.loadSqN = IN_uop[i].loadSqN + ((IN_uop[i].isLoad && IN_uop[i].isStore) ? 1 : 0);
                 OUT_branch.storeSqN = IN_uop[i].storeSqN;
@@ -343,7 +330,6 @@ always_comb begin
                 // This saves as from needing a real register file write port for stores. Instead, all
                 // of this can be handled in rename.
                 if (IN_uop[i].isLrSc && !storeHasRsv[i]) begin
-                    OUT_branch.dstPC = 'x;//IN_uop[i].pc;
                     OUT_branch.sqN = IN_uop[i].sqN - 1;
                     OUT_branch.storeSqN = IN_uop[i].storeSqN - 1;
                     OUT_branch.isSCFail = 1;
@@ -352,7 +338,6 @@ always_comb begin
 
                 prevStoreConflict = 1;
                 prevStoreConflictSqN = IN_uop[i].sqN;
-
             end
         end
 end
@@ -388,16 +373,6 @@ always_ff@(posedge clk) begin
             if (!IN_stall[i]) begin
                 lateLoadUOp[i] <= 'x;
                 lateLoadUOp[i].valid <= 0;
-            end
-            else if (lateLoadUOp[i].valid && IN_memc.ldDataFwd.valid &&
-                     lateLoadUOp[i].addr[31:$clog2(`AXI_WIDTH/8)] == IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
-            ) begin
-                lateLoadUOp[i].dataValid <= 1;
-                lateLoadUOp[i].data <= IN_memc.ldDataFwd.data[(lateLoadUOp[i].addr[$clog2(`AXI_WIDTH/8)-1:2])*32+:32];
-            end
-            else begin
-                lateLoadUOp[i].dataValid <= 0;
-                lateLoadUOp[i].data <= 'x;
             end
         end
 
@@ -458,8 +433,8 @@ always_ff@(posedge clk) begin
                         LBEntry e = entries[ltIssue[i].idx];
 
                         entries[ltIssue[i].idx].issued <= 1;
-                        lateLoadUOp[i].data <= ltIssue[i].isLdFwd ? (IN_memc.ldDataFwd.data[32*e.addr[$clog2(`AXI_WIDTH/8)-1:2]+:32]) : 'x;
-                        lateLoadUOp[i].dataValid <= ltIssue[i].isLdFwd;
+                        lateLoadUOp[i].data <= 'x;
+                        lateLoadUOp[i].dataValid <= 0;
                         lateLoadUOp[i].addr <= e.addr;
                         lateLoadUOp[i].signExtend <= e.signExtend;
                         lateLoadUOp[i].size <= e.size;
