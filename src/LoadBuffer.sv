@@ -65,7 +65,6 @@ LBEntry entries[NUM_ENTRIES-1:0];
 
 wire SqN baseIndex = IN_comLoadSqN;
 SqN lastBaseIndex;
-wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 
 LD_UOp lateLoadUOp[`NUM_AGUS-1:0];
 reg delayLoad[`NUM_AGUS-1:0];
@@ -150,12 +149,42 @@ always_comb begin
     end
 end
 
-logic[NUM_ENTRIES-1:0] isBefore[`NUM_AGUS-1:0];
+logic[NUM_ENTRIES-1:0] isBefore_dbg[`NUM_AGUS-1:0];
 always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1)
         for (integer i = 0; i < NUM_ENTRIES; i=i+1)
-            isBefore[h][i] = $signed(IN_uop[h].loadSqN - {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) <= 0;
+            isBefore_dbg[h][i] = $signed(IN_uop[h].loadSqN - {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) <= 0;
 end
+
+logic[NUM_ENTRIES-1:0] isBefore[`NUM_AGUS-1:0];
+always_comb begin
+    logic[NUM_ENTRIES-1:0] baseIndexOH = (1 << lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]);
+
+    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+        logic[NUM_ENTRIES-1:0] storeIndexOH = (1 << IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0]);
+        logic active = IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0] >= lastBaseIndex[$clog2(NUM_ENTRIES)-1:0];
+
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+
+            if ($signed(IN_uop[h].loadSqN - (lastBaseIndex + SqN'(NUM_ENTRIES)) ) >= 0)
+                active = 0;
+            else if (storeIndexOH[i])
+                active = 1;
+            else if (baseIndexOH[i])
+                active = 0;
+
+            isBefore[h][i] = active;
+        end
+    end
+end
+
+always_ff@(posedge clk)
+    if (!rst)
+        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+            if (IN_uop[i].valid)
+                for (integer j = 0; j < `NUM_AGUS; j=j+1)
+                    if (entries[j].valid)
+                        assert(isBefore[i][j] == isBefore_dbg[i][j]);
 
 // For store-conditional, check if a reservation exists
 logic storeHasRsv[`NUM_AGUS-1:0];
@@ -195,8 +224,8 @@ typedef struct packed
     logic isLdFwd;
     logic valid;
 } LateIssue;
-
 LateIssue ltIssue[`NUM_AGUS-1:0];
+wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 always_comb begin
     logic memcNotBusy = !IN_memc.transfers[0].valid;
 
@@ -260,27 +289,39 @@ end
 
 
 // Generate invalidation mask based on last cycle's and current baseIndex
-wire SqN invalSqN = IN_branch.taken ? IN_branch.loadSqN : lastBaseIndex;
-wire[NUM_ENTRIES-1:0] beginOneHot = (1 << invalSqN[$clog2(NUM_ENTRIES)-1:0]);
+wire invalBranch = IN_branch.taken;
+wire invalCommit = !invalBranch;
+
+wire[NUM_ENTRIES-1:0] beginOneHot = (1 << lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]);
+wire[NUM_ENTRIES-1:0] branchOneHot = (1 << IN_branch.loadSqN[$clog2(NUM_ENTRIES)-1:0]);
 wire[NUM_ENTRIES-1:0] endOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
 reg[NUM_ENTRIES-1:0] invalMask;
 always_comb begin
-    reg active;
-    if (IN_branch.taken)
-        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] <= invalSqN[$clog2(NUM_ENTRIES)-1:0];
-    else
-        active = baseIndex[$clog2(NUM_ENTRIES)-1:0] < invalSqN[$clog2(NUM_ENTRIES)-1:0];
-
+    reg active = baseIndex[$clog2(NUM_ENTRIES)-1:0] < lastBaseIndex[$clog2(NUM_ENTRIES)-1:0];
     for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (IN_branch.taken) begin
-            if (beginOneHot[i]) active = 1;
-            else if (endOneHot[i]) active = 0;
-        end
-        else begin
-            if (endOneHot[i]) active = 0;
-            else if (beginOneHot[i]) active = 1;
-        end
+        if (endOneHot[i])
+            active = 0;
+        else if (beginOneHot[i])
+            active = 1;
         invalMask[i] = active;
+    end
+end
+
+// Generate invalidation mask based on invalidation index and current baseIndex
+reg[NUM_ENTRIES-1:0] invalMaskBr;
+always_comb begin
+    reg active = baseIndex[$clog2(NUM_ENTRIES)-1:0] <= IN_branch.loadSqN[$clog2(NUM_ENTRIES)-1:0];
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+
+        if (branchOneHot[i])
+            active = 1;
+        else if (endOneHot[i])
+            active = 0;
+
+        invalMaskBr[i] = IN_branch.taken && (
+            (IN_branch.flush) ||
+            (active && !($signed(IN_branch.loadSqN - lastBaseIndex) >= NUM_ENTRIES))
+        );
     end
 end
 
@@ -342,17 +383,17 @@ always_comb begin
         end
 end
 
+always_ff@(posedge clk)
+    OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
+
 LoadRsv specRsv;
 LoadRsv comRsv;
 always_ff@(posedge clk) begin
-
-    lastBaseIndex <= baseIndex;
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
         end
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
 
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
             lateLoadUOp[i] <= 'x;
@@ -365,8 +406,9 @@ always_ff@(posedge clk) begin
         comRsv <= LoadRsv'{valid: 0, default: 'x};
     end
     else begin
-
         reg[`NUM_AGUS-1:0] lateLoadPassthru = 0;
+
+        lastBaseIndex <= baseIndex;
 
         // Handle late load outputs
         for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
@@ -402,14 +444,14 @@ always_ff@(posedge clk) begin
             specRsv <= LoadRsv'{valid: 0, default: 'x};
         end
 
+        // Invalidate entries (both post-commit and misspeculated)
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+            if (invalMaskBr[i] || invalMask[i])
+                entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
+        end
+
         // Invalidate misspeculated state
         if (IN_branch.taken) begin
-            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if ((invalMask[i] && !($signed(IN_branch.loadSqN - baseIndex) >= NUM_ENTRIES)) || IN_branch.flush) begin
-                    entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
-                end
-            end
-
             for (integer i = 0; i < `NUM_AGUS; i=i+1)
                 if ($signed(lateLoadUOp[i].sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
                     lateLoadUOp[i] <= 'x;
@@ -479,12 +521,6 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-
-            for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if (invalMask[i]) begin
-                    entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
-                end
-            end
         end
 
         // Insert new entries, check stores
@@ -505,7 +541,6 @@ always_ff@(posedge clk) begin
                 entries[index].nonSpec <= nonSpeculative[i];
                 entries[index].valid <= 1;
             end
-        OUT_maxLoadSqN <= baseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
     end
 end
 
