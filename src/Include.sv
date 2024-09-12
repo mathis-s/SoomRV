@@ -765,9 +765,11 @@ typedef struct packed
     logic[31:0] addr;
     logic signExtend;
     logic[1:0] size;
+    SqN storeSqN;
     SqN loadSqN;
     Tag tagDst;
     SqN sqN;
+    logic atomic;
     logic doNotCommit;
     logic external; // not part of normal execution, ignore sqn, tagDst and rd, don't commit
     AGU_Exception exception;

@@ -75,6 +75,7 @@ SRC_FILES = \
 	src/StoreDataLoad.sv \
 	src/StoreQueueBackend.sv \
 	src/OHEncoder.sv \
+	src/RangeMaskGen.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

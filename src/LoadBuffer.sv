@@ -35,11 +35,13 @@ localparam TAG_SIZE = $bits(SqN) - $clog2(NUM_ENTRIES);
 typedef struct packed
 {
     AGU_Exception exception;
+    SqN storeSqN;
     SqN sqN;
     Tag tagDst;
     logic[TAG_SIZE-1:0] highLdSqN;
     logic[1:0] size;
     logic[31:0] addr;
+    logic atomic;
     logic signExtend;
     logic doNotCommit;
     logic nonSpec;
@@ -102,8 +104,10 @@ always_comb begin
             OUT_uopAGULd[h].signExtend = IN_uop[h].signExtend;
             OUT_uopAGULd[h].size = IN_uop[h].size;
             OUT_uopAGULd[h].loadSqN = IN_uop[h].loadSqN;
+            OUT_uopAGULd[h].storeSqN = IN_uop[h].storeSqN;
             OUT_uopAGULd[h].tagDst = IN_uop[h].tagDst;
             OUT_uopAGULd[h].sqN = IN_uop[h].sqN;
+            OUT_uopAGULd[h].atomic = IN_uop[h].isLoad && IN_uop[h].isStore;
             OUT_uopAGULd[h].doNotCommit = IN_uop[h].doNotCommit;
             OUT_uopAGULd[h].external = 0;
             OUT_uopAGULd[h].exception = IN_uop[h].exception;
@@ -464,7 +468,6 @@ always_ff@(posedge clk) begin
         else begin
             // Issue Late Loads
             for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-
                 if (!lateLoadUOp[i].valid || !IN_stall[i] || ltIssue[i].isLdFwd) begin
 
                     if (IN_stall[i] && lateLoadUOp[i].valid)
@@ -480,9 +483,11 @@ always_ff@(posedge clk) begin
                         lateLoadUOp[i].addr <= e.addr;
                         lateLoadUOp[i].signExtend <= e.signExtend;
                         lateLoadUOp[i].size <= e.size;
+                        lateLoadUOp[i].storeSqN <= e.storeSqN;
                         lateLoadUOp[i].loadSqN <= {e.highLdSqN, ltIssue[i].idx};
                         lateLoadUOp[i].tagDst <= e.tagDst;
                         lateLoadUOp[i].sqN <= e.sqN;
+                        lateLoadUOp[i].atomic <= e.atomic;
                         lateLoadUOp[i].doNotCommit <= e.doNotCommit;
                         lateLoadUOp[i].external <= 0;
                         lateLoadUOp[i].exception <= e.exception;
@@ -507,9 +512,11 @@ always_ff@(posedge clk) begin
                             lateLoadUOp[i].addr <= IN_uop[i].addr;
                             lateLoadUOp[i].signExtend <= IN_uop[i].signExtend;
                             lateLoadUOp[i].size <= IN_uop[i].size;
+                            lateLoadUOp[i].storeSqN <= IN_uop[i].storeSqN;
                             lateLoadUOp[i].loadSqN <= IN_uop[i].loadSqN;
                             lateLoadUOp[i].tagDst <= IN_uop[i].tagDst;
                             lateLoadUOp[i].sqN <= IN_uop[i].sqN;
+                            lateLoadUOp[i].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
                             lateLoadUOp[i].doNotCommit <= IN_uop[i].doNotCommit;
                             lateLoadUOp[i].external <= 0;
                             lateLoadUOp[i].exception <= IN_uop[i].exception;
@@ -529,8 +536,10 @@ always_ff@(posedge clk) begin
 
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
                 entries[index].exception <= IN_uop[i].exception;
+                entries[index].storeSqN <= IN_uop[i].storeSqN;
                 entries[index].sqN <= IN_uop[i].sqN;
                 entries[index].tagDst <= IN_uop[i].tagDst;
+                entries[index].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
                 entries[index].signExtend <= IN_uop[i].signExtend;
                 entries[index].addr <= IN_uop[i].addr;
                 entries[index].size <= IN_uop[i].size;

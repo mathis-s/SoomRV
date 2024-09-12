@@ -42,7 +42,6 @@ typedef struct packed
 
     // wmask == 0 is escape sequence for special operations
     logic[3:0] wmask;
-    SqN sqN;
     logic loaded;
     logic addrAvail;
 } SQEntry;
@@ -50,40 +49,42 @@ typedef struct packed
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
 always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
 
-wire[NUM_ENTRIES-1:0] baseIndexOneHot = (1 << baseIndex[IDX_LEN-1:0]);
-wire[NUM_ENTRIES-1:0] comStSqNOneHot = (1 << IN_comStSqN[IDX_LEN-1:0]);
-wire[NUM_ENTRIES-1:0] branchStSqNOneHot = (1 << IN_branch.storeSqN[IDX_LEN-1:0]);
+wire[NUM_ENTRIES-1:0] entryReady_c;
+RangeMaskGen#(NUM_ENTRIES, 0) readyRangeGen
+(
+    .IN_allOnes(SqN'(baseIndex + SqN'(NUM_ENTRIES)) == IN_comStSqN),
+    .IN_enable(1'b1),
+    .IN_startIdx(baseIndex[IDX_LEN-1:0]),
+    .IN_endIdx(IN_comStSqN[IDX_LEN-1:0]),
+    .OUT_range(entryReady_c)
+);
 
-reg[NUM_ENTRIES-1:0] entryReady_c;
-always_comb begin
-    reg active = IN_comStSqN[IDX_LEN-1:0] < baseIndex[IDX_LEN-1:0];
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (SqN'(baseIndex + SqN'(NUM_ENTRIES)) == IN_comStSqN)
-            active = 1;
-        else if (comStSqNOneHot[i])
-            active = 0;
-        else if (baseIndexOneHot[i])
-            active = 1;
+wire[NUM_ENTRIES-1:0] invalRange_c;
+RangeMaskGen#(NUM_ENTRIES, 1, 1, 0) invalRangeGen
+(
+    .IN_allOnes(1'b0),
+    .IN_enable(($signed(IN_branch.storeSqN - baseIndex) < NUM_ENTRIES-1)),
+    .IN_startIdx(IN_branch.storeSqN[IDX_LEN-1:0]),
+    .IN_endIdx(baseIndex[IDX_LEN-1:0]),
+    .OUT_range(invalRange_c)
+);
 
-        entryReady_c[i] = active;
-    end
+
+wire[NUM_ENTRIES-1:0] forwardRange_c[`NUM_AGUS-1:0];
+generate
+for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
+    wire SqN endSqN = IN_uopLd[i].storeSqN + (IN_uopLd[i].atomic ? 0 : 1);
+    RangeMaskGen#(NUM_ENTRIES, 0) forwardRangeGen
+    (
+        .IN_allOnes($signed(endSqN - baseIndex) >= NUM_ENTRIES),
+        .IN_enable(1'b1),
+        .IN_startIdx(baseIndex[IDX_LEN-1:0]),
+        .IN_endIdx(endSqN[IDX_LEN-1:0]),
+        .OUT_range(forwardRange_c[i])
+    );
 end
+endgenerate
 
-reg[NUM_ENTRIES-1:0] invalRange_c;
-always_comb begin
-    reg active = baseIndex[IDX_LEN-1:0] <= (IN_branch.storeSqN[IDX_LEN-1:0] + IDX_LEN'(1));
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-
-        if ($signed(IN_branch.storeSqN - baseIndex) >= NUM_ENTRIES-1)
-            active = 0;
-        else if (branchStSqNOneHot[(i-1) % NUM_ENTRIES])
-            active = 1;
-        else if (baseIndexOneHot[i])
-            active = 0;
-
-        invalRange_c[i] = active;
-    end
-end
 
 SQEntry entries[NUM_ENTRIES-1:0] /* verilator public */;
 SqN baseIndex /* verilator public */;
@@ -97,13 +98,11 @@ always_comb begin
 end
 
 typedef enum logic[0:0] {LOAD, STORE_FUSE} LookupType;
-reg[31:0] lookupAddr[`NUM_AGUS-1:0];
-LookupType lookupType[`NUM_AGUS-1:0];
 
-for (genvar h = 0; h < `NUM_AGUS; h=h+1)
+reg[31:0] lookupAddr[`NUM_AGUS-1:0];
 always_comb begin
-    lookupAddr[h] = IN_uopLd[h].addr;
-    lookupType[h] = LOAD;
+    for (integer h = 0; h < `NUM_AGUS; h=h+1)
+        lookupAddr[h] = IN_uopLd[h].addr;
 end
 
 reg[3:0] readMask[`NUM_AGUS-1:0];
@@ -184,9 +183,7 @@ always_comb begin
     // actual forwarding
     lookupConflictList[h][i] = 0;
     if (entries[i].addrAvail &&
-        entries[i].addr == lookupAddr[h][31:2] &&
-        ((lookupType[h] == LOAD && $signed(entries[i].sqN - IN_uopLd[h].sqN) < 0) ||
-            entryReady_r[i]) &&
+        entries[i].addr == lookupAddr[h][31:2] && (forwardRange_c[h][i] || entryReady_r[i]) &&
         !`IS_MMIO_PMA_W(entries[i].addr)
     ) begin
 
@@ -373,18 +370,6 @@ always_ff@(posedge clk) begin
             flushing <= IN_branch.flush;
 
             for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-                if (entries[i].addrAvail)
-
-                    `ifdef DEBUG
-                    if(!entryReady_c[i] &&
-                        invalRange_c[i] !=
-                        $signed(entries[i].sqN - IN_branch.sqN) > 0
-                    ) begin
-                        $display("got %x, baseIndex=%x, storeSqN=%x, %d\n", invalRange_c[i], baseIndex, IN_branch.storeSqN, i);
-                        assert(0);
-                    end
-                    `endif
-
                 if (invalRange_c[i] || (IN_branch.flush && !entryReady_r[i]))
                     entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
             end
@@ -402,7 +387,6 @@ always_ff@(posedge clk) begin
                 assert(!entries[index].addrAvail);
 
                 if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
-                    entries[index].sqN <= IN_uopSt[i].sqN;
                     entries[index].addr <= IN_uopSt[i].addr[31:2];
                     entries[index].wmask <= IN_uopSt[i].wmask;
                     entries[index].addrAvail <= 1;

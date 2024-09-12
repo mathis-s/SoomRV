@@ -43,8 +43,10 @@ always_comb begin
             OUT_ldUOp[i].size = 2;
             OUT_ldUOp[i].sqN = 0;
             OUT_ldUOp[i].tagDst = 7'h40;
-            OUT_ldUOp[i].sqN = 0;
+            OUT_ldUOp[i].loadSqN = 0;
+            OUT_ldUOp[i].storeSqN = 0;
             OUT_ldUOp[i].doNotCommit = 1;
+            OUT_ldUOp[i].atomic = 0;
             OUT_ldUOp[i].external = 1;
             OUT_ldUOp[i].exception = AGU_NO_EXCEPTION;
             OUT_ldUOp[i].isMMIO = 0;
