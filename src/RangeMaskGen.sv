@@ -23,15 +23,9 @@ always_comb begin
         logic doEnd = endIdxOH[(i-END_SHIFT)%LENGTH];
         logic doStart = startIdxOH[(i-START_SHIFT)%LENGTH];
 
-        // Swap cases depending on what we are supposed to output when indices are equal.
-        if (OUTPUT_ON_EQUAL) begin
-            if (doStart) active = 1;
-            else if (doEnd) active = 0;
-        end
-        else begin
-            if (doEnd) active = 0;
-            else if (doStart) active = 1;
-        end
+        if (doStart && doEnd) active = OUTPUT_ON_EQUAL;
+        else if (doStart) active = 1;
+        else if (doEnd) active = 0;
 
         OUT_range[i] = (active && IN_enable) || IN_allOnes;
     end

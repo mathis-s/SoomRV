@@ -142,10 +142,6 @@ always_comb begin
     for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             wAddrMatch[h][i] = ((entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E]) &&
-
-                                (entries[i].addr[`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)] ==
-                                 wAddrToMatch[h][`CLSIZE_E-1:$clog2(`AXI_WIDTH/8)]) &&
-
                                 (entries[i].addr[`CLSIZE_E-1:2] ==
                                  wAddrToMatch[h][`CLSIZE_E-1:2])
                             );
@@ -153,54 +149,21 @@ always_comb begin
     end
 end
 
-logic[NUM_ENTRIES-1:0] isBefore_dbg[`NUM_AGUS-1:0];
-always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1)
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1)
-            isBefore_dbg[h][i] = $signed(IN_uop[h].loadSqN - {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) <= 0;
-end
-
 logic[NUM_ENTRIES-1:0] isBefore[`NUM_AGUS-1:0];
-always_comb begin
-    logic[NUM_ENTRIES-1:0] baseIndexOH = (1 << lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]);
-
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
-        logic[NUM_ENTRIES-1:0] storeIndexOH = (1 << IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0]);
-        logic active = IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0] >= lastBaseIndex[$clog2(NUM_ENTRIES)-1:0];
-
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-
-            if ($signed(IN_uop[h].loadSqN - (lastBaseIndex + SqN'(NUM_ENTRIES)) ) >= 0)
-                active = 0;
-            else if (storeIndexOH[i])
-                active = 1;
-            else if (baseIndexOH[i])
-                active = 0;
-
-            isBefore[h][i] = active;
-        end
-    end
+generate
+for (genvar h = 0; h < `NUM_AGUS; h=h+1) begin
+    wire[$clog2(NUM_ENTRIES)-1:0] startIdx = IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0] +
+        $clog2(NUM_ENTRIES)'(IN_uop[h].isLoad && IN_uop[h].isStore);
+    RangeMaskGen#(NUM_ENTRIES, 1) isBeforeMaskGen
+    (
+        .IN_allOnes(1'b0),
+        .IN_enable($signed(IN_uop[h].loadSqN - (lastBaseIndex + SqN'(NUM_ENTRIES))) < 0),
+        .IN_startIdx(startIdx),
+        .IN_endIdx(lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]),
+        .OUT_range(isBefore[h])
+    );
 end
-
-always_ff@(posedge clk)
-    if (!rst)
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
-            if (IN_uop[i].valid)
-                for (integer j = 0; j < `NUM_AGUS; j=j+1)
-                    if (entries[j].valid)
-                        assert(isBefore[i][j] == isBefore_dbg[i][j]);
-
-// For store-conditional, check if a reservation exists
-logic storeHasRsv[`NUM_AGUS-1:0];
-always_comb begin
-    // Currently, SCs are issued non-speculatively, so we only have to check
-    // the committed load reservation
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
-        storeHasRsv[h] =
-            IN_uop[h].isStore && IN_uop[h].isLrSc &&
-            comRsv.valid && comRsv.addr == IN_uop[h].addr[31:2];
-    end
-end
+endgenerate
 
 // For every store, check if we previously speculatively loaded from the address written to
 // (if so, flush pipeline)
@@ -211,7 +174,7 @@ always_comb begin
         // The order we check loads here does not matter as we reset all the way back to the store on collision.
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             if (wAddrMatch[h][i] && entries[i].issued && IN_uop[h].isStore && isBefore[h][i] &&
-                (!IN_uop[h].doNotCommit || IN_uop[h].loadSqN != {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) &&
+                //(!IN_uop[h].doNotCommit || IN_uop[h].loadSqN != {entries[i].highLdSqN, i[$clog2(NUM_ENTRIES)-1:0]}) &&
                     (IN_uop[h].size == 2 ||
                     (IN_uop[h].size == 1 && (entries[i].size > 1 || entries[i].addr[1] == IN_uop[h].addr[1])) ||
                     (IN_uop[h].size == 0 && (entries[i].size > 0 || entries[i].addr[1:0] == IN_uop[h].addr[1:0])))
@@ -219,6 +182,18 @@ always_comb begin
                 storeIsConflict[h] = 1;
             end
         end
+    end
+end
+
+// For store-conditional, check if a reservation exists
+logic storeHasRsv[`NUM_AGUS-1:0];
+always_comb begin
+    // Currently, SCs are issued non-speculatively, so we only have to check
+    // the committed load reservation
+    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+        storeHasRsv[h] =
+            IN_uop[h].isStore && IN_uop[h].isLrSc &&
+            comRsv.valid && comRsv.addr == IN_uop[h].addr[31:2];
     end
 end
 
@@ -291,43 +266,26 @@ always_comb begin
         loadRsv = IdxN'{valid: 0, default: 'x};
 end
 
-
 // Generate invalidation mask based on last cycle's and current baseIndex
-wire invalBranch = IN_branch.taken;
-wire invalCommit = !invalBranch;
-
-wire[NUM_ENTRIES-1:0] beginOneHot = (1 << lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]);
-wire[NUM_ENTRIES-1:0] branchOneHot = (1 << IN_branch.loadSqN[$clog2(NUM_ENTRIES)-1:0]);
-wire[NUM_ENTRIES-1:0] endOneHot = (1 << baseIndex[$clog2(NUM_ENTRIES)-1:0]);
 reg[NUM_ENTRIES-1:0] invalMask;
-always_comb begin
-    reg active = baseIndex[$clog2(NUM_ENTRIES)-1:0] < lastBaseIndex[$clog2(NUM_ENTRIES)-1:0];
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-        if (endOneHot[i])
-            active = 0;
-        else if (beginOneHot[i])
-            active = 1;
-        invalMask[i] = active;
-    end
-end
+RangeMaskGen#(NUM_ENTRIES, 0) invalMaskGen
+(
+    .IN_allOnes(1'b0),
+    .IN_enable(1'b1),
+    .IN_startIdx(lastBaseIndex[$clog2(NUM_ENTRIES)-1:0]),
+    .IN_endIdx(baseIndex[$clog2(NUM_ENTRIES)-1:0]),
+    .OUT_range(invalMask)
+);
 
-// Generate invalidation mask based on invalidation index and current baseIndex
 reg[NUM_ENTRIES-1:0] invalMaskBr;
-always_comb begin
-    reg active = baseIndex[$clog2(NUM_ENTRIES)-1:0] <= IN_branch.loadSqN[$clog2(NUM_ENTRIES)-1:0];
-    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-
-        if (branchOneHot[i])
-            active = 1;
-        else if (endOneHot[i])
-            active = 0;
-
-        invalMaskBr[i] = IN_branch.taken && (
-            (IN_branch.flush) ||
-            (active && !($signed(IN_branch.loadSqN - lastBaseIndex) >= NUM_ENTRIES))
-        );
-    end
-end
+RangeMaskGen#(NUM_ENTRIES, 1) invalMaskBrGen
+(
+    .IN_allOnes(IN_branch.taken && IN_branch.flush),
+    .IN_enable(IN_branch.taken && !($signed(IN_branch.loadSqN - lastBaseIndex) >= NUM_ENTRIES)),
+    .IN_startIdx(IN_branch.loadSqN[$clog2(NUM_ENTRIES)-1:0]),
+    .IN_endIdx(baseIndex[$clog2(NUM_ENTRIES)-1:0]),
+    .OUT_range(invalMaskBr)
+);
 
 always_ff@(posedge clk) begin
     OUT_comLimit.sqN <= 'x;
@@ -340,7 +298,6 @@ always_ff@(posedge clk) begin
             OUT_comLimit.sqN <= {entries[loadRsv.idx].highLdSqN, loadRsv.idx};
     end
 end
-
 
 always_comb begin
 
