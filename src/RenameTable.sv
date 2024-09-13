@@ -85,8 +85,8 @@ always_ff@(posedge clk) begin
         if (IN_mispred) begin
             for (integer i = 1; i < NUM_REGS; i=i+1) begin
                 // Ideally we would set specTag to the last specTag that isn't post incoming branch.
-                // We can't keep such a history for every register though. As such, we flush the pipeline
-                // after a mispredict. After flush, all results are committed, and rename can continue again.
+                // We can't keep such a history for every register though. Instead we reset to committed
+                // state, then the ROB re-applies all non-committed but pre-mispredict changes.
                 specTag[i] <= comTag[i];
             end
         end
