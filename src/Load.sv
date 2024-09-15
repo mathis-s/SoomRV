@@ -139,8 +139,8 @@ always_ff@(posedge clk) begin
                 outUOpReg[i].imm <= IN_uop[i].imm;
 
                 // jalr uses a different encoding
-                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT &&
-                    (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)
+                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_BRANCH &&
+                    (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR)
                 ) begin
                     outUOpReg[i].imm <= 'x;
                     outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;

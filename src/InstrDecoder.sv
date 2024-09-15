@@ -395,27 +395,27 @@ always_comb begin
                         invalidEnc = 0;
                     end
                     `OPC_AUIPC: begin
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
                         uop.rs1 = 0;
                         uop.rs2 = 0;
                         uop.rd = instr.rd;
-                        uop.opcode = INT_AUIPC;
+                        uop.opcode = BR_AUIPC;
                         invalidEnc = 0;
                     end
                     `OPC_JAL: begin
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
                         uop.rs1 = 0;
                         uop.rs2 = 0;
                         uop.immB = 1;
                         uop.rd = instr.rd;
-                        uop.opcode = INT_JAL;
+                        uop.opcode = BR_JAL;
                         invalidEnc = 0;
 
                         // No need to execute jumps that don't write to a register
                         if (uop.rd == 0) uop.fu = FU_RN;
                     end
                     `OPC_JALR: begin
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
                         uop.rs1 = instr.rs1;
                         uop.immB = 1;
                         uop.rd = instr.rd;
@@ -423,11 +423,11 @@ always_comb begin
                         uop.imm12 = instr[31:20];
 
                         unique casez ({instr.rd==1 || instr.rd==5, instr.rs1==1 || instr.rs1==5, instr.rd==instr.rs1})
-                            3'b00?: uop.opcode = INT_V_JR;
-                            3'b01?: uop.opcode = INT_V_RET;
-                            3'b10?: uop.opcode = INT_V_JALR;
-                            3'b110: uop.opcode = INT_V_JR;
-                            3'b111: uop.opcode = INT_V_JALR;
+                            3'b00?: uop.opcode = BR_V_JR;
+                            3'b01?: uop.opcode = BR_V_RET;
+                            3'b10?: uop.opcode = BR_V_JALR;
+                            3'b110: uop.opcode = BR_V_JR;
+                            3'b111: uop.opcode = BR_V_JALR;
                         endcase
 
                         // the regular imm field is used to pass the speculated
@@ -489,41 +489,40 @@ always_comb begin
                                 default: invalidEnc = 1;
                             endcase
                         end
-                        else begin
-                            uop.rs1 = instr.rs1;
-                            uop.rs2 = instr.rs2;
-                            uop.rd = instr.rs1;
-                            uop.immB = 1;
-                            uop.fu = FU_AGU;
-                            invalidEnc = 0;
-                            case (instr.funct3)
-                                0: uop.opcode = LSU_SB_PREINC;
-                                1: uop.opcode = LSU_SH_PREINC;
-                                2: uop.opcode = LSU_SW_PREINC;
-
-                                4: uop.opcode = LSU_SB_POSTINC;
-                                5: uop.opcode = LSU_SH_POSTINC;
-                                6: uop.opcode = LSU_SW_POSTINC;
-                                default: invalidEnc = 1;
-                            endcase
-                        end
+                        //else begin
+                        //    uop.rs1 = instr.rs1;
+                        //    uop.rs2 = instr.rs2;
+                        //    uop.rd = instr.rs1;
+                        //    uop.immB = 1;
+                        //    uop.fu = FU_AGU;
+                        //    invalidEnc = 0;
+                        //    case (instr.funct3)
+                        //        0: uop.opcode = LSU_SB_PREINC;
+                        //        1: uop.opcode = LSU_SH_PREINC;
+                        //        2: uop.opcode = LSU_SW_PREINC;
+                        //        4: uop.opcode = LSU_SB_POSTINC;
+                        //        5: uop.opcode = LSU_SH_POSTINC;
+                        //        6: uop.opcode = LSU_SW_POSTINC;
+                        //        default: invalidEnc = 1;
+                        //    endcase
+                        //end
                     end
                     `OPC_BRANCH: begin
                         uop.rs1 = instr.rs1;
                         uop.rs2 = instr.rs2;
                         uop.immB = 0;
                         uop.rd = 0;
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
 
                         invalidEnc = (uop.opcode == 2) || (uop.opcode == 3);
 
                         case (instr.funct3)
-                            0: uop.opcode = INT_BEQ;
-                            1: uop.opcode = INT_BNE;
-                            4: uop.opcode = INT_BLT;
-                            5: uop.opcode = INT_BGE;
-                            6: uop.opcode = INT_BLTU;
-                            7: uop.opcode = INT_BGEU;
+                            0: uop.opcode = BR_BEQ;
+                            1: uop.opcode = BR_BNE;
+                            4: uop.opcode = BR_BLT;
+                            5: uop.opcode = BR_BGE;
+                            6: uop.opcode = BR_BLTU;
+                            7: uop.opcode = BR_BGEU;
                         endcase
                     end
                     `OPC_FENCE: begin
@@ -590,15 +589,18 @@ always_comb begin
                             if (instr.funct3 == 3'b001) begin
                                 if (instr.rs2 == 5'b00000) begin
                                     invalidEnc = 0;
-                                    uop.opcode = INT_CLZ;
+                                    uop.fu = FU_BITMANIP;
+                                    uop.opcode = BM_CLZ;
                                 end
                                 else if (instr.rs2 == 5'b00001) begin
                                     invalidEnc = 0;
-                                    uop.opcode = INT_CTZ;
+                                    uop.fu = FU_BITMANIP;
+                                    uop.opcode = BM_CTZ;
                                 end
                                 else if (instr.rs2 == 5'b00010) begin
                                     invalidEnc = 0;
-                                    uop.opcode = INT_CPOP;
+                                    uop.fu = FU_BITMANIP;
+                                    uop.opcode = BM_CPOP;
                                 end
                                 else if (instr.rs2 == 5'b00100) begin
                                     invalidEnc = 0;
@@ -615,41 +617,48 @@ always_comb begin
                             end
                             else if (instr.funct3 == 3'b101) begin
                                 invalidEnc = 0;
-                                uop.opcode = INT_ROR;
+                                uop.fu = FU_BITMANIP;
+                                uop.opcode = BM_ROR;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr[31:20] == 12'b001010000111 && instr.funct3 == 3'b101) begin
                             invalidEnc = 0;
-                            uop.opcode = INT_ORC_B;
+                            uop.fu = FU_BITMANIP;
+                            uop.opcode = BM_ORC_B;
                         end
                         else if (instr[31:20] == 12'b011010011000 && instr.funct3 == 3'b101) begin
                             invalidEnc = 0;
-                            uop.opcode = INT_REV8;
+                            uop.fu = FU_BITMANIP;
+                            uop.opcode = BM_REV8;
                         end
                         if (instr.funct7 == 7'b0100100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BCLR;
+                                uop.fu = FU_BITMANIP;
+                                uop.opcode = BM_BCLR;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                             else if (instr.funct3 == 3'b101) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BEXT;
+                                uop.fu = FU_BITMANIP;
+                                uop.opcode = BM_BEXT;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr.funct7 == 7'b0110100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BINV;
+                                uop.fu = FU_BITMANIP;
+                                uop.opcode = BM_BINV;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                         end
                         else if (instr.funct7 == 7'b0010100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BSET;
+                                uop.fu = FU_BITMANIP;
+                                uop.opcode = BM_BSET;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                         end
@@ -783,39 +792,39 @@ always_comb begin
                         else if (instr.funct7 == 7'b0110000) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_ROL;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_ROL;
+                                uop.fu = FU_BITMANIP;
                             end
                             else if (instr.funct3 == 3'b101) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_ROR;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_ROR;
+                                uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0100100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BCLR;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_BCLR;
+                                uop.fu = FU_BITMANIP;
                             end
                             else if (instr.funct3 == 3'b101) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BEXT;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_BEXT;
+                                uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0110100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BINV;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_BINV;
+                                uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0010100) begin
                             if (instr.funct3 == 3'b001) begin
                                 //invalidEnc = 0;
-                                uop.opcode = INT_BSET;
-                                uop.fu = FU_INT;
+                                uop.opcode = BM_BSET;
+                                uop.fu = FU_BITMANIP;
                             end
                         end
                         /*else if (IN_enCustom && instr.funct7 == 7'b1000000) begin
@@ -1186,27 +1195,27 @@ always_comb begin
                     end
                     `endif
                     // c.sw with preinc
-                    else if (i16.ciw.funct3 == 3'b101 && IN_dec.allowCustom) begin
-                        uop.opcode = LSU_SW_PREINC;
-                        uop.fu = FU_AGU;
-                        uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
-                        uop.rs1 = {2'b01, i16.cs.rd_rs1};
-                        uop.rs2 = {2'b01, i16.cs.rs2};
-                        uop.rd = {2'b01, i16.cs.rd_rs1};
-                        uop.immB = 1;
-                        invalidEnc = 0;
-                    end
-                    // c.sw with postinc
-                    else if (i16.ciw.funct3 == 3'b111 && IN_dec.allowCustom) begin
-                        uop.opcode = LSU_SW_POSTINC;
-                        uop.fu = FU_AGU;
-                        uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
-                        uop.rs1 = {2'b01, i16.cs.rd_rs1};
-                        uop.rs2 = {2'b01, i16.cs.rs2};
-                        uop.rd = {2'b01, i16.cs.rd_rs1};
-                        uop.immB = 1;
-                        invalidEnc = 0;
-                    end
+                    //else if (i16.ciw.funct3 == 3'b101 && IN_dec.allowCustom) begin
+                    //    uop.opcode = LSU_SW_PREINC;
+                    //    uop.fu = FU_AGU;
+                    //    uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
+                    //    uop.rs1 = {2'b01, i16.cs.rd_rs1};
+                    //    uop.rs2 = {2'b01, i16.cs.rs2};
+                    //    uop.rd = {2'b01, i16.cs.rd_rs1};
+                    //    uop.immB = 1;
+                    //    invalidEnc = 0;
+                    //end
+                    //// c.sw with postinc
+                    //else if (i16.ciw.funct3 == 3'b111 && IN_dec.allowCustom) begin
+                    //    uop.opcode = LSU_SW_POSTINC;
+                    //    uop.fu = FU_AGU;
+                    //    uop.imm = {25'b0, i16.cs.imm[0], i16.cs.imm2, i16.cs.imm[1], 2'b00};
+                    //    uop.rs1 = {2'b01, i16.cs.rd_rs1};
+                    //    uop.rs2 = {2'b01, i16.cs.rs2};
+                    //    uop.rd = {2'b01, i16.cs.rd_rs1};
+                    //    uop.immB = 1;
+                    //    invalidEnc = 0;
+                    //end
                     // c.lw with full-range address register
                     else if (i16.cl.funct3 == 3'b011 && {i16.raw[12], i16.raw[5]} != 2'b01 && IN_dec.allowCustom) begin
                         uop.opcode = LSU_LW;
@@ -1235,21 +1244,13 @@ always_comb begin
                 else if (i16.raw[1:0] == 2'b01) begin
                     // c.j
                     if (i16.cj.funct3 == 3'b101) begin
-                        uop.opcode = INT_JAL;
-                        uop.fu = FU_INT;
-                        // certainly one of the encodings of all time
-                        uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4],
-                            i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
-
                         uop.fu = FU_RN;
-
-                        uop.immB = 1;
                         invalidEnc = 0;
                     end
                     // c.jal
                     else if (i16.cj.funct3 == 3'b001) begin
-                        uop.opcode = INT_JAL;
-                        uop.fu = FU_INT;
+                        uop.opcode = BR_JAL;
+                        uop.fu = FU_BRANCH;
                         uop.imm = {{20{i16.cj.imm[10]}}, i16.cj.imm[10], i16.cj.imm[6], i16.cj.imm[8:7], i16.cj.imm[4],
                             i16.cj.imm[5], i16.cj.imm[0], i16.cj.imm[9], i16.cj.imm[3:1], 1'b0};
                         uop.immB = 1;
@@ -1258,8 +1259,8 @@ always_comb begin
                     end
                     // c.beqz
                     else if (i16.cb.funct3 == 3'b110) begin
-                        uop.opcode = INT_BEQ;
-                        uop.fu = FU_INT;
+                        uop.opcode = BR_BEQ;
+                        uop.fu = FU_BRANCH;
                         uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3],
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
 
@@ -1268,8 +1269,8 @@ always_comb begin
                     end
                     // c.bnez
                     else if (i16.cb.funct3 == 3'b111) begin
-                        uop.opcode = INT_BNE;
-                        uop.fu = FU_INT;
+                        uop.opcode = BR_BNE;
+                        uop.fu = FU_BRANCH;
                         uop.imm = {{23{i16.cb.imm2[2]}}, i16.cb.imm2[2], i16.cb.imm[4:3],
                             i16.cb.imm[0], i16.cb.imm2[1:0], i16.cb.imm[2:1], 1'b0};
 
@@ -1459,10 +1460,10 @@ always_comb begin
                     end
                     // c.jr
                     else if (i16.cr.funct4 == 4'b1000 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
                         uop.rs1 = i16.cr.rd_rs1;
 
-                        uop.opcode = (i16.cr.rd_rs1 == 1) ? INT_V_RET : INT_V_JR;
+                        uop.opcode = (i16.cr.rd_rs1 == 1) ? BR_V_RET : BR_V_JR;
                         uop.immB = 1;
                         uop.imm12 = 0;
 
@@ -1475,11 +1476,11 @@ always_comb begin
                     end
                     // c.jalr
                     else if (i16.cr.funct4 == 4'b1001 && !(i16.cr.rd_rs1 == 0 || i16.cr.rs2 != 0)) begin
-                        uop.fu = FU_INT;
+                        uop.fu = FU_BRANCH;
                         uop.rs1 = i16.cr.rd_rs1;
                         uop.rd = 1;
 
-                        uop.opcode = INT_V_JALR;
+                        uop.opcode = BR_V_JALR;
                         uop.immB = 1;
                         uop.imm12 = 0;
 

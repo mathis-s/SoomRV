@@ -35,10 +35,14 @@ module Rename
     output SqN OUT_nextStoreSqN
 );
 
-function automatic IntUOpOrder_t NextOrder(FuncUnit fu, IntUOpOrder_t ord);
+function automatic IntUOpOrder_t NextOrder(FuncUnit fu, IntUOpOrder_t ord, SqN storeSqN);
     IntUOpOrder_t retval = ord;
 
-    if (fu != FU_AGU) begin
+    if (fu == FU_AGU) ;
+    else if (fu == FU_ATOMIC) begin
+        retval = IntUOpOrder_t'(storeSqN);
+    end
+    else begin
         // find next fu in sequence that supports operation
         for (integer i = NUM_ALUS-1; i >= 0; i=i-1) begin
             // verilator lint_off WIDTHEXPAND
@@ -345,10 +349,6 @@ always_ff@(posedge clk) begin
                 end
 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
-
-                intOrder = NextOrder(IN_uop[i].fu, intOrder);
-                OUT_uopOrdering[i] <= intOrder;
-
                 if (!(isSc[i] && !scSuccessful[i]))
                     case (IN_uop[i].fu)
                         FU_AGU: begin
@@ -364,8 +364,10 @@ always_ff@(posedge clk) begin
                         end
                         default: begin end
                     endcase
-
                 OUT_uop[i].storeSqN <= counterStoreSqN;
+
+                intOrder = NextOrder(IN_uop[i].fu, intOrder, counterStoreSqN);
+                OUT_uopOrdering[i] <= intOrder;
             end
         end
         counterSqN <= nextCounterSqN;

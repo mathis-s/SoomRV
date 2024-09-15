@@ -94,7 +94,8 @@ always_comb begin
 
         for (integer j = 0; j < NUM_ALUS; j=j+1) begin
             if (IN_issueUOps[j].valid && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
-                if (IN_issueUOps[j].fu == FU_INT) begin
+                if (IN_issueUOps[j].fu == FU_INT || IN_issueUOps[j].fu == FU_BRANCH || IN_issueUOps[j].fu == FU_BITMANIP
+                ) begin
                     for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                         if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
                 end
@@ -134,10 +135,11 @@ always_comb begin
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
-            (!(IN_uop[i].fu == FU_INT) || IN_uopOrdering[i] == IntUOpOrder_t'(PORT_IDX)) &&
+
+            (PORT_IDX >= NUM_ALUS || IN_uopOrdering[i] == IntUOpOrder_t'(PORT_IDX)) &&
 
             // Edge Case: INT ports do not enqueue AMOSWAP (no int uop needed)
-            (!HasFU(FU_INT) || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
+            (PORT_IDX >= NUM_ALUS || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
             // check if we have capacity to enqueue this op now
             if (!limit && qIdx != $bits(qIdx)'(SIZE) && !IN_branch.taken && !defer[i]) begin
@@ -164,7 +166,8 @@ always_comb begin
             &(queue[i].avail | newAvail[i]) &&
             (!HasFU(FU_DIV)  || queue[i].fu != FU_DIV  || !IN_doNotIssueDiv) &&
             (!HasFU(FU_FDIV) || queue[i].fu != FU_FDIV || !IN_doNotIssueFDiv) &&
-            !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) &&
+            !((queue[i].fu == FU_INT || queue[i].fu == FU_BRANCH || queue[i].fu == FU_BITMANIP ||
+                queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) &&
 
             // Issue CSR accesses in order
             (!HasFU(FU_CSR) ||
@@ -262,7 +265,7 @@ always_ff@(posedge clk) begin
                 OUT_uop.fu <= deqEntry.fu;
                 OUT_uop.compressed <= deqEntry.compressed;
 
-                if (IMM_BITS == 36 && HasFU(FU_INT)) begin
+                if (IMM_BITS == 36 && HasFU(FU_BRANCH)) begin
                     // verilator lint_off SELRANGE
                     OUT_uop.imm12 <= {deqEntry.imm[35:32], deqEntry.imm[0], deqEntry.tags[1]};
                     // verilator lint_on SELRANGE
@@ -342,8 +345,8 @@ always_ff@(posedge clk) begin
 
                 // Special handling for jalr
                 // verilator lint_off SELRANGE
-                if (enqCandidates[i].fu == FU_INT &&
-                    (enqCandidates[i].opcode == INT_V_JALR || enqCandidates[i].opcode == INT_V_JR)
+                if (enqCandidates[i].fu == FU_BRANCH &&
+                    (enqCandidates[i].opcode == BR_V_JALR || enqCandidates[i].opcode == BR_V_JR)
                 ) begin
                     assert(IMM_BITS == 36);
 

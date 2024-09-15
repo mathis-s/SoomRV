@@ -45,7 +45,8 @@ CommitUOp comUOps[3:0] /*verilator public*/;
 
 wire ifetchEn = !TH_disableIFetch;
 
-BranchProv branchProvs[3:0];
+localparam NUM_BRANCHES = NUM_ALUS + 2;
+BranchProv branchProvs[NUM_BRANCHES-1:0];
 BranchProv branch /*verilator public*/;
 wire mispredFlush /*verilator public*/;
 wire BS_PERFC_branchMispr;
@@ -57,7 +58,7 @@ BranchSelector#(4) bsel
 
     .IN_isUOps(IS_uop),
 
-    .IN_branches(branchProvs),
+    .IN_branches(branchProvs[3:0]),
     .OUT_branch(branch),
 
     .OUT_PERFC_branchMispr(BS_PERFC_branchMispr),
@@ -300,7 +301,12 @@ EX_UOp LD_uop[3:0] /*verilator public*/;
 
 ZCForward LD_zcFwd[1:0];
 
-Load ld
+Load#(
+    .NUM_UOPS(NUM_PORTS),
+    .NUM_WBS(NUM_PORTS),
+    .NUM_ZC_FWDS(NUM_ALUS),
+    .NUM_PC_READS(NUM_BRANCH_PORTS)
+) ld
 (
     .clk(clk),
     .rst(rst),
@@ -384,13 +390,12 @@ CSR csr
 generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin : intPortsGen
     RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps = '0;
 
-    if ((PORT_FUS[i] & FU_INT_OH) != 0)
-        IntALU ialu
+    if ((PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) != 0)
+        IntALU#(PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) ialu
         (
             .clk(clk),
             .rst(rst),
 
-            .IN_wbStall(1'b0),
             .IN_uop(LD_uop[i]),
             .IN_branch(branch),
 

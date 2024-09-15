@@ -27,6 +27,8 @@
 #include "Registers.hpp"
 #include "Utils.hpp"
 
+#define LEN(x) (sizeof((x)) / sizeof((x[0])))
+
 struct
 {
     uint32_t lastComSqN;
@@ -277,7 +279,7 @@ void LogInstructions()
     int brSqN = ExtractField(core->branch, 1 + 5 + 1 + 7 + 7, 8);
 
     // Issue
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < LEN(core->LD_uop); i++)
     {
         if (!core->stall[i] && core->IS_uop[i][0] & 1)
         {
@@ -287,7 +289,7 @@ void LogInstructions()
     }
 
     // Execute
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < LEN(core->LD_uop); i++)
     {
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
@@ -301,7 +303,7 @@ void LogInstructions()
     }
 
     // Result
-    for (size_t i = 0; i < 6; i++)
+    for (size_t i = 0; i < LEN(core->wbUOp); i++)
     {
         uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
         // WB valid

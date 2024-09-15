@@ -26,15 +26,7 @@ typedef enum logic[5:0]
     INT_SLTU,
     INT_SUB,
     INT_SRA,
-    INT_BEQ,
-    INT_BNE,
-    INT_BLT,
-    INT_BGE,
-    INT_BLTU,
-    INT_BGEU,
     INT_LUI,
-    INT_AUIPC,
-    INT_JAL,
     INT_SYS,
     INT_SH1ADD,
     INT_SH2ADD,
@@ -42,33 +34,51 @@ typedef enum logic[5:0]
     INT_XNOR,
     INT_ANDN,
     INT_ORN,
-    INT_CLZ,
-    INT_CTZ,
-    INT_CPOP,
     INT_MAX,
     INT_MAXU,
     INT_MIN,
     INT_MINU,
     INT_SE_B,
     INT_SE_H,
-    INT_ZE_H,
-    INT_ROL,
-    INT_ROR,
-    INT_ORC_B,
-    INT_REV8,
-    INT_BCLR,
-    INT_BEXT,
-    INT_BINV,
-    INT_BSET,
-`ifdef ENABLE_FP
-    INT_FSGNJ_S,
-    INT_FSGNJN_S,
-    INT_FSGNJX_S,
-`endif
-    INT_V_RET,
-    INT_V_JALR,
-    INT_V_JR
+    INT_ZE_H
 } OPCode_INT;
+
+typedef enum logic[5:0]
+{
+    BR_AUIPC,
+    BR_JAL,
+    BR_BEQ,
+    BR_BNE,
+    BR_BLT,
+    BR_BGE,
+    BR_BLTU,
+    BR_BGEU,
+    BR_V_RET,
+    BR_V_JALR,
+    BR_V_JR
+} OPCode_Branch;
+
+typedef enum logic[5:0]
+{
+    BM_CLZ,
+    BM_CTZ,
+    BM_CPOP,
+    BM_ROL,
+    BM_ROR,
+    BM_ORC_B,
+    BM_REV8,
+    BM_BCLR,
+    BM_BEXT,
+    BM_BINV,
+    BM_BSET
+`ifdef ENABLE_FP
+    ,
+    BM_FSGNJ_S,
+    BM_FSGNJN_S,
+    BM_FSGNJX_S
+`endif
+
+} OPCode_Bitmanip;
 
 typedef enum logic[5:0]
 {
@@ -103,14 +113,7 @@ typedef enum logic[5:0]
 
     LSU_CBO_CLEAN,
     LSU_CBO_INVAL,
-    LSU_CBO_FLUSH,
-
-    LSU_SB_PREINC=48,
-    LSU_SH_PREINC,
-    LSU_SW_PREINC,
-    LSU_SB_POSTINC,
-    LSU_SH_POSTINC,
-    LSU_SW_POSTINC
+    LSU_CBO_FLUSH
 
 } OPCode_AGU;
 
@@ -229,21 +232,37 @@ typedef enum logic[5:0]
 
 } OPCode_FU_TRAP;
 
-typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FMUL, FU_FDIV, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+typedef enum logic[3:0]
+{
+    FU_INT,
+    FU_BRANCH,
+    FU_BITMANIP,
+    FU_AGU,
+    FU_MUL,
+    FU_DIV,
+    FU_FPU,
+    FU_FMUL,
+    FU_FDIV,
+    FU_RN,
+    FU_ATOMIC,
+    FU_CSR,
+    FU_TRAP
+} FuncUnit;
 typedef enum logic[(1<<$bits(FuncUnit))-1:0]
 {
-    FU_INT_OH    = 1 << FU_INT,
-    FU_AGU_OH    = 1 << FU_AGU,
-    FU_UNUSED_OH = 1 << FU_UNUSED,
-    FU_MUL_OH    = 1 << FU_MUL,
-    FU_DIV_OH    = 1 << FU_DIV,
-    FU_FPU_OH    = 1 << FU_FPU,
-    FU_FDIV_OH   = 1 << FU_FDIV,
-    FU_FMUL_OH   = 1 << FU_FMUL,
-    FU_RN_OH     = 1 << FU_RN,
-    FU_ATOMIC_OH = 1 << FU_ATOMIC,
-    FU_CSR_OH    = 1 << FU_CSR,
-    FU_TRAP_OH   = 1 << FU_TRAP
+    FU_INT_OH      = 1 << FU_INT,
+    FU_BRANCH_OH   = 1 << FU_BRANCH,
+    FU_BITMANIP_OH = 1 << FU_BITMANIP,
+    FU_AGU_OH      = 1 << FU_AGU,
+    FU_MUL_OH      = 1 << FU_MUL,
+    FU_DIV_OH      = 1 << FU_DIV,
+    FU_FPU_OH      = 1 << FU_FPU,
+    FU_FMUL_OH     = 1 << FU_FMUL,
+    FU_FDIV_OH     = 1 << FU_FDIV,
+    FU_RN_OH       = 1 << FU_RN,
+    FU_ATOMIC_OH   = 1 << FU_ATOMIC,
+    FU_CSR_OH      = 1 << FU_CSR,
+    FU_TRAP_OH     = 1 << FU_TRAP
 } FuncUnitOH;
 
 typedef enum logic[3:0]
