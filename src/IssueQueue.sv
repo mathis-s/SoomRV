@@ -7,13 +7,7 @@ module IssueQueue
     parameter NUM_UOPS = 4,
     parameter RESULT_BUS_COUNT = 4,
     parameter IMM_BITS=32,
-    parameter FU0 = FU_AGU,
-    parameter FU1 = FU_AGU,
-    parameter FU2 = FU_AGU,
-    parameter FU3 = FU_AGU,
-    parameter FU0_SPLIT=0,
-    parameter FU0_ORDER=0,
-    parameter FU1_DLY=0
+    parameter FUS=0
 
 )
 (
@@ -24,8 +18,8 @@ module IssueQueue
     output reg[NUM_UOPS-1:0] OUT_stall,
 
     input wire IN_stall,
-    input wire IN_doNotIssueFU1,
-    input wire IN_doNotIssueFU2,
+    input wire IN_doNotIssueDiv,
+    input wire IN_doNotIssueFDiv,
 
     input R_UOp IN_uop[NUM_UOPS-1:0],
     input wire IN_uopOrdering[NUM_UOPS-1:0],
@@ -46,10 +40,17 @@ module IssueQueue
     output IS_UOp OUT_uop
 );
 
+function automatic HasFU(FuncUnit fu);
+    logic rv = (FUS & (1 << fu)) != 0;
+    return rv;
+endfunction
+
 localparam ID_LEN = $clog2(SIZE);
 localparam IMM_EXT = ((32 - IMM_BITS) > 0) ? (32 - IMM_BITS) : 0;
 localparam REGULAR_IMM_BITS = (IMM_BITS < 32) ? IMM_BITS : 32;
 
+localparam IDIV_DLY=33;
+localparam IMUL_DLY=9-4-2;
 
 typedef struct packed
 {
@@ -128,20 +129,18 @@ always_comb begin
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         OUT_stall[i] = 0;
         // check if this is a candidate to enqueue
-        if (IN_uop[i].validIQ[PORT_IDX] &&
+        if (IN_uop[i].validIQ[PORT_IDX] && HasFU(IN_uop[i].fu) &&
 
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_INT) || IN_uopOrdering[i] == PORT_IDX[0]) &&
 
-            ((IN_uop[i].fu == FU0 && (!FU0_SPLIT || IN_uopOrdering[i] == FU0_ORDER)) ||
-                IN_uop[i].fu == FU1 || IN_uop[i].fu == FU2 || IN_uop[i].fu == FU3 ||
-                    (IN_uop[i].fu == FU_ATOMIC)) &&
             // Edge Case: INT ports do not enqueue AMOSWAP (no int uop needed)
-            (PORT_IDX >= 2 || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
+            (!HasFU(FU_INT) || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
         ) begin
             // check if we have capacity to enqueue this op now
-            if (!limit && qIdx != SIZE && !IN_branch.taken && !defer[i]) begin
+            if (!limit && qIdx != $bits(qIdx)'(SIZE) && !IN_branch.taken && !defer[i]) begin
 
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];
@@ -163,26 +162,26 @@ always_comb begin
     for (integer i = 0; i < SIZE; i=i+1) begin
         deqCandidate_c[i] = (i < insertIndex) &&
             &(queue[i].avail | newAvail[i]) &&
-            (queue[i].fu != FU1 || !IN_doNotIssueFU1) &&
-            (queue[i].fu != FU2 || !IN_doNotIssueFU2) &&
+            (!HasFU(FU_DIV)  || queue[i].fu != FU_DIV  || !IN_doNotIssueDiv) &&
+            (!HasFU(FU_FDIV) || queue[i].fu != FU_FDIV || !IN_doNotIssueFDiv) &&
             !((queue[i].fu == FU_INT || queue[i].fu == FU_FPU || queue[i].fu == FU_FMUL) && reservedWBs[0]) &&
 
             // Issue CSR accesses in order
-            ((FU0 != FU_CSR && FU1 != FU_CSR && FU2 != FU_CSR && FU3 != FU_CSR) ||
+            (!HasFU(FU_CSR) ||
                 queue[i].fu != FU_CSR || (i == 0 && queue[i].sqN == IN_commitSqN)) &&
 
             // Only issue loads that fit into load order buffer
-            ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) ||
+            (!HasFU(FU_AGU) ||
                 (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) ||
                 (queue[i].opcode >= LSU_SC_W && queue[i].opcode < ATOMIC_AMOSWAP_W) || $signed(queue[i].loadSqN - IN_maxLoadSqN) <= 0) &&
 
             // Only stores that fit into store queue
-            ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) ||
+            (!HasFU(FU_AGU) ||
                 (queue[i].fu != FU_AGU && queue[i].fu != FU_ATOMIC) ||
                 (queue[i].opcode < LSU_SC_W) || $signed(queue[i].storeSqN - IN_maxStoreSqN) <= 0) &&
 
             // Issue SCs in order (currently we don't have a recovery mechanism for reservations)
-            ((FU0 != FU_AGU && FU1 != FU_AGU && FU2 != FU_AGU && FU3 != FU_AGU) ||
+            (!HasFU(FU_AGU) ||
                 queue[i].fu != FU_AGU || queue[i].opcode != LSU_SC_W ||
                     (i == 0 && queue[i].sqN == IN_commitSqN));
     end
@@ -263,7 +262,7 @@ always_ff@(posedge clk) begin
                 OUT_uop.fu <= deqEntry.fu;
                 OUT_uop.compressed <= deqEntry.compressed;
 
-                if (IMM_BITS == 36 && FU0 == FU_INT) begin
+                if (IMM_BITS == 36 && HasFU(FU_INT)) begin
                     // verilator lint_off SELRANGE
                     OUT_uop.imm12 <= {deqEntry.imm[35:32], deqEntry.imm[0], deqEntry.tags[1]};
                     // verilator lint_on SELRANGE
@@ -272,8 +271,11 @@ always_ff@(posedge clk) begin
 
 
                 // Reserve WB if this is a slow operation
-                if (deqEntry.fu == FU1 && FU1_DLY > 0)
-                    reservedWBs <= {1'b0, reservedWBs[32:1]} | (1 << (FU1_DLY - 1));
+                case (deqEntry.fu)
+                    FU_DIV: reservedWBs <= {1'b0, reservedWBs[32:1]} | (1 << (IDIV_DLY - 1));
+                    FU_MUL: reservedWBs <= {1'b0, reservedWBs[32:1]} | (1 << (IMUL_DLY - 1));
+                    default: ;
+                endcase
 
                 newInsertIndex = newInsertIndex - 1;
 
@@ -317,10 +319,11 @@ always_ff@(posedge clk) begin
 
                 // verilator lint_off SELRANGE
                 if (temp.fu == FU_ATOMIC) begin
-                    temp.fu = FuncUnit'(FU0);
                     // No changes for LD uop
                     // INT port uses value loaded by LD uop as operand
-                    if (PORT_IDX <= 1) begin
+                    if (PORT_IDX < NUM_ALUS) begin
+                        assert(HasFU(FU_INT));
+                        temp.fu = FU_INT;
                         temp.avail[0] = enqCandidates[i].availC;
                         temp.tags[0] = enqCandidates[i].tagC;
                         temp.tagDst = 7'h40;

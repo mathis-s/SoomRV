@@ -71,8 +71,8 @@ BranchSelector#(4) bsel
 IF_Instr IF_instrs /*verilator public*/;
 BTUpdate BP_btUpdates[1:0];
 
-PCFileReadReq PC_readReq[`NUM_ALUS-1:0];
-PCFileEntry PC_readData[`NUM_ALUS-1:0];
+PCFileReadReq PC_readReq[NUM_ALUS-1:0];
+PCFileEntry PC_readData[NUM_ALUS-1:0];
 PCFileReadReqTH PC_readReqTH;
 PCFileEntry PC_readDataTH;
 
@@ -160,7 +160,7 @@ wire RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall /*verilator public*/;
-Rename rn
+Rename#(.WIDTH_ISSUE(NUM_AGUS+NUM_ALUS)) rn
 (
     .clk(clk),
     .frontEn(frontendEn),
@@ -192,139 +192,52 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire[5:0][`DEC_WIDTH-1:0] IQ_stalls;
-//wire IQS_ready /*verilator public*/ = !IQ0_full && !IQ1_full && !IQ2_full && !IQ3_full;
-//wire IQ0_full;
-IssueQueue#(`IQ_0_SIZE,2,0,2,`DEC_WIDTH,4,32+4,FU_INT,FU_DIV,FU_FPU,FU_CSR,1,0,
-`ifdef ENABLE_INT_DIV
-    33
-`else
-    0
-`endif
-) iq0
-(
-    .clk(clk),
-    .rst(rst),
+wire[NUM_ALUS+2*NUM_AGUS-1:0][NUM_AGUS+NUM_ALUS-1:0] IQ_stalls;
 
-    .IN_defer('0),
-    .OUT_stall(IQ_stalls[0]),
+generate for (genvar i = 0; i < NUM_ALUS + NUM_AGUS; i=i+1)
+    IssueQueue#(
+        .SIZE(PORT_IQ_SIZE[i]),
+        .NUM_ENQUEUE(2),
+        .PORT_IDX(i),
+        .NUM_OPERANDS((i<NUM_ALUS) ? 2 : 1),
+        .NUM_UOPS(`DEC_WIDTH),
+        .RESULT_BUS_COUNT(4),
+        .IMM_BITS((i<NUM_ALUS) ? 36 : 12),
+        .FUS(PORT_FUS[i])
+    ) iq (
+        .clk(clk),
+        .rst(rst),
 
-    .IN_stall(stall[0]),
-    .IN_doNotIssueFU1(DIV_doNotIssue),
-    .IN_doNotIssueFU2(1'b0),
+        .IN_defer((i<NUM_ALUS) ? '0 : IQ_stalls[i+NUM_AGUS]),
+        .OUT_stall(IQ_stalls[i]),
 
-    .IN_uop(RN_uop),
-    .IN_uopOrdering(RN_uopOrdering),
+        .IN_stall(stall[i]),
+        .IN_doNotIssueDiv(DIV_doNotIssue),
+        .IN_doNotIssueFDiv(FDIV_doNotIssue),
 
-    .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp[3:0]),
+        .IN_uop(RN_uop),
+        .IN_uopOrdering(RN_uopOrdering),
 
-    .IN_branch(branch),
+        .IN_resultValid(wbHasResult),
+        .IN_resultUOp(wbUOp[3:0]),
 
-    .IN_issueUOps(IS_uop),
+        .IN_branch(branch),
 
-    .IN_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_maxLoadSqN(LB_maxLoadSqN),
-    .IN_commitSqN(ROB_curSqN),
+        .IN_issueUOps(IS_uop),
 
-    .OUT_uop(IS_uop[0])
-);
-IssueQueue#(`IQ_1_SIZE,2,1,2,`DEC_WIDTH,4,32+4,FU_INT,FU_MUL,FU_FDIV,FU_FMUL,1,1,
-`ifdef ENABLE_INT_MUL
-    9-4-2
-`else
-    0
-`endif
-) iq1
-(
-    .clk(clk),
-    .rst(rst),
+        .IN_maxStoreSqN(SQ_maxStoreSqN),
+        .IN_maxLoadSqN(LB_maxLoadSqN),
+        .IN_commitSqN(ROB_curSqN),
 
-    .IN_defer('0),
-    .OUT_stall(IQ_stalls[1]),
+        .OUT_uop(IS_uop[i])
+    );
+endgenerate
 
-    .IN_stall(stall[1]),
-    .IN_doNotIssueFU1(MUL_doNotIssue),
-    .IN_doNotIssueFU2(FDIV_doNotIssue),
+StDataLookupUOp stLookupUOp[NUM_AGUS-1:0];
+wire stLookupUOp_ready[NUM_AGUS-1:0];
+ComLimit stCommitLimit[NUM_AGUS-1:0];
 
-    .IN_uop(RN_uop),
-    .IN_uopOrdering(RN_uopOrdering),
-
-    .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp[3:0]),
-
-    .IN_branch(branch),
-
-    .IN_issueUOps(IS_uop),
-
-    .IN_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_maxLoadSqN(LB_maxLoadSqN),
-    .IN_commitSqN(ROB_curSqN),
-
-    .OUT_uop(IS_uop[1])
-);
-IssueQueue#(`IQ_2_SIZE,2,2,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq2
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_defer(IQ_stalls[2+2]),
-    .OUT_stall(IQ_stalls[2]),
-
-    .IN_stall(stall[2]),
-    .IN_doNotIssueFU1(1'b0),
-    .IN_doNotIssueFU2(1'b0),
-
-    .IN_uop(RN_uop),
-    .IN_uopOrdering(RN_uopOrdering),
-
-    .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp[3:0]),
-
-    .IN_branch(branch),
-
-    .IN_issueUOps(IS_uop),
-
-    .IN_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_maxLoadSqN(LB_maxLoadSqN),
-    .IN_commitSqN(ROB_curSqN),
-
-    .OUT_uop(IS_uop[2])
-);
-IssueQueue#(`IQ_3_SIZE,2,3,1,`DEC_WIDTH,4,12,FU_AGU,FU_AGU,FU_AGU,FU_ATOMIC,0,0,0) iq3
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_defer(IQ_stalls[3+2]),
-    .OUT_stall(IQ_stalls[3]),
-
-    .IN_stall(stall[3]),
-    .IN_doNotIssueFU1(1'b0),
-    .IN_doNotIssueFU2(1'b0),
-
-    .IN_uop(RN_uop),
-    .IN_uopOrdering(RN_uopOrdering),
-
-    .IN_resultValid(wbHasResult),
-    .IN_resultUOp(wbUOp[3:0]),
-
-    .IN_branch(branch),
-
-    .IN_issueUOps(IS_uop),
-
-    .IN_maxStoreSqN(SQ_maxStoreSqN),
-    .IN_maxLoadSqN(LB_maxLoadSqN),
-    .IN_commitSqN(ROB_curSqN),
-
-    .OUT_uop(IS_uop[3])
-);
-
-StDataLookupUOp stLookupUOp[`NUM_AGUS-1:0];
-wire stLookupUOp_ready[`NUM_AGUS-1:0];
-ComLimit stCommitLimit[`NUM_AGUS-1:0];
-
-generate for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
+generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     StoreDataIQ #(8, 2, i, 4, 4) iqStD
     (
         .clk(clk),
@@ -413,11 +326,11 @@ Load ld
     .OUT_uop(LD_uop)
 );
 
-AMO_Data_UOp SDL_amoData[`NUM_AGUS-1:0];
-logic SDL_readEnable[`NUM_AGUS-1:0];
-RFTag SDL_readTag[`NUM_AGUS-1:0];
-RegT SDL_readData[`NUM_AGUS-1:0];
-StDataUOp SDL_stDataUOp[`NUM_AGUS-1:0];
+AMO_Data_UOp SDL_amoData[NUM_AGUS-1:0];
+logic SDL_readEnable[NUM_AGUS-1:0];
+RFTag SDL_readTag[NUM_AGUS-1:0];
+RegT SDL_readData[NUM_AGUS-1:0];
+StDataUOp SDL_stDataUOp[NUM_AGUS-1:0];
 StoreDataLoad stDataLd
 (
     .clk(clk),
@@ -562,7 +475,7 @@ end
 
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[1:0];
-PW_LD_UOp PW_LD_uop[`NUM_AGUS-1:0];
+PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
 assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
 PageWalker pageWalker
 (
@@ -578,8 +491,8 @@ PageWalker pageWalker
     .IN_ldResUOp(wbUOp[3:2])
 );
 
-wire LS_AGULD_uopStall[`NUM_AGUS-1:0];
-LD_UOp LS_uopLd[`NUM_AGUS-1:0];
+wire LS_AGULD_uopStall[NUM_AGUS-1:0];
+LD_UOp LS_uopLd[NUM_AGUS-1:0];
 LoadSelector loadSelector
 (
     .IN_aguLd(LB_uopLd),
@@ -605,8 +518,8 @@ TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
 );
 
 
-AGU_UOp AGU_uop[`NUM_AGUS-1:0];
-ELD_UOp AGU_eLdUOp[`NUM_AGUS-1:0];
+AGU_UOp AGU_uop[NUM_AGUS-1:0];
+ELD_UOp AGU_eLdUOp[NUM_AGUS-1:0];
 
 PageWalk_Req LDAGU_PW_rq;
 wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] LDAGU_TMQ_free;
@@ -665,8 +578,8 @@ AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
 
 
 SqN LB_maxLoadSqN;
-LD_UOp LB_uopLd[`NUM_AGUS-1:0];
-LD_UOp LB_aguUOpLd[`NUM_AGUS-1:0];
+LD_UOp LB_uopLd[NUM_AGUS-1:0];
+LD_UOp LB_aguUOpLd[NUM_AGUS-1:0];
 
 ComLimit LB_ldComLimit;
 LoadBuffer lb
@@ -698,13 +611,13 @@ LoadBuffer lb
 wire SQ_empty;
 wire SQ_done;
 
-StFwdResult SQ_fwd[`NUM_AGUS-1:0];
-StFwdResult SQB_fwd[`NUM_AGUS-1:0];
+StFwdResult SQ_fwd[NUM_AGUS-1:0];
+StFwdResult SQB_fwd[NUM_AGUS-1:0];
 
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
-SQ_UOp SQ_uops[`NUM_AGUS-1:0];
-wire SQ_stall[`NUM_AGUS-1:0];
+SQ_UOp SQ_uops[NUM_AGUS-1:0];
+wire SQ_stall[NUM_AGUS-1:0];
 StoreQueue sq
 (
     .clk(clk),
@@ -752,11 +665,11 @@ StoreQueueBackend sqb
     .IN_stAck(LSU_stAck)
 );
 
-wire CC_loadStall[`NUM_AGUS-1:0];
+wire CC_loadStall[NUM_AGUS-1:0];
 wire CC_storeStall;
-wire LSU_ldAGUStall[`NUM_AGUS-1:0];
-LD_UOp CC_SQ_uopLd[`NUM_AGUS-1:0];
-LD_Ack LSU_ldAck[`NUM_AGUS-1:0];
+wire LSU_ldAGUStall[NUM_AGUS-1:0];
+LD_UOp CC_SQ_uopLd[NUM_AGUS-1:0];
+LD_Ack LSU_ldAck[NUM_AGUS-1:0];
 wire LSU_busy;
 
 MemController_Req LSU_MC_if;
@@ -823,7 +736,6 @@ IntALU ialu1
 `ifdef ENABLE_INT_MUL
 RES_UOp MUL_uop;
 wire MUL_busy;
-wire MUL_doNotIssue = 0;
 Multiply mul
 (
     .clk(clk),

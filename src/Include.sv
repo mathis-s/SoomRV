@@ -229,6 +229,21 @@ typedef enum logic[5:0]
 } OPCode_FU_TRAP;
 
 typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+typedef enum logic[(1<<$bits(FuncUnit))-1:0]
+{
+    FU_INT_OH    = 1 << FU_INT,
+    FU_AGU_OH    = 1 << FU_AGU,
+    FU_UNUSED_OH = 1 << FU_UNUSED,
+    FU_MUL_OH    = 1 << FU_MUL,
+    FU_DIV_OH    = 1 << FU_DIV,
+    FU_FPU_OH    = 1 << FU_FPU,
+    FU_FDIV_OH   = 1 << FU_FDIV,
+    FU_FMUL_OH   = 1 << FU_FMUL,
+    FU_RN_OH     = 1 << FU_RN,
+    FU_ATOMIC_OH = 1 << FU_ATOMIC,
+    FU_CSR_OH    = 1 << FU_CSR,
+    FU_TRAP_OH   = 1 << FU_TRAP
+} FuncUnitOH;
 
 typedef enum logic[3:0]
 {
@@ -1011,15 +1026,15 @@ endinterface
 
 interface IF_Cache();
 
-    logic[`NUM_AGUS-1:0] re;
-    logic[`NUM_AGUS-1:0] we;
-    logic[`NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
-    logic[`NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
-    logic[`NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
-    logic[`NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
-    logic[`NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
-    logic[`NUM_AGUS-1:0] busy;
-    logic[`NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
+    logic[NUM_AGUS-1:0] re;
+    logic[NUM_AGUS-1:0] we;
+    logic[NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
+    logic[NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
+    logic[NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
+    logic[NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
+    logic[NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
+    logic[NUM_AGUS-1:0] busy;
+    logic[NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
 
     modport HOST
     (

@@ -5,8 +5,8 @@ module StoreQueueBackend#(parameter NUM_IN = 2, parameter NUM_EVICTED = 4)
 
     output reg OUT_busy,
 
-    input LD_UOp IN_uopLd[`NUM_AGUS-1:0],
-    output StFwdResult OUT_fwd[`NUM_AGUS-1:0],
+    input LD_UOp IN_uopLd[NUM_AGUS-1:0],
+    output StFwdResult OUT_fwd[NUM_AGUS-1:0],
 
     input SQ_UOp IN_uop[NUM_IN-1:0],
     output logic OUT_stall[NUM_IN-1:0],
@@ -108,10 +108,10 @@ always_comb begin
     evictedV[NUM_EVICTED] = fusedUOp_r;
 end
 
-reg[3:0] lookupMask[`NUM_AGUS-1:0];
-reg[31:0] lookupData[`NUM_AGUS-1:0];
+reg[3:0] lookupMask[NUM_AGUS-1:0];
+reg[31:0] lookupData[NUM_AGUS-1:0];
 // Store queue lookup
-for (genvar h = 0; h < `NUM_AGUS; h=h+1)
+for (genvar h = 0; h < NUM_AGUS; h=h+1)
 always_comb begin
 
     reg[AXI_BWIDTH_E-3:0] shift = IN_uopLd[h].addr[2+:AXI_BWIDTH_E-2];
@@ -191,7 +191,7 @@ end
 
 always_ff@(posedge clk) begin
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
         OUT_fwd[i].valid <= 0;
     end
@@ -267,7 +267,7 @@ always_ff@(posedge clk) begin
 
         end
 
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        for (integer i = 0; i < NUM_AGUS; i=i+1)
             if (IN_uopLd[i].valid) begin
                 OUT_fwd[i].valid <= 1;
                 OUT_fwd[i].data <= lookupData[i];

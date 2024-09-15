@@ -13,14 +13,14 @@ module LoadBuffer
     input SqN IN_comLoadSqN,
     input SqN IN_comSqN,
 
-    input wire IN_stall[`NUM_AGUS-1:0],
-    input AGU_UOp IN_uop[`NUM_AGUS-1:0],
+    input wire IN_stall[NUM_AGUS-1:0],
+    input AGU_UOp IN_uop[NUM_AGUS-1:0],
 
-    input LD_Ack IN_ldAck[`NUM_AGUS-1:0],
+    input LD_Ack IN_ldAck[NUM_AGUS-1:0],
     input wire IN_SQ_done,
 
-    output LD_UOp OUT_uopAGULd[`NUM_AGUS-1:0],
-    output LD_UOp OUT_uopLd[`NUM_AGUS-1:0],
+    output LD_UOp OUT_uopAGULd[NUM_AGUS-1:0],
+    output LD_UOp OUT_uopLd[NUM_AGUS-1:0],
 
     input BranchProv IN_branch,
     output BranchProv OUT_branch,
@@ -68,11 +68,11 @@ LBEntry entries[NUM_ENTRIES-1:0];
 wire SqN baseIndex = IN_comLoadSqN;
 SqN lastBaseIndex;
 
-LD_UOp lateLoadUOp[`NUM_AGUS-1:0];
-reg delayLoad[`NUM_AGUS-1:0];
-reg nonSpeculative[`NUM_AGUS-1:0];
+LD_UOp lateLoadUOp[NUM_AGUS-1:0];
+reg delayLoad[NUM_AGUS-1:0];
+reg nonSpeculative[NUM_AGUS-1:0];
 always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+    for (integer h = 0; h < NUM_AGUS; h=h+1) begin
         OUT_uopAGULd[h] = 'x;
         OUT_uopAGULd[h].valid = 0;
         OUT_uopLd[h] = 'x;
@@ -82,7 +82,7 @@ always_comb begin
         delayLoad[h] = nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
 
         // If it needs forwarding from current cycle's store, we also delay the load.
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (i != h) begin
                 if (IN_uop[h].valid && IN_uop[h].isLoad && $signed(IN_uop[i].loadSqN - IN_uop[h].loadSqN) <= 0 &&
                     IN_uop[i].valid && IN_uop[i].isStore &&
@@ -120,14 +120,14 @@ always_comb begin
 end
 
 
-logic[31:0] wAddrToMatch[`NUM_AGUS-1:0];
+logic[31:0] wAddrToMatch[NUM_AGUS-1:0];
 typedef enum logic[1:0]
 {
     STORE
 } AddrCompareType;
-AddrCompareType addrCompT[`NUM_AGUS-1:0];
+AddrCompareType addrCompT[NUM_AGUS-1:0];
 always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+    for (integer h = 0; h < NUM_AGUS; h=h+1) begin
         wAddrToMatch[h] = 'x;
         addrCompT[h] = STORE;
 
@@ -137,9 +137,9 @@ always_comb begin
     end
 end
 
-logic[NUM_ENTRIES-1:0] wAddrMatch[`NUM_AGUS-1:0];
+logic[NUM_ENTRIES-1:0] wAddrMatch[NUM_AGUS-1:0];
 always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+    for (integer h = 0; h < NUM_AGUS; h=h+1) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
             wAddrMatch[h][i] = ((entries[i].valid && entries[i].addr[31:`CLSIZE_E] == wAddrToMatch[h][31:`CLSIZE_E]) &&
                                 (entries[i].addr[`CLSIZE_E-1:2] ==
@@ -149,9 +149,9 @@ always_comb begin
     end
 end
 
-logic[NUM_ENTRIES-1:0] isBefore[`NUM_AGUS-1:0];
+logic[NUM_ENTRIES-1:0] isBefore[NUM_AGUS-1:0];
 generate
-for (genvar h = 0; h < `NUM_AGUS; h=h+1) begin
+for (genvar h = 0; h < NUM_AGUS; h=h+1) begin
     wire[$clog2(NUM_ENTRIES)-1:0] startIdx = IN_uop[h].loadSqN[$clog2(NUM_ENTRIES)-1:0] +
         $clog2(NUM_ENTRIES)'(IN_uop[h].isLoad && IN_uop[h].isStore);
     RangeMaskGen#(NUM_ENTRIES, 1) isBeforeMaskGen
@@ -167,9 +167,9 @@ endgenerate
 
 // For every store, check if we previously speculatively loaded from the address written to
 // (if so, flush pipeline)
-logic storeIsConflict[`NUM_AGUS-1:0];
+logic storeIsConflict[NUM_AGUS-1:0];
 always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+    for (integer h = 0; h < NUM_AGUS; h=h+1) begin
         storeIsConflict[h] = 0;
         // The order we check loads here does not matter as we reset all the way back to the store on collision.
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -186,11 +186,11 @@ always_comb begin
 end
 
 // For store-conditional, check if a reservation exists
-logic storeHasRsv[`NUM_AGUS-1:0];
+logic storeHasRsv[NUM_AGUS-1:0];
 always_comb begin
     // Currently, SCs are issued non-speculatively, so we only have to check
     // the committed load reservation
-    for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+    for (integer h = 0; h < NUM_AGUS; h=h+1) begin
         storeHasRsv[h] =
             IN_uop[h].isStore && IN_uop[h].isLrSc &&
             comRsv.valid && comRsv.addr == IN_uop[h].addr[31:2];
@@ -203,12 +203,12 @@ typedef struct packed
     logic isLdFwd;
     logic valid;
 } LateIssue;
-LateIssue ltIssue[`NUM_AGUS-1:0];
+LateIssue ltIssue[NUM_AGUS-1:0];
 wire[$clog2(NUM_ENTRIES)-1:0] deqIndex = baseIndex[$clog2(NUM_ENTRIES)-1:0];
 always_comb begin
     logic memcNotBusy = !IN_memc.transfers[0].valid;
 
-   for (integer h = 0; h < `NUM_AGUS; h=h+1) begin
+   for (integer h = 0; h < NUM_AGUS; h=h+1) begin
 
         logic[NUM_ENTRIES-1:0] issueCandidates = 0;
 
@@ -307,7 +307,7 @@ always_comb begin
     OUT_branch = 'x;
     OUT_branch.taken = 0;
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         if (IN_uop[i].valid && IN_uop[i].isStore && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
             if ((storeIsConflict[i] || (IN_uop[i].isLrSc && !storeHasRsv[i])) &&
                 (!prevStoreConflict || $signed(IN_uop[i].sqN - prevStoreConflictSqN) < 0)) begin
@@ -356,7 +356,7 @@ always_ff@(posedge clk) begin
             entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
         end
 
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             lateLoadUOp[i] <= 'x;
             lateLoadUOp[i].valid <= 0;
         end
@@ -367,12 +367,12 @@ always_ff@(posedge clk) begin
         comRsv <= LoadRsv'{valid: 0, default: 'x};
     end
     else begin
-        reg[`NUM_AGUS-1:0] lateLoadPassthru = 0;
+        reg[NUM_AGUS-1:0] lateLoadPassthru = 0;
 
         lastBaseIndex <= baseIndex;
 
         // Handle late load outputs
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (!IN_stall[i]) begin
                 lateLoadUOp[i] <= 'x;
                 lateLoadUOp[i].valid <= 0;
@@ -380,7 +380,7 @@ always_ff@(posedge clk) begin
         end
 
         // Process negative load acks
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (IN_ldAck[i].valid && IN_ldAck[i].fail && !IN_ldAck[i].external) begin
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
                 entries[index].issued <= 0;
@@ -388,7 +388,7 @@ always_ff@(posedge clk) begin
         end
 
         // Delete reservation on SC
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (IN_uop[i].valid &&
                 (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) &&
                 IN_uop[i].isStore && IN_uop[i].isLrSc
@@ -413,7 +413,7 @@ always_ff@(posedge clk) begin
 
         // Invalidate misspeculated state
         if (IN_branch.taken) begin
-            for (integer i = 0; i < `NUM_AGUS; i=i+1)
+            for (integer i = 0; i < NUM_AGUS; i=i+1)
                 if ($signed(lateLoadUOp[i].sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
                     lateLoadUOp[i] <= 'x;
                     lateLoadUOp[i].valid <= 0;
@@ -424,7 +424,7 @@ always_ff@(posedge clk) begin
         end
         else begin
             // Issue Late Loads
-            for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+            for (integer i = 0; i < NUM_AGUS; i=i+1) begin
                 if (!lateLoadUOp[i].valid || !IN_stall[i] || ltIssue[i].isLdFwd) begin
 
                     if (IN_stall[i] && lateLoadUOp[i].valid)
@@ -488,7 +488,7 @@ always_ff@(posedge clk) begin
         end
 
         // Insert new entries, check stores
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        for (integer i = 0; i < NUM_AGUS; i=i+1)
             if (IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
 
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];

@@ -23,8 +23,8 @@ module IFetch
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate IN_bpUpdate,
 
-    input PCFileReadReq IN_pcRead[`NUM_ALUS-1:0],
-    output PCFileEntry OUT_pcReadData[`NUM_ALUS-1:0],
+    input PCFileReadReq IN_pcRead[NUM_ALUS-1:0],
+    output PCFileEntry OUT_pcReadData[NUM_ALUS-1:0],
     input PCFileReadReqTH IN_pcReadTH,
     output PCFileEntry OUT_pcReadDataTH,
 

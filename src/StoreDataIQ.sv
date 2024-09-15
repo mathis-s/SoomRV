@@ -19,7 +19,7 @@ module StoreDataIQ
 
     input BranchProv IN_branch,
     input IS_UOp IN_issueUOps[NUM_UOPS-1:0],
-    input EX_UOp IN_aguUOps[`NUM_AGUS-1:0],
+    input EX_UOp IN_aguUOps[NUM_AGUS-1:0],
 
     input SqN IN_maxStoreSqN,
 
@@ -92,7 +92,7 @@ always_comb begin
         newAvail[i][1] = 0;
         newAvail_dl[i][1] = 0;
 
-        for (integer j = 0; j < `NUM_AGUS; j=j+1) begin
+        for (integer j = 0; j < NUM_AGUS; j=j+1) begin
             if (IN_aguUOps[j].valid && IN_aguUOps[j].fu == FU_AGU &&
                 (IN_aguUOps[j].opcode == LSU_SB || IN_aguUOps[j].opcode == LSU_SH)
             ) begin
