@@ -1,5 +1,5 @@
 module AGU
-#(parameter AGU_IDX=1, parameter RQ_ID=2)
+#(parameter RQ_ID=2)
 (
     input wire clk,
     input wire rst,
@@ -386,7 +386,7 @@ always_ff@(posedge clk) begin
         // Page Walk Request Logic
         if (pageWalkActive) begin
             if (!pageWalkAccepted) begin
-                if (IN_pw.busy && IN_pw.rqID == RQ_ID) begin
+                if (IN_pw.busy && IN_pw.rqID == $bits(IN_pw.rqID)'(RQ_ID)) begin
                     pageWalkAccepted <= 1;
                 end
                 else begin

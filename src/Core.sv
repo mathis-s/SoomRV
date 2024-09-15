@@ -108,7 +108,7 @@ IFetch ifetch
     .OUT_instrs(IF_instrs),
 
     .IN_vmem(CSR_vmem),
-    .OUT_pw(PC_PW_rq),
+    .OUT_pw(PW_reqs[0]),
     .IN_pw(PW_res),
 
     .OUT_memc(PC_MC_if),
@@ -515,6 +515,7 @@ TValSelect tvalSelect
     .OUT_tvalState(TVS_tvalState)
 );
 
+PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
@@ -524,7 +525,7 @@ PageWalker pageWalker
     .clk(clk),
     .rst(rst),
 
-    .IN_rqs('{LDAGU_PW_rq, STAGU_PW_rq, PC_PW_rq}),
+    .IN_rqs(PW_reqs),
     .OUT_res(PW_res),
 
     .IN_ldStall(CC_PW_LD_stall[0]),
@@ -547,9 +548,9 @@ LoadSelector loadSelector
     .OUT_ldUOp(LS_uopLd)
 );
 
-TLB_Req TLB_rqs[1:0];
-TLB_Res TLB_res[1:0];
-TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
+TLB_Req TLB_rqs[NUM_AGUS-1:0];
+TLB_Res TLB_res[NUM_AGUS-1:0];
+TLB#(NUM_AGUS, `DTLB_SIZE, `DTLB_ASSOC) dtlb
 (
     .clk(clk),
     .rst(rst),
@@ -559,65 +560,34 @@ TLB#(2, `DTLB_SIZE, `DTLB_ASSOC) dtlb
     .OUT_res(TLB_res)
 );
 
-
 AGU_UOp AGU_uop[NUM_AGUS-1:0];
 ELD_UOp AGU_eLdUOp[NUM_AGUS-1:0];
+generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin : aguPortsGen
+    AGU#(.RQ_ID(1+i)) agu
+    (
+        .clk(clk),
+        .rst(rst),
+        .IN_stall(LSU_AGUStall[i]),
+        .OUT_stall(stall[NUM_ALUS+i]),
 
-PageWalk_Req LDAGU_PW_rq;
-wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] LDAGU_TMQ_free;
-AGU#(.AGU_IDX(0), .RQ_ID(2)) aguLD
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_stall(LSU_ldAGUStall[0]),
-    .OUT_stall(stall[2]),
+        .OUT_TMQ_free(),
 
-    .OUT_TMQ_free(LDAGU_TMQ_free),
+        .IN_branch(branch),
+        .IN_vmem(CSR_vmem),
+        .OUT_pw(PW_reqs[i+1]),
+        .IN_pw(PW_res),
 
-    .IN_branch(branch),
-    .IN_vmem(CSR_vmem),
-    .OUT_pw(LDAGU_PW_rq),
-    .IN_pw(PW_res),
+        .OUT_tvalProv(TVS_tvalProvs[i]),
 
-    .OUT_tvalProv(TVS_tvalProvs[0]),
+        .OUT_tlb(TLB_rqs[i]),
+        .IN_tlb(TLB_res[i]),
 
-    .OUT_tlb(TLB_rqs[1]),
-    .IN_tlb(TLB_res[1]),
-
-    .IN_uop(LD_uop[2]),
-    .OUT_aguOp(AGU_uop[0]),
-    .OUT_eldOp(AGU_eLdUOp[0]),
-    .OUT_uop(wbUOp[4])
-);
-
-AGU_UOp AGU_ST_uop /* verilator public */;
-PageWalk_Req STAGU_PW_rq;
-wire[$clog2(`DTLB_MISS_QUEUE_SIZE):0] STAGU_TMQ_free;
-AGU#(.AGU_IDX(1), .RQ_ID(1)) aguST
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_stall(LSU_ldAGUStall[1]),
-    .OUT_stall(stall[3]),
-
-    .OUT_TMQ_free(STAGU_TMQ_free),
-
-    .IN_branch(branch),
-    .IN_vmem(CSR_vmem),
-    .OUT_pw(STAGU_PW_rq),
-    .IN_pw(PW_res),
-
-    .OUT_tvalProv(TVS_tvalProvs[1]),
-
-    .OUT_tlb(TLB_rqs[0]),
-    .IN_tlb(TLB_res[0]),
-
-    .IN_uop(LD_uop[3]),
-    .OUT_aguOp(AGU_uop[1]),
-    .OUT_eldOp(AGU_eLdUOp[1]),
-    .OUT_uop(wbUOp[5])
-);
-
+        .IN_uop(LD_uop[NUM_ALUS+i]),
+        .OUT_aguOp(AGU_uop[i]),
+        .OUT_eldOp(AGU_eLdUOp[i]),
+        .OUT_uop(wbUOp[NUM_ALUS+NUM_AGUS+i])
+    );
+end endgenerate
 
 SqN LB_maxLoadSqN;
 LD_UOp LB_uopLd[NUM_AGUS-1:0];
@@ -709,7 +679,7 @@ StoreQueueBackend sqb
 
 wire CC_loadStall[NUM_AGUS-1:0];
 wire CC_storeStall;
-wire LSU_ldAGUStall[NUM_AGUS-1:0];
+wire LSU_AGUStall[NUM_AGUS-1:0];
 LD_UOp CC_SQ_uopLd[NUM_AGUS-1:0];
 LD_Ack LSU_ldAck[NUM_AGUS-1:0];
 wire LSU_busy;
@@ -727,7 +697,7 @@ LoadStoreUnit lsu
     .OUT_busy(LSU_busy),
 
     .IN_branch(branch),
-    .OUT_ldAGUStall(LSU_ldAGUStall),
+    .OUT_ldAGUStall(LSU_AGUStall),
     .OUT_ldStall(CC_loadStall),
     .OUT_stStall(CC_storeStall),
 
