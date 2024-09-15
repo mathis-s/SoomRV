@@ -22,7 +22,7 @@ module IssueQueue
     input wire IN_doNotIssueFDiv,
 
     input R_UOp IN_uop[NUM_UOPS-1:0],
-    input wire IN_uopOrdering[NUM_UOPS-1:0],
+    input IntUOpOrder_t IN_uopOrdering[NUM_UOPS-1:0],
 
     input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
@@ -134,7 +134,7 @@ always_comb begin
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
-            (!(IN_uop[i].fu == FU_INT) || IN_uopOrdering[i] == PORT_IDX[0]) &&
+            (!(IN_uop[i].fu == FU_INT) || IN_uopOrdering[i] == IntUOpOrder_t'(PORT_IDX)) &&
 
             // Edge Case: INT ports do not enqueue AMOSWAP (no int uop needed)
             (!HasFU(FU_INT) || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)

@@ -156,7 +156,7 @@ wire frontendEn /*verilator public*/ =
     !SQ_flush;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
-wire RN_uopOrdering[`DEC_WIDTH-1:0];
+IntUOpOrder_t RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall /*verilator public*/;
