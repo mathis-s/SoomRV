@@ -275,39 +275,57 @@ always_ff@(posedge clk) begin
     if (rst) ;
     else if (!IN_branch.taken && frontEn && !OUT_stall) begin
 
-        // Look up tags and availability of operands for new instructions
-        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i].imm <= IN_uop[i].imm;
-            OUT_uop[i].imm12 <= IN_uop[i].imm12;
-            OUT_uop[i].opcode <= IN_uop[i].opcode;
-            OUT_uop[i].fu <= IN_uop[i].fu;
-
-            // The cause for decode-time pure traps is encoded
-            // in rd. This saves encoding space, as these instructions
-            // have no result anyways.
-            if (IN_uop[i].fu == FU_TRAP)
-                OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
-            else
-                OUT_uop[i].rd <= IN_uop[i].rd;
-
-            // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
-            if (isSc[i] && !scSuccessful[i])
-                OUT_uop[i].fu <= FU_RN;
-
-            OUT_uop[i].fetchID <= IN_uop[i].fetchID;
-            OUT_uop[i].fetchOffs <= IN_uop[i].fetchOffs;
-            OUT_uop[i].immB <= IN_uop[i].immB;
-            OUT_uop[i].compressed <= IN_uop[i].compressed;
-        end
-
         // Set seqnum/tags for next instruction(s)
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+            OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
             if (IN_uop[i].valid) begin
 
                 failSc <= 0;
 
-                OUT_uop[i].valid <= 1;
-                OUT_uop[i].validIQ <= 6'b111111;
+                OUT_uop[i] <= R_UOp'{
+                    imm:        IN_uop[i].imm,
+                    imm12:      IN_uop[i].imm12,
+
+                    availA:     RAT_lookupAvail[2*i+0],
+                    tagA:       RAT_lookupSpecTag[2*i+0],
+                    availB:     RAT_lookupAvail[2*i+1],
+                    tagB:       RAT_lookupSpecTag[2*i+1],
+
+                    tagC:       7'h40,
+                    availC:     1'b1,
+
+                    sqN:        RAT_issueSqNs[i],
+                    tagDst:     newTags[i],
+                    rd:         IN_uop[i].rd,
+
+                    opcode:     IN_uop[i].opcode,
+                    fu:         IN_uop[i].fu,
+                    fetchID:    IN_uop[i].fetchID,
+                    fetchOffs:  IN_uop[i].fetchOffs,
+                    immB:       IN_uop[i].immB,
+                    compressed: IN_uop[i].compressed,
+
+                    valid:      1'b1,
+                    validIQ:    6'b111111,
+                    default:    'x
+                };
+
+                // The cause for decode-time pure traps is encoded
+                // in rd. This saves encoding space, as these instructions
+                // have no result anyways.
+                if (IN_uop[i].fu == FU_TRAP)
+                    OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
+
+                // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
+                if (isSc[i] && !scSuccessful[i])
+                    OUT_uop[i].fu <= FU_RN;
+
+                // Atomics need a total of three source tags (addr, reg operand, mem operand).
+                // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
+                if (IN_uop[i].fu == FU_ATOMIC) begin
+                    OUT_uop[i].tagC <= newTags[i];
+                    OUT_uop[i].availC <= 0;
+                end
 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
                 OUT_uopOrdering[i] <= intOrder;
@@ -333,28 +351,7 @@ always_ff@(posedge clk) begin
                         default: begin end
                     endcase
 
-                OUT_uop[i].sqN <= RAT_issueSqNs[i];
                 OUT_uop[i].storeSqN <= counterStoreSqN;
-
-                OUT_uop[i].tagA <= RAT_lookupSpecTag[2*i+0];
-                OUT_uop[i].tagB <= RAT_lookupSpecTag[2*i+1];
-                OUT_uop[i].availA <= RAT_lookupAvail[2*i+0];
-                OUT_uop[i].availB <= RAT_lookupAvail[2*i+1];
-                OUT_uop[i].tagDst <= newTags[i];
-
-                // Atomics need a total of three source tags (addr, reg operand, mem operand).
-                // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
-                if (IN_uop[i].fu == FU_ATOMIC) begin
-                    OUT_uop[i].tagC <= newTags[i];
-                    OUT_uop[i].availC <= 0;
-                end
-                else begin
-                    OUT_uop[i].tagC <= 7'h40;
-                    OUT_uop[i].availC <= 1;
-                end
-            end
-            else begin
-                OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
             end
         end
         counterSqN <= nextCounterSqN;
