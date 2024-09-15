@@ -86,12 +86,15 @@
 
 `define DEBUG
 
-
 parameter NUM_AGUS = 2;
 parameter NUM_ALUS = 2;
-parameter NUM_IQS = NUM_AGUS + NUM_ALUS;
+parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
+parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
 
-parameter int PORT_IQ_SIZE[NUM_AGUS+NUM_ALUS-1:0] = '{
+parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
+parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
+
+parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
     8,
     8,
     8,
@@ -99,7 +102,7 @@ parameter int PORT_IQ_SIZE[NUM_AGUS+NUM_ALUS-1:0] = '{
 };
 
 // verilator lint_off WIDTHEXPAND
-parameter logic[15:0] PORT_FUS[NUM_AGUS+NUM_ALUS-1:0] = '{
+parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
 
     // NUM_ALUS x AGU Ports
     FU_AGU_OH|FU_ATOMIC_OH,

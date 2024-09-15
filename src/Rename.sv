@@ -9,7 +9,7 @@ module Rename
     input wire frontEn,
     input wire rst,
 
-    input wire[5:0][WIDTH_ISSUE-1:0] IN_stalls,
+    input wire[NUM_PORTS_TOTAL-1:0][WIDTH_ISSUE-1:0] IN_stalls,
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
@@ -323,7 +323,7 @@ always_ff@(posedge clk) begin
                     compressed: IN_uop[i].compressed,
 
                     valid:      1'b1,
-                    validIQ:    6'b111111,
+                    validIQ:    {NUM_PORTS_TOTAL{1'b1}},
                     default:    'x
                 };
 

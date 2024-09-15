@@ -626,6 +626,12 @@ typedef struct packed
 
 typedef struct packed
 {
+    RFTag tag;
+    logic valid;
+} RF_ReadReq;
+
+typedef struct packed
+{
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] pc;

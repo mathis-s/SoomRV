@@ -18,7 +18,7 @@ module StoreDataIQ
     input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
 
     input BranchProv IN_branch,
-    input IS_UOp IN_issueUOps[NUM_UOPS-1:0],
+    input IS_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
     input EX_UOp IN_aguUOps[NUM_AGUS-1:0],
 
     input SqN IN_maxStoreSqN,
@@ -71,19 +71,6 @@ always_comb begin
             for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                 if (IN_resultValid[j] && queue[i].tags[k] == IN_resultUOp[j].tagDst) newAvail[i][k] = 1;
         end
-
-        /*for (integer j = 0; j < 2; j=j+1) begin
-            if (IN_issueUOps[j].valid && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
-                if (IN_issueUOps[j].fu == FU_INT) begin
-                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
-                end
-                else if (IN_issueUOps[j].fu == FU_FPU || IN_issueUOps[j].fu == FU_FMUL) begin
-                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail_dl[i][k] = 1;
-                end
-            end
-        end*/
     end
 
     // Snoop issued store uops to get lower two address bits for sh/sb.

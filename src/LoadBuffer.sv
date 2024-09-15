@@ -1,6 +1,5 @@
 module LoadBuffer
 #(
-    parameter NUM_PORTS=2,
     parameter NUM_ENTRIES=`LB_SIZE
 )
 (

@@ -34,11 +34,10 @@ assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
-localparam NUM_WBS = 4;
-RES_UOp wbUOp[5:0] /*verilator public*/;
-reg wbHasResult[NUM_WBS-1:0];
+RES_UOp wbUOp[NUM_PORTS_TOTAL-1:0] /*verilator public*/;
+reg wbHasResult[NUM_PORTS-1:0];
 always_comb begin
-    for (integer i = 0; i < NUM_WBS; i=i+1)
+    for (integer i = 0; i < NUM_PORTS; i=i+1)
         wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[6];
 end
 
@@ -160,7 +159,7 @@ IntUOpOrder_t RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
 wire RN_stall /*verilator public*/;
-Rename#(.WIDTH_ISSUE(NUM_AGUS+NUM_ALUS)) rn
+Rename#(.WIDTH_WR(NUM_PORTS)) rn
 (
     .clk(clk),
     .frontEn(frontendEn),
@@ -174,7 +173,7 @@ Rename#(.WIDTH_ISSUE(NUM_AGUS+NUM_ALUS)) rn
     .IN_comUOp(comUOps),
 
     .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp[3:0]),
+    .IN_wbUOp(wbUOp[NUM_PORTS-1:0]),
 
     .IN_branch(branch),
     .IN_mispredFlush(mispredFlush),
@@ -192,18 +191,18 @@ wire stall[3:0] /*verilator public*/;
 assign stall[0] = 0;
 assign stall[1] = 0;
 
-wire[NUM_ALUS+2*NUM_AGUS-1:0][NUM_AGUS+NUM_ALUS-1:0] IQ_stalls;
-wire DIV_doNotIssue[NUM_AGUS+NUM_ALUS-1:0];
-wire FDIV_doNotIssue[NUM_AGUS+NUM_ALUS-1:0];
+wire[NUM_ALUS+2*NUM_AGUS-1:0][NUM_PORTS-1:0] IQ_stalls;
+wire DIV_doNotIssue[NUM_PORTS-1:0];
+wire FDIV_doNotIssue[NUM_PORTS-1:0];
 
-generate for (genvar i = 0; i < NUM_ALUS + NUM_AGUS; i=i+1)
+generate for (genvar i = 0; i < NUM_PORTS; i=i+1)
     IssueQueue#(
         .SIZE(PORT_IQ_SIZE[i]),
         .NUM_ENQUEUE(2),
         .PORT_IDX(i),
         .NUM_OPERANDS((i<NUM_ALUS) ? 2 : 1),
         .NUM_UOPS(`DEC_WIDTH),
-        .RESULT_BUS_COUNT(4),
+        .RESULT_BUS_COUNT(NUM_PORTS),
         .IMM_BITS((i<NUM_ALUS) ? 36 : 12),
         .FUS(PORT_FUS[i])
     ) iq (
@@ -221,7 +220,7 @@ generate for (genvar i = 0; i < NUM_ALUS + NUM_AGUS; i=i+1)
         .IN_uopOrdering(RN_uopOrdering),
 
         .IN_resultValid(wbHasResult),
-        .IN_resultUOp(wbUOp[3:0]),
+        .IN_resultUOp(wbUOp[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
@@ -240,7 +239,7 @@ wire stLookupUOp_ready[NUM_AGUS-1:0];
 ComLimit stCommitLimit[NUM_AGUS-1:0];
 
 generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
-    StoreDataIQ #(8, 2, i, 4, 4) iqStD
+    StoreDataIQ #(8, 2, i, `DEC_WIDTH, NUM_PORTS) iqStD
     (
         .clk(clk),
         .rst(rst),
@@ -249,13 +248,13 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
         .IN_uop(RN_uop),
 
         .IN_resultValid(wbHasResult),
-        .IN_resultUOp(wbUOp[3:0]),
+        .IN_resultUOp(wbUOp[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
         .IN_issueUOps(IS_uop),
 
-        .IN_aguUOps(LD_uop[3:2]),
+        .IN_aguUOps(LD_uop[NUM_ALUS+:NUM_AGUS]),
         .IN_maxStoreSqN(SQ_maxStoreSqN),
 
         .OUT_comLimit(stCommitLimit[i]),
@@ -265,28 +264,26 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     );
 end endgenerate
 
+RF_ReadReq[NUM_RF_READS-1:0] RF_reads;
 
-logic[7:0] RF_readEnable;
-RFTag[7:0] RF_readAddress;
-RegT[7:0] RF_readData;
-for (genvar i = 0; i < 2; i=i+1) begin
-    assign RF_readEnable[i+6] = SDL_readEnable[i];
-    assign RF_readAddress[i+6] = SDL_readTag[i];
-    assign SDL_readData[i] = RF_readData[i+6];
+logic[NUM_RF_READS-1:0] RF_readEnable;
+RFTag[NUM_RF_READS-1:0] RF_readAddress;
+RegT[NUM_RF_READS-1:0] RF_readData;
+for (genvar i = 0; i < NUM_RF_READS; i=i+1) begin
+    assign RF_readEnable[i] = RF_reads[i].valid;
+    assign RF_readAddress[i] = RF_reads[i].tag;
 end
-
-logic[3:0] RF_writeEnable;
-RFTag[3:0] RF_writeAddress;
-RegT[3:0] RF_writeData;
+logic[NUM_RF_WRITES-1:0] RF_writeEnable;
+RFTag[NUM_RF_WRITES-1:0] RF_writeAddress;
+RegT[NUM_RF_WRITES-1:0] RF_writeData;
 always_comb begin
-    for (integer i = 0; i < 4; i=i+1) begin
+    for (integer i = 0; i < NUM_RF_WRITES; i=i+1) begin
         RF_writeAddress[i] = wbUOp[i].tagDst[5:0];
         RF_writeData[i] = wbUOp[i].result;
         RF_writeEnable[i] = wbHasResult[i];
     end
 end
-
-RegFile#(32, 64, 8, 4, 1) rf
+RegFile#(32, 64, NUM_RF_READS, NUM_RF_WRITES, 1) rf
 (
     .clk(clk),
 
@@ -311,7 +308,7 @@ Load ld
     .IN_uop(IS_uop),
 
     .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp[3:0]),
+    .IN_wbUOp(wbUOp[NUM_PORTS-1:0]),
 
     .IN_branch(branch),
     .IN_stall(stall),
@@ -321,9 +318,8 @@ Load ld
     .OUT_pcRead(PC_readReq),
     .IN_pcReadData(PC_readData),
 
-    .OUT_rfReadEnable(RF_readEnable[5:0]),
-    .OUT_rfReadAddr(RF_readAddress[5:0]),
-    .IN_rfReadData(RF_readData[5:0]),
+    .OUT_rfReadReq(RF_reads[0 +: 2*NUM_ALUS + NUM_AGUS]),
+    .IN_rfReadData(RF_readData[0 +: 2*NUM_ALUS + NUM_AGUS]),
 
     .OUT_uop(LD_uop)
 );
@@ -331,7 +327,6 @@ Load ld
 AMO_Data_UOp SDL_amoData[NUM_AGUS-1:0];
 logic SDL_readEnable[NUM_AGUS-1:0];
 RFTag SDL_readTag[NUM_AGUS-1:0];
-RegT SDL_readData[NUM_AGUS-1:0];
 StDataUOp SDL_stDataUOp[NUM_AGUS-1:0];
 StoreDataLoad stDataLd
 (
@@ -345,9 +340,8 @@ StoreDataLoad stDataLd
 
     .IN_atomicUOp(SDL_amoData),
 
-    .OUT_readEnable(SDL_readEnable),
-    .OUT_readTag(SDL_readTag),
-    .IN_readData(SDL_readData),
+    .OUT_readReq(RF_reads[NUM_RF_READS-1 -: NUM_AGUS]),
+    .IN_readData(RF_readData[NUM_RF_READS-1 -: NUM_AGUS]),
 
     .OUT_uop(SDL_stDataUOp)
 );
@@ -723,7 +717,7 @@ LoadStoreUnit lsu
     .IN_memc(IN_memc),
 
     .IN_ready('{1'b1, 1'b1}),
-    .OUT_uopLd(wbUOp[3:2])
+    .OUT_uopLd(wbUOp[NUM_ALUS+:NUM_AGUS])
 );
 
 SqN ROB_maxSqN;

@@ -4,8 +4,8 @@ module ROB
     // speculatively execute?
     parameter ID_LEN = `ROB_SIZE_EXP,
     parameter WIDTH_RN = `DEC_WIDTH,
-    parameter WIDTH = 4,
-    parameter WIDTH_WB = 6
+    parameter WIDTH = `DEC_WIDTH,
+    parameter WIDTH_WB = NUM_PORTS_TOTAL
 )
 (
     input wire clk,
