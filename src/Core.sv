@@ -193,6 +193,8 @@ assign stall[0] = 0;
 assign stall[1] = 0;
 
 wire[NUM_ALUS+2*NUM_AGUS-1:0][NUM_AGUS+NUM_ALUS-1:0] IQ_stalls;
+wire DIV_doNotIssue[NUM_AGUS+NUM_ALUS-1:0];
+wire FDIV_doNotIssue[NUM_AGUS+NUM_ALUS-1:0];
 
 generate for (genvar i = 0; i < NUM_ALUS + NUM_AGUS; i=i+1)
     IssueQueue#(
@@ -212,8 +214,8 @@ generate for (genvar i = 0; i < NUM_ALUS + NUM_AGUS; i=i+1)
         .OUT_stall(IQ_stalls[i]),
 
         .IN_stall(stall[i]),
-        .IN_doNotIssueDiv(DIV_doNotIssue),
-        .IN_doNotIssueFDiv(FDIV_doNotIssue),
+        .IN_doNotIssueDiv((i < NUM_ALUS) ? DIV_doNotIssue[i] : 1'b0),
+        .IN_doNotIssueFDiv((i < NUM_ALUS) ? FDIV_doNotIssue[i] : 1'b0),
 
         .IN_uop(RN_uop),
         .IN_uopOrdering(RN_uopOrdering),
@@ -350,78 +352,11 @@ StoreDataLoad stDataLd
     .OUT_uop(SDL_stDataUOp)
 );
 
-RES_UOp INT0_uop;
-IntALU ialu
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_wbStall(1'b0),
-    .IN_uop(LD_uop[0]),
-    .IN_branch(branch),
-
-    .OUT_branch(branchProvs[0]),
-    .OUT_btUpdate(BP_btUpdates[0]),
-
-    .OUT_zcFwd(LD_zcFwd[0]),
-
-    .OUT_amoData(SDL_amoData[0]),
-    .OUT_uop(INT0_uop)
-);
-
-`ifdef ENABLE_INT_DIV
-wire DIV_busy;
-RES_UOp DIV_uop;
-wire DIV_doNotIssue = DIV_busy || (LD_uop[0].valid && LD_uop[0].fu == FU_DIV) || (IS_uop[0].valid && IS_uop[0].fu == FU_DIV);
-Divide div
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[0].fu == FU_DIV),
-
-    .OUT_busy(DIV_busy),
-
-    .IN_branch(branch),
-    .IN_uop(LD_uop[0]),
-    .OUT_uop(DIV_uop)
-);
-`else
-wire DIV_doNotIssue = 1'b0;
-`endif
-
-`ifdef ENABLE_FP
-RES_UOp FPU_uop;
-FPU fpu
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[0].fu == FU_FPU),
-
-    .IN_branch(branch),
-    .IN_uop(LD_uop[0]),
-
-    .IN_fRoundMode(CSR_fRoundMode),
-    .OUT_uop(FPU_uop)
-);
-`endif
-
-TValProv TVS_tvalProvs[1:0];
-TValState TVS_tvalState;
-TValSelect tvalSelect
-(
-    .clk(clk),
-    .rst(rst),
-    .IN_branch(branch),
-    .IN_commitSqN(ROB_curSqN),
-    .IN_tvalProvs(TVS_tvalProvs),
-    .OUT_tvalState(TVS_tvalState)
-);
-
-RES_UOp CSR_uop;
 TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
 DecodeState CSR_dec;
 VirtMemState CSR_vmem;
+
 CSR csr
 (
     .clk(clk),
@@ -449,29 +384,136 @@ CSR csr
     .OUT_dec(CSR_dec),
     .OUT_vmem(CSR_vmem),
 
-    .OUT_uop(CSR_uop)
+    .OUT_uop(intPortsGen[0].resUOps[FU_CSR])
 );
 
-always_comb begin
-    wbUOp[0] = 'x;
-    wbUOp[0].valid = 1'b0;
+generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin : intPortsGen
+    RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps = '0;
 
-    if (INT0_uop.valid)
-        wbUOp[0] = INT0_uop;
-    else if (CSR_uop.valid)
-        wbUOp[0] = CSR_uop;
-    //else if (AGU_resUOp.valid && aguUOpPort_r == 0)
-    //    wbUOp[0] = AGU_resUOp;
-`ifdef ENABLE_FP
-    else if (FPU_uop.valid)
-        wbUOp[0] = FPU_uop;
-`endif
-`ifdef ENABLE_INT_DIV
-    else if (DIV_uop.valid)
-        wbUOp[0] = DIV_uop;
-`endif
+    if ((PORT_FUS[i] & FU_INT_OH) != 0)
+        IntALU ialu
+        (
+            .clk(clk),
+            .rst(rst),
 
-end
+            .IN_wbStall(1'b0),
+            .IN_uop(LD_uop[i]),
+            .IN_branch(branch),
+
+            .OUT_branch(branchProvs[i]),
+            .OUT_btUpdate(BP_btUpdates[i]),
+
+            .OUT_zcFwd(LD_zcFwd[i]),
+
+            .OUT_amoData(SDL_amoData[i]),
+            .OUT_uop(resUOps[FU_INT])
+        );
+
+    if ((PORT_FUS[i] & FU_DIV_OH) != 0) begin
+        wire DIV_busy;
+        Divide div
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_DIV),
+
+            .OUT_busy(DIV_busy),
+
+            .IN_branch(branch),
+            .IN_uop(LD_uop[i]),
+            .OUT_uop(resUOps[FU_DIV])
+        );
+        assign DIV_doNotIssue[i] = DIV_busy ||
+            (LD_uop[i].valid && LD_uop[i].fu == FU_DIV) ||
+            (IS_uop[i].valid && IS_uop[i].fu == FU_DIV);
+    end
+    else assign DIV_doNotIssue[i] = 1'b1;
+
+
+    if ((PORT_FUS[i] & FU_FPU_OH) != 0)
+        FPU fpu
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_FPU),
+
+            .IN_branch(branch),
+            .IN_uop(LD_uop[i]),
+
+            .IN_fRoundMode(CSR_fRoundMode),
+            .OUT_uop(resUOps[FU_FPU])
+        );
+
+    if ((PORT_FUS[i] & FU_MUL_OH) != 0)
+        Multiply mul
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_MUL),
+
+            .OUT_busy(),
+
+            .IN_branch(branch),
+            .IN_uop(LD_uop[i]),
+            .OUT_uop(resUOps[FU_MUL])
+        );
+
+    if ((PORT_FUS[i] & FU_FMUL_OH) != 0)
+        FMul fmul
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_FMUL),
+
+            .IN_branch(branch),
+            .IN_uop(LD_uop[i]),
+
+            .IN_fRoundMode(CSR_fRoundMode),
+            .OUT_uop(resUOps[FU_FMUL])
+        );
+
+    if ((PORT_FUS[i] & FU_FDIV_OH) != 0) begin
+        wire FDIV_busy;
+        FDiv fdiv
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_FDIV),
+
+            .IN_wbAvail(1'b1),
+            .OUT_busy(FDIV_busy),
+
+            .IN_branch(branch),
+            .IN_uop(LD_uop[i]),
+            .IN_fRoundMode(CSR_fRoundMode),
+            .OUT_uop(resUOps[FU_FDIV])
+        );
+        assign FDIV_doNotIssue[i] = FDIV_busy ||
+            (LD_uop[i].valid && LD_uop[i].fu == FU_FDIV) ||
+            (IS_uop[i].valid && IS_uop[i].fu == FU_FDIV);
+    end
+    else assign FDIV_doNotIssue[i] = 1;
+
+    always_comb begin
+        wbUOp[i] = RES_UOp'{valid: 0, default: 'x};
+        for (integer j = 0; j < (1 << $bits(FuncUnit)); j=j+1) begin
+            if (resUOps[j].valid)
+                wbUOp[i] = resUOps[j];
+        end
+    end
+end endgenerate
+
+TValProv TVS_tvalProvs[1:0];
+TValState TVS_tvalState;
+TValSelect tvalSelect
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_branch(branch),
+    .IN_commitSqN(ROB_curSqN),
+    .IN_tvalProvs(TVS_tvalProvs),
+    .OUT_tvalState(TVS_tvalState)
+);
 
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[1:0];
@@ -713,98 +755,6 @@ LoadStoreUnit lsu
     .IN_ready('{1'b1, 1'b1}),
     .OUT_uopLd(wbUOp[3:2])
 );
-
-RES_UOp INT1_uop;
-IntALU ialu1
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_wbStall(1'b0),
-    .IN_uop(LD_uop[1]),
-    .IN_branch(branch),
-
-    .OUT_branch(branchProvs[1]),
-    .OUT_btUpdate(BP_btUpdates[1]),
-
-    .OUT_zcFwd(LD_zcFwd[1]),
-
-    .OUT_amoData(SDL_amoData[1]),
-    .OUT_uop(INT1_uop)
-);
-
-`ifdef ENABLE_INT_MUL
-RES_UOp MUL_uop;
-wire MUL_busy;
-Multiply mul
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[1].fu == FU_MUL),
-
-    .OUT_busy(MUL_busy),
-
-    .IN_branch(branch),
-    .IN_uop(LD_uop[1]),
-    .OUT_uop(MUL_uop)
-);
-`endif
-
-`ifdef ENABLE_FP
-RES_UOp FMUL_uop;
-FMul fmul
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[1].fu == FU_FMUL),
-
-    .IN_branch(branch),
-    .IN_uop(LD_uop[1]),
-
-    .IN_fRoundMode(CSR_fRoundMode),
-    .OUT_uop(FMUL_uop)
-);
-
-wire FDIV_busy;
-wire FDIV_doNotIssue = FDIV_busy || (LD_uop[1].valid && LD_uop[1].fu == FU_FDIV) || (IS_uop[1].valid && IS_uop[1].fu == FU_FDIV);
-RES_UOp FDIV_uop;
-FDiv fdiv
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[1].fu == FU_FDIV),
-
-    .IN_wbAvail(!INT1_uop.valid && !MUL_uop.valid && !FMUL_uop.valid),
-    .OUT_busy(FDIV_busy),
-
-    .IN_branch(branch),
-    .IN_uop(LD_uop[1]),
-    .IN_fRoundMode(CSR_fRoundMode),
-    .OUT_uop(FDIV_uop)
-);
-`else
-wire FDIV_busy = 1;
-wire FDIV_doNotIssue = 1;
-`endif
-
-always_comb begin
-    wbUOp[1] = 'x;
-    wbUOp[1].valid = 1'b0;
-
-    if (INT1_uop.valid)
-        wbUOp[1] = INT1_uop;
-
-    `ifdef ENABLE_INT_MUL
-    else if (MUL_uop.valid)
-        wbUOp[1] = MUL_uop;
-    `endif
-    `ifdef ENABLE_FP
-    else if (FMUL_uop.valid)
-        wbUOp[1] = FMUL_uop;
-    else if (FDIV_uop.valid)
-        wbUOp[1] = FDIV_uop;
-    `endif
-end
 
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;

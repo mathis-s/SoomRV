@@ -228,7 +228,7 @@ typedef enum logic[5:0]
 
 } OPCode_FU_TRAP;
 
-typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FDIV, FU_FMUL, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
+typedef enum logic[3:0] {FU_INT, FU_AGU, FU_UNUSED, FU_MUL, FU_DIV, FU_FPU, FU_FMUL, FU_FDIV, FU_RN, FU_ATOMIC, FU_CSR, FU_TRAP} FuncUnit;
 typedef enum logic[(1<<$bits(FuncUnit))-1:0]
 {
     FU_INT_OH    = 1 << FU_INT,
