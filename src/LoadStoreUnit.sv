@@ -389,7 +389,7 @@ reg[$clog2(`CASSOC)-1:0] storeWriteAssoc;
 reg setDirty;
 reg[$clog2(SIZE)-1:0] setDirtyIdx;
 // Process Cache Table Read Responses
-LD_UOp curLd[1:0];
+LD_UOp curLd[NUM_AGUS-1:0];
 reg blsuLoadHandled;
 always_comb begin
 
@@ -605,7 +605,7 @@ end
 // Load Result Buffering
 wire LRB_ready[NUM_AGUS-1:0];
 LoadResUOp LRB_uop[NUM_AGUS-1:0];
-LoadResultBuffer#(`LRB_SIZE) loadResBuf[1:0]
+LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
 (
     .clk(clk),
     .rst(rst),

@@ -331,7 +331,7 @@ AMO_Data_UOp SDL_amoData[NUM_ALUS-1:0];
 logic SDL_readEnable[NUM_AGUS-1:0];
 RFTag SDL_readTag[NUM_AGUS-1:0];
 StDataUOp SDL_stDataUOp[NUM_AGUS-1:0];
-StoreDataLoad stDataLd
+StoreDataLoad#(NUM_AGUS) stDataLd
 (
     .clk(clk),
     .rst(rst),
@@ -501,9 +501,9 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     end
 end endgenerate
 
-TValProv TVS_tvalProvs[1:0];
+TValProv TVS_tvalProvs[NUM_AGUS-1:0];
 TValState TVS_tvalState;
-TValSelect tvalSelect
+TValSelect#(NUM_AGUS) tvalSelect
 (
     .clk(clk),
     .rst(rst),
@@ -515,10 +515,10 @@ TValSelect tvalSelect
 
 PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
-wire CC_PW_LD_stall[1:0];
+wire CC_PW_LD_stall[NUM_AGUS-1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
 assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
-PageWalker pageWalker
+PageWalker#(NUM_AGUS+1) pageWalker
 (
     .clk(clk),
     .rst(rst),
@@ -720,7 +720,7 @@ LoadStoreUnit lsu
     .OUT_BLSU_memc(BLSU_MC_if),
     .IN_memc(IN_memc),
 
-    .IN_ready('{1'b1, 1'b1}),
+    .IN_ready({NUM_AGUS{1'b1}}),
     .OUT_uopLd(wbUOp[NUM_ALUS+:NUM_AGUS])
 );
 
