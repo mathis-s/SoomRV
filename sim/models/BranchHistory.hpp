@@ -5,13 +5,7 @@
 
 #include "Model.hpp"
 
-#include "VTop.h"
-#include "VTop_SoC.h"
-#include "VTop_Top.h"
-#include "VTop_Core.h"
-#include "VTop_IFetch.h"
-#include "VTop_BranchPredictor__N3.h"
-#include "VTop_RegFile__W50_S20_N1_NB1.h"
+#include "../model_headers.h"
 #include "riscv/processor.h"
 
 

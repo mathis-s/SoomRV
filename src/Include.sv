@@ -597,7 +597,7 @@ typedef struct packed
     SqN loadSqN;
     FuncUnit fu;
     logic compressed;
-    logic[5:0] validIQ; // valids for individual Issue Queues
+    logic[NUM_PORTS_TOTAL-1:0] validIQ; // valids for individual Issue Queues
     logic valid;
 } R_UOp;
 

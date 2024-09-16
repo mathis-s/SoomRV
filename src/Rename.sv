@@ -40,7 +40,7 @@ function automatic IntUOpOrder_t NextOrder(FuncUnit fu, IntUOpOrder_t ord, SqN s
 
     if (fu == FU_AGU) ;
     else if (fu == FU_ATOMIC) begin
-        retval = IntUOpOrder_t'(storeSqN);
+        retval = IntUOpOrder_t'(storeSqN % SqN'(NUM_AGUS));
     end
     else begin
         // find next fu in sequence that supports operation
@@ -66,7 +66,7 @@ reg[3:0] portStall;
 always_comb begin
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
         portStall[i] = 0;
-        for (integer j = 0; j < 4; j=j+1)
+        for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1)
             portStall[i] |= IN_stalls[j][i];
     end
 end
@@ -153,8 +153,8 @@ always_comb begin
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
         RAT_commitAvail[i] = IN_comUOp[i].compressed;
-
     end
+
 end
 
 RenameTable
@@ -381,7 +381,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_ISSUE; i++) begin
             OUT_uop[i].valid <= 0;
 
-            for (integer j = 0; j < 6; j=j+1) begin
+            for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1) begin
                 if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
             end
         end

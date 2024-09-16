@@ -1,5 +1,5 @@
 #pragma once
-#include "VTop.h"
+#include "../model_headers.h"
 #include "../Inst.hpp"
 #include "riscv/processor.h"
 

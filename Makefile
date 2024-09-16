@@ -104,6 +104,11 @@ setup:
 	git submodule update --init --recursive
 	cd riscv-isa-sim && ./configure CFLAGS="-Os -g0" CXXFLAGS="-Os -g0" --with-boost=no --with-boost-asio=no --with-boost-regex=no
 	make -j $(nproc) -C riscv-isa-sim
+
+.PHONY: prepare_header
+prepare_header:
+	python scripts/prepare_header.py obj_dir/\*.h sim/model_headers.h
+
 .PHONY: clean
 clean:
 	$(RM) -r obj_dir

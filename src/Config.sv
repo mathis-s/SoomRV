@@ -87,7 +87,7 @@
 `define DEBUG
 
 parameter NUM_AGUS = 2;
-parameter NUM_ALUS = 2;
+parameter NUM_ALUS = 3;
 parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
 parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
 
@@ -98,6 +98,7 @@ parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
 parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
 
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
+    8,
     8,
     8,
     8,
@@ -112,6 +113,7 @@ parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
     FU_AGU_OH|FU_ATOMIC_OH,
 
     // NUM_ALUS x ALU Ports
+    FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
     FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_MUL_OH|FU_FDIV_OH|FU_FMUL_OH|FU_ATOMIC_OH,
     FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_DIV_OH|FU_FPU_OH|FU_CSR_OH|FU_ATOMIC_OH
 };

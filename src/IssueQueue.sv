@@ -52,6 +52,8 @@ localparam REGULAR_IMM_BITS = (IMM_BITS < 32) ? IMM_BITS : 32;
 localparam IDIV_DLY=33;
 localparam IMUL_DLY=9-4-2;
 
+localparam AGU_PORT_IDX = (PORT_IDX >= NUM_ALUS) ? (PORT_IDX - NUM_ALUS) : PORT_IDX;
+
 typedef struct packed
 {
     logic[IMM_BITS-1:0] imm;
@@ -132,9 +134,9 @@ always_comb begin
         // check if this is a candidate to enqueue
         if (IN_uop[i].validIQ[PORT_IDX] && HasFU(IN_uop[i].fu) &&
 
-            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == PORT_IDX[0])) &&
-            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
-            (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == AGU_PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == AGU_PORT_IDX[0])) &&
+            (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == AGU_PORT_IDX[0])) &&
 
             (PORT_IDX >= NUM_ALUS || IN_uopOrdering[i] == IntUOpOrder_t'(PORT_IDX)) &&
 

@@ -23,8 +23,8 @@ module IFetch
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
     input BPUpdate IN_bpUpdate,
 
-    input PCFileReadReq IN_pcRead[NUM_ALUS-1:0],
-    output PCFileEntry OUT_pcReadData[NUM_ALUS-1:0],
+    input PCFileReadReq IN_pcRead[NUM_BRANCH_PORTS-1:0],
+    output PCFileEntry OUT_pcReadData[NUM_BRANCH_PORTS-1:0],
     input PCFileReadReqTH IN_pcReadTH,
     output PCFileEntry OUT_pcReadDataTH,
 
@@ -176,7 +176,7 @@ wire PCFileReadReq sharedReq =
 PCFileEntry sharedData;
 assign OUT_pcReadData[0] = sharedData;
 assign OUT_pcReadDataTH = sharedData;
-RegFile#($bits(PCFileEntry), 1<<$bits(FetchID_t), 3, 1) pcFile
+RegFile#($bits(PCFileEntry), 1<<$bits(FetchID_t), NUM_BRANCH_PORTS+1, 1) pcFile
 (
     .clk(clk),
 

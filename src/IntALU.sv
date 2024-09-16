@@ -91,6 +91,7 @@ always_comb begin
 
         FU_BRANCH: if (HasFU(FU_BRANCH)) case (IN_uop.opcode)
             BR_AUIPC: resC = firstHalfwPC + imm;
+            BR_V_JR,
             BR_V_JALR,
             BR_JAL: resC = nextInstrPC;
             default: ;

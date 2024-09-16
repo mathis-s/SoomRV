@@ -56,7 +56,7 @@ BranchSelector#(4) bsel
     .clk(clk),
     .rst(rst),
 
-    .IN_isUOps(IS_uop),
+    .IN_isUOps(IS_uop[3:0]),
 
     .IN_branches(branchProvs[3:0]),
     .OUT_branch(branch),
@@ -69,10 +69,10 @@ BranchSelector#(4) bsel
 );
 
 IF_Instr IF_instrs /*verilator public*/;
-BTUpdate BP_btUpdates[1:0];
+BTUpdate BP_btUpdates[NUM_ALUS-1:0];
 
-PCFileReadReq PC_readReq[NUM_ALUS-1:0];
-PCFileEntry PC_readData[NUM_ALUS-1:0];
+PCFileReadReq PC_readReq[NUM_BRANCH_PORTS-1:0];
+PCFileEntry PC_readData[NUM_BRANCH_PORTS-1:0];
 PCFileReadReqTH PC_readReqTH;
 PCFileEntry PC_readDataTH;
 
@@ -96,7 +96,7 @@ IFetch ifetch
 
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
-    .IN_btUpdates(BP_btUpdates),
+    .IN_btUpdates(BP_btUpdates[NUM_BRANCH_PORTS-1:0]),
     .IN_bpUpdate(ROB_bpUpdate),
 
     .IN_pcRead(PC_readReq),
@@ -186,13 +186,10 @@ Rename#(.WIDTH_WR(NUM_PORTS)) rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-IS_UOp IS_uop[3:0] /*verilator public*/;
+IS_UOp IS_uop[NUM_PORTS-1:0] /*verilator public*/;
+wire stall[NUM_PORTS-1:0] /*verilator public*/;
 
-wire stall[3:0] /*verilator public*/;
-assign stall[0] = 0;
-assign stall[1] = 0;
-
-wire[NUM_ALUS+2*NUM_AGUS-1:0][NUM_PORTS-1:0] IQ_stalls;
+wire[NUM_PORTS_TOTAL-1:0][`DEC_WIDTH-1:0] IQ_stalls;
 wire DIV_doNotIssue[NUM_PORTS-1:0];
 wire FDIV_doNotIssue[NUM_PORTS-1:0];
 
@@ -245,7 +242,7 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
         .clk(clk),
         .rst(rst),
 
-        .OUT_stall(IQ_stalls[4+i]),
+        .OUT_stall(IQ_stalls[NUM_PORTS+i]),
         .IN_uop(RN_uop),
 
         .IN_resultValid(wbHasResult),
@@ -297,9 +294,9 @@ RegFile#(32, 64, NUM_RF_READS, NUM_RF_WRITES, 1) rf
     .IN_wdata(RF_writeData)
 );
 
-EX_UOp LD_uop[3:0] /*verilator public*/;
+EX_UOp LD_uop[NUM_PORTS-1:0] /*verilator public*/;
 
-ZCForward LD_zcFwd[1:0];
+ZCForward LD_zcFwd[NUM_ALUS-1:0];
 
 Load#(
     .NUM_UOPS(NUM_PORTS),
@@ -330,7 +327,7 @@ Load#(
     .OUT_uop(LD_uop)
 );
 
-AMO_Data_UOp SDL_amoData[NUM_AGUS-1:0];
+AMO_Data_UOp SDL_amoData[NUM_ALUS-1:0];
 logic SDL_readEnable[NUM_AGUS-1:0];
 RFTag SDL_readTag[NUM_AGUS-1:0];
 StDataUOp SDL_stDataUOp[NUM_AGUS-1:0];
@@ -344,7 +341,7 @@ StoreDataLoad stDataLd
     .IN_uop(stLookupUOp),
     .OUT_ready(stLookupUOp_ready),
 
-    .IN_atomicUOp(SDL_amoData),
+    .IN_atomicUOp(SDL_amoData[NUM_AGUS-1:0]),
 
     .OUT_readReq(RF_reads[NUM_RF_READS-1 -: NUM_AGUS]),
     .IN_readData(RF_readData[NUM_RF_READS-1 -: NUM_AGUS]),
@@ -387,8 +384,10 @@ CSR csr
     .OUT_uop(intPortsGen[0].resUOps[FU_CSR])
 );
 
-generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin : intPortsGen
+generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps = '0;
+
+    assign stall[i] = 1'b0;
 
     if ((PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) != 0)
         IntALU#(PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) ialu
@@ -530,7 +529,7 @@ PageWalker pageWalker
     .IN_ldStall(CC_PW_LD_stall[0]),
     .OUT_ldUOp(PW_LD_uop[0]),
     .IN_ldAck(LSU_ldAck),
-    .IN_ldResUOp(wbUOp[3:2])
+    .IN_ldResUOp(wbUOp[NUM_ALUS+:NUM_AGUS])
 );
 
 wire LS_AGULD_uopStall[NUM_AGUS-1:0];

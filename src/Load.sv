@@ -110,7 +110,7 @@ always_comb begin
 
             // forward values from register file and pc file combinationally
             if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
-            if (i < 2)
+            if (i < NUM_ALUS)
                 if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
 
             OUT_uop[i].bpi = '0;
@@ -171,7 +171,7 @@ always_ff@(posedge clk) begin
                 end
 
                 outUOpReg[i].srcB <= 'x;
-                if (IN_uop[i].immB || i == 2 || i == 3) begin
+                if (IN_uop[i].immB || i >= NUM_ALUS) begin
                     outUOpReg[i].srcB <= IN_uop[i].imm;
                 end
                 else if (IN_uop[i].tagB[6]) begin

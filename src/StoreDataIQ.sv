@@ -202,7 +202,7 @@ always_ff@(posedge clk) begin
 
         // Enqueue
         for (integer i = 0; i < NUM_ENQUEUE; i=i+1) begin
-            if (enqCandidates[i].validIQ[4+PORT_IDX]) begin
+            if (enqCandidates[i].validIQ[NUM_PORTS+PORT_IDX]) begin
                 R_ST_UOp temp;
 
                 temp.avail[0] = enqCandidates[i].availB;
