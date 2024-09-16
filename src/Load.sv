@@ -67,7 +67,7 @@ end
 
 logic[$clog2(NUM_FWD)-1:0] matchIdx[NUM_LOOKUP-1:0];
 logic matchValid[NUM_LOOKUP-1:0];
-OHEncoder#(NUM_LOOKUP, 1) lookupEnc[NUM_LOOKUP-1:0]
+OHEncoder#(NUM_FWD, 1) lookupEnc[NUM_LOOKUP-1:0]
 (
     .IN_idxOH(match),
     .OUT_idx(matchIdx),
