@@ -7,13 +7,7 @@
 #include <memory>
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
-#include "VTop.h"
-#include "VTop_CSR.h"
-#include "VTop_Core.h"
-#include "VTop_ExternalAXISim.h"
-#include "VTop_IFetch.h"
-#include "VTop_SoC.h"
-#include "VTop_Top.h"
+#include "model_headers.h"
 #include <cstdio>
 #include <unistd.h>
 #include <array>
@@ -26,6 +20,8 @@
 #include "Simif.hpp"
 #include "Registers.hpp"
 #include "Utils.hpp"
+
+#define LEN(x) (sizeof((x)) / sizeof((x[0])))
 
 struct
 {
@@ -215,7 +211,7 @@ void LogRename(Inst& inst)
 #ifdef KONATA
     if (wrap->main_time > DEBUG_TIME)
     {
-        if (inst.fu == 8 || inst.fu == 11)
+        if (inst.fu == 9 || inst.fu == 12)
             fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
         else
             fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IS");
@@ -277,7 +273,7 @@ void LogInstructions()
     int brSqN = ExtractField(core->branch, 1 + 5 + 1 + 7 + 7, 8);
 
     // Issue
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < LEN(core->LD_uop); i++)
     {
         if (!core->stall[i] && core->IS_uop[i][0] & 1)
         {
@@ -287,7 +283,7 @@ void LogInstructions()
     }
 
     // Execute
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < LEN(core->LD_uop); i++)
     {
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
@@ -301,7 +297,7 @@ void LogInstructions()
     }
 
     // Result
-    for (size_t i = 0; i < 6; i++)
+    for (size_t i = 0; i < LEN(core->wbUOp); i++)
     {
         uint32_t sqn = (core->wbUOp[i] >> 6) & 127;
         // WB valid
@@ -312,7 +308,7 @@ void LogInstructions()
             state.insts[sqn].flags = (core->wbUOp[i] >> 2) & 0xF;
 
             // FP ops use a different flag encoding. These are not traps, so ignore them.
-            if ((state.insts[sqn].fu == 5 || state.insts[sqn].fu == 6 || state.insts[sqn].fu == 7) &&
+            if ((state.insts[sqn].fu == 6 || state.insts[sqn].fu == 7 || state.insts[sqn].fu == 8) &&
                 state.insts[sqn].flags >= 8 && state.insts[sqn].flags <= 13)
                 state.insts[sqn].flags = 0;
 
@@ -383,9 +379,9 @@ void LogInstructions()
         for (size_t i = 0; i < 4; i++)
             if (core->RN_uop[i][0] & 1)
             {
-                int sqn = ExtractField<4>(core->RN_uop[i], 46 + 6, 7);
-                int fu = ExtractField<4>(core->RN_uop[i], 2 + 6, 4);
-                uint8_t tagDst = ExtractField<4>(core->RN_uop[i], 46 + 6 - 7, 7);
+                int sqn = ExtractField(core->RN_uop[i], 46 + 7, 7);
+                int fu = ExtractField(core->RN_uop[i], 2 + 7, 4);
+                uint8_t tagDst = ExtractField(core->RN_uop[i], 46 + 7 - 7, 7);
 
                 state.insts[sqn].valid = 1;
                 state.insts[sqn] = state.de[i];

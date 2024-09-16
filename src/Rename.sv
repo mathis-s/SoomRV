@@ -9,7 +9,7 @@ module Rename
     input wire frontEn,
     input wire rst,
 
-    input wire[5:0][WIDTH_ISSUE-1:0] IN_stalls,
+    input wire[NUM_PORTS_TOTAL-1:0][WIDTH_ISSUE-1:0] IN_stalls,
     output reg OUT_stall,
 
     // Tag lookup for just decoded instrs
@@ -29,11 +29,32 @@ module Rename
     output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
     // This is just an alternating bit that switches with each regular int op,
     // for assignment to issue queues.
-    output reg OUT_uopOrdering[WIDTH_ISSUE-1:0],
+    output IntUOpOrder_t OUT_uopOrdering[WIDTH_ISSUE-1:0],
     output SqN OUT_nextSqN,
     output SqN OUT_nextLoadSqN,
     output SqN OUT_nextStoreSqN
 );
+
+function automatic IntUOpOrder_t NextOrder(FuncUnit fu, IntUOpOrder_t ord, SqN storeSqN);
+    IntUOpOrder_t retval = ord;
+
+    if (fu == FU_AGU) ;
+    else if (fu == FU_ATOMIC) begin
+        retval = IntUOpOrder_t'(storeSqN % SqN'(NUM_AGUS));
+    end
+    else begin
+        // find next fu in sequence that supports operation
+        for (integer i = NUM_ALUS-1; i >= 0; i=i-1) begin
+            // verilator lint_off WIDTHEXPAND
+            IntUOpOrder_t candidate = IntUOpOrder_t'((ord + (i+1)) % NUM_ALUS);
+            // verilator lint_on WIDTHEXPAND
+            if (PORT_FUS[$clog2(NUM_AGUS+NUM_ALUS)'(candidate)][fu])
+                retval = candidate;
+        end
+    end
+    // todo: improve scheduling
+    return retval;
+endfunction;
 
 typedef struct packed
 {
@@ -45,7 +66,7 @@ reg[3:0] portStall;
 always_comb begin
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
         portStall[i] = 0;
-        for (integer j = 0; j < 4; j=j+1)
+        for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1)
             portStall[i] |= IN_stalls[j][i];
     end
 end
@@ -132,8 +153,8 @@ always_comb begin
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
         // Only using during mispredict replay
         RAT_commitAvail[i] = IN_comUOp[i].compressed;
-
     end
+
 end
 
 RenameTable
@@ -198,7 +219,7 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
     .IN_commitTagDst(RAT_commitTags)
 );
 
-reg intOrder;
+IntUOpOrder_t intOrder;
 SqN counterSqN;
 SqN counterStoreSqN;
 SqN counterLoadSqN;
@@ -306,7 +327,7 @@ always_ff@(posedge clk) begin
                     compressed: IN_uop[i].compressed,
 
                     valid:      1'b1,
-                    validIQ:    6'b111111,
+                    validIQ:    {NUM_PORTS_TOTAL{1'b1}},
                     default:    'x
                 };
 
@@ -328,14 +349,8 @@ always_ff@(posedge clk) begin
                 end
 
                 OUT_uop[i].loadSqN <= counterLoadSqN;
-                OUT_uopOrdering[i] <= intOrder;
-
                 if (!(isSc[i] && !scSuccessful[i]))
                     case (IN_uop[i].fu)
-                        FU_INT: intOrder = !intOrder;
-                        FU_DIV, FU_FPU:  intOrder = 1;
-                        FU_FDIV, FU_FMUL, FU_MUL: intOrder = 0;
-
                         FU_AGU: begin
                             if (IN_uop[i].opcode < LSU_SC_W)
                                 counterLoadSqN = counterLoadSqN + 1;
@@ -346,12 +361,13 @@ always_ff@(posedge clk) begin
                         FU_ATOMIC: begin
                             counterStoreSqN = counterStoreSqN + 1;
                             counterLoadSqN = counterLoadSqN + 1;
-                            intOrder = 1;
                         end
                         default: begin end
                     endcase
-
                 OUT_uop[i].storeSqN <= counterStoreSqN;
+
+                intOrder = NextOrder(IN_uop[i].fu, intOrder, counterStoreSqN);
+                OUT_uopOrdering[i] <= intOrder;
             end
         end
         counterSqN <= nextCounterSqN;
@@ -365,7 +381,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < WIDTH_ISSUE; i++) begin
             OUT_uop[i].valid <= 0;
 
-            for (integer j = 0; j < 6; j=j+1) begin
+            for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1) begin
                 if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
             end
         end

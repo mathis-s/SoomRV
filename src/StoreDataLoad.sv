@@ -10,9 +10,8 @@ module StoreDataLoad#(parameter WIDTH=2)
 
     input AMO_Data_UOp IN_atomicUOp[WIDTH-1:0],
 
-    output logic OUT_readEnable[WIDTH-1:0],
-    output RFTag OUT_readTag[WIDTH-1:0],
-    input RegT IN_readData[WIDTH-1:0],
+    output RF_ReadReq[WIDTH-1:0] OUT_readReq,
+    input RegT[WIDTH-1:0] IN_readData,
 
     output StDataUOp OUT_uop[WIDTH-1:0]
 );
@@ -31,8 +30,8 @@ endfunction
 
 always_comb begin
     for (integer i = 0; i < WIDTH; i=i+1) begin
-        OUT_readTag[i] = RFTag'(IN_uop[i].tag);
-        OUT_readEnable[i] = IN_uop[i].valid && !IN_uop[i].tag[$bits(Tag)-1];
+        OUT_readReq[i].tag = RFTag'(IN_uop[i].tag);
+        OUT_readReq[i].valid = IN_uop[i].valid && !IN_uop[i].tag[$bits(Tag)-1];
     end
 end
 

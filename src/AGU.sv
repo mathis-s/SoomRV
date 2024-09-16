@@ -1,5 +1,5 @@
 module AGU
-#(parameter AGU_IDX=1, parameter RQ_ID=2)
+#(parameter RQ_ID=2)
 (
     input wire clk,
     input wire rst,
@@ -40,7 +40,7 @@ reg eldIsPageWalkOp;
 assign OUT_stall = (OUT_TMQ_free == 0);
 
 
-wire[31:0] addr = IN_uop.srcA + (IN_uop.opcode >= LSU_SB_POSTINC ? 0 : IN_uop.srcB);
+wire[31:0] addr = IN_uop.srcA + IN_uop.srcB;
 
 // Address Calculation for incoming UOps
 AGU_UOp aguUOp_c;
@@ -119,8 +119,6 @@ always_comb begin
 
         case (IN_uop.opcode)
 
-            LSU_SB_PREINC,
-            LSU_SB_POSTINC,
             LSU_SB: begin
                 aguUOp_c.size = 0;
                 case (addr[1:0])
@@ -139,8 +137,6 @@ always_comb begin
                 endcase
             end
 
-            LSU_SH_PREINC,
-            LSU_SH_POSTINC,
             LSU_SH: begin
                 aguUOp_c.size = 1;
                 case (addr[1])
@@ -159,8 +155,6 @@ always_comb begin
                 resUOp_c.tagDst = 7'h40;
             end
 
-            LSU_SW_PREINC,
-            LSU_SW_POSTINC,
             LSU_SW: begin
                 aguUOp_c.wmask = 4'b1111;
             end
@@ -386,7 +380,7 @@ always_ff@(posedge clk) begin
         // Page Walk Request Logic
         if (pageWalkActive) begin
             if (!pageWalkAccepted) begin
-                if (IN_pw.busy && IN_pw.rqID == RQ_ID) begin
+                if (IN_pw.busy && IN_pw.rqID == $bits(IN_pw.rqID)'(RQ_ID)) begin
                     pageWalkAccepted <= 1;
                 end
                 else begin

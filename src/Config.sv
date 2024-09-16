@@ -19,12 +19,6 @@
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
 
-// Issue
-`define IQ_0_SIZE 8
-`define IQ_1_SIZE 8
-`define IQ_2_SIZE 8
-`define IQ_3_SIZE 8
-
 // Memory
 `define SQ_SIZE 16
 `define LB_SIZE 16
@@ -36,7 +30,6 @@
 `define DTLB_SIZE 8
 `define DTLB_ASSOC 4
 `define DTLB_MISS_QUEUE_SIZE 4
-
 
 // ROB Size
 `define ROB_SIZE_EXP 6
@@ -85,8 +78,6 @@
 // Enable floating point (zfinx) support
 //`define ENABLE_FP
 
-`define NUM_AGUS 2
-`define NUM_ALUS 2
 `define NUM_TAGS 64
 
 `define ENABLE_INT_DIV
@@ -94,3 +85,39 @@
 `define ENABLE_ZCB
 
 `define DEBUG
+
+
+parameter NUM_AGUS = 2;
+parameter NUM_ALUS = 3;
+// How many of the ALU ports support branches?
+parameter NUM_BRANCH_PORTS = 2;
+
+
+
+parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
+    8,
+    8,
+    8,
+    8,
+    8
+};
+
+// verilator lint_off WIDTHEXPAND
+parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
+
+    // NUM_ALUS x AGU Ports
+    FU_AGU_OH|FU_ATOMIC_OH,
+    FU_AGU_OH|FU_ATOMIC_OH,
+
+    // NUM_ALUS x ALU Ports
+    FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
+    FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_MUL_OH|FU_FDIV_OH|FU_FMUL_OH|FU_ATOMIC_OH,
+    FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_DIV_OH|FU_FPU_OH|FU_CSR_OH|FU_ATOMIC_OH
+};
+// verilator lint_on WIDTHEXPAND
+
+
+parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
+parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
+parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
+parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;

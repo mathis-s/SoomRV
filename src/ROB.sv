@@ -4,8 +4,8 @@ module ROB
     // speculatively execute?
     parameter ID_LEN = `ROB_SIZE_EXP,
     parameter WIDTH_RN = `DEC_WIDTH,
-    parameter WIDTH = 4,
-    parameter WIDTH_WB = 6
+    parameter WIDTH = `DEC_WIDTH,
+    parameter WIDTH_WB = NUM_PORTS_TOTAL
 )
 (
     input wire clk,
@@ -20,7 +20,7 @@ module ROB
     output ROB_PERFC_Info OUT_perfcInfo,
 
     input BranchProv IN_branch,
-    input ComLimit IN_stComLimit[`NUM_AGUS-1:0],
+    input ComLimit IN_stComLimit[NUM_AGUS-1:0],
     input ComLimit IN_ldComLimit,
 
     output SqN OUT_maxSqN,
@@ -231,7 +231,7 @@ always_ff@(posedge clk) begin
                 reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(deqEntries[i].loadSqN - IN_ldComLimit.sqN) < 0);
 
                 reg sqAllowsCommit = 1;
-                for (integer j = 0; j < `NUM_AGUS-1; j=j+1)
+                for (integer j = 0; j < NUM_AGUS-1; j=j+1)
                     sqAllowsCommit &= (!IN_stComLimit[j].valid || $signed(deqEntries[i].storeSqN - IN_stComLimit[j].sqN) < 0);
 
                 if (!temp && isRenamed && isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) begin

@@ -1,12 +1,5 @@
 #pragma once
-#include "VTop.h"
-#include "VTop_Core.h"
-#include "VTop_RegFile__A1.h"
-#include "VTop_Rename.h"
-#include "VTop_RenameTable.h"
-#include "VTop_SoC.h"
-#include "VTop_TagBuffer.h"
-#include "VTop_Top.h"
+#include "model_headers.h"
 #include <stdint.h>
 
 class Registers

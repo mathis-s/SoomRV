@@ -8,8 +8,8 @@ module PageWalker#(parameter NUM_RQS=3)
 
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
-    input LD_Ack IN_ldAck[`NUM_AGUS-1:0],
-    input RES_UOp IN_ldResUOp[`NUM_AGUS-1:0]
+    input LD_Ack IN_ldAck[NUM_AGUS-1:0],
+    input RES_UOp IN_ldResUOp[NUM_AGUS-1:0]
 );
 
 
@@ -25,7 +25,7 @@ enum logic[1:0]
 RES_UOp pwLdRes;
 always_comb begin
     pwLdRes = RES_UOp'{valid: 0, default: 'x};
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit &&
             IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == 7'h40
         ) begin
@@ -143,7 +143,7 @@ always_ff@(posedge clk) begin
                     // If a lot of misses are coming in, the LSU might not have capacity to
                     // buffer our op. Page walk loads cannot use the LB as fallback buffering,
                     // so we just re-issue on NACK.
-                    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+                    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
                         if (IN_ldAck[i].valid && IN_ldAck[i].external && IN_ldAck[i].fail)
                             OUT_ldUOp.valid <= 1;
                     end

@@ -12,13 +12,13 @@ module StoreQueue
     output reg OUT_empty,
     output wire OUT_done,
 
-    input LD_UOp IN_uopLd[`NUM_AGUS-1:0],
-    output StFwdResult OUT_fwd[`NUM_AGUS-1:0],
+    input LD_UOp IN_uopLd[NUM_AGUS-1:0],
+    output StFwdResult OUT_fwd[NUM_AGUS-1:0],
 
-    input AGU_UOp IN_uopSt[`NUM_AGUS-1:0],
+    input AGU_UOp IN_uopSt[NUM_AGUS-1:0],
 
     input R_UOp IN_rnUOp[WIDTH_RN-1:0],
-    input StDataUOp IN_stDataUOp[`NUM_AGUS-1:0],
+    input StDataUOp IN_stDataUOp[NUM_AGUS-1:0],
 
     input SqN IN_curSqN,
     input SqN IN_comStSqN,
@@ -70,9 +70,9 @@ RangeMaskGen#(NUM_ENTRIES, 1, 1, 0) invalRangeGen
 );
 
 
-wire[NUM_ENTRIES-1:0] forwardRange_c[`NUM_AGUS-1:0];
+wire[NUM_ENTRIES-1:0] forwardRange_c[NUM_AGUS-1:0];
 generate
-for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
+for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     wire SqN endSqN = IN_uopLd[i].storeSqN + (IN_uopLd[i].atomic ? 0 : 1);
     RangeMaskGen#(NUM_ENTRIES, 0) forwardRangeGen
     (
@@ -99,15 +99,15 @@ end
 
 typedef enum logic[0:0] {LOAD, STORE_FUSE} LookupType;
 
-reg[31:0] lookupAddr[`NUM_AGUS-1:0];
+reg[31:0] lookupAddr[NUM_AGUS-1:0];
 always_comb begin
-    for (integer h = 0; h < `NUM_AGUS; h=h+1)
+    for (integer h = 0; h < NUM_AGUS; h=h+1)
         lookupAddr[h] = IN_uopLd[h].addr;
 end
 
-reg[3:0] readMask[`NUM_AGUS-1:0];
+reg[3:0] readMask[NUM_AGUS-1:0];
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         readMask[i] = 4'b1111;
         if (IN_uopLd[i].valid)
             case (IN_uopLd[i].size)
@@ -118,11 +118,11 @@ always_comb begin
     end
 end
 
-reg[3:0] lookupMask[`NUM_AGUS-1:0];
-reg[31:0] lookupData[`NUM_AGUS-1:0];
-reg lookupConflict[`NUM_AGUS-1:0];
+reg[3:0] lookupMask[NUM_AGUS-1:0];
+reg[31:0] lookupData[NUM_AGUS-1:0];
+reg lookupConflict[NUM_AGUS-1:0];
 // Store queue lookup
-for (genvar h = 0; h < `NUM_AGUS; h=h+1)
+for (genvar h = 0; h < NUM_AGUS; h=h+1)
 always_comb begin
 
     reg[AXI_BWIDTH_E-3:0] shift = lookupAddr[h][2+:AXI_BWIDTH_E-2];
@@ -159,12 +159,12 @@ end
 // Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
 // If tooling does not support this, it might be necessary to make the SQ a shift register again
 // or chose one of the less efficient methods of iteration.
-logic[31:0] lookupDataIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
-logic[3:0]  lookupMaskIter[`NUM_AGUS-1:0][NUM_ENTRIES-1:0];
-logic[NUM_ENTRIES-1:0] lookupConflictList[`NUM_AGUS-1:0];
+logic[31:0] lookupDataIter[NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[3:0]  lookupMaskIter[NUM_AGUS-1:0][NUM_ENTRIES-1:0];
+logic[NUM_ENTRIES-1:0] lookupConflictList[NUM_AGUS-1:0];
 wire[IDX_LEN-1:0] outputIdx = baseIndex[IDX_LEN-1:0] - 1;
 generate
-for (genvar h = 0; h < `NUM_AGUS; h=h+1)
+for (genvar h = 0; h < NUM_AGUS; h=h+1)
 for (genvar i = 0; i < NUM_ENTRIES; i=i+1)
 always_comb begin
 
@@ -315,7 +315,7 @@ reg flushing;
 assign OUT_flush = flushing;
 always_ff@(posedge clk) begin
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
         OUT_fwd[i].valid <= 0;
     end
@@ -352,7 +352,7 @@ always_ff@(posedge clk) begin
         end
 
         // Write Loaded Data
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (IN_stDataUOp[i].valid && (!IN_branch.taken ||
                 (!IN_branch.flush && $signed(IN_stDataUOp[i].storeSqN - IN_branch.storeSqN) <= 0))
             ) begin
@@ -376,7 +376,7 @@ always_ff@(posedge clk) begin
         end
 
         // Set Address
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (IN_uopSt[i].valid && IN_uopSt[i].isStore &&
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
@@ -402,7 +402,7 @@ always_ff@(posedge clk) begin
         end
         OUT_maxStoreSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1;
 
-        for (integer i = 0; i < `NUM_AGUS; i=i+1)
+        for (integer i = 0; i < NUM_AGUS; i=i+1)
             if (IN_uopLd[i].valid) begin
                 OUT_fwd[i].valid <= 1;
                 OUT_fwd[i].data <= lookupData[i];

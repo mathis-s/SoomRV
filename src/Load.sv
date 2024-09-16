@@ -27,14 +27,13 @@ module Load
     input PCFileEntry IN_pcReadData[NUM_PC_READS-1:0],
 
     // Register File read
-    output reg[6-1:0] OUT_rfReadEnable,
-    output reg[6-1:0][5:0] OUT_rfReadAddr,
-    input wire[6-1:0][31:0] IN_rfReadData,
+    output RF_ReadReq[NUM_ALUS*2+NUM_AGUS-1:0] OUT_rfReadReq,
+    input wire[NUM_ALUS*2+NUM_AGUS-1:0][31:0] IN_rfReadData,
 
     output EX_UOp OUT_uop[NUM_UOPS-1:0]
 );
 localparam NUM_FWD = NUM_ZC_FWDS + NUM_WBS;
-localparam NUM_LOOKUP = 6;
+localparam NUM_LOOKUP = NUM_ALUS * 2 + NUM_AGUS * 1;
 
 // Forwarding
 ZCForward forwards[NUM_FWD-1:0];
@@ -55,7 +54,7 @@ always_comb begin
 
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         lookups[i] = IN_uop[i].tagA;
-        if (i < 2)
+        if (i < NUM_ALUS)
             lookups[i+NUM_UOPS] = IN_uop[i].tagB;
     end
 
@@ -79,15 +78,15 @@ OHEncoder#(NUM_LOOKUP, 1) lookupEnc[NUM_LOOKUP-1:0]
 // Reads from RF and PC File
 always_comb begin
 
-    // All ports get to read from integer rf and pc rf
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        OUT_rfReadAddr[i] = IN_uop[i].tagA[5:0];
-        OUT_rfReadEnable[i] = IN_uop[i].valid && !IN_uop[i].tagA[$bits(Tag)-1];
+        // All ports read at least one register
+        OUT_rfReadReq[i].tag = IN_uop[i].tagA[5:0];
+        OUT_rfReadReq[i].valid = IN_uop[i].valid && !IN_uop[i].tagA[$bits(Tag)-1];
 
-        // LD/ST only use one register read port
-        if (i < 2) begin
-            OUT_rfReadAddr[i+NUM_UOPS] = IN_uop[i].tagB[5:0];
-            OUT_rfReadEnable[i+NUM_UOPS] = IN_uop[i].valid && !IN_uop[i].tagB[$bits(Tag)-1];
+        // INT ports read a second register as well
+        if (i < NUM_ALUS) begin
+            OUT_rfReadReq[i+NUM_UOPS].tag = IN_uop[i].tagB[5:0];
+            OUT_rfReadReq[i+NUM_UOPS].valid = IN_uop[i].valid && !IN_uop[i].tagB[$bits(Tag)-1];
         end
 
         if (i < NUM_PC_READS) begin
@@ -111,7 +110,7 @@ always_comb begin
 
             // forward values from register file and pc file combinationally
             if (operandIsReg[i][0]) OUT_uop[i].srcA = IN_rfReadData[i];
-            if (i < 2)
+            if (i < NUM_ALUS)
                 if (operandIsReg[i][1]) OUT_uop[i].srcB = IN_rfReadData[i+NUM_UOPS];
 
             OUT_uop[i].bpi = '0;
@@ -140,8 +139,8 @@ always_ff@(posedge clk) begin
                 outUOpReg[i].imm <= IN_uop[i].imm;
 
                 // jalr uses a different encoding
-                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_INT &&
-                    (IN_uop[i].opcode == INT_V_JALR || IN_uop[i].opcode == INT_V_JR)
+                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_BRANCH &&
+                    (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR)
                 ) begin
                     outUOpReg[i].imm <= 'x;
                     outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
@@ -172,7 +171,7 @@ always_ff@(posedge clk) begin
                 end
 
                 outUOpReg[i].srcB <= 'x;
-                if (IN_uop[i].immB || i == 2 || i == 3) begin
+                if (IN_uop[i].immB || i >= NUM_ALUS) begin
                     outUOpReg[i].srcB <= IN_uop[i].imm;
                 end
                 else if (IN_uop[i].tagB[6]) begin

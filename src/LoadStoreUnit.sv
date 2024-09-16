@@ -37,19 +37,19 @@ module LoadStoreUnit
     output wire OUT_busy,
 
     input BranchProv IN_branch,
-    output reg OUT_ldAGUStall[`NUM_AGUS-1:0],
-    output reg OUT_ldStall[`NUM_AGUS-1:0],
+    output reg OUT_ldAGUStall[NUM_AGUS-1:0],
+    output reg OUT_ldStall[NUM_AGUS-1:0],
     output wire OUT_stStall,
 
     // regular loads come through these two
     // structs. uopELd provides the lower 12 addr bits
     // one cycle early.
-    input ELD_UOp IN_uopELd[`NUM_AGUS-1:0],
-    input LD_UOp IN_aguLd[`NUM_AGUS-1:0],
+    input ELD_UOp IN_uopELd[NUM_AGUS-1:0],
+    input LD_UOp IN_aguLd[NUM_AGUS-1:0],
 
-    input LD_UOp IN_uopLd[`NUM_AGUS-1:0], // special loads (page walk, non-speculative)
-    output LD_UOp OUT_uopLdSq[`NUM_AGUS-1:0],
-    output LD_Ack OUT_ldAck[`NUM_AGUS-1:0],
+    input LD_UOp IN_uopLd[NUM_AGUS-1:0], // special loads (page walk, non-speculative)
+    output LD_UOp OUT_uopLdSq[NUM_AGUS-1:0],
+    output LD_Ack OUT_ldAck[NUM_AGUS-1:0],
 
     input ST_UOp IN_uopSt,
 
@@ -57,28 +57,28 @@ module LoadStoreUnit
     IF_MMIO.HOST IF_mmio,
     IF_CTable.HOST IF_ct,
 
-    input StFwdResult IN_sqStFwd[`NUM_AGUS-1:0],
-    input StFwdResult IN_sqbStFwd[`NUM_AGUS-1:0],
+    input StFwdResult IN_sqStFwd[NUM_AGUS-1:0],
+    input StFwdResult IN_sqbStFwd[NUM_AGUS-1:0],
     output ST_Ack OUT_stAck,
 
     output MemController_Req OUT_memc,
     output MemController_Req OUT_BLSU_memc,
     input MemController_Res IN_memc,
 
-    input wire[`NUM_AGUS-1:0] IN_ready,
-    output RES_UOp OUT_uopLd[`NUM_AGUS-1:0]
+    input wire[NUM_AGUS-1:0] IN_ready,
+    output RES_UOp OUT_uopLd[NUM_AGUS-1:0]
 );
 
-LoadResUOp ldResUOp[`NUM_AGUS-1:0];
+LoadResUOp ldResUOp[NUM_AGUS-1:0];
 
 MemController_Req BLSU_memc;
 MemController_Req LSU_memc;
 assign OUT_memc = LSU_memc;
 assign OUT_BLSU_memc = BLSU_memc;
 
-logic[`NUM_AGUS-1:0] isCacheBypassLdUOp;
+logic[NUM_AGUS-1:0] isCacheBypassLdUOp;
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         isCacheBypassLdUOp[i] =
             `ENABLE_EXT_MMIO && uopLd_0[i].valid && uopLd_0[i].isMMIO && uopLd_0[i].exception == AGU_NO_EXCEPTION &&
             uopLd_0[i].addr >= `EXT_MMIO_START_ADDR && uopLd_0[i].addr < `EXT_MMIO_END_ADDR;
@@ -91,9 +91,9 @@ wire isCacheBypassStUOp =
 
 wire ignoreSt = isCacheBypassStUOp;
 
-wire[$clog2(`NUM_AGUS)-1:0] blsuLdIdx;
+wire[$clog2(NUM_AGUS)-1:0] blsuLdIdx;
 wire blsuLdIdxValid;
- OHEncoder#(`NUM_AGUS, 1) ohEnc(
+ OHEncoder#(NUM_AGUS, 1) ohEnc(
     .IN_idxOH(isCacheBypassLdUOp), .OUT_idx(blsuLdIdx), .OUT_valid(blsuLdIdxValid));
 
 wire BLSU_stStall;
@@ -122,9 +122,9 @@ BypassLSU bypassLSU
     .IN_memc(IN_memc)
 );
 
-StFwdResult stFwd[`NUM_AGUS-1:0];
+StFwdResult stFwd[NUM_AGUS-1:0];
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         stFwd[i] = IN_sqbStFwd[i];
         stFwd[i].mask |= IN_sqStFwd[i].mask;
         stFwd[i].conflict |= IN_sqStFwd[i].conflict;
@@ -139,7 +139,7 @@ end
 // Loads work fine but require write forwaring in the cache table.
 assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) || !uopStPortValid) && IN_uopSt.valid;
 
-reg[$clog2(`NUM_AGUS)-1:0] uopStPort;
+reg[$clog2(NUM_AGUS)-1:0] uopStPort;
 reg uopStPortValid;
 
 always_comb begin
@@ -150,9 +150,9 @@ always_comb begin
     end
 end
 
-LD_UOp uopLd[`NUM_AGUS-1:0];
+LD_UOp uopLd[NUM_AGUS-1:0];
 always_comb
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         OUT_uopLdSq[i] = uopLd_0[i];
 
 ST_UOp uopSt;
@@ -179,23 +179,23 @@ always_comb begin
     end
 end
 
-reg[$clog2(`NUM_AGUS)-1:0] startIdx;
+reg[$clog2(NUM_AGUS)-1:0] startIdx;
 always_ff@(posedge clk)
     startIdx <= rst ? 0 : (startIdx + 1);
 
 // Store only go through port 0. To still make port
 // pressure even we shuffle incoming loads.
-reg[`NUM_AGUS-1:0][$clog2(`NUM_AGUS)-1:0] idxs_c;
+reg[NUM_AGUS-1:0][$clog2(NUM_AGUS)-1:0] idxs_c;
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
-        idxs_c[i] = startIdx + $clog2(`NUM_AGUS)'(i);
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
+        idxs_c[i] = startIdx + $clog2(NUM_AGUS)'(i);
 end
 
-reg[`NUM_AGUS-1:0][$clog2(`NUM_AGUS)-1:0] idxs_r;
+reg[NUM_AGUS-1:0][$clog2(NUM_AGUS)-1:0] idxs_r;
 always_ff@(posedge clk) idxs_r <= idxs_c;
 
-reg[`NUM_AGUS-1:0] regularLd_c;
-reg[`NUM_AGUS-1:0] regularLd_r;
+reg[NUM_AGUS-1:0] regularLd_c;
+reg[NUM_AGUS-1:0] regularLd_r;
 always_ff@(posedge clk) regularLd_r <= rst ? '0 : regularLd_c;
 
 // Select load to execute
@@ -203,13 +203,13 @@ always_ff@(posedge clk) regularLd_r <= rst ? '0 : regularLd_c;
 // 2. regular load
 always_comb begin
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_ldStall[i] = IN_uopLd[i].valid;
         OUT_ldAGUStall[i] = IN_uopELd[i].valid;
     end
 
-    for (integer i = `NUM_AGUS-1; i >= 0; i=i-1) begin
-        reg[$clog2(`NUM_AGUS)-1:0] idx = idxs_c[i];
+    for (integer i = NUM_AGUS-1; i >= 0; i=i-1) begin
+        reg[$clog2(NUM_AGUS)-1:0] idx = idxs_c[i];
 
         uopLd[i] = 'x;
         uopLd[i].valid = 0;
@@ -222,7 +222,7 @@ always_comb begin
         if (flushActive) begin
             // do not issue load
         end
-        else if (i[$clog2(`NUM_AGUS)-1:0] == stOpPort[1] && stOps[1].valid) begin
+        else if (i[$clog2(NUM_AGUS)-1:0] == stOpPort[1] && stOps[1].valid) begin
             // port is being used by store during store's write cycle
         end
         else if (i == 1 && cacheTableWrite) begin
@@ -252,10 +252,10 @@ always_comb begin
     end
 end
 
-LD_UOp uopLd_0[`NUM_AGUS-1:0];
+LD_UOp uopLd_0[NUM_AGUS-1:0];
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
-        reg[$clog2(`NUM_AGUS)-1:0] idx = idxs_r[i];
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+        reg[$clog2(NUM_AGUS)-1:0] idx = idxs_r[i];
         uopLd_0[i] = ldOps[i][0];
 
         // For regular loads, we only get the full address and other
@@ -279,7 +279,7 @@ always_comb begin
     IF_mmio.raddr = 'x;
     IF_mmio.rsize = 'x;
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         if (uopLd_0[i].valid && uopLd_0[i].isMMIO && !isCacheBypassLdUOp[i]) begin
             IF_mmio.re = 0;
             IF_mmio.raddr = uopLd_0[i].addr;
@@ -303,17 +303,17 @@ always_comb begin
 end
 
 // delay lines, waiting for cache response
-LD_UOp ldOps[`NUM_AGUS-1:0][1:0];
+LD_UOp ldOps[NUM_AGUS-1:0][1:0];
 ST_UOp stOps[1:0];
-reg[$clog2(`NUM_AGUS)-1:0] stOpPort[1:0];
+reg[$clog2(NUM_AGUS)-1:0] stOpPort[1:0];
 
-reg loadWasExtIOBusy[`NUM_AGUS-1:0];
-reg[1:0] loadCacheAccessFailed[`NUM_AGUS-1:0];
+reg loadWasExtIOBusy[NUM_AGUS-1:0];
+reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
 
 // Load Pipeline
 always_ff@(posedge clk) begin
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         for (integer j = 0; j < 2; j=j+1) begin
             ldOps[i][j] <= 'x;
             ldOps[i][j].valid <= 0;
@@ -321,7 +321,7 @@ always_ff@(posedge clk) begin
 
     if (rst) ;
     else begin
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             // Progress the delay line
             if (uopLd[i].valid) begin
                 ldOps[i][0] <= uopLd[i];
@@ -343,7 +343,7 @@ end
 // Cache Access
 always_comb begin
     // Loads speculatively load from all possible locations
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
 
         IF_cache.addr[i] = 'x;
         IF_cache.wdata[i] = 'x;
@@ -381,7 +381,7 @@ typedef struct packed
     logic valid;
 } CacheMiss;
 
-CacheMiss miss[`NUM_AGUS-1:0];
+CacheMiss miss[NUM_AGUS-1:0];
 
 reg storeWriteToCache;
 reg[$clog2(`CASSOC)-1:0] storeWriteAssoc;
@@ -389,7 +389,7 @@ reg[$clog2(`CASSOC)-1:0] storeWriteAssoc;
 reg setDirty;
 reg[$clog2(SIZE)-1:0] setDirtyIdx;
 // Process Cache Table Read Responses
-LD_UOp curLd[1:0];
+LD_UOp curLd[NUM_AGUS-1:0];
 reg blsuLoadHandled;
 always_comb begin
 
@@ -401,19 +401,19 @@ always_comb begin
     storeWriteToCache = 0;
     storeWriteAssoc = 'x;
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
         ldResUOp[i] = LoadResUOp'{valid: 0, default: 'x};
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         miss[i] = 'x;
         miss[i].valid = 0;
     end
 
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
 
         // only one of these is valid
         LD_UOp ld = ldOps[i][1];
-        ST_UOp st = (i[$clog2(`NUM_AGUS)-1:0] == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
+        ST_UOp st = (i[$clog2(NUM_AGUS)-1:0] == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
         assert(!(ld.valid && st.valid));
 
         if (!ld.valid && !st.valid && !blsuLoadHandled)
@@ -603,9 +603,9 @@ always_comb begin
 end
 
 // Load Result Buffering
-wire LRB_ready[`NUM_AGUS-1:0];
-LoadResUOp LRB_uop[`NUM_AGUS-1:0];
-LoadResultBuffer#(`LRB_SIZE) loadResBuf[1:0]
+wire LRB_ready[NUM_AGUS-1:0];
+LoadResUOp LRB_uop[NUM_AGUS-1:0];
+LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
 (
     .clk(clk),
     .rst(rst),
@@ -652,7 +652,7 @@ enum logic[3:0]
 } state;
 
 // Place load in LoadResultBuffer or reactivate back in LoadBuffer via negative ack
-for (genvar i = 0; i < `NUM_AGUS; i=i+1) begin
+for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     always_comb begin
         OUT_ldAck[i] = LD_Ack'{valid: 0, default: 'x};
         LRB_uop[i] = LoadResUOp'{valid: 0, default: 'x};
@@ -708,9 +708,9 @@ assign OUT_stAck.fail = redoStore && !fuseStoreMiss;
 
 
 // Check for conflicts
-logic[`NUM_AGUS-1:0] missEvictConflict;
+logic[NUM_AGUS-1:0] missEvictConflict;
 always_comb begin
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         missEvictConflict[i] = 0;
 
         // read after write
@@ -771,7 +771,7 @@ always_comb begin;
     newMiss = 0;
 
     if (!rst && state == IDLE) begin
-        for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (forwardMiss[i]) begin
                 newMiss = 1;
                 // Immediately write the new cache table entry (about to be loaded)
@@ -824,7 +824,7 @@ reg initialFlush;
 reg busy;
 always_comb begin
     busy = 0;
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         if (uopLd[i].valid || uopSt.valid || uopLd_0[i].valid || curLd[i].valid || stOps[0].valid || stOps[1].valid || !IN_SQ_empty || (OUT_ldAck[i].valid && OUT_ldAck[i].fail) || (OUT_stAck.valid && OUT_stAck.fail)) busy = 1;
     end
 end
@@ -843,11 +843,11 @@ reg[$clog2(`CASSOC)-1:0] flushAssocIdx;
 reg[$clog2(`CASSOC)-1:0] assocCnt;
 
 wire canOutputMiss = (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]);
-reg[`NUM_AGUS-1:0] forwardMiss;
+reg[NUM_AGUS-1:0] forwardMiss;
 always_comb begin
     reg temp = 0;
     forwardMiss = '0;
-    for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         if (!temp &&
             canOutputMiss &&
             miss[i].valid && !missEvictConflict[i] &&
@@ -882,7 +882,7 @@ always_ff@(posedge clk) begin
 
         case (state)
             IDLE: begin
-                for (integer i = 0; i < `NUM_AGUS; i=i+1) begin
+                for (integer i = 0; i < NUM_AGUS; i=i+1) begin
 
                     reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
                     MissType missType = miss[i].mtype;

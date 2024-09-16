@@ -6,6 +6,9 @@
 !sim
 !sim/**
 
+!scripts
+!scripts/**
+
 !test_programs
 !test_programs/**
 
