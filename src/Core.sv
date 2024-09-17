@@ -45,7 +45,9 @@ CommitUOp comUOps[3:0] /*verilator public*/;
 
 wire ifetchEn = !TH_disableIFetch;
 
-localparam NUM_BRANCHES = NUM_ALUS + 2;
+localparam NUM_BRANCHES = NUM_BRANCH_PORTS + 2;
+localparam LQ_BRANCH_PORT = NUM_BRANCHES-2;
+localparam TH_BRANCH_PORT = NUM_BRANCHES-1;
 BranchProv branchProvs[NUM_BRANCHES-1:0];
 BranchProv branch /*verilator public*/;
 wire mispredFlush /*verilator public*/;
@@ -389,7 +391,8 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
 
     assign stall[i] = 1'b0;
 
-    if ((PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) != 0)
+    if ((PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) != 0) begin
+        BranchProv ialuBranch;
         IntALU#(PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) ialu
         (
             .clk(clk),
@@ -398,7 +401,7 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
             .IN_uop(LD_uop[i]),
             .IN_branch(branch),
 
-            .OUT_branch(branchProvs[i]),
+            .OUT_branch(ialuBranch),
             .OUT_btUpdate(BP_btUpdates[i]),
 
             .OUT_zcFwd(LD_zcFwd[i]),
@@ -406,6 +409,9 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
             .OUT_amoData(SDL_amoData[i]),
             .OUT_uop(resUOps[FU_INT])
         );
+        if (i < NUM_BRANCH_PORTS)
+            assign branchProvs[i] = ialuBranch;
+    end
 
     if ((PORT_FUS[i] & FU_DIV_OH) != 0) begin
         wire DIV_busy;
@@ -611,7 +617,7 @@ LoadBuffer lb
     .OUT_uopLd(LB_uopLd),
 
     .IN_branch(branch),
-    .OUT_branch(branchProvs[2]),
+    .OUT_branch(branchProvs[LQ_BRANCH_PORT]),
 
     .OUT_maxLoadSqN(LB_maxLoadSqN),
 
@@ -782,7 +788,7 @@ TrapHandler trapHandler
     .IN_pcReadData(PC_readDataTH),
     .IN_trapControl(CSR_trapControl),
     .OUT_trapInfo(TH_trapInfo),
-    .OUT_branch(branchProvs[3]),
+    .OUT_branch(branchProvs[TH_BRANCH_PORT]),
 
     .IN_MEM_busy(MEMSUB_busy),
 
