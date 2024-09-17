@@ -25,9 +25,6 @@ wire[31:0] srcA = IN_uop.srcA;
 wire[31:0] srcB = IN_uop.srcB;
 wire[31:0] imm = IN_uop.imm;
 
-reg[31:0] resC;
-Flags flags;
-
 assign OUT_zcFwd.result = resC;
 assign OUT_zcFwd.tag = IN_uop.tagDst;
 assign OUT_zcFwd.valid = IN_uop.valid && HasFU(IN_uop.fu) && !IN_uop.tagDst[$bits(Tag)-1];
@@ -58,6 +55,7 @@ wire[31:0] finalHalfwPC = IN_uop.pc;
 wire[31:0] nextInstrPC = finalHalfwPC + 2;
 wire[31:0] firstHalfwPC = finalHalfwPC - (IN_uop.compressed ? 0 : 2);
 
+reg[31:0] resC;
 always_comb begin
     resC = 32'bx;
     case (IN_uop.fu)
@@ -101,8 +99,14 @@ always_comb begin
             BM_CLZ,
             BM_CTZ: resC = {26'b0, resLzTz};
             BM_CPOP: resC = {26'b0, resPopCnt};
+            BM_ROL: resC = (srcA << srcB[4:0]) | (srcA >> (32 - srcB[4:0]));
+            BM_ROR: resC = (srcA >> srcB[4:0]) | (srcA << (32 - srcB[4:0]));
             BM_ORC_B: resC = {{{4'd8}{|srcA[31:24]}}, {{4'd8}{|srcA[23:16]}}, {{4'd8}{|srcA[15:8]}}, {{4'd8}{|srcA[7:0]}}};
             BM_REV8: resC = {srcA[7:0], srcA[15:8], srcA[23:16], srcA[31:24]};
+            BM_BCLR: resC = srcA & ~(RegT'(1) << srcB[$clog2($bits(RegT))-1:0]);
+            BM_BEXT: resC = RegT'(srcA[srcB[$clog2($bits(RegT))-1:0]]);
+            BM_BINV: resC = srcA ^ (RegT'(1) << srcB[$clog2($bits(RegT))-1:0]);
+            BM_BSET: resC = srcA | (RegT'(1) << srcB[$clog2($bits(RegT))-1:0]);
     `ifdef ENABLE_FP
             BM_FSGNJ_S:  resC = {srcB[31], srcA[30:0]};
             BM_FSGNJN_S: resC = {~srcB[31], srcA[30:0]};
@@ -114,6 +118,7 @@ always_comb begin
     endcase
 end
 
+Flags flags;
 always_comb begin
     flags = FLAGS_NONE;
     if (IN_uop.fu == FU_INT && IN_uop.opcode == INT_SYS)

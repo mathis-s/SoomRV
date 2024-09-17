@@ -517,7 +517,7 @@ void Initialize(int argc, char** argv, Args& args)
              args.progFile.find(".out", args.progFile.size() - 4) == std::string::npos)
     {
         if (system((std::string(TOOLCHAIN
-                                "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zicbom_zifencei -o temp.o ") +
+                                "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zbs_zicbom_zifencei -o temp.o ") +
                     args.progFile)
                        .c_str()) != 0)
             abort();

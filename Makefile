@@ -5,8 +5,8 @@ VERILATOR_FLAGS = \
 	-CFLAGS "-march=native" \
 	-LDFLAGS "-ldl" \
 	-MAKEFLAGS -j$(nproc) \
-	-CFLAGS -DDEBUG_TIME=-1 \
-	-CFLAGS -DNOKONATA \
+	-CFLAGS -DDEBUG_TIME=0 \
+	-CFLAGS -DKONATA \
 	-CFLAGS -DCOSIM \
 
 VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat

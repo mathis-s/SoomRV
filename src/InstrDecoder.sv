@@ -634,13 +634,13 @@ always_comb begin
                         end
                         if (instr.funct7 == 7'b0100100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.fu = FU_BITMANIP;
                                 uop.opcode = BM_BCLR;
                                 uop.imm = {27'b0, instr.rs2};
                             end
                             else if (instr.funct3 == 3'b101) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.fu = FU_BITMANIP;
                                 uop.opcode = BM_BEXT;
                                 uop.imm = {27'b0, instr.rs2};
@@ -648,7 +648,7 @@ always_comb begin
                         end
                         else if (instr.funct7 == 7'b0110100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.fu = FU_BITMANIP;
                                 uop.opcode = BM_BINV;
                                 uop.imm = {27'b0, instr.rs2};
@@ -656,7 +656,7 @@ always_comb begin
                         end
                         else if (instr.funct7 == 7'b0010100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.fu = FU_BITMANIP;
                                 uop.opcode = BM_BSET;
                                 uop.imm = {27'b0, instr.rs2};
@@ -791,38 +791,38 @@ always_comb begin
                         end
                         else if (instr.funct7 == 7'b0110000) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_ROL;
                                 uop.fu = FU_BITMANIP;
                             end
                             else if (instr.funct3 == 3'b101) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_ROR;
                                 uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0100100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_BCLR;
                                 uop.fu = FU_BITMANIP;
                             end
                             else if (instr.funct3 == 3'b101) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_BEXT;
                                 uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0110100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_BINV;
                                 uop.fu = FU_BITMANIP;
                             end
                         end
                         else if (instr.funct7 == 7'b0010100) begin
                             if (instr.funct3 == 3'b001) begin
-                                //invalidEnc = 0;
+                                invalidEnc = 0;
                                 uop.opcode = BM_BSET;
                                 uop.fu = FU_BITMANIP;
                             end
