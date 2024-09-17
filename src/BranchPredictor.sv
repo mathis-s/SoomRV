@@ -116,7 +116,7 @@ always_comb begin
     OUT_lastOffs = {$bits(FetchOff_t){1'b1}};; // last valid offset for last cycle's PC
 
     if (ignorePred) begin
-        if (recovery.tgtSpec != BR_TGT_MANUAL)
+        if (recovery.valid && recovery.tgtSpec != BR_TGT_MANUAL)
             OUT_pc = recoveredPC;
     end
     else if (BTB_br.valid && BTB_br.btype != BT_RETURN) begin

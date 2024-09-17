@@ -388,6 +388,7 @@ always_comb begin
                 decBranch_c.fetchOffs = FetchOff_t'(i);
                 decBranch_c.dst = (curBr.btype == RETURN) ? IN_op.predRetAddr : curBr.target[31:1];
                 decBranch_c.histAct = dirOnlyTaken ? HIST_APPEND_1 : HIST_NONE;
+                decBranch_c.tgtSpec = BR_TGT_MANUAL;
                 decBranch_c.wfi = 0;
 
                 case (curBr.btype)
@@ -412,6 +413,7 @@ always_comb begin
                 decBranch_c.dst = nextPC;
                 decBranch_c.retAct = (curBr.btype == ICALL) ? RET_PUSH : RET_NONE;
                 decBranch_c.histAct = (curBr.btype == BRANCH) ? HIST_APPEND_0 : HIST_NONE;
+                decBranch_c.tgtSpec = BR_TGT_MANUAL;
                 decBranch_c.wfi = 0;
 
                 if (actualOffs != {$bits(FetchOff_t) {1'b1}}) begin
@@ -455,6 +457,7 @@ always_comb begin
             decBranch_c.dst = nextPC;
             decBranch_c.retAct = RET_NONE;
             decBranch_c.histAct = HIST_NONE;
+            decBranch_c.tgtSpec = BR_TGT_MANUAL;
             decBranch_c.wfi = 0;
 
             newPredTaken_c = 0;
