@@ -424,6 +424,7 @@ always_ff@(posedge clk) begin
     if (rst) begin
         fetchID <= 0;
         flushState <= FLUSH_QUEUED;
+        assocCnt <= 0;
     end
     else if (IN_mispr) begin
         fetchID <= IN_misprFetchID + 1;

@@ -203,24 +203,28 @@ always_comb begin
 end
 
 reg waitForInterrupt /* verilator public */;
-reg[$clog2(`WFI_DELAY)-1:0] wfiCount;
+reg[$clog2(`RESET_DELAY)-1:0] wfiCount;
 reg issuedInterrupt;
+reg resetWait;
 
 always_ff@(posedge clk) begin
 
     if (rst) begin
-        waitForInterrupt <= 0;
         issuedInterrupt <= 0;
+
+        waitForInterrupt <= 1;
+        wfiCount <= $bits(wfiCount)'(`RESET_DELAY - 1);
+        resetWait <= 1;
     end
     else begin
 
         if (waitForInterrupt) begin
-            reg[$clog2(`WFI_DELAY)-1:0] wfiCount_next;
+            reg[$bits(wfiCount)-1:0] wfiCount_next;
             reg wfiDone;
             {wfiDone, wfiCount_next} = wfiCount - 1;
             wfiCount <= wfiCount_next;
 
-            if (IN_interruptPending || wfiDone)
+            if ((IN_interruptPending && !resetWait) || wfiDone)
                 waitForInterrupt <= 0;
         end
 
@@ -233,7 +237,7 @@ always_ff@(posedge clk) begin
                 // for ops that always flush the pipeline
                 waitForInterrupt <= BH_decBranch.wfi;
                 if (BH_decBranch.wfi)
-                    wfiCount <= $clog2(`WFI_DELAY)'(`WFI_DELAY - 1);
+                    wfiCount <= $bits(wfiCount)'(`WFI_DELAY - 1);
             end
             issuedInterrupt <= 0;
         end

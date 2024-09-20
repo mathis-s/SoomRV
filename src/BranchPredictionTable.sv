@@ -42,10 +42,18 @@ always_comb begin
     write_c.taken = IN_writeTaken;
 end
 
+logic[IDX_LEN:0] resetIdx;
+
 always_ff@(posedge clk) begin
 
     if (rst) begin
-
+        write_r <= Write'{valid: 0, default: 'x};
+        resetIdx <= 0;
+    end
+    else if (!resetIdx[IDX_LEN]) begin
+        pred[resetIdx[IDX_LEN-1:0]] <= 0;
+        hist[resetIdx[IDX_LEN-1:0]] <= 0;
+        resetIdx <= resetIdx + 1;
     end
     else begin
         write_r <= write_c;

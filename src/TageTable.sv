@@ -68,10 +68,18 @@ end
 
 reg[INTERVAL-1:0] decrCnt;
 reg decrBit;
+reg[$clog2(SIZE):0] resetIdx;
+
 always_ff@(posedge clk) begin
 
     if (rst) begin
         decrCnt <= 0;
+        resetIdx <= 0;
+    end
+    else if (!resetIdx[$clog2(SIZE)]) begin
+        tag[resetIdx[$clog2(SIZE)-1:0]] <= 0;
+        useful[resetIdx[$clog2(SIZE)-1:0]] <= 0;
+        resetIdx <= resetIdx + 1;
     end
     else if (IN_writeValid) begin
         if (IN_writeUpdate) begin

@@ -72,11 +72,16 @@ typedef struct packed
 } SetMultiple;
 SetMultiple setMult;
 
-// Update
-always_ff@(posedge clk) begin
+logic[$clog2(LENGTH):0] resetIdx;
 
+always_ff@(posedge clk) begin
     if (rst) begin
         setMult <= SetMultiple'{valid: 0, default: 'x};
+        resetIdx <= 0;
+    end
+    else if (!resetIdx[$clog2(LENGTH)]) begin
+        entries[resetIdx[$clog2(LENGTH)-1:0]] <= '0;
+        resetIdx <= resetIdx + 1;
     end
     else begin
         if (IN_btUpdate.valid) begin

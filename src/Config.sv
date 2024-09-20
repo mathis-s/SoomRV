@@ -18,6 +18,7 @@
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
+`define RESET_DELAY 4096
 
 // Memory
 `define SQ_SIZE 16

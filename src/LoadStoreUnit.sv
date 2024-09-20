@@ -874,6 +874,7 @@ always_ff@(posedge clk) begin
         initialFlush <= 1;
         LSU_memc <= 'x;
         LSU_memc.cmd <= MEMC_NONE;
+        assocCnt <= 0;
     end
     else begin
 
