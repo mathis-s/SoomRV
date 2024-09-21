@@ -85,8 +85,7 @@
 `define ENABLE_INT_MUL
 `define ENABLE_ZCB
 
-`define DEBUG
-
+//`define DEBUG
 
 parameter NUM_AGUS = 2;
 parameter NUM_ALUS = 3;

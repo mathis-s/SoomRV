@@ -29,6 +29,7 @@ always_ff@(posedge clk) begin
         if (IN_we[i]) mem[IN_waddr[i]] <= IN_wdata[i];
     end
 
+    `ifdef DEBUG
     if (!ALLOW_COLLISION) begin
         for (integer i = 0; i < NUM_READ; i=i+1)
             for (integer j = 0; j < NUM_WRITE; j=j+1)
@@ -37,6 +38,7 @@ always_ff@(posedge clk) begin
                     assert(0);
                 end
     end
+    `endif
 end
 
 endmodule

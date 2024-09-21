@@ -35,27 +35,6 @@ module Rename
     output SqN OUT_nextStoreSqN
 );
 
-function automatic IntUOpOrder_t NextOrder(FuncUnit fu, IntUOpOrder_t ord, SqN storeSqN);
-    IntUOpOrder_t retval = ord;
-
-    if (fu == FU_AGU) ;
-    else if (fu == FU_ATOMIC) begin
-        retval = IntUOpOrder_t'(storeSqN % SqN'(NUM_AGUS));
-    end
-    else begin
-        // find next fu in sequence that supports operation
-        for (integer i = NUM_ALUS-1; i >= 0; i=i-1) begin
-            // verilator lint_off WIDTHEXPAND
-            IntUOpOrder_t candidate = IntUOpOrder_t'((ord + (i+1)) % NUM_ALUS);
-            // verilator lint_on WIDTHEXPAND
-            if (PORT_FUS[$clog2(NUM_AGUS+NUM_ALUS)'(candidate)][fu])
-                retval = candidate;
-        end
-    end
-    // todo: improve scheduling
-    return retval;
-endfunction;
-
 typedef struct packed
 {
     SqN sqN;
@@ -93,7 +72,6 @@ reg RAT_commitAvail[WIDTH_COMMIT-1:0];
 reg[6:0] RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
-
 
 reg isSc[3:0];
 reg scSuccessful[3:0];
@@ -219,12 +197,6 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
     .IN_commitTagDst(RAT_commitTags)
 );
 
-IntUOpOrder_t intOrder;
-SqN counterSqN;
-SqN counterStoreSqN;
-SqN counterLoadSqN;
-assign OUT_nextSqN = counterSqN;
-
 reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
@@ -239,15 +211,60 @@ always_comb begin
     end
 end
 
+wire cycleValid = !IN_branch.taken && frontEn && !OUT_stall;
+
+// Generate SqNs
+SqN counterSqN;
+SqN counterStoreSqN;
+SqN counterLoadSqN;
+assign OUT_nextSqN = counterSqN;
+
+SqN loadSqNs[WIDTH_ISSUE:0];
+SqN storeSqNs[WIDTH_ISSUE:0];
+always_comb begin
+
+    loadSqNs[0] = counterLoadSqN;
+    storeSqNs[0] = counterStoreSqN;
+
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+
+        loadSqNs[i+1] = loadSqNs[i];
+        storeSqNs[i+1] = storeSqNs[i];
+
+        if (cycleValid && IN_uop[i].valid && !(isSc[i] && !scSuccessful[i])) begin
+            if (IN_uop[i].fu == FU_ATOMIC || (IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W))
+                loadSqNs[i+1] = loadSqNs[i] + 1;
+            if (IN_uop[i].fu == FU_ATOMIC || (IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W))
+                storeSqNs[i+1] = storeSqNs[i] + 1;
+        end
+    end
+end
+
+// Assign UOps to Ports
+IntUOpOrder_t SCHED_uopOrder[WIDTH_ISSUE-1:0];
+Scheduler scheduler
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_valid(cycleValid),
+    .IN_uopSqN(RAT_issueSqNs),
+    .IN_uopLoadSqN(loadSqNs[WIDTH_ISSUE:1]),
+    .IN_uopStoreSqN(storeSqNs[WIDTH_ISSUE:1]),
+    .IN_uop(IN_uop),
+    .OUT_order(SCHED_uopOrder)
+);
+
+
 always_ff@(posedge clk) begin
 
     if (rst) begin
         counterSqN <= 0;
-        counterStoreSqN = -1;
-        counterLoadSqN = 0;
-        OUT_nextLoadSqN <= counterLoadSqN;
-        OUT_nextStoreSqN <= counterStoreSqN + 1;
-        intOrder = 0;
+        counterStoreSqN <= -1;
+        counterLoadSqN <= 0;
+
+        OUT_nextStoreSqN <= 0;
+        OUT_nextLoadSqN <= 0;
         failSc <= 0;
 
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
@@ -260,8 +277,12 @@ always_ff@(posedge clk) begin
 
         counterSqN <= IN_branch.sqN + 1;
 
-        counterLoadSqN = IN_branch.loadSqN;
-        counterStoreSqN = IN_branch.storeSqN;
+        counterLoadSqN <= IN_branch.loadSqN;
+        counterStoreSqN <= IN_branch.storeSqN;
+
+        OUT_nextLoadSqN <= IN_branch.loadSqN;
+        OUT_nextStoreSqN <= IN_branch.storeSqN + 1;
+
         failSc <= IN_branch.isSCFail;
 
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
@@ -271,6 +292,12 @@ always_ff@(posedge clk) begin
                 OUT_uop[i].validIQ <= 0;
             end
         end
+    end
+    else begin
+        counterLoadSqN <= loadSqNs[WIDTH_ISSUE];
+        counterStoreSqN <= storeSqNs[WIDTH_ISSUE];
+        OUT_nextLoadSqN <= loadSqNs[WIDTH_ISSUE];
+        OUT_nextStoreSqN <= storeSqNs[WIDTH_ISSUE] + 1;
     end
 
     if (!rst && |portStall) begin
@@ -294,8 +321,7 @@ always_ff@(posedge clk) begin
     end
 
     if (rst) ;
-    else if (!IN_branch.taken && frontEn && !OUT_stall) begin
-
+    else if (cycleValid) begin
         // Set seqnum/tags for next instruction(s)
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
@@ -323,6 +349,8 @@ always_ff@(posedge clk) begin
                     fu:         IN_uop[i].fu,
                     fetchID:    IN_uop[i].fetchID,
                     fetchOffs:  IN_uop[i].fetchOffs,
+                    storeSqN:   storeSqNs[i+1], // +1 here, store sqn pre-increments
+                    loadSqN:    loadSqNs[i],    // +0 here, load sqn post-increments
                     immB:       IN_uop[i].immB,
                     compressed: IN_uop[i].compressed,
 
@@ -348,28 +376,10 @@ always_ff@(posedge clk) begin
                     OUT_uop[i].availC <= 0;
                 end
 
-                OUT_uop[i].loadSqN <= counterLoadSqN;
-                if (!(isSc[i] && !scSuccessful[i]))
-                    case (IN_uop[i].fu)
-                        FU_AGU: begin
-                            if (IN_uop[i].opcode < LSU_SC_W)
-                                counterLoadSqN = counterLoadSqN + 1;
-                            else
-                                counterStoreSqN = counterStoreSqN + 1;
-                        end
-
-                        FU_ATOMIC: begin
-                            counterStoreSqN = counterStoreSqN + 1;
-                            counterLoadSqN = counterLoadSqN + 1;
-                        end
-                        default: begin end
-                    endcase
-                OUT_uop[i].storeSqN <= counterStoreSqN;
-
-                intOrder = NextOrder(IN_uop[i].fu, intOrder, counterStoreSqN);
-                OUT_uopOrdering[i] <= intOrder;
+                OUT_uopOrdering[i] <= SCHED_uopOrder[i];
             end
         end
+
         counterSqN <= nextCounterSqN;
     end
     else begin
@@ -386,10 +396,5 @@ always_ff@(posedge clk) begin
             end
         end
     end
-
-    OUT_nextLoadSqN <= counterLoadSqN;
-    OUT_nextStoreSqN <= counterStoreSqN + 1;
-
-
 end
 endmodule
