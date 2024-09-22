@@ -135,6 +135,10 @@ always_ff@(posedge clk) begin
         lastValid <= 0;
 
         postRecSave <= PostRecSave'{valid: 0, default: 'x};
+
+        rindexReg <= 0;
+        for (integer i = 0; i < SIZE; i=i+1)
+            rstack[i] <= 0;
     end
     else begin
 

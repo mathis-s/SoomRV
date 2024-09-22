@@ -183,7 +183,7 @@ reg[$clog2(NUM_AGUS)-1:0] startIdx;
 always_ff@(posedge clk)
     startIdx <= rst ? 0 : (startIdx + 1);
 
-// Store only go through port 0. To still make port
+// Stores only go through port 0. To still make port
 // pressure even we shuffle incoming loads.
 reg[NUM_AGUS-1:0][$clog2(NUM_AGUS)-1:0] idxs_c;
 always_comb begin

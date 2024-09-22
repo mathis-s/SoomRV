@@ -249,19 +249,19 @@ typedef enum logic[3:0]
     FU_TRAP
 } FuncUnit;
 
-parameter FU_INT_OH      = 1 << FU_INT;
-parameter FU_BRANCH_OH   = 1 << FU_BRANCH;
-parameter FU_BITMANIP_OH = 1 << FU_BITMANIP;
-parameter FU_AGU_OH      = 1 << FU_AGU;
-parameter FU_MUL_OH      = 1 << FU_MUL;
-parameter FU_DIV_OH      = 1 << FU_DIV;
-parameter FU_FPU_OH      = 1 << FU_FPU;
-parameter FU_FMUL_OH     = 1 << FU_FMUL;
-parameter FU_FDIV_OH     = 1 << FU_FDIV;
-parameter FU_RN_OH       = 1 << FU_RN;
-parameter FU_ATOMIC_OH   = 1 << FU_ATOMIC;
-parameter FU_CSR_OH      = 1 << FU_CSR;
-parameter FU_TRAP_OH     = 1 << FU_TRAP;
+parameter[15:0] FU_INT_OH      = 1 << FU_INT;
+parameter[15:0] FU_BRANCH_OH   = 1 << FU_BRANCH;
+parameter[15:0] FU_BITMANIP_OH = 1 << FU_BITMANIP;
+parameter[15:0] FU_AGU_OH      = 1 << FU_AGU;
+parameter[15:0] FU_MUL_OH      = 1 << FU_MUL;
+parameter[15:0] FU_DIV_OH      = 1 << FU_DIV;
+parameter[15:0] FU_FPU_OH      = 1 << FU_FPU;
+parameter[15:0] FU_FMUL_OH     = 1 << FU_FMUL;
+parameter[15:0] FU_FDIV_OH     = 1 << FU_FDIV;
+parameter[15:0] FU_RN_OH       = 1 << FU_RN;
+parameter[15:0] FU_ATOMIC_OH   = 1 << FU_ATOMIC;
+parameter[15:0] FU_CSR_OH      = 1 << FU_CSR;
+parameter[15:0] FU_TRAP_OH     = 1 << FU_TRAP;
 
 typedef enum logic[3:0]
 {

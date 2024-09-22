@@ -42,10 +42,12 @@ endfunction
 localparam PAD = $clog2(NUM_ALUS) + 1;
 localparam MOD_TABLE_LEN = 1 << PAD;
 reg[$clog2(NUM_ALUS)-1:0] modTable[MOD_TABLE_LEN-1:0];
+// verilator lint_off WIDTHTRUNC
 initial begin
     for (integer i = 0; i < MOD_TABLE_LEN; i=i+1)
-        modTable[i] = $clog2(NUM_ALUS)'(i % NUM_ALUS);
+        modTable[i] = (i % NUM_ALUS);
 end
+// verilator lint_on WIDTHTRUNC
 
 Candidates_t candidates[`DEC_WIDTH-1:0];
 always_comb begin
