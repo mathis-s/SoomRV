@@ -356,36 +356,6 @@ wire[2:0] CSR_fRoundMode;
 DecodeState CSR_dec;
 VirtMemState CSR_vmem;
 
-CSR csr
-(
-    .clk(clk),
-    .rst(rst),
-    .en(LD_uop[0].fu == FU_CSR),
-
-    .IN_irq(IN_irq),
-
-    .IN_uop(LD_uop[0]),
-    .IN_branch(branch),
-    .IN_fpNewFlags(ROB_fpNewFlags),
-
-    .IN_perfcInfo(ROB_perfcInfo),
-    .IN_branchMispr(BS_PERFC_branchMispr),
-    .IN_mispredFlush(mispredFlush),
-
-    .IF_mmio(IF_csr_mmio),
-
-    .IN_tvalState(TVS_tvalState),
-
-    .IN_trapInfo(TH_trapInfo),
-    .OUT_trapControl(CSR_trapControl),
-    .OUT_fRoundMode(CSR_fRoundMode),
-
-    .OUT_dec(CSR_dec),
-    .OUT_vmem(CSR_vmem),
-
-    .OUT_uop(intPortsGen[0].resUOps[FU_CSR])
-);
-
 generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps = '0;
 
@@ -497,6 +467,38 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
             (IS_uop[i].valid && IS_uop[i].fu == FU_FDIV);
     end
     else assign FDIV_doNotIssue[i] = 1;
+
+    if ((PORT_FUS[i] & FU_CSR_OH) != 0) begin
+        CSR csr
+        (
+            .clk(clk),
+            .rst(rst),
+            .en(LD_uop[i].fu == FU_CSR),
+
+            .IN_irq(IN_irq),
+
+            .IN_uop(LD_uop[i]),
+            .IN_branch(branch),
+            .IN_fpNewFlags(ROB_fpNewFlags),
+
+            .IN_perfcInfo(ROB_perfcInfo),
+            .IN_branchMispr(BS_PERFC_branchMispr),
+            .IN_mispredFlush(mispredFlush),
+
+            .IF_mmio(IF_csr_mmio),
+
+            .IN_tvalState(TVS_tvalState),
+
+            .IN_trapInfo(TH_trapInfo),
+            .OUT_trapControl(CSR_trapControl),
+            .OUT_fRoundMode(CSR_fRoundMode),
+
+            .OUT_dec(CSR_dec),
+            .OUT_vmem(CSR_vmem),
+
+            .OUT_uop(resUOps[FU_CSR])
+        );
+    end
 
     always_comb begin
         wbUOp[i] = RES_UOp'{valid: 0, default: 'x};

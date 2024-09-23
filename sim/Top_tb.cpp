@@ -83,7 +83,7 @@ void DumpState(FILE* stream, Inst inst)
 {
     auto core = wrap->top->Top->soc->core;
     fprintf(stream, "time=%lu\n", wrap->main_time);
-    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x sqn=%.2x\n", core->csr->minstret, inst.pc, inst.inst, state.lastComSqN);
+    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x sqn=%.2x\n", wrap->csr->minstret, inst.pc, inst.inst, state.lastComSqN);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
@@ -112,7 +112,7 @@ void LogCommit(Inst& inst)
 {
 #ifdef COSIM
     if (simif.doRestore)
-        simif.restore_from_top(wrap->top.get(), inst);
+        simif.restore_from_top(*wrap, inst);
 #endif
     if (inst.interrupt == Inst::IR_SQUASH)
     {
@@ -580,16 +580,16 @@ void Initialize(int argc, char** argv, Args& args)
 void LogPerf(VTop_Core* core)
 {
     std::array<uint64_t, 16> counters = {
-        core->csr->mcycle,       core->csr->minstret,     core->csr->mhpmcounter[3],
-        core->csr->mhpmcounter[4], core->csr->mhpmcounter[5],
+        wrap->csr->mcycle,       wrap->csr->minstret,     wrap->csr->mhpmcounter[3],
+        wrap->csr->mhpmcounter[4], wrap->csr->mhpmcounter[5],
 
-        core->csr->mhpmcounter[6], core->csr->mhpmcounter[7],
-        core->csr->mhpmcounter[8], core->csr->mhpmcounter[9],
-        core->csr->mhpmcounter[10], core->csr->mhpmcounter[11],
+        wrap->csr->mhpmcounter[6], wrap->csr->mhpmcounter[7],
+        wrap->csr->mhpmcounter[8], wrap->csr->mhpmcounter[9],
+        wrap->csr->mhpmcounter[10], wrap->csr->mhpmcounter[11],
 
-        core->csr->mhpmcounter[12], core->csr->mhpmcounter[13],
-        core->csr->mhpmcounter[14], core->csr->mhpmcounter[15],
-        core->csr->mhpmcounter[16],
+        wrap->csr->mhpmcounter[12], wrap->csr->mhpmcounter[13],
+        wrap->csr->mhpmcounter[14], wrap->csr->mhpmcounter[15],
+        wrap->csr->mhpmcounter[16],
 
     };
     static std::array<uint64_t, 16> lastCounters;
@@ -693,7 +693,7 @@ int main(int argc, char** argv)
     fprintf(konataFile, "Kanata	0004\n");
 #endif
 
-    auto core = wrap->top->Top->soc->core;
+    auto core = wrap->core;
 
     if (args.restoreSave)
     {
@@ -712,8 +712,8 @@ int main(int argc, char** argv)
         WriteRegister(11, args.deviceTreeAddr);
 
     const uint64_t perfInterval = 1024 * 1024 * 8;
-    uint64_t lastMInstret = core->csr->minstret;
-    uint64_t nextMinstretPerf = core->csr->minstret + perfInterval;
+    uint64_t lastMInstret = wrap->csr->minstret;
+    uint64_t nextMinstretPerf = wrap->csr->minstret + perfInterval;
 
     // Run
     wrap->top->en = 1;
@@ -737,7 +737,7 @@ int main(int argc, char** argv)
         // Hang Detection
         if ((wrap->main_time & (0x3fff)) == 0 && !args.restoreSave && !core->ifetch->waitForInterrupt)
         {
-            uint64_t minstret = core->csr->minstret;
+            uint64_t minstret = wrap->csr->minstret;
             if (minstret == lastMInstret)
             {
                 fprintf(stderr, "ERROR: Hang detected\n");
@@ -747,11 +747,11 @@ int main(int argc, char** argv)
             }
             lastMInstret = minstret;
         }
-        if (core->csr->minstret >= nextMinstretPerf)
+        if (wrap->csr->minstret >= nextMinstretPerf)
         {
             if (args.logPerformance)
                 LogPerf(core);
-            nextMinstretPerf = core->csr->minstret + perfInterval;
+            nextMinstretPerf = wrap->csr->minstret + perfInterval;
         }
         if ((wrap->main_time & 0xffffff) == 0)
         {

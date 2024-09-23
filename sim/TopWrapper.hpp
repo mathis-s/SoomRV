@@ -1,6 +1,10 @@
 #pragma once
 
 #include "VTop.h"
+#include "VTop_CSR.h"
+#include "VTop_Core.h"
+#include "VTop_SoC.h"
+#include "VTop_Top.h"
 #include <memory>
 
 #ifdef TRACE
@@ -15,6 +19,8 @@ class TopWrapper
     std::unique_ptr<VerilatedVcdC> tfp = std::make_unique<VerilatedVcdC>();
 #endif
     uint64_t main_time = 0;
+    VTop_Core* core = top->Top->soc->core;
+    VTop_CSR* csr = core->intPortsGen__BRA__0__KET____DOT__genblk7__DOT__csr;
 
     void HalfCycle()
     {

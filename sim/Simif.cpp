@@ -1,4 +1,5 @@
 #include "Simif.hpp"
+#include "TopWrapper.hpp"
 
 bool SpikeSimif::compare_state()
 {
@@ -263,7 +264,7 @@ void SpikeSimif::take_trap(bool interrupt, reg_t cause, reg_t epc, bool delegate
     soomrv_trap_t trap(cause | (interrupt ? 0x80000000 : 0));
     processor->take_trap(trap, epc);
 }
-void SpikeSimif::restore_from_top(VTop* top, Inst& inst)
+void SpikeSimif::restore_from_top(TopWrapper& wrap, Inst& inst)
 {
     doRestore = false;
     processor->get_state()->pc = inst.pc;
@@ -271,7 +272,7 @@ void SpikeSimif::restore_from_top(VTop* top, Inst& inst)
     for (size_t i = 0; i < 32; i++)
         write_reg(i, registers.ReadRegister(i));
 
-    auto csr = top->Top->soc->core->csr;
+    auto csr = wrap.csr;
     // If ENABLE_FP is defined in Config.sv, these should be uncommented too
     // processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
     // processor->put_csr(CSR_FRM, csr->__PVT__frm);

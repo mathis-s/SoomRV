@@ -2,6 +2,7 @@
 
 #include "Inst.hpp"
 #include "Registers.hpp"
+#include "TopWrapper.hpp"
 #include "models/Model.hpp"
 
 #include "VTop_CSR.h"
@@ -87,5 +88,5 @@ class SpikeSimif : public simif_t
         return processor->get_disassembler()->disassemble(instr);
     }
 
-    void restore_from_top(VTop* top, Inst& inst);
+    void restore_from_top(TopWrapper& wrap, Inst& inst);
 };
