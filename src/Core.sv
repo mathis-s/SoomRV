@@ -43,7 +43,7 @@ end
 
 CommitUOp comUOps[3:0] /*verilator public*/;
 
-wire ifetchEn = !TH_disableIFetch;
+wire ifetchEn = en && !TH_disableIFetch;
 
 localparam NUM_BRANCHES = NUM_BRANCH_PORTS + 2;
 localparam LQ_BRANCH_PORT = NUM_BRANCHES-2;
@@ -357,7 +357,9 @@ DecodeState CSR_dec;
 VirtMemState CSR_vmem;
 
 generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
-    RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps = '0;
+    // verilator lint_off UNDRIVEN
+    RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps;
+    // verilator lint_on UNDRIVEN
 
     assign stall[i] = 1'b0;
 
@@ -503,7 +505,7 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     always_comb begin
         wbUOp[i] = RES_UOp'{valid: 0, default: 'x};
         for (integer j = 0; j < (1 << $bits(FuncUnit)); j=j+1) begin
-            if (resUOps[j].valid)
+            if ((PORT_FUS[i] & (1 << j)) != 0 && resUOps[j].valid)
                 wbUOp[i] = resUOps[j];
         end
     end

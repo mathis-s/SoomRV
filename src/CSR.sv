@@ -344,7 +344,7 @@ typedef struct packed
 MEnvCfg_t menvcfg;
 MEnvCfg_t senvcfg;
 
-reg[5:0] scounteren;
+reg[31:0] scounteren;
 reg[31:0] sepc;
 reg[31:0] sscratch;
 reg[31:0] scause;
@@ -538,7 +538,7 @@ always_comb begin
             rdata = temp;
         end
 
-        CSR_scounteren: rdata = {26'b0, scounteren};
+        CSR_scounteren: rdata = scounteren;
         CSR_sepc: rdata = sepc;
         CSR_sscratch: rdata = sscratch;
         CSR_scause: rdata = scause;

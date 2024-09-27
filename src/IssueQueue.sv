@@ -269,7 +269,7 @@ always_ff@(posedge clk) begin
 
                 if (IMM_BITS == 36 && HasFU(FU_BRANCH)) begin
                     // verilator lint_off SELRANGE
-                    OUT_uop.imm12 <= {deqEntry.imm[35:32], deqEntry.imm[0], deqEntry.tags[1]};
+                    OUT_uop.imm12 <= {deqEntry.imm[IMM_BITS-1-:4], deqEntry.imm[0], deqEntry.tags[1]};
                     // verilator lint_on SELRANGE
                 end
                 else OUT_uop.imm12 <= 'x;
@@ -322,7 +322,6 @@ always_ff@(posedge clk) begin
                 temp.loadSqN = enqCandidates[i].loadSqN;
                 temp.compressed = enqCandidates[i].compressed;
 
-                // verilator lint_off SELRANGE
                 if (temp.fu == FU_ATOMIC) begin
                     // No changes for LD uop
                     // INT port uses value loaded by LD uop as operand
@@ -334,7 +333,6 @@ always_ff@(posedge clk) begin
                         temp.tagDst = 7'h40;
                     end
                 end
-                // verilator lint_on SELRANGE
 
 
                 // Check if the result for this op is being broadcast in the current cycle
@@ -346,21 +344,21 @@ always_ff@(posedge clk) begin
                 end
 
                 // Special handling for jalr
-                // verilator lint_off SELRANGE
-                if (enqCandidates[i].fu == FU_BRANCH &&
+                if (HasFU(FU_BRANCH) && enqCandidates[i].fu == FU_BRANCH &&
                     (enqCandidates[i].opcode == BR_V_JALR || enqCandidates[i].opcode == BR_V_JR)
                 ) begin
                     assert(IMM_BITS == 36);
+                    assert(NUM_OPERANDS == 2);
 
                     // Use {imm[0], tags[1]} to encode 8 bits of imm12
-                    temp.tags[1] = enqCandidates[i].imm12[6:0];
+                    temp.tags[NUM_OPERANDS-1] = enqCandidates[i].imm12[6:0];
                     temp.imm[0] = enqCandidates[i].imm12[7];
 
                     // rest goes into upper 4 bits of 36 (!) immediate bits
-                    temp.imm[35:32] = enqCandidates[i].imm12[11:8];
+                    temp.imm[IMM_BITS-1-:4] = enqCandidates[i].imm12[11:8];
 
                     // tags[1] is not used for register encoding, thus is always valid
-                    temp.avail[1] = 1;
+                    temp.avail[NUM_OPERANDS-1] = 1;
                 end
                 // verilator lint_on SELRANGE
 

@@ -146,8 +146,6 @@ CacheIF[`CBANKS-1:0] bankIFs;
 always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         bankIFs[i] = CacheIF'{ce: 1, we: 1, default: 'x};
-    IF_cache.busy[0] = 0;
-    IF_cache.rbusyBank[0] = 'x;
 
     if (!IF_cache.re[0]) begin
         bankIFs[IF_cache.addr[0][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[0];
@@ -159,6 +157,13 @@ always_comb begin
 
     if (!MC_DC_wr.ce) begin
         bankIFs[MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_wr;
+    end
+end
+always_comb begin
+    IF_cache.busy[0] = 0;
+    IF_cache.rbusyBank[0] = 'x;
+
+    if (!MC_DC_wr.ce) begin
         IF_cache.busy[0] = 1;
         IF_cache.rbusyBank[0] = MC_DC_wr.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
     end
@@ -170,9 +175,6 @@ always_comb begin
     for (integer i = 0; i < `CBANKS; i=i+1)
         bankIFs_1[i] = CacheIF'{ce: 1, we: 1, default: 'x};
 
-    IF_cache.busy[1] = 0;
-    IF_cache.rbusyBank[1] = 'x;
-
     if (!IF_cache.re[1]) begin
         bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].ce = IF_cache.re[1];
         bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].we = IF_cache.we[1];
@@ -180,12 +182,21 @@ always_comb begin
         bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].data = {IF_cache.wdata[1]};
         bankIFs_1[IF_cache.addr[1][2+$clog2(`CWIDTH) +:$clog2(`CBANKS)]].addr = {IF_cache.wassoc[1], IF_cache.addr[1][11:2]};
     end
+
     if (!MC_DC_rd.ce) begin
         bankIFs_1[MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)]] = MC_DC_rd;
+    end
+end
+always_comb begin
+    IF_cache.busy[1] = 0;
+    IF_cache.rbusyBank[1] = 'x;
+
+    if (!MC_DC_rd.ce) begin
         IF_cache.busy[1] = 1;
         IF_cache.rbusyBank[1] = MC_DC_rd.addr[$clog2(`CWIDTH) +: $clog2(`CBANKS)];
     end
 end
+
 // Read Address Shift Registers
 logic[9:0] CORE_raddr_0[1:0];
 logic[9:0] CORE_raddr_1[1:0];

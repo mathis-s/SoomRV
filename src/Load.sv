@@ -190,7 +190,7 @@ always_ff@(posedge clk) begin
             end
             else if (IN_stall[i]) begin
                 if (operandIsReg[i][0]) outUOpReg[i].srcA <= IN_rfReadData[i];
-                if (operandIsReg[i][1]) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
+                if (operandIsReg[i][1] && i < NUM_ALUS) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
                 operandIsReg[i] <= 2'b00;
             end
 

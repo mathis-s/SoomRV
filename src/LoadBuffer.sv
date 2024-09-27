@@ -424,7 +424,7 @@ always_ff@(posedge clk) begin
         else begin
             // Issue Late Loads
             for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-                if (!lateLoadUOp[i].valid || !IN_stall[i] || ltIssue[i].isLdFwd) begin
+                if (!lateLoadUOp[i].valid || !IN_stall[i] || (ltIssue[i].valid && ltIssue[i].isLdFwd)) begin
 
                     if (IN_stall[i] && lateLoadUOp[i].valid)
                         entries[lateLoadUOp[i].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;

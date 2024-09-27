@@ -81,15 +81,18 @@ always_ff@(posedge clk) begin
     end
     else begin
 
-        // Invalidate
-        if (IN_branch.taken)
-            for (integer i = 0; i < SIZE; i=i+1) begin
-                if (entries[i].valid && !entries[i].external &&
-                    $signed(entries[i].sqN - IN_branch.sqN) > 0
-                ) begin
-                    entries[i] <= LoadResUOp'{valid: 0, default: 'x};
-                end
+        // Snoop Results
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            if (entries[i].valid && !entries[i].dataAvail && IN_memc.ldDataFwd.valid &&
+                entries[i].addr[31:$clog2(`AXI_WIDTH/8)] == IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
+            ) begin
+                entries[i].dataAvail <= 1;
+                for (integer j = 0; j < 4; j=j+1)
+                    if (!entries[i].fwdMask[j])
+                        entries[i].data[8*j+:8] <=
+                            IN_memc.ldDataFwd.data[{entries[i].addr[$clog2(`AXI_WIDTH/8)-1:2], j[1:0]}*8+:8];
             end
+        end
 
         // Dequeue
         if (deq_c.valid)
@@ -100,23 +103,16 @@ always_ff@(posedge clk) begin
             (!IN_branch.taken || enqLMQ_c.external || $signed(enqLMQ_c.sqN - IN_branch.sqN) <= 0)) begin
             entries[enq.idx] <= enqLMQ_c;
         end
-    end
-end
 
-always_ff@(posedge clk) begin
-    if (rst) ;
-    else begin
-        for (integer i = 0; i < SIZE; i=i+1) begin
-            if (entries[i].valid && !entries[i].dataAvail &&
-                entries[i].addr[31:$clog2(`AXI_WIDTH/8)] ==
-                    IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
-            ) begin
-                entries[i].dataAvail <= 1;
-                for (integer j = 0; j < 4; j=j+1)
-                    if (!entries[i].fwdMask[j])
-                        entries[i].data[8*j+:8] <= IN_memc.ldDataFwd.data[{entries[i].addr[$clog2(`AXI_WIDTH/8)-1:2], j[1:0]}*8+:8];
+        // Invalidate
+        if (IN_branch.taken)
+            for (integer i = 0; i < SIZE; i=i+1) begin
+                if (entries[i].valid && !entries[i].external &&
+                    $signed(entries[i].sqN - IN_branch.sqN) > 0
+                ) begin
+                    entries[i] <= LoadResUOp'{valid: 0, default: 'x};
+                end
             end
-        end
     end
 end
 

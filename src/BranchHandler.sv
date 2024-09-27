@@ -302,7 +302,6 @@ always_comb begin
                 // Legal predictions are always in the final halfword, such that the entire
                 // 32-bit instruction can be fetched before the prediction is made.
                 logic predIllegal = is32bit[IN_op.predBr.offs + ($bits(FetchOff_t)+1)'(1)];
-                FetchOff_t actualOffs = curBr.fhPC[1+:$bits(FetchOff_t)];
 
                 // Delete matching regular branch prediction entries
                 btUpdate_c.valid = 1;
@@ -317,22 +316,22 @@ always_comb begin
                 decBranch_c.fetchID = IN_op.fetchID;
                 decBranch_c.fetchOffs = FetchOff_t'(i);
                 decBranch_c.retAct = RET_NONE;
-                decBranch_c.histAct = curBr.btype == BRANCH ? HIST_APPEND_1 : HIST_NONE;
+                decBranch_c.histAct = (curBr.valid && curBr.btype == BRANCH) ? HIST_APPEND_1 : HIST_NONE;
                 decBranch_c.tgtSpec = BR_TGT_MANUAL;
                 decBranch_c.wfi = 0;
 
-                if (curBr.btype == CALL || curBr.btype == ICALL) begin
+                if (curBr.valid && (curBr.btype == CALL || curBr.btype == ICALL)) begin
                     retUpd_c.valid = 1;
                     retUpd_c.idx = IN_op.rIdx;
-                    retUpd_c.addr = {IN_op.pc[31:1+$bits(FetchOff_t)], actualOffs};
+                    retUpd_c.addr = {IN_op.pc[31:1+$bits(FetchOff_t)], curBr.fhPC[1+:$bits(FetchOff_t)]};
                 end
 
-                case (curBr.btype)
-                    CALL, ICALL: decBranch_c.retAct = RET_PUSH;
-                    RETURN: decBranch_c.retAct = RET_POP;
-                    // TODO: RETICALL action
-                    default: decBranch_c.retAct = RET_NONE;
-                endcase
+                if (curBr.valid)
+                    case (curBr.btype)
+                        CALL, ICALL: decBranch_c.retAct = RET_PUSH;
+                        RETURN: decBranch_c.retAct = RET_POP;
+                        default: ;
+                    endcase
 
 
                 // Branch was predicted at correct address, but target is wrong.

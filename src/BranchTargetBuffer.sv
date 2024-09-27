@@ -80,6 +80,7 @@ always_ff@(posedge clk) begin
         resetIdx <= 0;
     end
     else if (!resetIdx[$clog2(LENGTH)]) begin
+        multiple[resetIdx[$clog2(LENGTH)-1:0]] <= 0;
         entries[resetIdx[$clog2(LENGTH)-1:0]] <= '0;
         resetIdx <= resetIdx + 1;
     end

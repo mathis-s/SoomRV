@@ -580,9 +580,7 @@ always_ff@(posedge clk) begin
 
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};
-
-    ldDataFwd <= 'x;
-    ldDataFwd.valid <= 0;
+    ldDataFwd <= MemController_LdDataFwd'{default: 'x, valid: 0};
 
     if (rst) begin
         for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
