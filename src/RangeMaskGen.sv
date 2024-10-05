@@ -20,8 +20,8 @@ always_comb begin
         (startIdxSh >  endIdxSh);
 
     for (integer i = 0; i < LENGTH; i=i+1) begin
-        logic doEnd = endIdxOH[(i-END_SHIFT)%LENGTH];
-        logic doStart = startIdxOH[(i-START_SHIFT)%LENGTH];
+        logic doEnd = endIdxOH[$unsigned(i-END_SHIFT)%LENGTH];
+        logic doStart = startIdxOH[$unsigned(i-START_SHIFT)%LENGTH];
 
         if (doStart && doEnd) active = OUTPUT_ON_EQUAL;
         else if (doStart) active = 1;
