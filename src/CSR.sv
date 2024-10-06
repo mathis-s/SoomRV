@@ -264,7 +264,7 @@ typedef enum logic[11:0]
     CSR_magic=12'hCC0
 } CSRAddr;
 
-typedef enum logic[$bits(TrapCause_t)-1:0]
+typedef enum logic[3:0]
 {
     SSI=1,
     MSI=3,
@@ -379,7 +379,7 @@ always_comb begin
         for (integer i = 0; i < 3; i=i+1)
             if (mip[sPrio[i][3:0]] && mie[sPrio[i][3:0]]) begin
                 interrupt = 1;
-                interruptCause = sPrio[i];
+                interruptCause = {1'b0, sPrio[i]};
                 interruptDelegate = 1;
             end
 
@@ -387,7 +387,7 @@ always_comb begin
         for (integer i = 0; i < 6; i=i+1)
             if (mip[mPrio[i][3:0]] && mie[mPrio[i][3:0]] && !mideleg[mPrio[i][3:0]]) begin
                 interrupt = 1;
-                interruptCause = mPrio[i];
+                interruptCause = {1'b0, mPrio[i]};
                 interruptDelegate = 0;
             end
 end
@@ -667,7 +667,7 @@ always_ff@(posedge clk) begin
                 mstatus.sie <= 0;
                 mstatus.spp <= priv[0];
                 sepc <= IN_trapInfo.trapPC;
-                scause[0+:$bits(TrapCause_t)] <= IN_trapInfo.cause;
+                scause[0+:5] <= IN_trapInfo.cause;
                 scause[31] <= IN_trapInfo.isInterrupt;
                 stval <= tval;
 
@@ -678,7 +678,7 @@ always_ff@(posedge clk) begin
                 mstatus.mie <= 0;
                 mstatus.mpp <= priv;
                 mepc <= IN_trapInfo.trapPC;
-                mcause[0+:$bits(TrapCause_t)] <= IN_trapInfo.cause;
+                mcause[0+:5] <= IN_trapInfo.cause;
                 mcause[4] <= 0;
                 mcause[31] <= IN_trapInfo.isInterrupt;
                 mtval <= tval;
@@ -983,7 +983,7 @@ always_ff@(posedge clk) begin
                             CSR_sepc: sepc[31:1] <= wdata[31:1];
                             CSR_sscratch: sscratch <= wdata;
                             CSR_scause: begin
-                                scause[0+:$bits(TrapCause_t)] <= wdata[0+:$bits(TrapCause_t)];
+                                scause[0+:5] <= wdata[0+:5];
                                 scause[31] <= wdata[31];
                             end
                             CSR_stval: stval <= wdata;

@@ -182,7 +182,7 @@ always_comb begin
                 end
                 else begin
                     case (IN_trapInstr.flags)
-                        FLAGS_TRAP: trapCause = TrapCause_t'(IN_trapInstr.rd);
+                        FLAGS_TRAP: trapCause = IN_trapInstr.rd;
                         FLAGS_LD_MA: trapCause = RVP_TRAP_LD_MA;
                         FLAGS_LD_AF: trapCause = RVP_TRAP_LD_AF;
                         FLAGS_LD_PF: trapCause = RVP_TRAP_LD_PF;
@@ -194,7 +194,7 @@ always_comb begin
                     endcase
 
                     // Distinguish between ecall in different priv levels
-                    if (trapCause == TrapCause_t'(TRAP_ECALL_M)) begin
+                    if (trapCause == 5'(TRAP_ECALL_M)) begin
                         case (IN_trapControl.priv)
                             PRIV_SUPERVISOR: trapCause = RVP_TRAP_ECALL_S;
                             PRIV_USER: trapCause = RVP_TRAP_ECALL_U;
