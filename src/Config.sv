@@ -86,12 +86,12 @@
 `define ENABLE_ZCB
 
 //`define DEBUG
+parameter HANG_COUNTER_LEN = 16;
 
 parameter NUM_AGUS = 2;
 parameter NUM_ALUS = 3;
 // How many of the ALU ports support branches?
 parameter NUM_BRANCH_PORTS = 2;
-
 
 
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{

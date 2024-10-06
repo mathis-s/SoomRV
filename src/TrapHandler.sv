@@ -27,7 +27,7 @@ reg memoryWait;
 
 assign OUT_disableIFetch = memoryWait;
 
-assign OUT_pcRead.prio = IN_trapInstr.flags != FLAGS_NX;
+assign OUT_pcRead.prio = IN_trapInstr.timeout || IN_trapInstr.flags != FLAGS_NX;
 assign OUT_pcRead.addr = IN_trapInstr.fetchID;
 assign OUT_pcRead.valid = IN_trapInstr.valid;
 
@@ -95,12 +95,14 @@ always_comb begin
     else begin
         // Exception and branch prediction update handling
         if (IN_trapInstr.valid) begin
+
             // Instructions requiring pipeline flush and MRET/SRET handling
-            if (IN_trapInstr.flags == FLAGS_FENCE ||
-                IN_trapInstr.flags == FLAGS_ORDERING ||
-                IN_trapInstr.flags == FLAGS_XRET ||
-                (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_SFENCE_VMA))
-            ) begin
+            if (!IN_trapInstr.timeout && (
+                    IN_trapInstr.flags == FLAGS_FENCE ||
+                    IN_trapInstr.flags == FLAGS_ORDERING ||
+                    IN_trapInstr.flags == FLAGS_XRET ||
+                    (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_SFENCE_VMA))
+            )) begin
 
                 case (IN_trapInstr.flags)
                     FLAGS_ORDERING: begin
@@ -163,18 +165,24 @@ always_comb begin
 
 
             // Traps, Exceptions, Interrupts Handling
-            else if ((IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)) begin
+            else if (IN_trapInstr.timeout ||
+                (IN_trapInstr.flags >= FLAGS_ILLEGAL_INSTR && IN_trapInstr.flags <= FLAGS_ST_PF)
+            ) begin
 
-                reg[3:0] trapCause = RVP_TRAP_ILLEGAL;
+                TrapCause_t trapCause = RVP_TRAP_ILLEGAL;
                 reg delegate;
-                reg isInterrupt = IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT);
+                reg isInterrupt = !IN_trapInstr.timeout &&
+                    (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT));
 
-                if (isInterrupt) begin
+                if (IN_trapInstr.timeout) begin
+                    trapCause = TRAP_CUSTOM_HANG;
+                end
+                else if (isInterrupt) begin
                     trapCause = IN_trapControl.interruptCause;
                 end
                 else begin
                     case (IN_trapInstr.flags)
-                        FLAGS_TRAP: trapCause = IN_trapInstr.rd[3:0];
+                        FLAGS_TRAP: trapCause = TrapCause_t'(IN_trapInstr.rd);
                         FLAGS_LD_MA: trapCause = RVP_TRAP_LD_MA;
                         FLAGS_LD_AF: trapCause = RVP_TRAP_LD_AF;
                         FLAGS_LD_PF: trapCause = RVP_TRAP_LD_PF;
@@ -186,7 +194,7 @@ always_comb begin
                     endcase
 
                     // Distinguish between ecall in different priv levels
-                    if (trapCause == 4'(TRAP_ECALL_M)) begin
+                    if (trapCause == TrapCause_t'(TRAP_ECALL_M)) begin
                         case (IN_trapControl.priv)
                             PRIV_SUPERVISOR: trapCause = RVP_TRAP_ECALL_S;
                             PRIV_USER: trapCause = RVP_TRAP_ECALL_U;
@@ -195,8 +203,8 @@ always_comb begin
                     end
                 end
 
-                delegate = (IN_trapControl.priv != PRIV_MACHINE) &&
-                    (isInterrupt ? IN_trapControl.mideleg[trapCause] : IN_trapControl.medeleg[trapCause]);
+                delegate = (trapCause <= RVP_TRAP_ST_PF) && (IN_trapControl.priv != PRIV_MACHINE) &&
+                    (isInterrupt ? IN_trapControl.mideleg[trapCause[3:0]] : IN_trapControl.medeleg[trapCause[3:0]]);
 
                 trapInfo_c.valid = 1;
                 trapInfo_c.trapPC = 'x;

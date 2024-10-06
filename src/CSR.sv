@@ -264,7 +264,7 @@ typedef enum logic[11:0]
     CSR_magic=12'hCC0
 } CSRAddr;
 
-typedef enum logic[3:0]
+typedef enum logic[$bits(TrapCause_t)-1:0]
 {
     SSI=1,
     MSI=3,
@@ -362,7 +362,7 @@ struct packed
 reg[30:0] retvec;
 
 reg interrupt;
-reg[3:0] interruptCause;
+TrapCause_t interruptCause;
 reg interruptDelegate;
 always_comb begin
 
@@ -377,7 +377,7 @@ always_comb begin
 
     if (priv < PRIV_SUPERVISOR || (mstatus.sie && priv == PRIV_SUPERVISOR))
         for (integer i = 0; i < 3; i=i+1)
-            if (mip[sPrio[i]] && mie[sPrio[i]]) begin
+            if (mip[sPrio[i][3:0]] && mie[sPrio[i][3:0]]) begin
                 interrupt = 1;
                 interruptCause = sPrio[i];
                 interruptDelegate = 1;
@@ -385,7 +385,7 @@ always_comb begin
 
     if (priv < PRIV_MACHINE || mstatus.mie)
         for (integer i = 0; i < 6; i=i+1)
-            if (mip[mPrio[i]] && mie[mPrio[i]] && !mideleg[mPrio[i]]) begin
+            if (mip[mPrio[i][3:0]] && mie[mPrio[i][3:0]] && !mideleg[mPrio[i][3:0]]) begin
                 interrupt = 1;
                 interruptCause = mPrio[i];
                 interruptDelegate = 0;
@@ -667,7 +667,7 @@ always_ff@(posedge clk) begin
                 mstatus.sie <= 0;
                 mstatus.spp <= priv[0];
                 sepc <= IN_trapInfo.trapPC;
-                scause[3:0] <= IN_trapInfo.cause;
+                scause[0+:$bits(TrapCause_t)] <= IN_trapInfo.cause;
                 scause[31] <= IN_trapInfo.isInterrupt;
                 stval <= tval;
 
@@ -678,7 +678,7 @@ always_ff@(posedge clk) begin
                 mstatus.mie <= 0;
                 mstatus.mpp <= priv;
                 mepc <= IN_trapInfo.trapPC;
-                mcause[3:0] <= IN_trapInfo.cause;
+                mcause[0+:$bits(TrapCause_t)] <= IN_trapInfo.cause;
                 mcause[4] <= 0;
                 mcause[31] <= IN_trapInfo.isInterrupt;
                 mtval <= tval;
@@ -983,7 +983,7 @@ always_ff@(posedge clk) begin
                             CSR_sepc: sepc[31:1] <= wdata[31:1];
                             CSR_sscratch: sscratch <= wdata;
                             CSR_scause: begin
-                                scause[4:0] <= wdata[4:0];
+                                scause[0+:$bits(TrapCause_t)] <= wdata[0+:$bits(TrapCause_t)];
                                 scause[31] <= wdata[31];
                             end
                             CSR_stval: stval <= wdata;

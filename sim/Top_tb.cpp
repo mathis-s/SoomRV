@@ -735,7 +735,7 @@ int main(int argc, char** argv)
             HandleInput();
 
         // Hang Detection
-        if ((wrap->main_time & (0x3fff)) == 0 && !args.restoreSave && !core->ifetch->waitForInterrupt)
+        if ((wrap->main_time & (0x1ffff)) == 0 && !args.restoreSave && !core->ifetch->waitForInterrupt)
         {
             uint64_t minstret = wrap->csr->minstret;
             if (minstret == lastMInstret)

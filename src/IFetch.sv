@@ -172,7 +172,7 @@ wire pcFileWriteEn;
 
 
 wire PCFileReadReq sharedReq =
-    (IN_pcReadTH.valid && IN_pcReadTH.prio) ? PCFileReadReq'(IN_pcReadTH) : IN_pcRead[0];
+    (IN_pcReadTH.valid && (IN_pcReadTH.prio || !IN_pcRead[0].valid)) ? PCFileReadReq'(IN_pcReadTH) : IN_pcRead[0];
 PCFileEntry sharedData;
 assign OUT_pcReadData[0] = sharedData;
 assign OUT_pcReadDataTH = sharedData;

@@ -281,7 +281,7 @@ always_ff@(posedge clk) begin
         if (HasFU(FU_BRANCH)) begin
             if (isBranch)
                 OUT_uop.flags <= branchTaken ? FLAGS_PRED_TAKEN : FLAGS_PRED_NTAKEN;
-            else if (isBranch || IN_uop.opcode == BR_V_RET || IN_uop.opcode == BR_V_JALR || IN_uop.opcode == BR_V_JR)
+            else if (IN_uop.opcode == BR_V_RET || IN_uop.opcode == BR_V_JALR || IN_uop.opcode == BR_V_JR)
                 OUT_uop.flags <= FLAGS_BRANCH;
         end
 

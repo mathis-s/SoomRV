@@ -13,6 +13,7 @@ typedef logic[2:0] StNonce_t;
 typedef logic[3:0] TageID_t;
 typedef logic[`TAGE_BASE*(1<<(`TAGE_STAGES-2))-1:0] BHist_t;
 typedef logic[$clog2(NUM_ALUS)-1:0] IntUOpOrder_t;
+typedef logic[4:0] TrapCause_t;
 
 typedef enum logic[5:0]
 {
@@ -191,7 +192,7 @@ typedef enum logic[5:0]
 } OPCode_FU_CSR;
 
 // Trap Cause Encodings straight from Privilege Spec
-typedef enum logic[3:0]
+typedef enum logic[$bits(TrapCause_t)-1:0]
 {
     RVP_TRAP_IF_MA   = 0,
     RVP_TRAP_IF_AF   = 1,
@@ -205,7 +206,8 @@ typedef enum logic[3:0]
     RVP_TRAP_ECALL_S = 9,
     RVP_TRAP_IF_PF   = 12,
     RVP_TRAP_LD_PF   = 13,
-    RVP_TRAP_ST_PF   = 15
+    RVP_TRAP_ST_PF   = 15,
+    TRAP_CUSTOM_HANG = 24
 } RVPTrapCause;
 
 // For decode-time traps, we use FLAGS_TRAP/FU_TRAP as an,
@@ -887,6 +889,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic timeout;
     Flags flags;
     Tag tag;
     SqN sqN;
@@ -927,7 +930,7 @@ typedef struct packed
     PrivLevel priv;
 
     logic interruptPending;
-    logic[3:0] interruptCause;
+    TrapCause_t interruptCause;
     logic interruptDelegate;
 
 } TrapControlState;
@@ -941,7 +944,7 @@ typedef struct packed
 {
     logic[31:0] trapPC;
     logic isInterrupt;
-    logic[3:0] cause;
+    TrapCause_t cause;
     logic delegate;
     logic valid;
 } TrapInfoUpdate;
