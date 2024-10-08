@@ -192,7 +192,7 @@ typedef enum logic[5:0]
 } OPCode_FU_CSR;
 
 // Trap Cause Encodings straight from Privilege Spec
-typedef enum logic[$bits(TrapCause_t)-1:0]
+typedef enum logic[4:0]
 {
     RVP_TRAP_IF_MA   = 0,
     RVP_TRAP_IF_AF   = 1,
