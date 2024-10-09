@@ -44,15 +44,18 @@ wire[31:0] addr = IN_uop.srcA + IN_uop.srcB;
 
 // Address Calculation for incoming UOps
 AGU_UOp aguUOp_c;
-RES_UOp resUOp_c;
 TValProv tvalProv_c;
+reg isIllegalInstr_c;
+
+// do not commit atomics
+// sc.w needs tagDst = 7'h40
+
 always_comb begin
     aguUOp_c = 'x;
     aguUOp_c.valid = 0;
-    resUOp_c = 'x;
-    resUOp_c.valid = 0;
     tvalProv_c = 'x;
     tvalProv_c.valid = 0;
+    isIllegalInstr_c = 0;
 
     aguUOp_c.addr = addr;
     aguUOp_c.tagDst = IN_uop.tagDst;
@@ -105,17 +108,9 @@ always_comb begin
         aguUOp_c.isStore = 1;
         aguUOp_c.doNotCommit = 0;
 
-        resUOp_c.tagDst = 7'h40;
-        resUOp_c.sqN = IN_uop.sqN;
-        resUOp_c.result = 'x;
-        resUOp_c.doNotCommit = 0;
-        resUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);;
-
         // default
         aguUOp_c.wmask = 4'b1111;
         aguUOp_c.size = 2;
-
-        resUOp_c.flags = FLAGS_NONE;
 
         case (IN_uop.opcode)
 
@@ -152,7 +147,8 @@ always_comb begin
             LSU_SC_W: begin
                 aguUOp_c.isLrSc = 1;
                 aguUOp_c.wmask = 4'b1111;
-                resUOp_c.tagDst = 7'h40;
+                // The 0/1 write is handled by rename, do not write anything.
+                aguUOp_c.tagDst = 7'h40;
             end
 
             LSU_SW: begin
@@ -162,21 +158,21 @@ always_comb begin
             LSU_CBO_CLEAN: begin
                 aguUOp_c.wmask = 0;
                 if (!IN_vmem.cbcfe) begin
-                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                    isIllegalInstr_c = 1;
                 end
             end
 
             LSU_CBO_INVAL: begin
                 aguUOp_c.wmask = 0;
                 if (IN_vmem.cbie == 2'b00) begin
-                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                    isIllegalInstr_c = 1;
                 end
             end
 
             LSU_CBO_FLUSH: begin
                 aguUOp_c.wmask = 0;
                 if (!IN_vmem.cbcfe) begin
-                    resUOp_c.flags = FLAGS_ILLEGAL_INSTR;
+                    isIllegalInstr_c = 1;
                 end
             end
 
@@ -189,9 +185,6 @@ always_comb begin
             ATOMIC_AMOMAX_W,
             ATOMIC_AMOMINU_W,
             ATOMIC_AMOMAXU_W: begin
-                resUOp_c.doNotCommit = 1;
-                resUOp_c.tagDst = 7'h40;
-
                 // The integer uop commits atomics,
                 // except for amoswap where there isn't one.
                 if (IN_uop.opcode != ATOMIC_AMOSWAP_W)
@@ -247,22 +240,23 @@ always_comb begin
 
     if (aguUOp_c.valid && !OUT_stall) begin
         issUOp_c = aguUOp_c;
-        issResUOp_c = resUOp_c;
+        issResUOp_c.valid = aguUOp_c.valid;
+        issResUOp_c.doNotCommit = aguUOp_c.doNotCommit;
+        issResUOp_c.flags = isIllegalInstr_c ? FLAGS_ILLEGAL_INSTR : FLAGS_NONE;
+        issResUOp_c.sqN = aguUOp_c.sqN;
+        issResUOp_c.tagDst = aguUOp_c.tagDst;
+        issResUOp_c.result = 'x;
     end
     else if (TMQ_uop.valid) begin
 
         TMQ_dequeue = 1;
-
         issUOp_c = TMQ_uop;
-
-        if (!TMQ_uop.isLoad) begin
-            issResUOp_c.valid = TMQ_uop.valid;
-            issResUOp_c.doNotCommit = TMQ_uop.doNotCommit;
-            issResUOp_c.flags = FLAGS_NONE;
-            issResUOp_c.sqN = TMQ_uop.sqN;
-            issResUOp_c.tagDst = TMQ_uop.tagDst;
-            issResUOp_c.result = 'x;
-        end
+        issResUOp_c.valid = TMQ_uop.valid;
+        issResUOp_c.doNotCommit = TMQ_uop.doNotCommit;
+        issResUOp_c.flags = FLAGS_NONE;
+        issResUOp_c.sqN = TMQ_uop.sqN;
+        issResUOp_c.tagDst = TMQ_uop.tagDst;
+        issResUOp_c.result = 'x;
     end
 end
 
@@ -303,11 +297,11 @@ always_comb begin
         (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad, issUOp_c.isStore))
     ) begin
         except = AGU_PAGE_FAULT;
-        exceptFlags = FLAGS_ST_PF;
+        exceptFlags = issUOp_c.isStore ? FLAGS_ST_PF : FLAGS_LD_PF;
     end
     else if ((!`IS_LEGAL_ADDR(phyAddr) || IN_tlb.accessFault) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
         except = AGU_ACCESS_FAULT;
-        exceptFlags = FLAGS_ST_AF;
+        exceptFlags = issUOp_c.isStore ? FLAGS_ST_AF : FLAGS_LD_AF;
     end
 
     // Misalign has higher priority than access fault
@@ -332,14 +326,24 @@ always_comb begin
         case (issUOp_c.size)
             0: ;
             1: begin
-                if (phyAddr[0])
+                if (phyAddr[0]) begin
                     except = AGU_ADDR_MISALIGN;
+                    exceptFlags = FLAGS_LD_MA;
+                end
             end
             default: begin
-                if (phyAddr[0] || phyAddr[1])
+                if (phyAddr[0] || phyAddr[1]) begin
                     except = AGU_ADDR_MISALIGN;
+                    exceptFlags = FLAGS_LD_MA;
+                end
             end
         endcase
+    end
+
+    // Previous exception has highest priority.
+    if (issResUOp_c.flags != FLAGS_NONE) begin
+        exceptFlags = issResUOp_c.flags;
+        except = AGU_NO_EXCEPTION;
     end
 end
 
@@ -401,7 +405,7 @@ always_ff@(posedge clk) begin
         ) begin
 
             reg doIssue = 1;
-            if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
+            if (exceptFlags != FLAGS_ILLEGAL_INSTR) begin
                 if (tlbMiss) begin
                     if (!pageWalkActive) begin
                         pageWalkActive <= 1;
@@ -420,19 +424,31 @@ always_ff@(posedge clk) begin
 
             if (doIssue) begin
 
-                OUT_uop <= issResUOp_c;
-                if (!(issResUOp_c.valid && issResUOp_c.flags == FLAGS_ILLEGAL_INSTR)) begin
+                reg isLoad = issUOp_c.isLoad && !issUOp_c.isStore;
+                reg isStore = !issUOp_c.isLoad && issUOp_c.isStore;
+                reg isAtomic = issUOp_c.isLoad && issUOp_c.isStore;
+
+                // Stores generate a RES_UOp right away (no result, just for tracking completion in ROB).
+                // Loads/atomics only generate one early (ie right now) on exception.
+                if (((isLoad || isAtomic) && exceptFlags != FLAGS_NONE) || isStore) begin
+                    OUT_uop <= issResUOp_c;
+                    OUT_uop.flags <= exceptFlags;
+                    // doNotCommit might be set for atomics.
+                    // Since there's an exception we want to commit right away though!
+                    OUT_uop.doNotCommit <= 0;
+                end
+
+                // Issue the AGU_UOp only if there's no exception
+                if (exceptFlags == FLAGS_NONE) begin
                     OUT_aguOp <= issUOp_c;
                     OUT_aguOp.earlyLoadFailed <= IN_stall;
-
                     OUT_aguOp.exception <= except;
-                    OUT_uop.flags <= exceptFlags;
-
-                    if (IN_vmem.sv32en) begin
+                    if (IN_vmem.sv32en)
                         OUT_aguOp.addr <= phyAddr;
-                    end
                 end
+
             end
+
         end
     end
 end
