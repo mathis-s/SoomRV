@@ -202,7 +202,7 @@ endgenerate
 wire[IDX_LEN-1:0] baseIndexI = baseIndex[IDX_LEN-1:0];
 wire[IDX_LEN-1:0] comStSqNI = IN_comStSqN[IDX_LEN-1:0];
 
-assign OUT_done = baseIndex == IN_comStSqN;// && !anyInEv;
+assign OUT_done = baseIndex == IN_comStSqN;
 
 // Sort uops to enqueue by storeSqN
 R_UOp rnUOpSorted[`DEC_WIDTH-1:0];
@@ -386,11 +386,9 @@ always_ff@(posedge clk) begin
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 assert(!entries[index].addrAvail);
 
-                if (IN_uopSt[i].exception == AGU_NO_EXCEPTION) begin
-                    entries[index].addr <= IN_uopSt[i].addr[31:2];
-                    entries[index].wmask <= IN_uopSt[i].wmask;
-                    entries[index].addrAvail <= 1;
-                end
+                entries[index].addr <= IN_uopSt[i].addr[31:2];
+                entries[index].wmask <= IN_uopSt[i].wmask;
+                entries[index].addrAvail <= 1;
 
                 modified = 1;
             end

@@ -80,7 +80,7 @@ logic[NUM_AGUS-1:0] isCacheBypassLdUOp;
 always_comb begin
     for (integer i = 0; i < NUM_AGUS; i=i+1)
         isCacheBypassLdUOp[i] =
-            `ENABLE_EXT_MMIO && uopLd_0[i].valid && uopLd_0[i].isMMIO && uopLd_0[i].exception == AGU_NO_EXCEPTION &&
+            `ENABLE_EXT_MMIO && uopLd_0[i].valid && uopLd_0[i].isMMIO &&
             uopLd_0[i].addr >= `EXT_MMIO_START_ADDR && uopLd_0[i].addr < `EXT_MMIO_END_ADDR;
 end
 
@@ -161,10 +161,10 @@ assign uopSt = IN_uopSt;
 // Both load and store read from cache table
 always_comb begin
 
-    IF_ct.re[0] = uopLd[0].valid && !uopLd[0].isMMIO && uopLd[0].exception == AGU_NO_EXCEPTION;
+    IF_ct.re[0] = uopLd[0].valid && !uopLd[0].isMMIO;
     IF_ct.raddr[0] = uopLd[0].addr[`VIRT_IDX_LEN-1:0];
 
-    IF_ct.re[1] = uopLd[1].valid && !uopLd[1].isMMIO && uopLd[1].exception == AGU_NO_EXCEPTION;
+    IF_ct.re[1] = uopLd[1].valid && !uopLd[1].isMMIO;
     IF_ct.raddr[1] = uopLd[1].addr[`VIRT_IDX_LEN-1:0];
 
     if (uopStPortValid) begin
@@ -244,7 +244,6 @@ always_comb begin
             uopLd[i].addr[11:0] = IN_uopELd[idx].addr;
 
             uopLd[i].isMMIO = 0; // assume that this is not MMIO such that cache is read
-            uopLd[i].exception = AGU_NO_EXCEPTION; // assume no exception
 
             OUT_ldAGUStall[idx] = 0;
             regularLd_c[i] = 1;
@@ -352,7 +351,7 @@ always_comb begin
         IF_cache.we[i] = 1;
         IF_cache.re[i] = 1;
 
-        IF_cache.re[i] = !(uopLd[i].valid && !uopLd[i].isMMIO && uopLd[i].exception == AGU_NO_EXCEPTION);
+        IF_cache.re[i] = !(uopLd[i].valid && !uopLd[i].isMMIO);
         IF_cache.addr[i] = uopLd[i].addr[`VIRT_IDX_LEN-1:0];
     end
 
@@ -549,15 +548,14 @@ always_comb begin
             ldResUOp[i].external = ld.external;
             ldResUOp[i].sqN = ld.sqN;
             ldResUOp[i].tagDst = ld.tagDst;
-            ldResUOp[i].exception = ld.exception;
             ldResUOp[i].sext = ld.signExtend;
             ldResUOp[i].size = ld.size;
             ldResUOp[i].addr = ld.addr;
 
-            if ((!loadCacheAccessFailed[i][1] || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) &&
-                (cacheHit || ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || ld.dataValid) &&
+            if ((!loadCacheAccessFailed[i][1] || isExtMMIO || isIntMMIO || ld.dataValid) &&
+                (cacheHit || isExtMMIO || isIntMMIO || ld.dataValid) &&
                 (!loadWasExtIOBusy[i] || isExtMMIO) &&
-                (ld.exception != AGU_NO_EXCEPTION || isExtMMIO || isIntMMIO || !stFwd[i].conflict)
+                (isExtMMIO || isIntMMIO || !stFwd[i].conflict)
             ) begin
                 // Use forwarded store data if available
                 if (!(isExtMMIO || isIntMMIO)) begin

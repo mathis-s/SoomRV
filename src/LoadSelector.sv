@@ -48,7 +48,6 @@ always_comb begin
             OUT_ldUOp[i].doNotCommit = 1;
             OUT_ldUOp[i].atomic = 0;
             OUT_ldUOp[i].external = 1;
-            OUT_ldUOp[i].exception = AGU_NO_EXCEPTION;
             OUT_ldUOp[i].isMMIO = 0;
             OUT_ldUOp[i].valid = IN_pwLd[i].valid;
         end

@@ -688,14 +688,6 @@ typedef struct packed
     logic valid;
 } AMO_Data_UOp;
 
-typedef enum logic[1:0]
-{
-    AGU_NO_EXCEPTION,
-    AGU_ADDR_MISALIGN,
-    AGU_ACCESS_FAULT,
-    AGU_PAGE_FAULT
-} AGU_Exception;
-
 typedef struct packed
 {
     logic[31:0] addr;
@@ -714,7 +706,6 @@ typedef struct packed
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
     logic doNotCommit;
-    AGU_Exception exception;
     logic compressed;
     logic valid;
 } AGU_UOp;
@@ -743,7 +734,6 @@ typedef struct packed
     logic sext;
     logic dataAvail;
 
-    AGU_Exception exception;
     Tag tagDst;
     SqN sqN;
     logic external;
@@ -813,7 +803,6 @@ typedef struct packed
     logic atomic;
     logic doNotCommit;
     logic external; // not part of normal execution, ignore sqn, tagDst and rd, don't commit
-    AGU_Exception exception;
     logic isMMIO;
     logic valid;
 } LD_UOp;
