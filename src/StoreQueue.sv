@@ -68,12 +68,16 @@ RangeMaskGen#(NUM_ENTRIES, 1, 1, 0) invalRangeGen
     .IN_endIdx(baseIndex[IDX_LEN-1:0]),
     .OUT_range(invalRange_c)
 );
-
-
+`ifndef SQ_LINEAR
 wire[NUM_ENTRIES-1:0] forwardRange_c[NUM_AGUS-1:0];
+`else
+wire[2*NUM_ENTRIES-1:0] forwardRange_c[NUM_AGUS-1:0];
+`endif
+
 generate
 for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     wire SqN endSqN = IN_uopLd[i].storeSqN + (IN_uopLd[i].atomic ? 0 : 1);
+    `ifndef SQ_LINEAR
     RangeMaskGen#(NUM_ENTRIES, 0) forwardRangeGen
     (
         .IN_allOnes($signed(endSqN - baseIndex) >= NUM_ENTRIES),
@@ -82,6 +86,11 @@ for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
         .IN_endIdx(endSqN[IDX_LEN-1:0]),
         .OUT_range(forwardRange_c[i])
     );
+    `else
+    wire[NUM_ENTRIES-1:0] mask = ($signed(endSqN - baseIndex) >= NUM_ENTRIES) ? {NUM_ENTRIES{1'b1}} :
+        (1 << IDX_LEN'(endSqN - baseIndex)) - 1;
+    assign forwardRange_c[i] = {NUM_ENTRIES'(0), mask} << baseIndex[IDX_LEN-1:0];
+    `endif
 end
 endgenerate
 
@@ -147,14 +156,39 @@ always_comb begin
         end
     end
 
+    `ifdef SQ_LINEAR
+    for (integer i = 0; i < 2 * NUM_ENTRIES; i=i+1) begin
+
+        integer ii = i % NUM_ENTRIES;
+
+        if (entries[ii].addrAvail &&
+            entries[ii].addr == lookupAddr[h][31:2] &&
+            (forwardRange_c[h][i] || (i < NUM_ENTRIES && entryReady_r[ii])) &&
+            !`IS_MMIO_PMA_W(entries[ii].addr)
+        ) begin
+
+            if (entries[ii].loaded) begin
+
+                for (integer j = 0; j < 4; j=j+1)
+                    if (entries[ii].wmask[j]) begin
+                        lookupData[h][j*8 +: 8] = entries[ii].data[j*8 +: 8];
+                        lookupMask[h][j] = 1;
+                    end
+            end
+            else if ((entries[ii].wmask & readMask[h]) != 0) lookupConflict[h] = 1;
+        end
+    end
+    `else
     for (integer i = 0; i < 4; i=i+1)
         if (lookupMaskIter[h][outputIdx][i])
             lookupData[h][i*8 +: 8] = lookupDataIter[h][outputIdx][i*8 +: 8];
 
     lookupMask[h] = lookupMask[h] | lookupMaskIter[h][outputIdx];
     lookupConflict[h] = |lookupConflictList[h];
+    `endif
 end
 
+`ifndef SQ_LINEAR
 // This generates circular logic to iterate through the StoreQueue for forwarding data to loads.
 // Circular logic is necessary to efficiently iterate through a circular buffer (which the SQ is).
 // If tooling does not support this, it might be necessary to make the SQ a shift register again
@@ -198,6 +232,7 @@ always_comb begin
     end
 end
 endgenerate
+`endif
 
 wire[IDX_LEN-1:0] baseIndexI = baseIndex[IDX_LEN-1:0];
 wire[IDX_LEN-1:0] comStSqNI = IN_comStSqN[IDX_LEN-1:0];
