@@ -66,7 +66,6 @@ always_comb begin
     aguUOp_c.fetchOffs = IN_uop.fetchOffs;
     aguUOp_c.isLrSc = 0;
     aguUOp_c.compressed = IN_uop.compressed;
-    aguUOp_c.exception = AGU_NO_EXCEPTION;
     aguUOp_c.valid = IN_uop.valid && (IN_uop.fu == FU_AGU || IN_uop.fu == FU_ATOMIC);
 
     if (IN_uop.opcode < LSU_SC_W) begin // is load
@@ -283,9 +282,7 @@ end
 
 wire[31:0] phyAddr = IN_vmem.sv32en ? {IN_tlb.ppn, issUOp_c.addr[11:0]} : issUOp_c.addr; // super is already handled in TLB
 Flags exceptFlags;
-AGU_Exception except;
 always_comb begin
-    except = AGU_NO_EXCEPTION;
     exceptFlags = FLAGS_NONE;
 
     // Cache Management Ops are encoded with wmask 0 and
@@ -296,11 +293,9 @@ always_comb begin
     if (IN_vmem.sv32en && IN_tlb.hit &&
         (IN_tlb.pageFault || IsPermFault(IN_tlb.rwx, IN_tlb.user, issUOp_c.isLoad, issUOp_c.isStore))
     ) begin
-        except = AGU_PAGE_FAULT;
         exceptFlags = issUOp_c.isStore ? FLAGS_ST_PF : FLAGS_LD_PF;
     end
     else if ((!`IS_LEGAL_ADDR(phyAddr) || IN_tlb.accessFault) && !(IN_vmem.sv32en && !IN_tlb.hit)) begin
-        except = AGU_ACCESS_FAULT;
         exceptFlags = issUOp_c.isStore ? FLAGS_ST_AF : FLAGS_LD_AF;
     end
 
@@ -310,13 +305,11 @@ always_comb begin
             0: ;
             1: begin
                 if (phyAddr[0]) begin
-                    except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_ST_MA;
                 end
             end
             default: begin
                 if (phyAddr[0] || phyAddr[1]) begin
-                    except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_ST_MA;
                 end
             end
@@ -327,13 +320,11 @@ always_comb begin
             0: ;
             1: begin
                 if (phyAddr[0]) begin
-                    except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_LD_MA;
                 end
             end
             default: begin
                 if (phyAddr[0] || phyAddr[1]) begin
-                    except = AGU_ADDR_MISALIGN;
                     exceptFlags = FLAGS_LD_MA;
                 end
             end
@@ -343,7 +334,6 @@ always_comb begin
     // Previous exception has highest priority.
     if (issResUOp_c.flags != FLAGS_NONE) begin
         exceptFlags = issResUOp_c.flags;
-        except = AGU_NO_EXCEPTION;
     end
 end
 
@@ -356,7 +346,7 @@ always_comb begin
 
     if (!rst && issUOp_c.valid &&
         (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0) &&
-        (IN_vmem.sv32en && except == AGU_NO_EXCEPTION && !IN_tlb.hit)
+        (IN_vmem.sv32en && exceptFlags == FLAGS_NONE && !IN_tlb.hit)
     ) begin
         tlbMiss = 1;
         TMQ_enqueue = 1;
@@ -415,7 +405,7 @@ always_ff@(posedge clk) begin
                     doIssue = 0;
                 end
 
-                if (except != AGU_NO_EXCEPTION) begin
+                if (exceptFlags != FLAGS_NONE) begin
                     OUT_tvalProv.valid <= 1;
                     OUT_tvalProv.sqN <= issUOp_c.sqN;
                     OUT_tvalProv.tval <= issUOp_c.addr;
@@ -442,7 +432,6 @@ always_ff@(posedge clk) begin
                 if (exceptFlags == FLAGS_NONE) begin
                     OUT_aguOp <= issUOp_c;
                     OUT_aguOp.earlyLoadFailed <= IN_stall;
-                    OUT_aguOp.exception <= except;
                     if (IN_vmem.sv32en)
                         OUT_aguOp.addr <= phyAddr;
                 end

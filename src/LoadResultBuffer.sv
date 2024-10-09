@@ -126,13 +126,6 @@ always_comb begin
         OUT_uop.tagDst = outLMQ_c.tagDst;
         OUT_uop.sqN = outLMQ_c.sqN;
 
-        case (outLMQ_c.exception)
-            AGU_NO_EXCEPTION: OUT_uop.flags = FLAGS_NONE;
-            AGU_ADDR_MISALIGN: OUT_uop.flags = FLAGS_LD_MA;
-            AGU_ACCESS_FAULT: OUT_uop.flags = FLAGS_LD_AF;
-            AGU_PAGE_FAULT: OUT_uop.flags = FLAGS_LD_PF;
-        endcase
-
         case (outLMQ_c.size)
             0: OUT_uop.result =
                 {{24{outLMQ_c.sext ? outLMQ_c.data[8*(outLMQ_c.addr[1:0])+7] : 1'b0}},

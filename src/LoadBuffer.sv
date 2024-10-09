@@ -33,7 +33,6 @@ localparam TAG_SIZE = $bits(SqN) - $clog2(NUM_ENTRIES);
 
 typedef struct packed
 {
-    AGU_Exception exception;
     SqN storeSqN;
     SqN sqN;
     Tag tagDst;
@@ -77,7 +76,7 @@ always_comb begin
         OUT_uopLd[h] = 'x;
         OUT_uopLd[h].valid = 0;
 
-        nonSpeculative[h] = IN_uop[h].valid && `IS_MMIO_PMA(IN_uop[h].addr) && IN_uop[h].exception == AGU_NO_EXCEPTION;
+        nonSpeculative[h] = IN_uop[h].valid && `IS_MMIO_PMA(IN_uop[h].addr);
         delayLoad[h] = nonSpeculative[h] || IN_uop[h].earlyLoadFailed;
 
         // If it needs forwarding from current cycle's store, we also delay the load.
@@ -86,7 +85,6 @@ always_comb begin
                 if (IN_uop[h].valid && IN_uop[h].isLoad && $signed(IN_uop[i].loadSqN - IN_uop[h].loadSqN) <= 0 &&
                     IN_uop[i].valid && IN_uop[i].isStore &&
                     (!IN_uop[i].doNotCommit || IN_uop[i].loadSqN != IN_uop[h].loadSqN) &&
-                    IN_uop[h].exception == AGU_NO_EXCEPTION &&
                     IN_uop[h].addr[31:2] == IN_uop[i].addr[31:2] &&
                         (IN_uop[i].size == 2 ||
                         (IN_uop[i].size == 1 && (IN_uop[h].size > 1 || IN_uop[h].addr[1] == IN_uop[i].addr[1])) ||
@@ -109,7 +107,6 @@ always_comb begin
             OUT_uopAGULd[h].atomic = IN_uop[h].isLoad && IN_uop[h].isStore;
             OUT_uopAGULd[h].doNotCommit = IN_uop[h].doNotCommit;
             OUT_uopAGULd[h].external = 0;
-            OUT_uopAGULd[h].exception = IN_uop[h].exception;
             OUT_uopAGULd[h].isMMIO = `IS_MMIO_PMA(IN_uop[h].addr);
             OUT_uopAGULd[h].valid = IN_uop[h].valid;
         end
@@ -446,7 +443,6 @@ always_ff@(posedge clk) begin
                         lateLoadUOp[i].atomic <= e.atomic;
                         lateLoadUOp[i].doNotCommit <= e.doNotCommit;
                         lateLoadUOp[i].external <= 0;
-                        lateLoadUOp[i].exception <= e.exception;
                         lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(e.addr);
                         lateLoadUOp[i].valid <= 1;
                     end
@@ -475,7 +471,6 @@ always_ff@(posedge clk) begin
                             lateLoadUOp[i].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
                             lateLoadUOp[i].doNotCommit <= IN_uop[i].doNotCommit;
                             lateLoadUOp[i].external <= 0;
-                            lateLoadUOp[i].exception <= IN_uop[i].exception;
                             lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(IN_uop[i].addr);
                             lateLoadUOp[i].valid <= 1;
 
@@ -491,7 +486,6 @@ always_ff@(posedge clk) begin
             if (IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
 
                 reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
-                entries[index].exception <= IN_uop[i].exception;
                 entries[index].storeSqN <= IN_uop[i].storeSqN;
                 entries[index].sqN <= IN_uop[i].sqN;
                 entries[index].tagDst <= IN_uop[i].tagDst;
