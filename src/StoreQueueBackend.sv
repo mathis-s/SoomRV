@@ -251,7 +251,7 @@ always_ff@(posedge clk) begin
             mask = evicted[evInsert.idx].wmask | fusedUOp_r.wmask;
             data = evicted[evInsert.idx].data;
             for (integer i = 0; i < AXI_BWIDTH; i=i+1)
-                if (fusedUOp_r.wmask[i] || fusedUOp_r.wmask[i] == 0)
+                if (fusedUOp_r.wmask[i] || fusedUOp_r.wmask == 0)
                     data[i*8+:8] = fusedUOp_r.data[i*8+:8];
 
             evicted[evInsert.idx].data <= data;
