@@ -828,6 +828,7 @@ typedef struct packed
     RegT data;
     logic[31:0] addr;
     logic[3:0] wmask;
+    logic isMgmt;
     logic valid;
 } SQ_UOp;
 
@@ -837,6 +838,7 @@ typedef struct packed
     logic[`AXI_WIDTH-1:0] data;
     logic[`AXI_WIDTH/8-1:0] wmask;
     logic isMMIO;
+    logic isMgmt;
     StNonce_t nonce;
     StID_t id;
     logic valid;

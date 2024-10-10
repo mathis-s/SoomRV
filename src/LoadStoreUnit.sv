@@ -464,7 +464,7 @@ always_comb begin
             if (st.isMMIO) begin
                 // nothing to do for MMIO
             end
-            else if (st.wmask == 0) begin
+            else if (st.isMgmt) begin
                 // Management Ops
                 if (cacheTableHit) begin
                     miss[i].valid = 1;

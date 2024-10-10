@@ -23,6 +23,7 @@ typedef struct packed
     logic[`AXI_WIDTH-1:0] data;
     logic[29:0] addr;
     logic[`AXI_WIDTH/8-1:0] wmask;
+    logic isMgmt;
 
     logic issued;
     StNonce_t nonce;
@@ -69,11 +70,13 @@ always_comb begin
         fusedUOp_c.valid = 1;
         fusedUOp_c.nonce = 0;
         fusedUOp_c.issued = 0;
+        fusedUOp_c.isMgmt = 0;
 
-        if (`IS_MMIO_PMA(IN_uop[0].addr)) begin
+        if (`IS_MMIO_PMA(IN_uop[0].addr) || IN_uop[0].isMgmt) begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask);
             fusedUOp_c.addr = IN_uop[0].addr[31:2];
             fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data);
+            fusedUOp_c.isMgmt = IN_uop[0].isMgmt;
         end
         else begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
@@ -139,15 +142,19 @@ always_comb begin
 end
 
 logic mmioOpInEv;
+logic mgmtOpInEv;
 logic anyInEv;
 always_comb begin
     mmioOpInEv = 0;
+    mgmtOpInEv = 0;
     anyInEv = 0;
     for (integer i = 0; i < NUM_EVICTED; i=i+1)
         if (evicted[i].valid) begin
             anyInEv = 1;
-           if (`IS_MMIO_PMA_W(evicted[i].addr))
-            mmioOpInEv = 1;
+            if (`IS_MMIO_PMA_W(evicted[i].addr))
+                mmioOpInEv = 1;
+            if (evicted[i].isMgmt)
+                mgmtOpInEv = 1;
         end
 end
 
@@ -156,7 +163,7 @@ IdxN evInsert;
 always_comb begin
     evInsert = IdxN'{valid: 0, default: 'x};
 
-    if (!(mmioOpInEv && `IS_MMIO_PMA_W(fusedUOp_r.addr)))
+    if (!(mmioOpInEv && `IS_MMIO_PMA_W(fusedUOp_r.addr)) && !mgmtOpInEv)
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
             if ((evicted[i].valid &&
                  evicted[i].addr[29:AXI_BWIDTH_E-2] == fusedUOp_r.addr[29:AXI_BWIDTH_E-2]) ||
@@ -231,6 +238,7 @@ always_ff@(posedge clk) begin
             OUT_uopSt.addr <= {evicted[reIssue.idx].addr, 2'b0};
             OUT_uopSt.data <= evicted[reIssue.idx].data;
             OUT_uopSt.wmask <= evicted[reIssue.idx].wmask;
+            OUT_uopSt.isMgmt <= evicted[reIssue.idx].isMgmt;
             OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssue.idx].addr);
         end
 
@@ -243,7 +251,7 @@ always_ff@(posedge clk) begin
             mask = evicted[evInsert.idx].wmask | fusedUOp_r.wmask;
             data = evicted[evInsert.idx].data;
             for (integer i = 0; i < AXI_BWIDTH; i=i+1)
-                if (fusedUOp_r.wmask[i])
+                if (fusedUOp_r.wmask[i] || fusedUOp_r.wmask[i] == 0)
                     data[i*8+:8] = fusedUOp_r.data[i*8+:8];
 
             evicted[evInsert.idx].data <= data;
@@ -262,6 +270,7 @@ always_ff@(posedge clk) begin
                 OUT_uopSt.addr <= {fusedUOp_r.addr, 2'b0};
                 OUT_uopSt.data <= data;
                 OUT_uopSt.wmask <= mask;
+                OUT_uopSt.isMgmt <= fusedUOp_r.isMgmt;
                 OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(fusedUOp_r.addr);
             end
 

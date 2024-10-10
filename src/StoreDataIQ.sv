@@ -214,6 +214,14 @@ always_ff@(posedge clk) begin
                 temp.offs = temp.avail[1] ? '0 : 'x;
 
 
+                // For cache management ops we encode the type of operation as store data via an immediate tag
+                if (enqCandidates[i].fu == FU_AGU &&
+                    enqCandidates[i].opcode >= LSU_CBO_CLEAN && enqCandidates[i].opcode <= LSU_CBO_FLUSH) begin
+                    temp.avail[0] = 1;
+                    temp.tags[0] = 7'h40 + Tag'(enqCandidates[i].opcode - LSU_CBO_CLEAN);
+                end
+
+
                 // Check if the result for this op is being broadcast in the current cycle
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
                     if (IN_resultValid[j]) begin

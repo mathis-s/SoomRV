@@ -284,6 +284,7 @@ always_comb begin
             deqPorts[i].data = entry.data;
             deqPorts[i].addr = {entry.addr, 2'b0};
             deqPorts[i].wmask = entry.wmask;
+            deqPorts[i].isMgmt = entry.wmask == 0;
             deqPorts[i].valid = 1;
         end
     end
