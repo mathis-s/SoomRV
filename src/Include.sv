@@ -485,7 +485,7 @@ typedef struct packed
     FetchID_t fetchID;
     logic wfi;
     logic taken;
-} DecodeBranchProv;
+} FetchBranchProv;
 
 typedef struct packed
 {
@@ -559,6 +559,14 @@ typedef struct packed
     logic is16bit;
     logic valid;
 } PD_Instr;
+
+typedef struct packed
+{
+    FetchID_t fetchID;
+    FetchOff_t fetchOffs;
+    logic wfi;
+    logic taken;
+} DecodeBranch;
 
 typedef struct packed
 {

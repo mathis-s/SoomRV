@@ -33,7 +33,7 @@ module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(
     output PCFileEntry OUT_pcFileEntry,
 
     // branch mispredict handling
-    output DecodeBranchProv OUT_decBranch,
+    output FetchBranchProv OUT_fetchBranch,
     output BTUpdate OUT_btUpdate,
     output ReturnDecUpdate OUT_retUpdate,
 
@@ -60,7 +60,7 @@ FetchOff_t BH_endOffset;
 
 logic BH_newPredTaken;
 FetchOff_t BH_newPredPos;
-DecodeBranchProv BH_decBranch;
+FetchBranchProv BH_decBranch;
 BranchHandler branchHandler
 (
     .clk(clk),
@@ -353,10 +353,10 @@ end
 always_ff@(posedge clk) OUT_memc <= rst ? MemController_Req'{cmd: MEMC_NONE, default: 'x} : OUT_memc_c;
 
 always_comb begin
-    OUT_decBranch = BH_decBranch;
+    OUT_fetchBranch = BH_decBranch;
 
     if (cacheMiss || tlbMiss) begin
-        OUT_decBranch = DecodeBranchProv'{
+        OUT_fetchBranch = FetchBranchProv'{
             taken: 1,
             fetchID: fetch1.fetchID,
             fetchOffs: fetch1.pc[1+:$bits(FetchOff_t)],

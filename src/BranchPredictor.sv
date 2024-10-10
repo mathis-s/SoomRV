@@ -8,7 +8,7 @@ module BranchPredictor
     input wire en1,
 
     output wire OUT_stall,
-    input DecodeBranchProv IN_mispr,
+    input FetchBranchProv IN_mispr,
 
     // IF interface
     input wire IN_pcValid,

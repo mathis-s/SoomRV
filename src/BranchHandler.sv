@@ -8,7 +8,7 @@ module BranchHandler#(parameter NUM_INST=8)
     input IFetchOp IN_op,
     input wire[NUM_INST-1:0][15:0] IN_instrs,
 
-    output DecodeBranchProv OUT_decBranch,
+    output FetchBranchProv OUT_decBranch,
     output BTUpdate OUT_btUpdate,
     output ReturnDecUpdate OUT_retUpdate,
     output logic OUT_endOffsValid,
@@ -217,7 +217,7 @@ always_comb begin
 end
 
 // Generate Outputs
-DecodeBranchProv decBranch_c;
+FetchBranchProv decBranch_c;
 BTUpdate btUpdate_c;
 ReturnDecUpdate retUpd_c;
 logic endOffsValid;
@@ -226,7 +226,7 @@ FetchOff_t newPredPos_c;
 logic newPredTaken_c;
 
 always_comb begin
-    OUT_decBranch = DecodeBranchProv'{taken: 0, default: 'x};
+    OUT_decBranch = FetchBranchProv'{taken: 0, default: 'x};
     //OUT_btUpdate = BTUpdate'{valid: 0, default: 'x};
     OUT_retUpdate = ReturnDecUpdate'{valid: 0, default: 'x};
     OUT_endOffsValid = 0;
@@ -255,7 +255,7 @@ end
 
 always_comb begin
 
-    decBranch_c = DecodeBranchProv'{taken: 0, default: 'x};
+    decBranch_c = FetchBranchProv'{taken: 0, default: 'x};
     btUpdate_c = BTUpdate'{valid: 0, default: 'x};
     retUpd_c = ReturnDecUpdate'{valid: 0, default: 'x};
 

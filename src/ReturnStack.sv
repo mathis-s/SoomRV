@@ -22,7 +22,7 @@ module ReturnStack
     output wire[30:0] OUT_lateRetAddr,
 
     input RetStackIdx_t IN_recoveryIdx,
-    input DecodeBranchProv IN_mispr,
+    input FetchBranchProv IN_mispr,
 
     output RetStackIdx_t OUT_curIdx,
     output PredBranch OUT_predBr,

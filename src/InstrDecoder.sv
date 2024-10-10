@@ -206,6 +206,7 @@ module InstrDecoder
 
     input wire IN_enCustom,
 
+    output DecodeBranch OUT_decBranch,
     output D_UOp OUT_uop[NUM_UOPS-1:0]
 );
 
@@ -217,8 +218,11 @@ Instr16 i16;
 I32 i32;
 
 D_UOp uopsComb[NUM_UOPS-1:0];
+DecodeBranch decBranch;
 
 always_comb begin
+
+    decBranch = DecodeBranch'{taken: 0, default: 'x};
 
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
 
@@ -228,8 +232,7 @@ always_comb begin
 
         uop = 0;
         invalidEnc = 1;
-        //uop.pc = {IN_instrs[i].pc, 1'b0};
-        uop.valid = IN_instrs[i].valid && en;
+        uop.valid = IN_instrs[i].valid && en && !decBranch.taken;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[$bits(FetchOff_t)-1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
 
@@ -248,9 +251,7 @@ always_comb begin
             default:      uop.imm = 0;
         endcase
 
-        if (IN_instrs[i].valid && en) begin
-
-            reg isWFI = 0;
+        if (uop.valid) begin
 
             if (IN_instrs[i].predInvalid) begin
                 // A branch was predicted that is impossible considering actual instruction boundaries
@@ -286,7 +287,7 @@ always_comb begin
                                     uop.rs2 = 0;
                                     uop.rd = 0;
                                     uop.immB = 1;
-                                    isWFI = 1;
+                                    decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                     invalidEnc = 0;
                                 end
                                 else if (instr.rs2 == 5'b00010 && instr.rs1 == 0 && instr.rd == 0) begin
@@ -294,13 +295,13 @@ always_comb begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_SRET;
                                         invalidEnc = 0;
-                                        isWFI = 1;
+                                        decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                     end
                                     else if (instr.funct7 == 7'b0011000) begin
                                         uop.fu = FU_CSR;
                                         uop.opcode = CSR_MRET;
                                         invalidEnc = 0;
-                                        isWFI = 1;
+                                        decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                     end
                                 end
                                 else if (instr.funct7 == 7'b0001000 && instr.rs2 == 5'b00101 && instr.rs1 == 0 && instr.rd == 0) begin
@@ -308,13 +309,14 @@ always_comb begin
                                         // WFI
                                         uop.fu = FU_RN;
                                         invalidEnc = 0;
-                                        isWFI = 1;
+                                        decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                     end
                                 end
                                 else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
                                     uop.fu = FU_TRAP;
                                     uop.opcode = TRAP_V_SFENCE_VMA;
                                     invalidEnc = 0;
+                                    decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                 end
                                 else if (instr.funct7 == 7'b0001011 && instr.rd == 0) begin
                                     // sinval.vma
@@ -537,30 +539,34 @@ always_comb begin
                             uop.opcode = INT_SYS;
                             uop.imm = {28'bx, FLAGS_FENCE};
                             invalidEnc = 0;
+                            decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                         end
-                        // cbo.inval -> runs as store op, invalidates to instruction after itself
+                        // cbo.inval
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 0) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_INVAL;
                             uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                             uop.rs2 = 0;
+                            decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                         end
-                        // cbo.clean -> runs as store op
+                        // cbo.clean
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 1) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_CLEAN;
                             uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                             uop.rs2 = 0;
+                            decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                         end
-                        // cbo.flush -> runs as store op, invalidates to instruction after itself
+                        // cbo.flush
                         else if (instr.funct3 == 3'b010 && instr.rd == 0 && instr[31:20] == 2) begin
                             invalidEnc = 0;
                             uop.opcode = LSU_CBO_FLUSH;
                             uop.fu = FU_AGU;
                             uop.rs1 = instr.rs1;
                             uop.rs2 = 0;
+                            decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                         end
                     end
                     `OPC_REG_IMM: begin
@@ -1522,6 +1528,7 @@ always_comb begin
                         uop.opcode = TRAP_BREAK;
                         uop.fu = FU_TRAP;
                         invalidEnc = 0;
+                        decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                     end
                 end
             end
@@ -1530,6 +1537,8 @@ always_comb begin
         if (invalidEnc) begin
             uop.opcode = TRAP_ILLEGAL_INSTR;
             uop.fu = FU_TRAP;
+            if (uop.valid)
+                decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
         end
         uopsComb[i] = uop;
     end
@@ -1537,16 +1546,18 @@ end
 
 always_ff@(posedge clk) begin
 
+    OUT_decBranch <= DecodeBranch'{taken: 0, default: 'x};
     if (rst || IN_branch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;
         end
     end
-    else if (en) begin
+    else if (en && !OUT_decBranch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= uopsComb[i];
         end
+        OUT_decBranch <= decBranch;
     end
 end
 

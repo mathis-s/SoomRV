@@ -95,6 +95,7 @@ IFetch ifetch
 
     .IN_ROB_curFetchID(ROB_curFetchID),
     .IN_branch(branch),
+    .IN_decBranch(decBranch),
 
     .IN_clearICache(TH_clearICache),
     .IN_flushTLB(TH_flushTLB),
@@ -128,7 +129,7 @@ PreDecode preDec
     .rst(rst),
 
     .IN_en(!RN_stall && frontendEn),
-    .IN_invalidate(branch.taken),
+    .IN_invalidate(branch.taken || decBranch.taken),
     .OUT_full(PD_full),
 
     .IN_instrs(IF_instrs),
@@ -136,6 +137,7 @@ PreDecode preDec
 );
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
+DecodeBranch decBranch;
 InstrDecoder idec
 (
     .clk(clk),
@@ -148,7 +150,8 @@ InstrDecoder idec
 
     .IN_enCustom(1'b1),
 
-    .OUT_uop(DE_uop)
+    .OUT_uop(DE_uop),
+    .OUT_decBranch(decBranch)
 );
 
 wire sqNStall = ($signed((RN_nextSqN) - ROB_maxSqN) > -(`DEC_WIDTH));

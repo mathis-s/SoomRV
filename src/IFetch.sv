@@ -18,6 +18,8 @@ module IFetch
     input FetchID_t IN_ROB_curFetchID,
     input BranchProv IN_branch,
 
+    input DecodeBranch IN_decBranch,
+
     input wire IN_clearICache,
     input wire IN_flushTLB,
     input BTUpdate IN_btUpdates[NUM_BP_UPD-1:0],
@@ -52,11 +54,11 @@ RetStackIdx_t BP_rIdx;
 PCFileReadReq BP_pcFileRead;
 PCFileEntry BP_pcFileRData;
 
-DecodeBranchProv BP_mispr;
+FetchBranchProv BP_mispr;
 always_comb begin
-    BP_mispr = BH_decBranch;
+    BP_mispr = BH_fetchBranch;
     if (IN_branch.taken) begin
-        BP_mispr = DecodeBranchProv'{
+        BP_mispr = FetchBranchProv'{
             taken: IN_branch.taken,
             fetchID: IN_branch.fetchID,
             dst: IN_branch.dstPC[31:1],
@@ -64,6 +66,18 @@ always_comb begin
             retAct: IN_branch.retAct,
             fetchOffs: IN_branch.fetchOffs,
             tgtSpec: IN_branch.tgtSpec,
+            default: '0
+        };
+    end
+    else if (IN_decBranch.taken) begin
+        BP_mispr = FetchBranchProv'{
+            taken: IN_decBranch.taken,
+            fetchID: IN_decBranch.fetchID,
+            dst: 'x,
+            histAct: HIST_NONE,
+            retAct: RET_NONE,
+            fetchOffs: IN_decBranch.fetchOffs,
+            tgtSpec: BR_TGT_NEXT,
             default: '0
         };
     end
@@ -112,7 +126,7 @@ wire ifetchEn /* verilator public */ =
 
 wire icacheStall;
 
-DecodeBranchProv BH_decBranch;
+FetchBranchProv BH_fetchBranch;
 BTUpdate BH_btUpdate;
 ReturnDecUpdate BH_retDecUpd;
 
@@ -122,8 +136,8 @@ IFetchPipeline ifp
     .rst(rst),
     .IN_MEM_busy(IN_MEM_busy),
 
-    .IN_mispr(IN_branch.taken),
-    .IN_misprFetchID(IN_branch.fetchID),
+    .IN_mispr(IN_branch.taken || IN_decBranch.taken),
+    .IN_misprFetchID(IN_branch.taken ? IN_branch.fetchID : IN_decBranch.fetchID),
 
     .IN_ROB_curFetchID(IN_ROB_curFetchID),
     .IN_BP_fetchLimit(BP_fetchLimit),
@@ -142,7 +156,7 @@ IFetchPipeline ifp
     .OUT_pcFileAddr(PCF_writeAddr),
     .OUT_pcFileEntry(PCF_writeData),
 
-    .OUT_decBranch(BH_decBranch),
+    .OUT_fetchBranch(BH_fetchBranch),
     .OUT_btUpdate(BH_btUpdate),
     .OUT_retUpdate(BH_retDecUpd),
 
@@ -193,7 +207,7 @@ IFetchOp ifetchOp;
 always_comb begin
     ifetchOp = IFetchOp'{valid: 0, default: 'x};
 
-    if (IN_branch.taken || BH_decBranch.taken) begin
+    if (IN_branch.taken || BH_fetchBranch.taken) begin
     end
     else if (ifetchEn) begin
         ifetchOp.valid = 1;
@@ -228,16 +242,16 @@ always_ff@(posedge clk) begin
                 waitForInterrupt <= 0;
         end
 
-        if (IN_branch.taken || BH_decBranch.taken) begin
+        if (IN_branch.taken || BH_fetchBranch.taken || IN_decBranch.taken) begin
             if (IN_branch.taken) begin
                 waitForInterrupt <= 0;
             end
-            else if (BH_decBranch.taken) begin
-                // We also use WFI to temporarily disable the frontend
-                // for ops that always flush the pipeline
-                waitForInterrupt <= BH_decBranch.wfi;
-                if (BH_decBranch.wfi)
+            else begin
+                // We also use WFI to temporarily disable the frontend for ops that always flush the pipeline
+                if ((BH_fetchBranch.taken && BH_fetchBranch.wfi) || (IN_decBranch.taken && IN_decBranch.wfi)) begin
+                    waitForInterrupt <= 1;
                     wfiCount <= $bits(wfiCount)'(`WFI_DELAY - 1);
+                end
             end
             issuedInterrupt <= 0;
         end
