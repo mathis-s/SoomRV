@@ -36,7 +36,6 @@ typedef struct packed
     SqN storeSqN;
     SqN sqN;
     Tag tagDst;
-    logic[TAG_SIZE-1:0] highLdSqN;
     logic[1:0] size;
     logic[31:0] addr;
     logic atomic;
@@ -60,6 +59,12 @@ typedef struct packed
     logic[$clog2(NUM_ENTRIES)-1:0] idx;
     logic valid;
 } IdxN;
+
+function automatic SqN GetLoadSqN(logic[$clog2(NUM_ENTRIES)-1:0] idx);
+    logic[TAG_SIZE-1:0] hiBits = baseIndex[$clog2(NUM_ENTRIES)+:TAG_SIZE];
+    SqN rv = {idx >= baseIndex[0+:$clog2(NUM_ENTRIES)] ? hiBits : hiBits + 1'b1, idx};
+    return rv;
+endfunction
 
 LBEntry entries[NUM_ENTRIES-1:0];
 
@@ -291,7 +296,7 @@ always_ff@(posedge clk) begin
     else begin
         OUT_comLimit.valid <= loadRsv.valid;
         if (loadRsv.valid)
-            OUT_comLimit.sqN <= {entries[loadRsv.idx].highLdSqN, loadRsv.idx};
+            OUT_comLimit.sqN <= GetLoadSqN(loadRsv.idx);
     end
 end
 
@@ -437,7 +442,7 @@ always_ff@(posedge clk) begin
                         lateLoadUOp[i].signExtend <= e.signExtend;
                         lateLoadUOp[i].size <= e.size;
                         lateLoadUOp[i].storeSqN <= e.storeSqN;
-                        lateLoadUOp[i].loadSqN <= {e.highLdSqN, ltIssue[i].idx};
+                        lateLoadUOp[i].loadSqN <= GetLoadSqN(ltIssue[i].idx);
                         lateLoadUOp[i].tagDst <= e.tagDst;
                         lateLoadUOp[i].sqN <= e.sqN;
                         lateLoadUOp[i].atomic <= e.atomic;
@@ -495,7 +500,6 @@ always_ff@(posedge clk) begin
                 entries[index].size <= IN_uop[i].size;
                 entries[index].hasRsv <= IN_uop[i].isLrSc;
                 entries[index].doNotCommit <= IN_uop[i].doNotCommit;
-                entries[index].highLdSqN <= IN_uop[i].loadSqN[$bits(SqN)-1:$clog2(NUM_ENTRIES)];
                 entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
                 entries[index].nonSpec <= nonSpeculative[i];
                 entries[index].valid <= 1;

@@ -42,7 +42,6 @@ module ROB
 typedef struct packed
 {
     Tag tag;
-    logic sqN_msb;
     RegNm rd; // also used to differentiate between decode-time exceptions (these have no dst anyways)
     FetchOff_t fetchOffs;
     FetchID_t fetchID;
@@ -56,6 +55,12 @@ typedef struct packed
 } ROBEntry;
 
 localparam LENGTH = 1 << ID_LEN;
+
+function automatic SqN GetSqN(logic[ID_LEN-1:0] idx);
+    logic[0:0] hiBits = baseIndex[ID_LEN+:1];
+    SqN rv = {idx >= baseIndex[0+:ID_LEN] ? hiBits : hiBits + 1'b1, idx};
+    return rv;
+endfunction
 
 R_UOp rnUOpSorted[WIDTH_RN-1:0];
 always_comb begin
@@ -199,7 +204,7 @@ always_ff@(posedge clk) begin
                         reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
 
                         OUT_comUOp[i].valid <= 1;
-                        OUT_comUOp[i].sqN <= 'x;//{deqEntries[i].sqN_msb, id[5:0]};
+                        OUT_comUOp[i].sqN <= 'x;
                         OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
                         OUT_comUOp[i].tagDst <= deqEntries[i].tag;
                         OUT_comUOp[i].compressed <= (deqFlags[i] != FLAGS_NX);
@@ -255,9 +260,11 @@ always_ff@(posedge clk) begin
                     reg sendTrapUOp = timeoutCommit ||
                         (deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR));
 
+                    SqN sqN = GetSqN(id);
+
                     OUT_comUOp[i].rd <= deqEntries[i].rd;
                     OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                    OUT_comUOp[i].sqN <= {deqEntries[i].sqN_msb, id};
+                    OUT_comUOp[i].sqN <= sqN;
                     OUT_comUOp[i].isBranch <= isBranch;
                     OUT_comUOp[i].compressed <= deqEntries[i].compressed;
                     OUT_comUOp[i].valid <= 1;
@@ -284,7 +291,7 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.timeout <= timeoutCommit;
                         OUT_trapUOp.flags <= deqFlags[i];
                         OUT_trapUOp.tag <= deqEntries[i].tag;
-                        OUT_trapUOp.sqN <= {deqEntries[i].sqN_msb, id};
+                        OUT_trapUOp.sqN <= sqN;
                         OUT_trapUOp.loadSqN <= deqEntries[i].loadSqN;
                         OUT_trapUOp.storeSqN <= deqEntries[i].storeSqN;
                         OUT_trapUOp.rd <= deqEntries[i].rd;
@@ -365,7 +372,6 @@ always_ff@(posedge clk) begin
 
                 entry.tag = rnUOpSorted[i].tagDst;
                 entry.rd = rnUOpSorted[i].rd;
-                entry.sqN_msb = rnUOpSorted[i].sqN[ID_LEN];
                 entry.compressed = rnUOpSorted[i].compressed;
                 entry.fetchID = rnUOpSorted[i].fetchID;
                 entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
