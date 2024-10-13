@@ -48,8 +48,6 @@ typedef struct packed
     logic isFP;
     logic compressed;
 
-    SqN storeSqN;
-    SqN loadSqN;
     logic isLd;
     logic isSt;
 } ROBEntry;
@@ -134,6 +132,22 @@ always_comb begin
     end
 end
 
+// Recover load/store sqNs from instruction stream
+SqN storeSqN_r;
+SqN loadSqN_r;
+
+SqN storeSqNs_c[WIDTH:0];
+SqN loadSqNs_c[WIDTH:0];
+always_comb begin
+    storeSqNs_c[0] = storeSqN_r;
+    loadSqNs_c[0] = loadSqN_r;
+
+    for (integer i = 0; i < WIDTH; i=i+1) begin
+        storeSqNs_c[i+1] = storeSqNs_c[i] + SqN'(deqEntries[i].isSt ? 1 : 0);
+        loadSqNs_c[i+1] = loadSqNs_c[i] + SqN'(deqEntries[i].isLd ? 1 : 0);
+    end
+end
+
 reg stop;
 reg misprReplay;
 reg misprReplayEnd;
@@ -173,6 +187,8 @@ always_ff@(posedge clk) begin
         lastIndex <= 0;
         OUT_lastLoadSqN <= 0;
         OUT_lastStoreSqN <= 0;
+        loadSqN_r <= 0;
+        storeSqN_r <= -1;
     end
     else if (IN_branch.taken) begin
         if (IN_branch.flush)
@@ -230,17 +246,19 @@ always_ff@(posedge clk) begin
             for (integer i = 0; i < WIDTH; i=i+1) begin
 
                 reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
+                SqN loadSqN = loadSqNs_c[i];
+                SqN storeSqN = storeSqNs_c[i+1]; // +1 for pre-increment
 
                 reg timeoutCommit = (i == 0) && hangDetected;
 
                 reg isRenamed = (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex));
                 reg isExecuted = deqFlags[i] != FLAGS_NX;
                 reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
-                reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(deqEntries[i].loadSqN - IN_ldComLimit.sqN) < 0);
+                reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(loadSqN - IN_ldComLimit.sqN) < 0);
                 reg sqAllowsCommit = 1;
                 for (integer j = 0; j < NUM_AGUS-1; j=j+1)
                     sqAllowsCommit &= (!IN_stComLimit[j].valid ||
-                        $signed(deqEntries[i].storeSqN - IN_stComLimit[j].sqN) < 0);
+                        $signed(storeSqN - IN_stComLimit[j].sqN) < 0);
 
                 if (!temp && isRenamed &&
                     ((isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) || timeoutCommit)
@@ -275,9 +293,12 @@ always_ff@(posedge clk) begin
                     OUT_curFetchID <= deqEntries[i].fetchID;
 
                     if (!isException) begin
-                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= deqEntries[i].loadSqN + 1;
-                        if (deqEntries[i].isSt) OUT_lastStoreSqN <= deqEntries[i].storeSqN + 1;
+                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= loadSqN + 1;
+                        if (deqEntries[i].isSt) OUT_lastStoreSqN <= storeSqN + 1;
+                        storeSqN_r <= storeSqN;
+                        loadSqN_r <= loadSqNs_c[i+1];
                     end
+
 
                     if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
                         OUT_bpUpdate.valid <= 1;
@@ -292,8 +313,8 @@ always_ff@(posedge clk) begin
                         OUT_trapUOp.flags <= deqFlags[i];
                         OUT_trapUOp.tag <= deqEntries[i].tag;
                         OUT_trapUOp.sqN <= sqN;
-                        OUT_trapUOp.loadSqN <= deqEntries[i].loadSqN;
-                        OUT_trapUOp.storeSqN <= deqEntries[i].storeSqN;
+                        OUT_trapUOp.loadSqN <= loadSqN;
+                        OUT_trapUOp.storeSqN <= storeSqN;
                         OUT_trapUOp.rd <= deqEntries[i].rd;
                         OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
                         OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
@@ -376,8 +397,6 @@ always_ff@(posedge clk) begin
                 entry.fetchID = rnUOpSorted[i].fetchID;
                 entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
                 entry.fetchOffs = rnUOpSorted[i].fetchOffs;
-                entry.storeSqN = rnUOpSorted[i].storeSqN;
-                entry.loadSqN = rnUOpSorted[i].loadSqN;
                 entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
                 entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
 

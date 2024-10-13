@@ -232,7 +232,7 @@ always_comb begin
 
         uop = 0;
         invalidEnc = 1;
-        uop.valid = IN_instrs[i].valid && en && !decBranch.taken;
+        uop.valid = IN_instrs[i].valid && en && !decBranch.taken && !OUT_decBranch.taken;
         uop.fetchID = IN_instrs[i].fetchID;
         uop.fetchOffs = IN_instrs[i].pc[$bits(FetchOff_t)-1:0] + (instr.opcode[1:0] == 2'b11 ? 1 : 0);
 
@@ -1553,7 +1553,7 @@ always_ff@(posedge clk) begin
             OUT_uop[i].valid <= 0;
         end
     end
-    else if (en && !OUT_decBranch.taken) begin
+    else if (en) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= uopsComb[i];
         end
