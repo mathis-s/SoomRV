@@ -177,7 +177,7 @@ always_comb begin
         if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
         else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
         else if (isSc[i]) newTags[i] = {1'b1, 5'b0, !scSuccessful[i]};
-        else newTags[i] = 7'h40;
+        else newTags[i] = TAG_ZERO;
     end
 end
 TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
@@ -338,7 +338,7 @@ always_ff@(posedge clk) begin
                     availB:     RAT_lookupAvail[2*i+1],
                     tagB:       RAT_lookupSpecTag[2*i+1],
 
-                    tagC:       7'h40,
+                    tagC:       TAG_ZERO,
                     availC:     1'b1,
 
                     sqN:        RAT_issueSqNs[i],

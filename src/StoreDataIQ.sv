@@ -218,7 +218,7 @@ always_ff@(posedge clk) begin
                 if (enqCandidates[i].fu == FU_AGU &&
                     enqCandidates[i].opcode >= LSU_CBO_CLEAN && enqCandidates[i].opcode <= LSU_CBO_FLUSH) begin
                     temp.avail[0] = 1;
-                    temp.tags[0] = 7'h40 + Tag'(enqCandidates[i].opcode - LSU_CBO_CLEAN);
+                    temp.tags[0] = TAG_ZERO + Tag'(enqCandidates[i].opcode - LSU_CBO_CLEAN);
                 end
 
 

@@ -47,9 +47,6 @@ AGU_UOp aguUOp_c;
 TValProv tvalProv_c;
 reg isIllegalInstr_c;
 
-// do not commit atomics
-// sc.w needs tagDst = 7'h40
-
 always_comb begin
     aguUOp_c = 'x;
     aguUOp_c.valid = 0;
@@ -147,7 +144,7 @@ always_comb begin
                 aguUOp_c.isLrSc = 1;
                 aguUOp_c.wmask = 4'b1111;
                 // The 0/1 write is handled by rename, do not write anything.
-                aguUOp_c.tagDst = 7'h40;
+                aguUOp_c.tagDst = TAG_ZERO;
             end
 
             LSU_SW: begin
@@ -405,7 +402,7 @@ always_ff@(posedge clk) begin
                     doIssue = 0;
                 end
 
-                if (exceptFlags != FLAGS_NONE) begin
+                if (exceptFlags != FLAGS_NONE && exceptFlags != FLAGS_ORDERING) begin
                     OUT_tvalProv.valid <= 1;
                     OUT_tvalProv.sqN <= issUOp_c.sqN;
                     OUT_tvalProv.tval <= issUOp_c.addr;
@@ -429,7 +426,7 @@ always_ff@(posedge clk) begin
                 end
 
                 // Issue the AGU_UOp only if there's no exception
-                if (exceptFlags == FLAGS_NONE) begin
+                if (exceptFlags == FLAGS_NONE || exceptFlags == FLAGS_ORDERING) begin
                     OUT_aguOp <= issUOp_c;
                     OUT_aguOp.earlyLoadFailed <= IN_stall;
                     if (IN_vmem.sv32en)

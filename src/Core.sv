@@ -286,7 +286,7 @@ always_comb begin
         RF_writeEnable[i] = wbHasResult[i];
     end
 end
-RegFile#(32, 64, NUM_RF_READS, NUM_RF_WRITES, 1) rf
+RegFile#(32, 1 << $bits(RFTag), NUM_RF_READS, NUM_RF_WRITES, 1) rf
 (
     .clk(clk),
 

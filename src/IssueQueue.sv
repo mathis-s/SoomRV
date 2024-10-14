@@ -254,7 +254,7 @@ always_ff@(posedge clk) begin
                     // verilator lint_on SELRANGE
                 end
                 else
-                    OUT_uop.tagB <= 7'h40;
+                    OUT_uop.tagB <= TAG_ZERO;
 
                 OUT_uop.immB <= deqEntry.immB;
                 OUT_uop.sqN <= deqEntry.sqN;
@@ -330,7 +330,7 @@ always_ff@(posedge clk) begin
                         temp.fu = FU_INT;
                         temp.avail[0] = enqCandidates[i].availC;
                         temp.tags[0] = enqCandidates[i].tagC;
-                        temp.tagDst = 7'h40;
+                        temp.tagDst = TAG_ZERO;
                     end
                 end
 

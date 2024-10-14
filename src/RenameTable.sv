@@ -69,8 +69,8 @@ always_ff@(posedge clk) begin
     if (rst) begin
         // Registers initialized with 0
         for (integer i = 0; i < NUM_REGS; i=i+1) begin
-            comTag[i] <= 7'h40;
-            specTag[i] <= 7'h40;
+            comTag[i] <= TAG_ZERO;
+            specTag[i] <= TAG_ZERO;
         end
         tagAvail <= {NUM_TAGS{1'b1}};
     end

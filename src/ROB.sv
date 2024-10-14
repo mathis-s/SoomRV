@@ -326,7 +326,7 @@ always_ff@(posedge clk) begin
                         // so changing these is fine (does not leave us with inconsistent RAT/TB)
                         if (isException) begin
                             OUT_comUOp[i].rd <= 0;
-                            OUT_comUOp[i].tagDst <= 7'h40;
+                            OUT_comUOp[i].tagDst <= TAG_ZERO;
                         end
 
                         stop <= 1;
