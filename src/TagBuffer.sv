@@ -13,14 +13,14 @@ module TagBuffer
     input wire IN_mispredFlush,
 
     input wire IN_issueValid[NUM_ISSUE-1:0],
-    output reg[5:0] OUT_issueTags[NUM_ISSUE-1:0],
+    output RFTag OUT_issueTags[NUM_ISSUE-1:0],
     output reg OUT_issueTagsValid[NUM_ISSUE-1:0],
 
 
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire IN_commitNewest[NUM_COMMIT-1:0],
-    input wire[6:0] IN_RAT_commitPrevTags[NUM_COMMIT-1:0],
-    input wire[6:0] IN_commitTagDst[NUM_COMMIT-1:0]
+    input Tag IN_RAT_commitPrevTags[NUM_COMMIT-1:0],
+    input Tag IN_commitTagDst[NUM_COMMIT-1:0]
 );
 // half of tag space is for eliminating immediates
 localparam PTAG_LEN = $bits(Tag) - 1;
@@ -32,7 +32,7 @@ logic[NUM_TAGS-1:0] freeCom /*verilator public*/;
 reg mispredWait;
 
 reg issueTagsValid[NUM_ISSUE-1:0];
-reg[5:0] issueTags[NUM_ISSUE-1:0];
+RFTag issueTags[NUM_ISSUE-1:0];
 
 PriorityEncoder#(NUM_TAGS, NUM_ISSUE) penc
 (
@@ -97,24 +97,24 @@ always_ff@(posedge clk) begin
 
                 if (IN_mispredFlush) begin
                     if (!IN_mispr && !IN_commitTagDst[i][6]) begin
-                        free[IN_commitTagDst[i][5:0]] <= 0;
+                        free[RFTag'(IN_commitTagDst[i])] <= 0;
                     end
                 end
                 else begin
                     if (IN_commitNewest[i]) begin
                         if (!IN_RAT_commitPrevTags[i][6]) begin
-                            freeCom[IN_RAT_commitPrevTags[i][5:0]] <= 1;
-                            free[IN_RAT_commitPrevTags[i][5:0]] <= 1;
+                            freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                            free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
                         end
 
                         if (!IN_commitTagDst[i][6]) begin
-                            freeCom[IN_commitTagDst[i][5:0]] <= 0;
-                            free[IN_commitTagDst[i][5:0]] <= 0;
+                            freeCom[RFTag'(IN_commitTagDst[i])] <= 0;
+                            free[RFTag'(IN_commitTagDst[i])] <= 0;
                         end
                     end
                     else if (!IN_commitTagDst[i][6]) begin
-                        freeCom[IN_commitTagDst[i][5:0]] <= 1;
-                        free[IN_commitTagDst[i][5:0]] <= 1;
+                        freeCom[RFTag'(IN_commitTagDst[i])] <= 1;
+                        free[RFTag'(IN_commitTagDst[i])] <= 1;
                     end
                 end
             end

@@ -269,7 +269,7 @@ always_ff@(posedge clk) begin
 
                 if (IMM_BITS == 36 && HasFU(FU_BRANCH)) begin
                     // verilator lint_off SELRANGE
-                    OUT_uop.imm12 <= {deqEntry.imm[IMM_BITS-1-:4], deqEntry.imm[0], deqEntry.tags[1]};
+                    OUT_uop.imm12 <= {deqEntry.imm[IMM_BITS-1-:4], deqEntry.imm[0], deqEntry.tags[1][6:0]};
                     // verilator lint_on SELRANGE
                 end
                 else OUT_uop.imm12 <= 'x;
@@ -351,7 +351,7 @@ always_ff@(posedge clk) begin
                     assert(NUM_OPERANDS == 2);
 
                     // Use {imm[0], tags[1]} to encode 8 bits of imm12
-                    temp.tags[NUM_OPERANDS-1] = enqCandidates[i].imm12[6:0];
+                    temp.tags[NUM_OPERANDS-1] = Tag'(enqCandidates[i].imm12[6:0]);
                     temp.imm[0] = enqCandidates[i].imm12[7];
 
                     // rest goes into upper 4 bits of 36 (!) immediate bits

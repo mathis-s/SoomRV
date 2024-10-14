@@ -27,7 +27,7 @@ always_comb begin
     pwLdRes = RES_UOp'{valid: 0, default: 'x};
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit &&
-            IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == 7'h40
+            IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == TAG_ZERO
         ) begin
             pwLdRes = IN_ldResUOp[i];
         end

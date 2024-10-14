@@ -80,12 +80,12 @@ always_comb begin
 
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
         // All ports read at least one register
-        OUT_rfReadReq[i].tag = IN_uop[i].tagA[5:0];
+        OUT_rfReadReq[i].tag = RFTag'(IN_uop[i].tagA);
         OUT_rfReadReq[i].valid = IN_uop[i].valid && !IN_uop[i].tagA[$bits(Tag)-1];
 
         // INT ports read a second register as well
         if (i < NUM_ALUS) begin
-            OUT_rfReadReq[i+NUM_UOPS].tag = IN_uop[i].tagB[5:0];
+            OUT_rfReadReq[i+NUM_UOPS].tag = RFTag'(IN_uop[i].tagB);
             OUT_rfReadReq[i+NUM_UOPS].valid = IN_uop[i].valid && !IN_uop[i].tagB[$bits(Tag)-1];
         end
 

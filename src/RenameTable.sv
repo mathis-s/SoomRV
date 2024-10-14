@@ -6,7 +6,7 @@ module RenameTable
     parameter NUM_WB=4,
     parameter NUM_REGS=32,
     parameter ID_SIZE=$clog2(NUM_REGS),
-    parameter TAG_SIZE=7
+    parameter TAG_SIZE=$bits(Tag)
 )
 (
     input wire clk,

@@ -51,7 +51,7 @@ always_comb begin
 end
 
 wire RAT_lookupAvail[2*WIDTH_ISSUE-1:0];
-wire[6:0] RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
+Tag RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
 reg[4:0] RAT_lookupIDs[2*WIDTH_ISSUE-1:0];
 
 reg[4:0] RAT_issueIDs[WIDTH_ISSUE-1:0];
@@ -65,11 +65,11 @@ reg RAT_commitValid[WIDTH_COMMIT-1:0];
 reg TB_commitValid[WIDTH_COMMIT-1:0];
 
 reg[4:0] RAT_commitIDs[WIDTH_COMMIT-1:0];
-reg[6:0] RAT_commitTags[WIDTH_COMMIT-1:0];
-wire[6:0] RAT_commitPrevTags[WIDTH_COMMIT-1:0];
+Tag RAT_commitTags[WIDTH_COMMIT-1:0];
+Tag RAT_commitPrevTags[WIDTH_COMMIT-1:0];
 reg RAT_commitAvail[WIDTH_COMMIT-1:0];
 
-reg[6:0] RAT_wbTags[WIDTH_WR-1:0];
+Tag RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
 
@@ -169,14 +169,14 @@ rt
 );
 
 reg failSc;
-reg[5:0] TB_tags[WIDTH_ISSUE-1:0];
-reg[6:0] newTags[WIDTH_ISSUE-1:0];
+RFTag TB_tags[WIDTH_ISSUE-1:0];
+Tag newTags[WIDTH_ISSUE-1:0];
 reg TB_tagsValid[WIDTH_ISSUE-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
         if (TB_issueValid[i]) newTags[i] = {1'b0, TB_tags[i]};
-        else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, IN_uop[i].imm[5:0]};
-        else if (isSc[i]) newTags[i] = {1'b1, 5'b0, !scSuccessful[i]};
+        else if (IN_uop[i].fu == FU_RN) newTags[i] = {1'b1, RFTag'(IN_uop[i].imm)};
+        else if (isSc[i]) newTags[i] = {1'b1, {($bits(Tag)-2){1'b0}}, !scSuccessful[i]};
         else newTags[i] = TAG_ZERO;
     end
 end

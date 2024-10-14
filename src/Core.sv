@@ -281,7 +281,7 @@ RFTag[NUM_RF_WRITES-1:0] RF_writeAddress;
 RegT[NUM_RF_WRITES-1:0] RF_writeData;
 always_comb begin
     for (integer i = 0; i < NUM_RF_WRITES; i=i+1) begin
-        RF_writeAddress[i] = wbUOp[i].tagDst[5:0];
+        RF_writeAddress[i] = RFTag'(wbUOp[i].tagDst);
         RF_writeData[i] = wbUOp[i].result;
         RF_writeEnable[i] = wbHasResult[i];
     end
