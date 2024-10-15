@@ -38,7 +38,7 @@ RES_UOp wbUOp[NUM_PORTS_TOTAL-1:0] /*verilator public*/;
 reg wbHasResult[NUM_PORTS-1:0];
 always_comb begin
     for (integer i = 0; i < NUM_PORTS; i=i+1)
-        wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[6];
+        wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[$bits(Tag)-1];
 end
 
 CommitUOp comUOps[3:0] /*verilator public*/;

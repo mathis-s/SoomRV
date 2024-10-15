@@ -253,20 +253,6 @@ typedef enum logic[3:0]
     FU_TRAP
 } FuncUnit;
 
-parameter[15:0] FU_INT_OH      = 1 << FU_INT;
-parameter[15:0] FU_BRANCH_OH   = 1 << FU_BRANCH;
-parameter[15:0] FU_BITMANIP_OH = 1 << FU_BITMANIP;
-parameter[15:0] FU_AGU_OH      = 1 << FU_AGU;
-parameter[15:0] FU_MUL_OH      = 1 << FU_MUL;
-parameter[15:0] FU_DIV_OH      = 1 << FU_DIV;
-parameter[15:0] FU_FPU_OH      = 1 << FU_FPU;
-parameter[15:0] FU_FMUL_OH     = 1 << FU_FMUL;
-parameter[15:0] FU_FDIV_OH     = 1 << FU_FDIV;
-parameter[15:0] FU_RN_OH       = 1 << FU_RN;
-parameter[15:0] FU_ATOMIC_OH   = 1 << FU_ATOMIC;
-parameter[15:0] FU_CSR_OH      = 1 << FU_CSR;
-parameter[15:0] FU_TRAP_OH     = 1 << FU_TRAP;
-
 typedef enum logic[3:0]
 {
     // Flags that do not cause a flush or trap
@@ -313,7 +299,7 @@ typedef enum logic[1:0]
 typedef enum logic[1:0]
 {
     IF_FAULT_NONE = 0, IF_INTERRUPT, IF_ACCESS_FAULT, IF_PAGE_FAULT
-} IFetchFault;
+} IFetchFault /* public */;
 
 typedef enum logic[2:0]
 {
@@ -323,7 +309,7 @@ typedef enum logic[2:0]
     FLUSH_RETURN,
     FLUSH_IBRANCH,
     FLUSH_MEM_ORDER
-} FlushCause;
+} FlushCause /* public */;
 
 typedef enum logic[2:0]
 {
@@ -410,7 +396,7 @@ typedef struct packed
 typedef enum logic[1:0]
 {
     BT_JUMP, BT_CALL, BT_BRANCH, BT_RETURN
-} BranchType;
+} BranchType /* public */;
 
 typedef struct packed
 {
@@ -422,12 +408,12 @@ typedef struct packed
     logic taken;
     logic dirOnly;
     logic valid;
-} PredBranch;
+} PredBranch /* public */;
 
 typedef struct packed
 {
     logic taken;
-} BranchPredInfo;
+} BranchPredInfo /* public */;
 
 typedef struct packed
 {
@@ -445,19 +431,19 @@ typedef struct packed
 typedef enum logic[1:0]
 {
     RET_NONE, RET_PUSH, RET_POP
-} RetStackAction;
+} RetStackAction /* public */;
 
 typedef enum logic[2:0]
 {
     HIST_NONE, HIST_APPEND_0, HIST_APPEND_1, HIST_WRITE_0, HIST_WRITE_1
-} HistoryAction;
+} HistoryAction /* public */;
 
 typedef enum logic[1:0]
 {
     // We generally store the PC of the last instruction halfword,
     // so next is always +1 while offset to current may be 0 or -1.
     BR_TGT_MANUAL, BR_TGT_NEXT, BR_TGT_CUR16, BR_TGT_CUR32
-} BranchTargetSpec;
+} BranchTargetSpec /* public */;
 
 typedef struct packed
 {
@@ -474,7 +460,7 @@ typedef struct packed
     logic flush;
     FetchID_t fetchID;
     logic taken;
-} BranchProv;
+} BranchProv /* public */;
 
 typedef struct packed
 {
@@ -529,7 +515,7 @@ typedef struct packed
     RetStackIdx_t rIdx;
 
     logic valid;
-} IFetchOp;
+} IFetchOp /* public */;
 
 typedef struct packed
 {
@@ -544,7 +530,7 @@ typedef struct packed
     logic[7:0][15:0] instrs;
 
     logic valid;
-} IF_Instr;
+} IF_Instr /* public */;
 
 typedef struct packed
 {
@@ -560,7 +546,7 @@ typedef struct packed
     IFetchFault fetchFault;
     logic is16bit;
     logic valid;
-} PD_Instr;
+} PD_Instr /* public */;
 
 typedef struct packed
 {

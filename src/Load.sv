@@ -160,7 +160,7 @@ always_ff@(posedge clk) begin
                 operandIsReg[i] <= 2'b00;
 
                 outUOpReg[i].srcA <= 'x;
-                if (IN_uop[i].tagA[6]) begin
+                if (IN_uop[i].tagA[$bits(Tag)-1]) begin
                     outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
                 end
                 else if (matchValid[i]) begin
@@ -174,7 +174,7 @@ always_ff@(posedge clk) begin
                 if (IN_uop[i].immB || i >= NUM_ALUS) begin
                     outUOpReg[i].srcB <= IN_uop[i].imm;
                 end
-                else if (IN_uop[i].tagB[6]) begin
+                else if (IN_uop[i].tagB[$bits(Tag)-1]) begin
                     outUOpReg[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
                 end
                 else if (matchValid[NUM_UOPS+i]) begin

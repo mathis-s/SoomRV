@@ -84,6 +84,7 @@
 `define ENABLE_INT_DIV
 `define ENABLE_INT_MUL
 `define ENABLE_ZCB
+//`define SQ_LINEAR
 
 //`define DEBUG
 parameter HANG_COUNTER_LEN = 16;
@@ -94,6 +95,11 @@ parameter NUM_ALUS = 3;
 parameter NUM_BRANCH_PORTS = 2;
 
 
+parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
+parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
+parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
+parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
+
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
     8,
     8,
@@ -102,10 +108,24 @@ parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
     8
 };
 
+localparam[15:0] FU_INT_OH      = 1 << FU_INT;
+localparam[15:0] FU_BRANCH_OH   = 1 << FU_BRANCH;
+localparam[15:0] FU_BITMANIP_OH = 1 << FU_BITMANIP;
+localparam[15:0] FU_AGU_OH      = 1 << FU_AGU;
+localparam[15:0] FU_MUL_OH      = 1 << FU_MUL;
+localparam[15:0] FU_DIV_OH      = 1 << FU_DIV;
+localparam[15:0] FU_FPU_OH      = 1 << FU_FPU;
+localparam[15:0] FU_FMUL_OH     = 1 << FU_FMUL;
+localparam[15:0] FU_FDIV_OH     = 1 << FU_FDIV;
+localparam[15:0] FU_RN_OH       = 1 << FU_RN;
+localparam[15:0] FU_ATOMIC_OH   = 1 << FU_ATOMIC;
+localparam[15:0] FU_CSR_OH      = 1 << FU_CSR;
+localparam[15:0] FU_TRAP_OH     = 1 << FU_TRAP;
+
 // verilator lint_off WIDTHEXPAND
 parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
 
-    // NUM_ALUS x AGU Ports
+    // NUM_AGUS x AGU Ports
     FU_AGU_OH|FU_ATOMIC_OH,
     FU_AGU_OH|FU_ATOMIC_OH,
 
@@ -115,9 +135,3 @@ parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
     FU_INT_OH|FU_BRANCH_OH|FU_DIV_OH/*|FU_FPU_OH*/|FU_CSR_OH|FU_ATOMIC_OH
 };
 // verilator lint_on WIDTHEXPAND
-
-
-parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
-parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
-parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
-parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;

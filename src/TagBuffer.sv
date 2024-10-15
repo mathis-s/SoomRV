@@ -96,23 +96,23 @@ always_ff@(posedge clk) begin
             if (IN_commitValid[i]) begin
 
                 if (IN_mispredFlush) begin
-                    if (!IN_mispr && !IN_commitTagDst[i][6]) begin
+                    if (!IN_mispr && !IN_commitTagDst[i][$bits(Tag)-1]) begin
                         free[RFTag'(IN_commitTagDst[i])] <= 0;
                     end
                 end
                 else begin
                     if (IN_commitNewest[i]) begin
-                        if (!IN_RAT_commitPrevTags[i][6]) begin
+                        if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
                             freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
                             free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
                         end
 
-                        if (!IN_commitTagDst[i][6]) begin
+                        if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
                             freeCom[RFTag'(IN_commitTagDst[i])] <= 0;
                             free[RFTag'(IN_commitTagDst[i])] <= 0;
                         end
                     end
-                    else if (!IN_commitTagDst[i][6]) begin
+                    else if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
                         freeCom[RFTag'(IN_commitTagDst[i])] <= 1;
                         free[RFTag'(IN_commitTagDst[i])] <= 1;
                     end
