@@ -81,16 +81,17 @@ SpikeSimif::SpikeSimif(std::vector<uint32_t>& pram, Registers& registers, uint64
     processor->set_privilege(3, false);
     processor->enable_log_commits();
 
-    std::array csrs_to_reset = {CSR_MSTATUS,    CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MTVEC,
-                                CSR_MEPC,       CSR_MCAUSE,   CSR_MTVAL,      CSR_MIDELEG,       CSR_MIDELEGH,
-                                CSR_MEDELEG,    CSR_MIP,      CSR_MIPH,       CSR_MIE,           CSR_MIEH,
-                                CSR_SCOUNTEREN, CSR_SEPC,     CSR_SCAUSE,     CSR_STVEC,         CSR_STVAL,
-                                CSR_SATP,       CSR_SENVCFG,  CSR_MENVCFG,    CSR_MSCRATCH,      CSR_SSCRATCH};
+    std::array csrs_to_reset = {CSR_MSTATUS, CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MEPC,    CSR_MCAUSE,
+                                CSR_MTVAL,   CSR_MIDELEG,  CSR_MIDELEGH,   CSR_MEDELEG,       CSR_MIP,     CSR_MIPH,
+                                CSR_MIE,     CSR_MIEH,     CSR_SCOUNTEREN, CSR_SEPC,          CSR_SCAUSE,  CSR_STVAL,
+                                CSR_SATP,    CSR_SENVCFG,  CSR_MENVCFG,    CSR_MSCRATCH,      CSR_SSCRATCH};
 
     timeCSR = std::make_shared<basic_csr_t>(processor.get(), CSR_TIME, 0);
     timehCSR = std::make_shared<basic_csr_t>(processor.get(), CSR_TIMEH, 0);
     processor->get_state()->csrmap[CSR_TIME] = timeCSR;
     processor->get_state()->csrmap[CSR_TIMEH] = timehCSR;
+    processor->get_state()->mtvec->write(0x80000000);
+    processor->get_state()->stvec->write(0x80000000);
 
     for (auto csr : csrs_to_reset)
         processor->put_csr(csr, 0);
