@@ -8,17 +8,18 @@
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "model_headers.h"
-#include <cstdio>
-#include <unistd.h>
 #include <array>
 #include <asm-generic/ioctls.h>
+#include <cstdio>
 #include <cstring>
 #include <getopt.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
 #include "Inst.hpp"
-#include "Simif.hpp"
+#include "Fuzzer.hpp"
 #include "Registers.hpp"
+#include "Simif.hpp"
 #include "Utils.hpp"
 
 #define LEN(x) (sizeof((x)) / sizeof((x[0])))
@@ -55,9 +56,9 @@ SpikeSimif simif(pram, registers, wrap->main_time);
 
 void WriteRegister(uint32_t rid, uint32_t val)
 {
-    #ifdef COSIM
+#ifdef COSIM
     simif.write_reg(rid, val);
-    #endif
+#endif
     registers.WriteRegister(rid, val);
 }
 
@@ -84,7 +85,8 @@ void DumpState(FILE* stream, Inst inst)
 {
     auto core = wrap->top->Top->soc->core;
     fprintf(stream, "time=%lu\n", wrap->main_time);
-    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x sqn=%.2x\n", wrap->csr->minstret, inst.pc, inst.inst, state.lastComSqN);
+    fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x sqn=%.2x\n", wrap->csr->minstret, inst.pc, inst.inst,
+            state.lastComSqN);
     for (size_t j = 0; j < 4; j++)
     {
         for (size_t k = 0; k < 8; k++)
@@ -178,16 +180,13 @@ void LogPredec(Inst& inst)
         fprintf(konataFile, "L\t%u\t%u\t[%.5lu]%.8x (%.8x): %s\n", inst.id, 0, wrap->main_time, inst.pc, inst.inst,
                 simif.disasm(inst.inst).c_str());
 
-        fprintf(konataFile, "C\t-%lu\n",
-            (wrap->main_time-state.fetches[inst.fetchID].fetchTime)/2);
+        fprintf(konataFile, "C\t-%lu\n", (wrap->main_time - state.fetches[inst.fetchID].fetchTime) / 2);
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
         fprintf(konataFile, "C\t%lu\n",
-            (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime)/2);
+                (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime) / 2);
 
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "PD");
-        fprintf(konataFile, "C\t%lu\n",
-            (wrap->main_time - state.fetches[inst.fetchID].pdTime)/2);
-
+        fprintf(konataFile, "C\t%lu\n", (wrap->main_time - state.fetches[inst.fetchID].pdTime) / 2);
 
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
     }
@@ -266,7 +265,7 @@ uint32_t mostRecentPC;
 void LogInstructions()
 {
 #ifdef COSIM
-    //CheckStoreConsistency2();
+    // CheckStoreConsistency2();
 #endif
 
     auto core = wrap->top->Top->soc->core;
@@ -424,9 +423,9 @@ void LogInstructions()
                     state.pd[i].pc = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 124 - 12 - 31 - 32, 31) << 1;
                     state.pd[i].inst = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 124 - 12 - 32, 32);
                     state.pd[i].fetchID = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 4, 5);
-                    state.pd[i].predTarget = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 4+5+3, 31) << 1;
-                    //state.pd[i].retIdx =
-                    //    ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
+                    state.pd[i].predTarget = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 4 + 5 + 3, 31) << 1;
+                    // state.pd[i].retIdx =
+                    //     ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
                     if ((state.pd[i].inst & 3) != 3)
                         state.pd[i].inst &= 0xffff;
 
@@ -462,6 +461,7 @@ struct Args
     bool restoreSave = 0;
     uint32_t deviceTreeAddr = 0;
     bool logPerformance = 0;
+    size_t programBytes;
 };
 
 static void ParseArgs(int argc, char** argv, Args& args)
@@ -523,7 +523,8 @@ void Initialize(int argc, char** argv, Args& args)
                     args.progFile)
                        .c_str()) != 0)
             abort();
-        if (system(TOOLCHAIN "ld --no-warn-rwx-segments --no-eh-frame-hdr -Tlinker.ld test_programs/entry.o temp.o") != 0)
+        if (system(TOOLCHAIN "ld --no-warn-rwx-segments --no-eh-frame-hdr -Tlinker.ld test_programs/entry.o temp.o") !=
+            0)
             abort();
         args.progFile = "a.out";
     }
@@ -553,8 +554,10 @@ void Initialize(int argc, char** argv, Args& args)
             f = fopen("data.bin", "rb");
             if (!f)
                 abort();
-            numProgBytes += fread(&pramBytes[numProgBytes], sizeof(uint8_t), pram.size() * sizeof(uint32_t) - numProgBytes, f);
+            numProgBytes +=
+                fread(&pramBytes[numProgBytes], sizeof(uint8_t), pram.size() * sizeof(uint32_t) - numProgBytes, f);
             fclose(f);
+            args.programBytes = numProgBytes;
         }
 
         if (!args.memDumpFile.empty())
@@ -582,16 +585,14 @@ void Initialize(int argc, char** argv, Args& args)
 void LogPerf(VTop_Core* core)
 {
     std::array<uint64_t, 16> counters = {
-        wrap->csr->mcycle,       wrap->csr->minstret,     wrap->csr->mhpmcounter[3],
-        wrap->csr->mhpmcounter[4], wrap->csr->mhpmcounter[5],
+        wrap->csr->mcycle,          wrap->csr->minstret,        wrap->csr->mhpmcounter[3],
+        wrap->csr->mhpmcounter[4],  wrap->csr->mhpmcounter[5],
 
-        wrap->csr->mhpmcounter[6], wrap->csr->mhpmcounter[7],
-        wrap->csr->mhpmcounter[8], wrap->csr->mhpmcounter[9],
-        wrap->csr->mhpmcounter[10], wrap->csr->mhpmcounter[11],
+        wrap->csr->mhpmcounter[6],  wrap->csr->mhpmcounter[7],  wrap->csr->mhpmcounter[8],
+        wrap->csr->mhpmcounter[9],  wrap->csr->mhpmcounter[10], wrap->csr->mhpmcounter[11],
 
-        wrap->csr->mhpmcounter[12], wrap->csr->mhpmcounter[13],
-        wrap->csr->mhpmcounter[14], wrap->csr->mhpmcounter[15],
-        wrap->csr->mhpmcounter[16],
+        wrap->csr->mhpmcounter[12], wrap->csr->mhpmcounter[13], wrap->csr->mhpmcounter[14],
+        wrap->csr->mhpmcounter[15], wrap->csr->mhpmcounter[16],
 
     };
     static std::array<uint64_t, 16> lastCounters;
@@ -609,21 +610,18 @@ void LogPerf(VTop_Core* core)
     fprintf(stderr, "mispredicts:        %lu # %f MPKI \n", current[4], mpki);
     fprintf(stderr, "branch mispredicts: %lu # %f%%\n", current[3], bmrate);
     fprintf(stderr, "branches:           %lu\n", current[2]);
-    fprintf(stderr, "frontend stalled:   %lu # %f%%\n", current[12-1], 100.*current[12-1]/(4*current[0]));
-    fprintf(stderr, "backend stalled:    %lu # %f%%\n", current[13-1], 100.*current[13-1]/(4*current[0]));
-    fprintf(stderr, "store stalled:      %lu # %f%%\n", current[14-1], 100.*current[14-1]/(4*current[0]));
-    fprintf(stderr, "load stalled:       %lu # %f%%\n", current[15-1], 100.*current[15-1]/(4*current[0]));
-    fprintf(stderr, "ROB stalled:        %lu # %f%%\n", current[16-1], 100.*current[16-1]/(4*current[0]));
+    fprintf(stderr, "frontend stalled:   %lu # %f%%\n", current[12 - 1], 100. * current[12 - 1] / (4 * current[0]));
+    fprintf(stderr, "backend stalled:    %lu # %f%%\n", current[13 - 1], 100. * current[13 - 1] / (4 * current[0]));
+    fprintf(stderr, "store stalled:      %lu # %f%%\n", current[14 - 1], 100. * current[14 - 1] / (4 * current[0]));
+    fprintf(stderr, "load stalled:       %lu # %f%%\n", current[15 - 1], 100. * current[15 - 1] / (4 * current[0]));
+    fprintf(stderr, "ROB stalled:        %lu # %f%%\n", current[16 - 1], 100. * current[16 - 1] / (4 * current[0]));
 
     fprintf(stderr,
-        "%7lu # %2.0f ORD | %7lu # %2.0f BTK | %7lu # %2.0f BNT\n"
-        "%7lu # %2.0f RET | %7lu # %2.0f IBR | %7lu # %2.0f MEM\n",
-        current[5], 100.*current[5] / current[4],
-        current[6], 100.*current[6] / current[4],
-        current[7], 100.*current[7] / current[4],
-        current[8], 100.*current[8] / current[4],
-        current[9], 100.*current[9] / current[4],
-        current[10], 100.*current[10] / current[4]);
+            "%7lu # %2.0f ORD | %7lu # %2.0f BTK | %7lu # %2.0f BNT\n"
+            "%7lu # %2.0f RET | %7lu # %2.0f IBR | %7lu # %2.0f MEM\n",
+            current[5], 100. * current[5] / current[4], current[6], 100. * current[6] / current[4], current[7],
+            100. * current[7] / current[4], current[8], 100. * current[8] / current[4], current[9],
+            100. * current[9] / current[4], current[10], 100. * current[10] / current[4]);
 
     lastCounters = counters;
 }
@@ -631,59 +629,49 @@ void LogPerf(VTop_Core* core)
 void Save(std::string fileName)
 {
     wrap->save_model(fileName);
-    #if defined(COSIM) | defined(KONATA)
-        FILE* f = fopen((fileName + "_cosim").c_str(), "wb");
-        if (fwrite(pram.data(), sizeof(uint32_t), pram.size(), f) != pram.size())
-            abort();
-        if (fwrite(&state, sizeof(state), 1, f) != 1)
-            abort();
+#if defined(COSIM) | defined(KONATA)
+    FILE* f = fopen((fileName + "_cosim").c_str(), "wb");
+    if (fwrite(pram.data(), sizeof(uint32_t), pram.size(), f) != pram.size())
+        abort();
+    if (fwrite(&state, sizeof(state), 1, f) != 1)
+        abort();
 
-        for (auto* model : simif.models)
-            model->Save(f);
+    for (auto* model : simif.models)
+        model->Save(f);
 
-        fclose(f);
-    #endif
+    fclose(f);
+#endif
 }
 
 void Restore(std::string fileName)
 {
     wrap->restore_model(fileName);
-    #if defined(COSIM) | defined(KONATA)
-        FILE* f = fopen((fileName + "_cosim").c_str(), "rb");
-        if (fread(pram.data(), sizeof(uint32_t), pram.size(), f) != pram.size())
-            abort();
-        if (fread(&state, sizeof(state), 1, f) != 1)
-            abort();
+#if defined(COSIM) | defined(KONATA)
+    FILE* f = fopen((fileName + "_cosim").c_str(), "rb");
+    if (fread(pram.data(), sizeof(uint32_t), pram.size(), f) != pram.size())
+        abort();
+    if (fread(&state, sizeof(state), 1, f) != 1)
+        abort();
 
-        for (auto* model : simif.models)
-            model->Restore(f);
+    for (auto* model : simif.models)
+        model->Restore(f);
 
-        fclose(f);
+    fclose(f);
 
-        long offset = state.insts[state.lastComSqN].id;
-        for (size_t i = 0; i < 128; i++)
-            state.insts[i].id -= offset;
-        for (size_t i = 0; i < 4; i++)
-        {
-            state.pd[i].id -= offset;
-            state.de[i].id -= offset;
-        }
-        state.id -= offset;
-    #endif
+    long offset = state.insts[state.lastComSqN].id;
+    for (size_t i = 0; i < 128; i++)
+        state.insts[i].id -= offset;
+    for (size_t i = 0; i < 4; i++)
+    {
+        state.pd[i].id -= offset;
+        state.de[i].id -= offset;
+    }
+    state.id -= offset;
+#endif
 }
 
-int main(int argc, char** argv)
+void run_sim(Args& args, uint64_t timeout = 0)
 {
-    Verilated::commandArgs(argc, argv); // Remember args
-#ifdef TRACE
-    Verilated::traceEverOn(true);
-#endif
-
-    Args args;
-    Initialize(argc, argv, args);
-
-    wrap->Initial();
-
     wrap->top->clk = 0;
     simif.models = {
         new ReturnStack(wrap->top.get(), simif.processor.get()),
@@ -736,6 +724,9 @@ int main(int argc, char** argv)
         if ((wrap->main_time & 0xff) == 0)
             HandleInput();
 
+        if (wrap->top->clk == 1 && timeout != 0 && wrap->main_time > timeout)
+            break;
+
         // Hang Detection
         if ((wrap->main_time & (0x1ffff)) == 0 && !args.restoreSave && !core->ifetch->waitForInterrupt)
         {
@@ -771,5 +762,50 @@ int main(int argc, char** argv)
 
     LogPerf(core);
     printf("%lu cycles\n", wrap->main_time / 2);
+}
+
+void run_fuzz(Args& args)
+{
+    TestCase testCase;
+    testCase.load((uint8_t*)pram.data(), args.programBytes);
+
+    static Args argsC = args;
+
+    class FuzzerImpl : public Fuzzer
+    {
+        virtual RunResults run(TestCase const& test_case)
+        {
+            test_case.unpack((uint8_t*)pram.data(), pram.size());
+            wrap->main_time = 0;
+            new (&simif) SpikeSimif(pram, registers, wrap->main_time);
+            run_sim(argsC, 16384);
+            return RunResults{1, RunResultFlags::FINISHED};
+        }
+        virtual void report(TestCase const& test_case, RunResults const& results)
+        {
+        }
+    };
+
+    FuzzerImpl fuzzer;
+
+    auto tactics = std::vector<std::unique_ptr<Tactic>>();
+    tactics.push_back(std::make_unique<RandomBitflipTactic>());
+    auto strategy = std::unique_ptr<Strategy>(new Strategy(std::move(tactics)));
+    fuzzer.strategy = std::move(strategy);
+    fuzzer.fuzz(100, 42, testCase);
+}
+
+int main(int argc, char** argv)
+{
+    Verilated::commandArgs(argc, argv); // Remember args
+#ifdef TRACE
+    Verilated::traceEverOn(true);
+#endif
+
+    Args args;
+    Initialize(argc, argv, args);
+
+    wrap->Initial();
+    run_sim(args);
     wrap->Final();
 }
