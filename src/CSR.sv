@@ -13,7 +13,6 @@ module CSR#(parameter NUM_FLOAT_FLAG_UPD = 2)
 
     input ROB_PERFC_Info IN_perfcInfo,
     input wire IN_branchMispr,
-    input wire IN_mispredFlush,
 
     IF_CSR_MMIO.CSR IF_mmio,
 

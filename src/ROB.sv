@@ -101,7 +101,7 @@ reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
 Flags deqFlagPorts[WIDTH-1:0];
 always_comb begin
-    reg[ID_LEN-1:0] deqBase = (misprReplay && !IN_branch.taken) ? misprReplayIter[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
+    reg[ID_LEN-1:0] deqBase = (misprReplay_c.valid) ? misprReplay_c.iterSqN[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
 
     // Generate the sequence of SqNs that possibly can be committed in this cycle
     for (integer i = 0; i < WIDTH; i=i+1)
@@ -148,11 +148,58 @@ always_comb begin
     end
 end
 
-reg stop;
-reg misprReplay;
+
+typedef struct packed
+{
+    SqN endSqN;
+    SqN iterSqN;
+    logic valid;
+} MisprReplay;
+
+MisprReplay misprReplay_r;
+MisprReplay misprReplay_c;
+
+always_comb begin
+    misprReplay_c = misprReplay_r;
+    if (IN_branch.taken) begin
+        misprReplay_c = MisprReplay'{
+            endSqN: IN_branch.sqN,
+            iterSqN: baseIndex,
+            valid: 1
+        };
+    end
+end
+
+always_ff@(posedge clk) begin
+    if (rst) begin
+        misprReplay_r <= MisprReplay'{valid: 0, default: 'x};
+    end
+    else if (misprReplay_c.valid) begin
+        if (misprReplayEnd)
+            misprReplay_r <= MisprReplay'{valid: 0, default: 'x};
+        else begin
+            misprReplay_r <= misprReplay_c;
+            misprReplay_r.iterSqN <= misprReplay_c.iterSqN + WIDTH;
+        end
+    end
+end
+
+reg[WIDTH-1:0] misprReplayFwdMask;
 reg misprReplayEnd;
-SqN misprReplayIter;
-SqN misprReplayEndSqN;
+always_comb begin
+    for (integer i = 0; i < WIDTH; i=i+1) begin
+        SqN curSqN = (misprReplay_c.iterSqN + SqN'(i));
+        misprReplayFwdMask[i] = $signed(curSqN - misprReplay_c.endSqN) <= 0;
+
+        if (i == WIDTH-1)
+            misprReplayEnd = !misprReplayFwdMask[i] || $signed(curSqN - misprReplay_c.endSqN) == 0;
+    end
+end
+
+always_ff@(posedge clk)
+    OUT_mispredFlush <= rst ? 0 : (misprReplay_c.valid && (|misprReplayFwdMask));
+
+reg stop;
 
 reg didCommit;
 always_ff@(posedge clk) begin
@@ -180,8 +227,6 @@ always_ff@(posedge clk) begin
 
     if (rst) begin
         baseIndex <= 0;
-        misprReplay <= 0;
-        OUT_mispredFlush <= 0;
         OUT_curFetchID <= -1;
         stop <= 0;
         lastIndex <= 0;
@@ -190,51 +235,30 @@ always_ff@(posedge clk) begin
         loadSqN_r <= 0;
         storeSqN_r <= -1;
     end
-    else if (IN_branch.taken) begin
-        if (IN_branch.flush)
-            OUT_curFetchID <= IN_branch.fetchID;
-        misprReplay <= 1;
-        misprReplayEndSqN <= IN_branch.sqN;
-        misprReplayIter <= baseIndex;
-        misprReplayEnd <= 0;
-        lastIndex <= IN_branch.sqN + 1;
-        OUT_mispredFlush <= 0;
-    end
-
-    if (!rst) begin
+    else begin
         stop <= 0;
 
+        if (IN_branch.taken) begin
+            if (IN_branch.flush)
+                OUT_curFetchID <= IN_branch.fetchID;
+            lastIndex <= IN_branch.sqN + 1;
+        end
+
         // After mispredict, we replay all ops from last committed to the branch
-        // without actually committing them, to roll back the Rename Map.
-        if (misprReplay && !IN_branch.taken) begin
-
-            if (misprReplayEnd) begin
-                misprReplay <= 0;
-                OUT_mispredFlush <= 0;
-            end
-            else begin
-                OUT_mispredFlush <= 1;
-                for (integer i = 0; i < WIDTH; i=i+1) begin
-                    if ($signed((misprReplayIter + i[$bits(SqN)-1:0]) - misprReplayEndSqN) <= 0) begin
-
-                        reg[$clog2(LENGTH)-1:0] id = misprReplayIter[ID_LEN-1:0]+i[ID_LEN-1:0];
-
-                        OUT_comUOp[i].valid <= 1;
-                        OUT_comUOp[i].sqN <= 'x;
-                        OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
-                        OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                        OUT_comUOp[i].compressed <= (deqFlags[i] != FLAGS_NX);
-                        for (integer j = 0; j < WIDTH_WB; j=j+1)
-                            if (IN_wbUOps[j].valid && IN_wbUOps[j].tagDst == deqEntries[i].tag && !IN_wbUOps[j].tagDst[$bits(Tag)-1])
-                                OUT_comUOp[i].compressed <= 1;
-                    end
-                    else
-                        misprReplayEnd <= 1;
+        // without actually committing them to roll back the Rename Map.
+        if (misprReplay_c.valid) begin
+            for (integer i = 0; i < WIDTH; i=i+1) begin
+                if (misprReplayFwdMask[i]) begin
+                    OUT_comUOp[i].valid <= 1;
+                    OUT_comUOp[i].sqN <= 'x;
+                    OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
+                    OUT_comUOp[i].tagDst <= deqEntries[i].tag;
+                    OUT_comUOp[i].compressed <= 'x;
                 end
-                misprReplayIter <= misprReplayIter + WIDTH;
             end
         end
-        else if (!stop && !IN_branch.taken) begin
+
+        else if (!stop) begin
 
             reg temp = 0;
             reg temp2 = 0;

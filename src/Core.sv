@@ -488,7 +488,6 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
 
             .IN_perfcInfo(ROB_perfcInfo),
             .IN_branchMispr(BS_PERFC_branchMispr),
-            .IN_mispredFlush(mispredFlush),
 
             .IF_mmio(IF_csr_mmio),
 

@@ -26,7 +26,6 @@ module RenameTable
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire[ID_SIZE-1:0] IN_commitIDs[NUM_COMMIT-1:0],
     input wire[TAG_SIZE-1:0] IN_commitTags[NUM_COMMIT-1:0],
-    input wire IN_commitAvail[NUM_COMMIT-1:0],
     output reg[TAG_SIZE-1:0] OUT_commitPrevTags[NUM_COMMIT-1:0],
 
     input wire IN_wbValid[NUM_WB-1:0],

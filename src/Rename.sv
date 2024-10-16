@@ -67,7 +67,6 @@ reg TB_commitValid[WIDTH_COMMIT-1:0];
 reg[4:0] RAT_commitIDs[WIDTH_COMMIT-1:0];
 Tag RAT_commitTags[WIDTH_COMMIT-1:0];
 Tag RAT_commitPrevTags[WIDTH_COMMIT-1:0];
-reg RAT_commitAvail[WIDTH_COMMIT-1:0];
 
 Tag RAT_wbTags[WIDTH_WR-1:0];
 
@@ -129,8 +128,6 @@ always_comb begin
 
         RAT_commitIDs[i] = IN_comUOp[i].rd;
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
-        // Only using during mispredict replay
-        RAT_commitAvail[i] = IN_comUOp[i].compressed;
     end
 
 end
@@ -161,7 +158,6 @@ rt
     .IN_commitValid(RAT_commitValid),
     .IN_commitIDs(RAT_commitIDs),
     .IN_commitTags(RAT_commitTags),
-    .IN_commitAvail(RAT_commitAvail),
     .OUT_commitPrevTags(RAT_commitPrevTags),
 
     .IN_wbValid(IN_wbHasResult),
