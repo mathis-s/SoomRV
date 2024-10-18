@@ -462,6 +462,7 @@ struct Args
     uint32_t deviceTreeAddr = 0;
     bool logPerformance = 0;
     size_t programBytes;
+    bool fuzz = 0;
 };
 
 static void ParseArgs(int argc, char** argv, Args& args)
@@ -471,10 +472,11 @@ static void ParseArgs(int argc, char** argv, Args& args)
         {"backup-file", required_argument, 0, 'b'},
         {"dump-mem", required_argument, 0, 'o'},
         {"perfc", no_argument, 0, 'p'},
+        {"fuzz", no_argument, 0, 'f'},
     };
     int idx;
     int c;
-    while ((c = getopt_long(argc, argv, "d:b:o:p", long_options, &idx)) != -1)
+    while ((c = getopt_long(argc, argv, "d:b:o:pf", long_options, &idx)) != -1)
     {
         switch (c)
         {
@@ -482,6 +484,7 @@ static void ParseArgs(int argc, char** argv, Args& args)
             case 'b': args.backupFile = std::string(optarg); break;
             case 'o': args.memDumpFile = std::string(optarg); break;
             case 'p': args.logPerformance = 1; break;
+            case 'f': args.fuzz = 1; break;
             default: break;
         }
     }
@@ -502,7 +505,9 @@ static void ParseArgs(int argc, char** argv, Args& args)
                 "\t"
                 "--dump-mem, -o:    Dump memory into output file after loading binary.\n"
                 "\t"
-                "--perfc, p:        Periodically dump performance counter stats.\n",
+                "--perfc, -p:       Periodically dump performance counter stats.\n"
+                "\t"
+                "--fuzz, -f:        Enable fuzzing mode.\n",
                 argv[0]);
         // clang-format on
         exit(-1);
@@ -790,8 +795,7 @@ void run_fuzz(Args& args)
 
     auto tactics = std::vector<std::unique_ptr<Tactic>>();
     tactics.push_back(std::make_unique<RandomBitflipTactic>());
-    auto strategy = std::unique_ptr<Strategy>(new Strategy(std::move(tactics)));
-    fuzzer.strategy = std::move(strategy);
+    fuzzer.strategy = std::unique_ptr<Strategy>(new Strategy(std::move(tactics)));
     fuzzer.fuzz(100, 42, testCase);
 }
 
@@ -806,6 +810,9 @@ int main(int argc, char** argv)
     Initialize(argc, argv, args);
 
     wrap->Initial();
-    run_sim(args);
+    if (args.fuzz)
+        run_fuzz(args);
+    else
+        run_sim(args);
     wrap->Final();
 }
