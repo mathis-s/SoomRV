@@ -8,7 +8,7 @@
 #include <memory>
 
 #ifdef TRACE
-#include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 #endif
 
 class TopWrapper
@@ -16,7 +16,7 @@ class TopWrapper
   public:
     std::unique_ptr<VTop> top = std::make_unique<VTop>();
 #ifdef TRACE
-    std::unique_ptr<VerilatedVcdC> tfp = std::make_unique<VerilatedVcdC>();
+    std::unique_ptr<VerilatedFstC> tfp = std::make_unique<VerilatedFstC>();
 #endif
     uint64_t main_time = 0;
     VTop_Core* core = top->Top->soc->core;
@@ -64,7 +64,7 @@ class TopWrapper
     {
 #ifdef TRACE
         top->trace(tfp.get(), 99);
-        tfp->open("Top_tb.vcd");
+        tfp->open("Top_tb.fst");
 #endif
     }
 

@@ -911,13 +911,12 @@ always_ff@(posedge clk) begin
                             CSR_minstret: minstret[31:0] <= wdata;
                             CSR_minstreth: minstret[63:32] <= wdata;
 
-                            CSR_mcounteren: mcounteren[11:0] <= wdata[11:0];
+                            CSR_mcounteren: mcounteren[31:0] <= wdata[31:0];
                             CSR_mcountinhibit: begin
                                 // do not allow disabling counters in verilator
                                 // simulation for performance measurement.
                                 `ifndef VERILATOR
-                                mcountinhibit[0] <= wdata[0];
-                                mcountinhibit[5:2] <= wdata[5:2];
+                                mcountinhibit <= wdata;
                                 `endif
                             end
 
@@ -978,7 +977,7 @@ always_ff@(posedge clk) begin
                                 mstatus.spp <= temp.spp;
                             end
 
-                            CSR_scounteren: scounteren[5:0] <= wdata[5:0];
+                            CSR_scounteren: scounteren[31:0] <= wdata[31:0];
                             CSR_sepc: sepc[31:1] <= wdata[31:1];
                             CSR_sscratch: sscratch <= wdata;
                             CSR_scause: begin

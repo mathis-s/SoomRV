@@ -11,7 +11,7 @@ VERILATOR_FLAGS = \
 
 VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
-VERILATOR_TRACE_FLAGS = --trace --trace-structs --trace-max-width 128 --trace-max-array 256 -CFLAGS -DTRACE
+VERILATOR_TRACE_FLAGS = --trace --trace-fst --trace-structs --trace-max-width 128 --trace-max-array 256 -CFLAGS -DTRACE
 
 SRC_FILES = \
 	src/Config.sv \

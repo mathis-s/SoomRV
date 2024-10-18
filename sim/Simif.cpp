@@ -27,18 +27,17 @@ bool SpikeSimif::is_pass_thru_inst(const Inst& i)
             case 0b111:
             {
                 uint32_t csrID = i.inst >> 20;
+                if (csrID >= CSR_MCYCLE && csrID <= CSR_MHPMCOUNTER31) return true;
+                if (csrID >= CSR_MCYCLEH && csrID <= CSR_MHPMCOUNTER31H) return true;
+                if (csrID >= CSR_CYCLE && csrID <= CSR_HPMCOUNTER31) return true;
+                if (csrID >= CSR_CYCLEH && csrID <= CSR_HPMCOUNTER31H) return true;
+
                 switch (csrID)
                 {
                     case CSR_CYCLE:
                     case CSR_CYCLEH:
                     case CSR_MCYCLE:
                     case CSR_MCYCLEH:
-                    case CSR_MHPMCOUNTER3:
-                    case CSR_MHPMCOUNTER4:
-                    case CSR_MHPMCOUNTER5:
-                    case CSR_MHPMCOUNTER3H:
-                    case CSR_MHPMCOUNTER4H:
-                    case CSR_MHPMCOUNTER5H:
                     case CSR_MISA:
                     case CSR_TIME:
                     case CSR_TIMEH:
@@ -69,7 +68,7 @@ SpikeSimif::SpikeSimif(std::vector<uint32_t>& pram, Registers& registers, uint64
 {
     cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "M", DEFAULT_VARCH, false, endianness_little, 0,
                     {mem_cfg_t(0x80000000, 1 << 26)}, {0}, false, 0);
-    isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zbs_zicbom_zifencei_zcb", "MSU");
+    isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zbs_zicbom_zifencei_zcb_zihpm_zicntr", "MSU");
     processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stderr, std::cerr);
     harts[0] = processor.get();
 
