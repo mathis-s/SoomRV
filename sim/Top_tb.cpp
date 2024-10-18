@@ -37,8 +37,9 @@ struct
     FetchPacket fetches[32];
     FetchPacket fetch0;
     FetchPacket fetch1;
+    int curCycInstRet = 0;
 } state;
-int curCycInstRet = 0;
+
 std::vector<Store> inFlightStores;
 
 std::unique_ptr<TopWrapper> wrap = std::make_unique<TopWrapper>();
@@ -129,7 +130,8 @@ void LogCommit(Inst& inst)
     else
     {
         if (inst.incMinstret)
-            curCycInstRet++;
+            state.curCycInstRet++;
+        inst.minstret = wrap->csr->minstret + state.curCycInstRet;
 
         if (inst.rd != 0 && inst.flags < 6)
             registers.regTagOverride[inst.rd] = inst.tag;
@@ -253,7 +255,7 @@ void LogIssue(Inst& inst)
 
 void LogCycle()
 {
-    curCycInstRet = 0;
+    state.curCycInstRet = 0;
     registers.Cycle();
 #ifdef KONATA
     fprintf(konataFile, "C\t1\n");

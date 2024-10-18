@@ -22,6 +22,7 @@ struct Inst
     uint8_t flags;
     uint8_t interruptCause;
     uint8_t retIdx;
+    uint64_t minstret;
     bool incMinstret;
     bool interruptDelegate;
     enum InterruptType

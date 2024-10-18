@@ -223,6 +223,8 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         return -4;
     if (!modelsPass)
         return -5;
+    if  (inst.minstret != processor->get_state()->csrmap[CSR_MINSTRET]->read())
+        return -6;
 
     return 0;
 }
