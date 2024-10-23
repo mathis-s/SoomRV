@@ -81,17 +81,29 @@ class RandomBitflipTactic : public Tactic
 };
 
 // strategy is a collection of tactics, selects tactic(s) to execute
-class Strategy : public Tactic
+class Strategy
 {
+    struct CaseState
+    {
+        TestCase testCase;
+    };
+
   public:
     std::vector<std::unique_ptr<Tactic>> tactics;
+    std::vector<CaseState> testCaseStack;
     Strategy(std::vector<std::unique_ptr<Tactic>> tactics) : tactics(std::move(tactics))
     {
     }
-    virtual bool mutate(TestCase& test_case)
+    virtual void base_case(TestCase test_case)
     {
+        testCaseStack.push_back(CaseState{test_case});
+    }
+    virtual std::unique_ptr<TestCase> get_case()
+    {
+        auto testCase = std::make_unique<TestCase>(testCaseStack[0].testCase);
         auto& tactic = *tactics[rand() % tactics.size()];
-        return tactic.mutate(test_case);
+        tactic.mutate(*testCase);
+        return testCase;
     }
 };
 
@@ -111,7 +123,7 @@ struct RunResults
 class Fuzzer
 {
   public:
-    std::unique_ptr<Tactic> strategy;
+    std::unique_ptr<Strategy> strategy;
 
     virtual RunResults run(TestCase const& test_case) = 0;
     virtual void report(TestCase const& test_case, RunResults const& results) = 0;
@@ -119,16 +131,19 @@ class Fuzzer
     void fuzz(size_t iters, uint seed, TestCase test_case)
     {
         srand(seed);
+        strategy->base_case(test_case);
+
         for (size_t i = 0; i < iters; i++)
         {
+            auto cur_case = strategy->get_case();
             auto results = run(test_case);
             switch (results.flags)
             {
-                case RunResultFlags::ERROR: report(test_case, results);
+                case RunResultFlags::ERROR: report(*cur_case, results);
                 case RunResultFlags::TIMEOUT:
                 case RunResultFlags::FINISHED: break;
             }
-            strategy->mutate(test_case);
+
         }
     }
 };

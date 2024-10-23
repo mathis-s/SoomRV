@@ -5,6 +5,7 @@
 #include "models/BranchHistory.hpp"
 #include "models/ReturnStack.hpp"
 #include <memory>
+#include <regex>
 #define TOOLCHAIN "riscv32-unknown-linux-gnu-"
 
 #include "model_headers.h"
@@ -16,11 +17,14 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "Inst.hpp"
 #include "Fuzzer.hpp"
+#include "Inst.hpp"
 #include "Registers.hpp"
 #include "Simif.hpp"
 #include "Utils.hpp"
+#include "Debug.hpp"
+
+uint64_t DEBUG_TIME;
 
 #define LEN(x) (sizeof((x)) / sizeof((x[0])))
 
@@ -142,6 +146,13 @@ void LogCommit(Inst& inst)
         uint32_t startPC = simif.get_pc();
         if (int err = simif.cosim_instr(inst))
         {
+            if (err == 1)
+            {
+                fprintf(stdout, "%s test with return code %.8x\n",
+                    simif.riscvTestReturn == 1 ? "PASSED" : "FAILED", simif.riscvTestReturn);
+                Exit(0);
+            }
+
             fprintf(stdout, "ERROR %u (fetchID=%.2x, sqN=%.2x)\n", -err, inst.fetchID, inst.sqn);
             DumpState(stdout, inst);
 
@@ -463,6 +474,8 @@ struct Args
     bool logPerformance = 0;
     size_t programBytes;
     bool fuzz = 0;
+    bool testMode = 0;
+    uint64_t debugTime = -1;
 };
 
 static void ParseArgs(int argc, char** argv, Args& args)
@@ -472,11 +485,13 @@ static void ParseArgs(int argc, char** argv, Args& args)
         {"backup-file", required_argument, 0, 'b'},
         {"dump-mem", required_argument, 0, 'o'},
         {"perfc", no_argument, 0, 'p'},
+        {"test-mode", no_argument, 0, 't'},
         {"fuzz", no_argument, 0, 'f'},
+        {"debug-time", required_argument, 0, 'x'},
     };
     int idx;
     int c;
-    while ((c = getopt_long(argc, argv, "d:b:o:pf", long_options, &idx)) != -1)
+    while ((c = getopt_long(argc, argv, "d:b:o:pftx:", long_options, &idx)) != -1)
     {
         switch (c)
         {
@@ -485,6 +500,8 @@ static void ParseArgs(int argc, char** argv, Args& args)
             case 'o': args.memDumpFile = std::string(optarg); break;
             case 'p': args.logPerformance = 1; break;
             case 'f': args.fuzz = 1; break;
+            case 't': args.testMode = 1; break;
+            case 'x': args.debugTime = std::stoull(optarg); break;
             default: break;
         }
     }
@@ -507,6 +524,8 @@ static void ParseArgs(int argc, char** argv, Args& args)
                 "\t"
                 "--perfc, -p:       Periodically dump performance counter stats.\n"
                 "\t"
+                "--test-mode, -t:   Enable RISC-V test mode.\n"
+                "\t"
                 "--fuzz, -f:        Enable fuzzing mode.\n",
                 argv[0]);
         // clang-format on
@@ -520,8 +539,8 @@ void Initialize(int argc, char** argv, Args& args)
 
     if (args.progFile.find(".backup", args.progFile.size() - 7) != std::string::npos)
         args.restoreSave = true;
-    else if (args.progFile.find(".elf", args.progFile.size() - 4) == std::string::npos &&
-             args.progFile.find(".out", args.progFile.size() - 4) == std::string::npos)
+    else if (args.progFile.find(".s", args.progFile.size() - 2) != std::string::npos ||
+             args.progFile.find(".S", args.progFile.size() - 2) != std::string::npos)
     {
         if (system((std::string(TOOLCHAIN
                                 "as -mabi=ilp32 -march=rv32imac_zicsr_zfinx_zba_zbb_zbs_zicbom_zifencei -o temp.o ") +
@@ -536,34 +555,62 @@ void Initialize(int argc, char** argv, Args& args)
 
     if (!args.restoreSave)
     {
-        if (system(std::string(TOOLCHAIN "objcopy -I elf32-little -j .text -O binary " + args.progFile + " text.bin")
-                       .c_str()) != 0)
-            abort();
-        if (system(std::string(TOOLCHAIN "objcopy -I elf32-little -j .data -O binary " + args.progFile + " data.bin")
-                       .c_str()) != 0)
-            abort();
+        struct ELFSection
+        {
+            std::string name;
+            size_t addr;
+            size_t size;
+        };
+        std::vector<ELFSection> sections;
+        {
+            std::string cmd = std::string("readelf -S ") + args.progFile;
+            auto readelf = popen(cmd.c_str(), "r");
+            char* line;
+            size_t line_size;
+            while (getline(&line, &line_size, readelf) != -1)
+            {
+                auto regex =
+                    std::regex("\\s*\\[\\s*[0-9]+\\]\\s+([a-zA-Z\\.]+)\\s+([a-zA-Z]+)\\s+([0-9a-fA-F]+)\\s+([0-9a-"
+                               "fA-F]+)\\s+([0-9a-fA-F]+)");
+                std::string line_str(line);
+                free(line);
+                line = nullptr;
+
+                std::smatch smatch;
+                auto begin = std::sregex_iterator(line_str.begin(), line_str.end(), regex);
+                auto end = std::sregex_iterator();
+
+                if (begin != end)
+                {
+                    std::smatch match = *begin;
+                    if (match[2] == "PROGBITS")
+                        sections.push_back(
+                            ELFSection{match[1], std::stoul(match[3], nullptr, 16), std::stoul(match[5], nullptr, 16)});
+                }
+            }
+        }
 
         size_t numProgBytes = 0;
+
+
+        for (auto& section : sections)
         {
-            uint8_t* pramBytes = (uint8_t*)pram.data();
+            uint8_t* dstBytes = (uint8_t*)pram.data() + (section.addr & ~0x80000000);
+            size_t maxSize = pram.size() * sizeof(uint32_t) - (dstBytes - (uint8_t*)pram.data());
 
-            FILE* f = fopen("text.bin", "rb");
+            auto filename = section.name + ".bin";
+            auto cmd = (TOOLCHAIN "objcopy -I elf32-little -j ") + section.name +
+                       (" -O binary " + args.progFile + " " + filename);
+            if (system(cmd.c_str()) == -1)
+                abort();
+
+            FILE* f = fopen(filename.c_str(), "rb");
             if (!f)
                 abort();
-            numProgBytes = fread(pramBytes, sizeof(uint8_t), pram.size() * sizeof(uint32_t), f);
+            numProgBytes += fread(dstBytes, sizeof(uint8_t), maxSize, f);
             fclose(f);
-
-            if (numProgBytes & 3)
-                numProgBytes = (numProgBytes & ~3) + 4;
-
-            f = fopen("data.bin", "rb");
-            if (!f)
-                abort();
-            numProgBytes +=
-                fread(&pramBytes[numProgBytes], sizeof(uint8_t), pram.size() * sizeof(uint32_t) - numProgBytes, f);
-            fclose(f);
-            args.programBytes = numProgBytes;
         }
+        args.programBytes = numProgBytes;
 
         if (!args.memDumpFile.empty())
         {
@@ -689,6 +736,9 @@ void run_sim(Args& args, uint64_t timeout = 0)
 #endif
 
     auto core = wrap->core;
+
+    simif.riscvTestMode = args.testMode;
+    DEBUG_TIME = args.debugTime;
 
     if (args.restoreSave)
     {
