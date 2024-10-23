@@ -1,5 +1,6 @@
 #include "Simif.hpp"
 #include "TopWrapper.hpp"
+#include "Debug.hpp"
 
 bool SpikeSimif::compare_state()
 {
@@ -9,6 +10,7 @@ bool SpikeSimif::compare_state()
             printf("mismatch x%zu\n", i);
             return false;
         }
+
     return true;
 }
 bool SpikeSimif::is_pass_thru_inst(const Inst& i)
@@ -197,6 +199,14 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
         if (processor->debug)
             fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
+
+        if (riscvTestMode)
+        {
+            if (phy == 0x80001000 || phy == 0x80003000)
+                riscvTestReturn = std::get<1>(write);
+            else if ((phy == 0x80001004 || phy == 0x80003004) && (int)std::get<1>(write) == 0)
+                return 1;
+        }
         // if (phy >= 0x80000000)
         //     inFlightStores.push_back((Store){
         //         .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});
