@@ -409,6 +409,7 @@ assign OUT_fRoundMode = frm;
 
 assign OUT_dec.allowWFI = (priv == PRIV_MACHINE) || (priv == PRIV_SUPERVISOR && !mstatus.tw);
 assign OUT_dec.allowCustom = misa_X;
+assign OUT_dec.allowSFENCE = !mstatus.tvm;
 
 always_comb begin
 
@@ -561,7 +562,10 @@ always_comb begin
             if (mideleg[11]) rdata[11] = mie[11];
         end
 
-        CSR_satp: rdata = satp;
+        CSR_satp: begin
+            invalidCSR = mstatus.tvm;
+            rdata = satp;
+        end
         CSR_senvcfg: rdata = senvcfg;
 
         CSR_mhpmevent3: rdata = 3;
@@ -783,6 +787,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
                 else begin
                     mstatus.mie <= mstatus.mpie;
+                    mstatus.mpie <= 1;
                     priv <= mstatus.mpp;
                     mstatus.mpp <= PRIV_USER;
                     if (mstatus.mpp != PRIV_MACHINE)
@@ -796,6 +801,7 @@ always_ff@(posedge clk) begin
                     OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
                 else begin
                     mstatus.sie <= mstatus.spie;
+                    mstatus.spie <= 1;
                     priv <= PrivLevel'({1'b0, mstatus.spp});
                     mstatus.spp <= 1'b0;
                     mstatus.mprv <= 0;

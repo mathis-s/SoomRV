@@ -314,7 +314,7 @@ always_comb begin
                                 end
                                 else if (instr.funct7 == 7'b0001001 && instr.rd == 0) begin
                                     uop.fu = FU_TRAP;
-                                    uop.opcode = TRAP_V_SFENCE_VMA;
+                                    uop.opcode = IN_dec.allowSFENCE ? TRAP_V_SFENCE_VMA : TRAP_ILLEGAL_INSTR;
                                     invalidEnc = 0;
                                     decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
                                 end
@@ -475,22 +475,22 @@ always_comb begin
                         endcase
                     end
                     `OPC_CUST0: if (IN_dec.allowCustom) begin
-                        if (instr.funct3 == 3'b011 && instr.funct7[6:3] == 0) begin
-                            uop.rs1 = instr.rs1;
-                            uop.rs2 = instr.rs2;
-                            uop.rd = instr.rd;
-                            uop.fu = FU_AGU;
-                            uop.imm = 0;
-                            invalidEnc = 0;
-                            case (instr.funct7[2:0])
-                                0: uop.opcode = LSU_LB;
-                                1: uop.opcode = LSU_LH;
-                                2: uop.opcode = LSU_LW;
-                                4: uop.opcode = LSU_LBU;
-                                5: uop.opcode = LSU_LHU;
-                                default: invalidEnc = 1;
-                            endcase
-                        end
+                        //if (instr.funct3 == 3'b011 && instr.funct7[6:3] == 0) begin
+                        //    uop.rs1 = instr.rs1;
+                        //    uop.rs2 = instr.rs2;
+                        //    uop.rd = instr.rd;
+                        //    uop.fu = FU_AGU;
+                        //    uop.imm = 0;
+                        //    invalidEnc = 0;
+                        //    case (instr.funct7[2:0])
+                        //        0: uop.opcode = LSU_LB;
+                        //        1: uop.opcode = LSU_LH;
+                        //        2: uop.opcode = LSU_LW;
+                        //        4: uop.opcode = LSU_LBU;
+                        //        5: uop.opcode = LSU_LHU;
+                        //        default: invalidEnc = 1;
+                        //    endcase
+                        //end
                         //else begin
                         //    uop.rs1 = instr.rs1;
                         //    uop.rs2 = instr.rs2;
@@ -577,19 +577,19 @@ always_comb begin
                         uop.fu = FU_INT;
 
                         if (!((instr.funct3 == 1 && instr.funct7 != 0) ||
-                                    (instr.funct3 == 5 && (instr.funct7 != 7'h20 && instr.funct7 != 0)))) begin
-                            case (instr.funct3)
-                                0: uop.opcode = INT_ADD;
-                                1: uop.opcode = INT_SLL;
-                                2: uop.opcode = INT_SLT;
-                                3: uop.opcode = INT_SLTU;
-                                4: uop.opcode = INT_XOR;
-                                5: uop.opcode = (instr.funct7 == 7'h20) ? INT_SRA : INT_SRL;
-                                6: uop.opcode = INT_OR;
-                                7: uop.opcode = INT_AND;
-                            endcase
-
+                              (instr.funct3 == 5 && instr.funct7 != 7'h20 && instr.funct7 != 0))) begin
                             invalidEnc = 0;
+
+                            case (instr.funct3)
+                                3'd0: uop.opcode = INT_ADD;
+                                3'd1: uop.opcode = INT_SLL;
+                                3'd2: uop.opcode = INT_SLT;
+                                3'd3: uop.opcode = INT_SLTU;
+                                3'd4: uop.opcode = INT_XOR;
+                                3'd5: uop.opcode = (instr.funct7 == 7'h20) ? INT_SRA : INT_SRL;
+                                3'd6: uop.opcode = INT_OR;
+                                3'd7: uop.opcode = INT_AND;
+                            endcase
                         end
                         else if (instr.funct7 == 7'b0110000) begin
                             if (instr.funct3 == 3'b001) begin
@@ -1223,29 +1223,29 @@ always_comb begin
                     //    invalidEnc = 0;
                     //end
                     // c.lw with full-range address register
-                    else if (i16.cl.funct3 == 3'b011 && {i16.raw[12], i16.raw[5]} != 2'b01 && IN_dec.allowCustom) begin
-                        uop.opcode = LSU_LW;
-                        uop.fu = FU_AGU;
-                        uop.imm = {27'b0, i16.cl.imm2[1:0], i16.cl.imm[1], 2'b00};
-                        uop.rs1 = {i16.raw[12], i16.raw[5], i16.cl.rs1};
-                        uop.rd = {2'b01, i16.cl.rd};
-                        uop.immB = 1;
-                        invalidEnc = 0;
-                    end
+                    //else if (i16.cl.funct3 == 3'b011 && {i16.raw[12], i16.raw[5]} != 2'b01 && IN_dec.allowCustom) begin
+                    //    uop.opcode = LSU_LW;
+                    //    uop.fu = FU_AGU;
+                    //    uop.imm = {27'b0, i16.cl.imm2[1:0], i16.cl.imm[1], 2'b00};
+                    //    uop.rs1 = {i16.raw[12], i16.raw[5], i16.cl.rs1};
+                    //    uop.rd = {2'b01, i16.cl.rd};
+                    //    uop.immB = 1;
+                    //    invalidEnc = 0;
+                    //end
                     // c.lw r8 r8(r8)
-                    else if (i16.cl.funct3 == 3'b001 && IN_dec.allowCustom) begin
-                        uop.fu = FU_AGU;
-                        uop.rs2 = {2'b01, i16.raw[12:10]};
-                        uop.rs1 = {2'b01, i16.raw[9:7]};
-                        uop.rd =  {2'b01, i16.raw[4:2]};
-                        invalidEnc = 0;
-                        case (i16.raw[6:5])
-                            0: uop.opcode = LSU_LB;
-                            1: uop.opcode = LSU_LH;
-                            2: uop.opcode = LSU_LW;
-                            default: invalidEnc = 1;
-                        endcase
-                    end
+                    //else if (i16.cl.funct3 == 3'b001 && IN_dec.allowCustom) begin
+                    //    uop.fu = FU_AGU;
+                    //    uop.rs2 = {2'b01, i16.raw[12:10]};
+                    //    uop.rs1 = {2'b01, i16.raw[9:7]};
+                    //    uop.rd =  {2'b01, i16.raw[4:2]};
+                    //    invalidEnc = 0;
+                    //    case (i16.raw[6:5])
+                    //        0: uop.opcode = LSU_LB;
+                    //        1: uop.opcode = LSU_LH;
+                    //        2: uop.opcode = LSU_LW;
+                    //        default: invalidEnc = 1;
+                    //    endcase
+                    //end
                 end
                 else if (i16.raw[1:0] == 2'b01) begin
                     // c.j
@@ -1537,6 +1537,7 @@ always_comb begin
         if (invalidEnc) begin
             uop.opcode = TRAP_ILLEGAL_INSTR;
             uop.fu = FU_TRAP;
+            uop.rd = 0;
             if (uop.valid)
                 decBranch = DecodeBranch'{taken: 1, wfi: 1, fetchID: uop.fetchID, fetchOffs: uop.fetchOffs};
         end

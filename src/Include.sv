@@ -959,6 +959,7 @@ typedef struct packed
 {
     logic allowCustom;
     logic allowWFI;
+    logic allowSFENCE;
 } DecodeState;
 
 typedef struct packed

@@ -646,7 +646,7 @@ end
 // Cache Transfer State Machine
 enum logic[3:0]
 {
-    IDLE, FLUSH, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT
+    IDLE, FLUSH, FLUSH_READ0, FLUSH_READ1, FLUSH_WAIT, FLUSH_FINALIZE
 } state;
 
 // Place load in LoadResultBuffer or reactivate back in LoadBuffer via negative ack
@@ -831,7 +831,7 @@ end
 wire flushReady = !busy;
 wire flushActive = (
     state == FLUSH || state == FLUSH_WAIT ||
-    state == FLUSH_READ0 || state == FLUSH_READ1);
+    state == FLUSH_READ0 || state == FLUSH_READ1 || state == FLUSH_FINALIZE);
 assign OUT_busy = busy || flushQueued || flushActive;
 
 reg flushDone;
@@ -962,7 +962,7 @@ always_ff@(posedge clk) begin
             end
             FLUSH: begin
                 if (flushDone) begin
-                    state <= IDLE;
+                    state <= FLUSH_FINALIZE;
                     initialFlush <= 0;
                 end
                 else if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
@@ -980,6 +980,12 @@ always_ff@(posedge clk) begin
                     {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
                     if (flushAssocIdx == $clog2(`CASSOC)'(`CASSOC-1)) state <= FLUSH_READ0;
                 end
+            end
+            FLUSH_FINALIZE: begin
+                state <= IDLE;
+                for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
+                    if (IN_memc.transfers[i].valid)
+                        state <= FLUSH_FINALIZE;
             end
             default: state <= IDLE;
         endcase
