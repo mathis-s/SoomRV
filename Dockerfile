@@ -55,13 +55,12 @@ ENTRYPOINT ["/bin/bash"]
 CMD ["-c", \
     "cd /workspace && \
     git config --global --add safe.directory \\* && \
-    ln -s riscv-isa-sim /opt/riscv-isa-sim && \
+    mv /opt/riscv-isa-sim . && \
     make && \
     mkdir logs && \
     ./obj_dir/VTop test_programs/coremark.elf 1> >(tee logs/coremark.out) 2> >(tee logs/coremark.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3_no_inline.s 1> >(tee logs/dhry_1_O3_no_inline.out) 2> >(tee logs/dhry_1_O3_no_inline.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3.s 1> >(tee logs/dhry_1_O3.out) 2> >(tee logs/dhry_1_O3.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3_inline.s 1> >(tee logs/dhry_1_O3_inline.out) 2> >(tee logs/dhry_1_O3_inline.err) && \
-    (timeout 300 ./obj_dir/VTop test_programs/linux/linux_image.elf --device-tree=test_programs/linux/device_tree.dtb --perfc 1> >(tee logs/linux.out) 2> >(tee logs/linux.err) || true) && \
-    tar -czf logs.tar.gz logs \
+    (timeout 300 ./obj_dir/VTop test_programs/linux/linux_image.elf --device-tree=test_programs/linux/device_tree.dtb --perfc 1> >(tee logs/linux.out) 2> >(tee logs/linux.err) || true) \
     " ]
