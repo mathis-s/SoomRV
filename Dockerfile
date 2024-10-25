@@ -56,7 +56,7 @@ CMD ["-c", \
     "cd /workspace && \
     git config --global --add safe.directory \\* && \
     rm -rf riscv-isa-sim && \
-    ln -s riscv-isa-sim /opt/riscv-isa-sim && \
+    mv /opt/riscv-isa-sim . && \
     make && \
     mkdir logs && \
     ./obj_dir/VTop test_programs/coremark.elf 1> >(tee logs/coremark.out) 2> >(tee logs/coremark.err) && \
