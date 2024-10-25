@@ -565,8 +565,8 @@ void Initialize(int argc, char** argv, Args& args)
         {
             std::string cmd = std::string("readelf -S ") + args.progFile;
             auto readelf = popen(cmd.c_str(), "r");
-            char* line;
-            size_t line_size;
+            char* line = nullptr;
+            size_t line_size = 0;
             while (getline(&line, &line_size, readelf) != -1)
             {
                 auto regex =
