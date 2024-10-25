@@ -11,6 +11,8 @@ if len(sys.argv) > 1: test_dir = sys.argv[1]
 
 arr = os.popen(f"find {test_dir} -type f ! -size 0 -exec grep -IL . \"{{}}\" \\;").read().split('\n')
 
+print(arr)
+
 # we're running without a runtime, so no misaligned accesses.
 arr.remove(f"{test_dir}/rv32ui-p-ma_data")
 arr.remove(f"{test_dir}/rv32ui-v-ma_data")
