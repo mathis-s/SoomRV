@@ -19,6 +19,8 @@ categories = ["rv32ui", "rv32uc", "rv32si", "rv32mi"]
 
 binary = "./obj_dir/VTop"
 
+any_failed = False
+
 for category in categories:
     tests = [test for test in arr if test.find(category) != -1]
     for test in tests:
@@ -29,5 +31,9 @@ for category in categories:
             print(f" {Fore.GREEN}passed{Style.RESET_ALL}")
         else:
             print(f" {Fore.RED}failed{Style.RESET_ALL}:")
-            print(os.popen(f"{binary} -x 0 -t {test} | tail -n32").read())
+            print(os.popen(f"{binary} -x 0 -t {test} 2>&1 | tail -n32").read())
             print("\n")
+            any_failed = True
+
+if any_failed:
+    exit(-1)

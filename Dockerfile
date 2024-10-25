@@ -61,8 +61,8 @@ CMD ["-c", \
     rm -rf riscv-isa-sim && \
     mv /opt/riscv-isa-sim . && \
     make && \
-    python3 scripts/test_suite.py /opt/riscv-tests/isa && \
     mkdir logs && \
+    python3 scripts/test_suite.py /opt/riscv-tests/isa | tee test_suite.out && \
     ./obj_dir/VTop test_programs/coremark.elf 1> >(tee logs/coremark.out) 2> >(tee logs/coremark.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3_no_inline.s 1> >(tee logs/dhry_1_O3_no_inline.out) 2> >(tee logs/dhry_1_O3_no_inline.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3.s 1> >(tee logs/dhry_1_O3.out) 2> >(tee logs/dhry_1_O3.err) && \
