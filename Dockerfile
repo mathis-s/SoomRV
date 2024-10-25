@@ -48,7 +48,7 @@ RUN cd /opt && \
     git checkout 51de00886cd28a3cf9b85ee306fb2b5ee5ab550e && \
     rm -rf .git && \
     ./configure --with-xlen=32 --prefix=/opt/riscv/ && \
-    make RISCV_PREFIX=riscv32-unknown-linux-gnu- isa
+    make isa
 
 RUN riscv32-unknown-elf-gcc --version && verilator --version
 
