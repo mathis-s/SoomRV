@@ -547,7 +547,7 @@ void Initialize(int argc, char** argv, Args& args)
                     args.progFile)
                        .c_str()) != 0)
             abort();
-        if (system(TOOLCHAIN "ld --no-warn-rwx-segments --no-eh-frame-hdr -Tlinker.ld test_programs/entry.o temp.o") !=
+        if (system(TOOLCHAIN "ld --no-warn-rwx-segments -Tlinker.ld test_programs/entry.o temp.o") !=
             0)
             abort();
         args.progFile = "a.out";
