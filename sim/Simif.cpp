@@ -203,10 +203,7 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         if (riscvTestMode)
         {
             if (phy == 0x80001000 || phy == 0x80003000)
-            {
-                printf("%.8x\n", (int)std::get<1>(write));
                 riscvTestReturn = std::get<1>(write);
-            }
             else if ((phy == 0x80001004 || phy == 0x80003004) && (int)std::get<1>(write) == 0)
                 return 1;
         }
