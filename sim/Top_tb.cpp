@@ -6,7 +6,7 @@
 #include "models/ReturnStack.hpp"
 #include <memory>
 #include <regex>
-#define TOOLCHAIN "riscv32-unknown-linux-gnu-"
+#define TOOLCHAIN "riscv32-unknown-elf-"
 
 #include "model_headers.h"
 #include <array>
