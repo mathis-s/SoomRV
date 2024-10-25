@@ -50,7 +50,6 @@ RetRecQEntry rrqueue[RQSIZE-1:0]; // return addr recovery
 
 
 reg forwardRindex;
-RetStackAction recAct;
 
 wire[30:0] addrToPush = {IN_lastPC[30:$bits(FetchOff_t)], IN_branch.offs} + 1;
 
@@ -148,7 +147,6 @@ always_ff@(posedge clk) begin
             reg startRecovery = qindex != qindexEnd;
 
             forwardRindex <= 1;
-            recAct <= IN_mispr.retAct;
             recoveryInProgress <= startRecovery;
             recoveryID <= IN_mispr.fetchID;
             recoveryBase <= lastInvalComFetchID;

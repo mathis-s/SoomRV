@@ -140,7 +140,7 @@ always_ff@(posedge clk) begin
 
                 // jalr uses a different encoding
                 if ((i == 0 || i == 1) && IN_uop[i].fu == FU_BRANCH &&
-                    (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR)
+                    (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR || IN_uop[i].opcode == BR_V_RET)
                 ) begin
                     outUOpReg[i].imm <= 'x;
                     outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;

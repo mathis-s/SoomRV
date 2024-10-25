@@ -35,26 +35,6 @@ always_comb begin
     end
 end
 
-
-// Cache Block Ops special handling
-/*if (rnUOpSorted[i].fu == FU_AGU) begin
-    case (rnUOpSorted[i].opcode)
-        LSU_CBO_CLEAN: begin
-            entries[index].data <= {30'bx, 2'd0};
-            entries[index].loaded <= 1;
-        end
-        LSU_CBO_INVAL: begin
-            entries[index].data <= {30'bx, (IN_vmem.cbie == 3) ? 2'd1 : 2'd2};
-            entries[index].loaded <= 1;
-        end
-        LSU_CBO_FLUSH: begin
-            entries[index].data <= {30'bx, 2'd2};
-            entries[index].loaded <= 1;
-        end
-        default: ;
-    endcase
-end*/
-
 generate for (genvar i = 0; i < WIDTH; i=i+1) begin
 
     assign OUT_ready[i] = !(uopATO.valid && uopIQ.valid);

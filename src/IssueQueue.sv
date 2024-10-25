@@ -345,7 +345,8 @@ always_ff@(posedge clk) begin
 
                 // Special handling for jalr
                 if (HasFU(FU_BRANCH) && enqCandidates[i].fu == FU_BRANCH &&
-                    (enqCandidates[i].opcode == BR_V_JALR || enqCandidates[i].opcode == BR_V_JR)
+                    (enqCandidates[i].opcode == BR_V_JALR || enqCandidates[i].opcode == BR_V_JR ||
+                     enqCandidates[i].opcode == BR_V_RET)
                 ) begin
                     assert(IMM_BITS == 36);
                     assert(NUM_OPERANDS == 2);

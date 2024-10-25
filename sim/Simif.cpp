@@ -141,7 +141,7 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         processor->set_debug(true);
     uint32_t initialSpikePC = get_pc();
     uint32_t instSIM;
-
+    bool fetchFault = 0;
     try
     {
         instSIM = processor->get_mmu()->load_insn(initialSpikePC).insn.bits();
@@ -149,6 +149,7 @@ int SpikeSimif::cosim_instr(const Inst& inst)
     catch (mem_trap_t)
     {
         instSIM = 0;
+        fetchFault = 1;
     }
 
     // failed sc.w
@@ -182,8 +183,6 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         uint32_t phy = get_phy_addr(std::get<0>(read), LOAD);
         // if (phy == 0x83ff5c00) printf("[%lu] load sqn = %x\n", main_time, inst.sqn);
 
-        if (processor->debug)
-            fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
 
         phy &= ~3;
         // MMIO is passed through
@@ -215,7 +214,7 @@ int SpikeSimif::cosim_instr(const Inst& inst)
     bool instrEqual = ((instSIM & 3) == 3) ? instSIM == inst.inst : (instSIM & 0xFFFF) == (inst.inst & 0xFFFF);
     if (inst.pc != initialSpikePC)
         return -1;
-    if (!instrEqual)
+    if (!instrEqual && !fetchFault)
         return -2;
     if (!writeValid)
         return -3;

@@ -38,6 +38,7 @@ always_ff@(posedge clk)
 wire[30:0] finalHalfwPC = {IN_pcReadData.pc[30:$bits(FetchOff_t)], fetchOffs};
 always_comb begin
     OUT_trapInfo = trapInfo_r;
+    OUT_trapInfo.finalHalfwPC = {finalHalfwPC, 1'b0};
     case (trapPCSpec_r)
         BR_TGT_MANUAL: ;
         BR_TGT_NEXT: OUT_trapInfo.trapPC = {finalHalfwPC, 1'b0} + 2;
@@ -130,6 +131,7 @@ always_comb begin
                 if (IN_trapInstr.flags == FLAGS_XRET || IN_trapInstr.flags == FLAGS_ORDERING)
                     if (IN_trapControl.interruptPending) begin
                         trapInfo_c.valid = 1;
+                        trapInfo_c.finalHalfwPC = 'x;
 
                         if (IN_trapInstr.flags == FLAGS_XRET) begin
                             trapInfo_c.trapPC = {IN_trapControl.retvec, 1'b0};
@@ -208,6 +210,7 @@ always_comb begin
 
                 trapInfo_c.valid = 1;
                 trapInfo_c.trapPC = 'x;
+                trapInfo_c.finalHalfwPC = 'x;
                 trapPCSpec_c = IN_trapInstr.compressed ? BR_TGT_CUR16 : BR_TGT_CUR32;
                 trapInfo_c.cause = trapCause;
                 trapInfo_c.delegate = delegate;

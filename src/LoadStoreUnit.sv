@@ -33,7 +33,7 @@ module LoadStoreUnit
     input wire rst,
 
     input wire IN_flush,
-    input wire IN_SQ_empty,
+    input wire IN_storeBusy,
     output wire OUT_busy,
 
     input BranchProv IN_branch,
@@ -817,22 +817,13 @@ end
 // (otherwise we would need a separate write port to cache table)
 reg[SIZE-1:0] dirty;
 
-reg flushQueued;
 reg initialFlush;
-reg busy;
-always_comb begin
-    busy = 0;
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-        if (uopLd[i].valid || uopSt.valid || uopLd_0[i].valid || curLd[i].valid || stOps[0].valid || stOps[1].valid || !IN_SQ_empty || (OUT_ldAck[i].valid && OUT_ldAck[i].fail) || (OUT_stAck.valid && OUT_stAck.fail)) busy = 1;
-    end
-end
-
-
-wire flushReady = !busy;
+reg flushQueued;
+wire flushReady = !IN_storeBusy;
 wire flushActive = (
     state == FLUSH || state == FLUSH_WAIT ||
     state == FLUSH_READ0 || state == FLUSH_READ1 || state == FLUSH_FINALIZE);
-assign OUT_busy = busy || flushQueued || flushActive;
+assign OUT_busy = flushQueued || flushActive;
 
 reg flushDone;
 reg[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushIdx;
@@ -938,7 +929,7 @@ always_ff@(posedge clk) begin
                     end
                 end
 
-                if (!(|forwardMiss) && flushQueued && flushReady) begin
+                if (flushQueued && flushReady) begin
                     state <= FLUSH_WAIT;
                     flushQueued <= 0;
                     flushIdx <= 0;

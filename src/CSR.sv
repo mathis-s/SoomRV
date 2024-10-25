@@ -260,6 +260,12 @@ typedef enum logic[11:0]
     CSR_mhpmevent30=12'h33E,
     CSR_mhpmevent31=12'h33F,
 
+    CSR_tselect=12'h7A0,
+    CSR_tdata1=12'h7A1,
+    CSR_tdata2=12'h7A2,
+    CSR_tdata3=12'h7A3,
+    CSR_mcontext=12'h7A8,
+
     CSR_magic=12'hCC0
 } CSRAddr;
 
@@ -579,7 +585,12 @@ always_comb begin
         CSR_mvendorid,
         CSR_mconfigptr,
         CSR_mstatush,
-        CSR_mhartid: rdata = 0;
+        CSR_mhartid,
+        CSR_tselect,
+        CSR_tdata1,
+        CSR_tdata2,
+        CSR_tdata3,
+        CSR_mcontext: rdata = 0;
 
         // all unused perf counter stuff, also r/o zero
         CSR_hpmcounter6, CSR_hpmcounter7, CSR_hpmcounter8, CSR_hpmcounter9,
@@ -652,7 +663,7 @@ always_ff@(posedge clk) begin
             if (!IN_trapInfo.isInterrupt)
                 case (IN_trapInfo.cause)
                     RVP_TRAP_IF_PF,
-                    RVP_TRAP_IF_AF,
+                    RVP_TRAP_IF_AF: tval = IN_trapInfo.finalHalfwPC;
                     RVP_TRAP_BREAK: tval = IN_trapInfo.trapPC;
 
                     RVP_TRAP_LD_MA,

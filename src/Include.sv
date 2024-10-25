@@ -930,6 +930,7 @@ typedef struct packed
 typedef struct packed
 {
     logic[31:0] trapPC;
+    logic[31:0] finalHalfwPC;
     logic isInterrupt;
     TrapCause_t cause;
     logic delegate;

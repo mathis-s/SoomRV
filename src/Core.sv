@@ -28,7 +28,7 @@ assign OUT_dbg.stallPC = TH_stallPC;
 assign OUT_dbg.sqNStall = sqNStall;
 assign OUT_dbg.stSqNStall = 0;
 assign OUT_dbg.rnStall = RN_stall;
-assign OUT_dbg.memBusy = MEMSUB_busy;
+assign OUT_dbg.memBusy = MEM_busy;
 assign OUT_dbg.sqBusy = !SQ_empty || SQB_uop.valid;
 assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
@@ -88,7 +88,7 @@ IFetch ifetch
     .IN_en(ifetchEn),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
-    .IN_MEM_busy(MEMSUB_busy),
+    .IN_MEM_busy(MEM_busy),
 
     .IF_ict(IF_ict),
     .IF_icache(IF_icache),
@@ -703,7 +703,7 @@ LoadStoreUnit lsu
     .rst(rst),
 
     .IN_flush(TH_startFence),
-    .IN_SQ_empty(SQ_empty),
+    .IN_storeBusy(STORE_busy),
     .OUT_busy(LSU_busy),
 
     .IN_branch(branch),
@@ -776,7 +776,8 @@ ROB rob
     .OUT_mispredFlush(mispredFlush)
 );
 
-wire MEMSUB_busy = !SQ_empty || SQB_busy || LSU_busy;
+wire STORE_busy = !SQ_empty || SQB_busy;
+wire MEM_busy = STORE_busy || LSU_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;
@@ -796,7 +797,7 @@ TrapHandler trapHandler
     .OUT_trapInfo(TH_trapInfo),
     .OUT_branch(branchProvs[TH_BRANCH_PORT]),
 
-    .IN_MEM_busy(MEMSUB_busy),
+    .IN_MEM_busy(MEM_busy),
 
     .OUT_flushTLB(TH_flushTLB),
     .OUT_fence(TH_startFence),

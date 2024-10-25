@@ -7,7 +7,7 @@ class ReturnStack : public Model
 {
   public:
     static const size_t RET_STACK_SIZE = 32;
-    uint32_t returnStack[RET_STACK_SIZE];
+    uint32_t returnStack[RET_STACK_SIZE] = {};
     int returnIdx;
 
     std::optional<uint32_t> get_expected_pred(uint32_t instSIM, uint32_t pc)

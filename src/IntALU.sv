@@ -89,6 +89,7 @@ always_comb begin
 
         FU_BRANCH: if (HasFU(FU_BRANCH)) case (IN_uop.opcode)
             BR_AUIPC: resC = firstHalfwPC + imm;
+            BR_V_RET,
             BR_V_JR,
             BR_V_JALR,
             BR_JAL: resC = nextInstrPC;
@@ -165,11 +166,7 @@ if (HasFU(FU_BRANCH)) begin
         indBranchCorrect = 'x;
         indBranchDst = 'x;
         case (IN_uop.opcode)
-            BR_V_RET: begin
-                indBranchDst = srcA;
-                indBranchDst[0] = 0;
-                indBranchCorrect = (indBranchDst[31:1] == srcB[31:1]);
-            end
+            BR_V_RET,
             BR_V_JALR,
             BR_V_JR: begin
                 indBranchDst = (srcA + {{20{imm[11]}}, imm[11:0]});
