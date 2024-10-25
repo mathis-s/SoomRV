@@ -21,16 +21,18 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     python3 \
     python3-colorama \
-    device-tree-compiler
+    device-tree-compiler \
+    gawk
 
 ENV RISCV=/opt/riscv
 ENV PATH=$RISCV/bin:$PATH
 
-ENV RISCV_GCC_VERSION="2024.09.03"
-
-RUN wget https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.09.03/riscv32-glibc-ubuntu-22.04-gcc-nightly-2024.09.03-nightly.tar.gz -O riscv.tar.gz && \
-    tar -xf riscv.tar.gz && \
-    mv riscv /opt/
+RUN git clone --recursive https://github.com/riscv-collab/riscv-gnu-toolchain.git && \
+    cd riscv-gnu-toolchain && \
+    ./configure --prefix=/opt/riscv --with-arch=rv32imac_zba_zbb --with-abi=ilp32 && \
+    make -j $(nproc) && \
+    make install && \
+    cd .. && rm -r riscv-gnu-toolchain
 
 RUN cd /opt && \
     git clone https://github.com/mathis-s/riscv-isa-sim-SoomRV.git riscv-isa-sim && \
@@ -46,9 +48,9 @@ RUN cd /opt && \
     git checkout 51de00886cd28a3cf9b85ee306fb2b5ee5ab550e && \
     rm -rf .git && \
     ./configure --with-xlen=32 --prefix=/opt/riscv/ && \
-    make RISCV_PREFIX=riscv32-unknown-linux-gnu isa
+    make RISCV_PREFIX=riscv32-unknown-linux-gnu- isa
 
-RUN riscv32-unknown-linux-gnu-gcc --version && verilator --version
+RUN riscv32-unknown-elf-gcc --version && verilator --version
 
 WORKDIR /workspace
 
