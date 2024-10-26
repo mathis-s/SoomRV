@@ -21,6 +21,8 @@ class SpikeSimif : public simif_t
 {
   public:
     bool doRestore = false;
+    bool riscvTestMode = false;
+    int riscvTestReturn = 0;
     std::vector<Model*> models;
     std::vector<uint32_t>& pram;
     uint64_t& main_time;

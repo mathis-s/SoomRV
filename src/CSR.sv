@@ -920,6 +920,9 @@ always_ff@(posedge clk) begin
                                 mstatus.mpie <= temp.mpie;
                                 mstatus.spp <= temp.spp;
                                 mstatus.mpp <= temp.mpp;
+
+                                mstatus.fs_ <= temp.fs_;
+                                mstatus.sd <= |temp.fs_;
                             end
 
                             CSR_mcycle: mcycle[31:0] <= wdata;

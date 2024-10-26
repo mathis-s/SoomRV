@@ -1,5 +1,6 @@
 #include "Simif.hpp"
 #include "TopWrapper.hpp"
+#include "Debug.hpp"
 
 bool SpikeSimif::compare_state()
 {
@@ -9,6 +10,7 @@ bool SpikeSimif::compare_state()
             printf("mismatch x%zu\n", i);
             return false;
         }
+
     return true;
 }
 bool SpikeSimif::is_pass_thru_inst(const Inst& i)
@@ -68,7 +70,7 @@ SpikeSimif::SpikeSimif(std::vector<uint32_t>& pram, Registers& registers, uint64
 {
     cfg = new cfg_t(std::make_pair(0, 0), "", "rv32i", "M", DEFAULT_VARCH, false, endianness_little, 0,
                     {mem_cfg_t(0x80000000, 1 << 26)}, {0}, false, 0);
-    isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zfinx_zba_zbb_zbs_zicbom_zifencei_zcb_zihpm_zicntr", "MSU");
+    isa_parser = std::make_unique<isa_parser_t>("rv32imac_zicsr_zba_zbb_zbs_zicbom_zifencei_zcb_zihpm_zicntr", "MSU");
     processor = std::make_unique<processor_t>(isa_parser.get(), cfg, this, 0, false, stderr, std::cerr);
     harts[0] = processor.get();
 
@@ -81,16 +83,17 @@ SpikeSimif::SpikeSimif(std::vector<uint32_t>& pram, Registers& registers, uint64
     processor->set_privilege(3, false);
     processor->enable_log_commits();
 
-    std::array csrs_to_reset = {CSR_MSTATUS,    CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MTVEC,
-                                CSR_MEPC,       CSR_MCAUSE,   CSR_MTVAL,      CSR_MIDELEG,       CSR_MIDELEGH,
-                                CSR_MEDELEG,    CSR_MIP,      CSR_MIPH,       CSR_MIE,           CSR_MIEH,
-                                CSR_SCOUNTEREN, CSR_SEPC,     CSR_SCAUSE,     CSR_STVEC,         CSR_STVAL,
-                                CSR_SATP,       CSR_SENVCFG,  CSR_MENVCFG,    CSR_MSCRATCH,      CSR_SSCRATCH};
+    std::array csrs_to_reset = {CSR_MSTATUS, CSR_MSTATUSH, CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MEPC,    CSR_MCAUSE,
+                                CSR_MTVAL,   CSR_MIDELEG,  CSR_MIDELEGH,   CSR_MEDELEG,       CSR_MIP,     CSR_MIPH,
+                                CSR_MIE,     CSR_MIEH,     CSR_SCOUNTEREN, CSR_SEPC,          CSR_SCAUSE,  CSR_STVAL,
+                                CSR_SATP,    CSR_SENVCFG,  CSR_MENVCFG,    CSR_MSCRATCH,      CSR_SSCRATCH};
 
     timeCSR = std::make_shared<basic_csr_t>(processor.get(), CSR_TIME, 0);
     timehCSR = std::make_shared<basic_csr_t>(processor.get(), CSR_TIMEH, 0);
     processor->get_state()->csrmap[CSR_TIME] = timeCSR;
     processor->get_state()->csrmap[CSR_TIMEH] = timehCSR;
+    processor->get_state()->mtvec->write(0x80000000);
+    processor->get_state()->stvec->write(0x80000000);
 
     for (auto csr : csrs_to_reset)
         processor->put_csr(csr, 0);
@@ -196,6 +199,14 @@ int SpikeSimif::cosim_instr(const Inst& inst)
         uint32_t phy = get_phy_addr(std::get<0>(write), STORE);
         if (processor->debug)
             fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(write), phy);
+
+        if (riscvTestMode)
+        {
+            if (phy == 0x80001000 || phy == 0x80003000)
+                riscvTestReturn = std::get<1>(write);
+            else if ((phy == 0x80001004 || phy == 0x80003004) && (int)std::get<1>(write) == 0)
+                return 1;
+        }
         // if (phy >= 0x80000000)
         //     inFlightStores.push_back((Store){
         //         .addr = phy, .data = (uint32_t)std::get<1>(write), .size = std::get<2>(write), .time = main_time});

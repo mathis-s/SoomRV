@@ -5,6 +5,7 @@
 #include "VTop_Core.h"
 #include "VTop_SoC.h"
 #include "VTop_Top.h"
+#include "Debug.hpp"
 #include <memory>
 
 #ifdef TRACE
@@ -46,18 +47,24 @@ class TopWrapper
 
     void save_model(std::string fileName)
     {
+#ifdef SAVEABLE
         VerilatedSave os;
         os.open(fileName.c_str());
         os << main_time; // user code must save the timestamp
         os << *top;
+#endif
     }
 
     void restore_model(std::string fileName)
     {
+#ifdef SAVEABLE
         VerilatedRestore os;
         os.open(fileName.c_str());
         os >> main_time;
         os >> *top;
+#else
+        abort();
+#endif
     }
 
     void Initial()
@@ -75,6 +82,9 @@ class TopWrapper
         tfp->flush();
         tfp->close();
         tfp.reset();
+#endif
+#ifdef COVERAGE
+        Verilated::threadContextp()->coveragep()->write("coverage.dat");
 #endif
     }
 };
