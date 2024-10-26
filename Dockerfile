@@ -62,11 +62,11 @@ CMD ["-c", \
     mv /opt/riscv-isa-sim . && \
     make && \
     mkdir logs && \
-    python3 scripts/test_suite.py /opt/riscv-tests/isa | tee test_suite.out && \
+    python3 scripts/test_suite.py /opt/riscv-tests/isa | tee logs/test_suite.out && \
     ./obj_dir/VTop test_programs/coremark.elf 1> >(tee logs/coremark.out) 2> >(tee logs/coremark.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3_no_inline.s 1> >(tee logs/dhry_1_O3_no_inline.out) 2> >(tee logs/dhry_1_O3_no_inline.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3.s 1> >(tee logs/dhry_1_O3.out) 2> >(tee logs/dhry_1_O3.err) && \
     ./obj_dir/VTop test_programs/dhry_1_O3_inline.s 1> >(tee logs/dhry_1_O3_inline.out) 2> >(tee logs/dhry_1_O3_inline.err) && \
-    (timeout 480 ./obj_dir/VTop test_programs/linux/linux_image.elf --device-tree=test_programs/linux/device_tree.dtb --perfc 1> >(tee logs/linux.out) 2> >(tee logs/linux.err) || { [ $? -eq 124 ] && exit 0; exit $?; }) && \
+    (timeout 3600 ./obj_dir/VTop test_programs/linux/linux_image.elf --device-tree=test_programs/linux/device_tree.dtb --perfc 1> >(tee logs/linux.out) 2> >(tee logs/linux.err) || { [ $? -eq 124 ] && exit 0; exit $?; }) && \
     tar -czf logs.tar.gz logs \
     " ]
