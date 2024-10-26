@@ -280,7 +280,7 @@ always_ff@(posedge clk) begin
                 reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
                 reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(loadSqN - IN_ldComLimit.sqN) < 0);
                 reg sqAllowsCommit = 1;
-                for (integer j = 0; j < NUM_AGUS-1; j=j+1)
+                for (integer j = 0; j < NUM_AGUS; j=j+1)
                     sqAllowsCommit &= (!IN_stComLimit[j].valid ||
                         $signed(storeSqN - IN_stComLimit[j].sqN) < 0);
 
