@@ -51,10 +51,10 @@ reg[NUM_OPERANDS:0] newAvail_dl[SIZE-1:0];
 
 StOff_t newOffs[SIZE-1:0];
 
-always_comb begin
-    OUT_comLimit = ComLimit'{valid: 0, default: 'x};
+always_ff@(posedge clk) begin
+    OUT_comLimit <= ComLimit'{valid: 0, default: 'x};
     if (insertIndex != 0) begin
-        OUT_comLimit = ComLimit'{valid: 1, sqN: queue[0].storeSqN};
+        OUT_comLimit <= ComLimit'{valid: 1, sqN: queue[0].storeSqN};
     end
 end
 

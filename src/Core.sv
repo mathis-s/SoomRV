@@ -214,7 +214,7 @@ generate for (genvar i = 0; i < NUM_PORTS; i=i+1)
         .IN_uop(RN_uop),
         .IN_uopOrdering(RN_uopOrdering),
 
-        .IN_resultUOp(resultUOps[NUM_PORTS-1:0]),
+        .IN_flagUOp(flagUOps[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
@@ -241,7 +241,7 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
         .OUT_stall(IQ_stalls[NUM_PORTS+i]),
         .IN_uop(RN_uop),
 
-        .IN_resultUOp(resultUOps[NUM_PORTS-1:0]),
+        .IN_flagUOp(flagUOps[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
