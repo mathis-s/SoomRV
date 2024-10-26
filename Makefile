@@ -78,6 +78,7 @@ SRC_FILES = \
 	src/OHEncoder.sv \
 	src/RangeMaskGen.sv \
 	src/Scheduler.sv \
+	src/ResultFlagsSplit.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

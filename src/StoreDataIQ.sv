@@ -14,8 +14,7 @@ module StoreDataIQ
 
     input R_UOp IN_uop[NUM_UOPS-1:0],
 
-    input wire IN_resultValid[RESULT_BUS_COUNT-1:0],
-    input RES_UOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
+    input ResultUOp IN_resultUOp[RESULT_BUS_COUNT-1:0],
 
     input BranchProv IN_branch,
     input IS_UOp IN_issueUOps[RESULT_BUS_COUNT-1:0],
@@ -69,7 +68,8 @@ always_comb begin
 
         for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
             for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                if (IN_resultValid[j] && queue[i].tags[k] == IN_resultUOp[j].tagDst) newAvail[i][k] = 1;
+                if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[$bits(Tag)-1] && queue[i].tags[k] == IN_resultUOp[j].tagDst)
+                    newAvail[i][k] = 1;
         end
     end
 
@@ -224,7 +224,7 @@ always_ff@(posedge clk) begin
 
                 // Check if the result for this op is being broadcast in the current cycle
                 for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
-                    if (IN_resultValid[j]) begin
+                    if (IN_resultUOp[j].valid && !IN_resultUOp[j].tagDst[$bits(Tag)-1]) begin
                         for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                             if (temp.tags[k] == IN_resultUOp[j].tagDst) temp.avail[k] = 1;
                     end

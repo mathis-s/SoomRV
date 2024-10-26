@@ -19,8 +19,7 @@ module Rename
     input CommitUOp IN_comUOp[WIDTH_COMMIT-1:0],
 
     // WB for uncommitted but speculatively available values
-    input wire IN_wbHasResult[WIDTH_WR-1:0],
-    input RES_UOp IN_wbUOp[WIDTH_WR-1:0],
+    input FlagsUOp IN_flagsUOps[WIDTH_WR-1:0],
 
     // Taken branch
     input BranchProv IN_branch,
@@ -68,6 +67,7 @@ reg[4:0] RAT_commitIDs[WIDTH_COMMIT-1:0];
 Tag RAT_commitTags[WIDTH_COMMIT-1:0];
 Tag RAT_commitPrevTags[WIDTH_COMMIT-1:0];
 
+reg RAT_wbValid[WIDTH_WR-1:0];
 Tag RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
@@ -118,7 +118,8 @@ always_comb begin
 
     // Writeback
     for (integer i = 0; i < WIDTH_WR; i=i+1) begin
-        RAT_wbTags[i] = IN_wbUOp[i].tagDst;
+        RAT_wbValid[i] = IN_flagsUOps[i].valid && !IN_flagsUOps[i].tagDst[$bits(Tag)-1];
+        RAT_wbTags[i] = IN_flagsUOps[i].tagDst;
     end
 
     // Commit
@@ -160,7 +161,7 @@ rt
     .IN_commitTags(RAT_commitTags),
     .OUT_commitPrevTags(RAT_commitPrevTags),
 
-    .IN_wbValid(IN_wbHasResult),
+    .IN_wbValid(RAT_wbValid),
     .IN_wbTag(RAT_wbTags)
 );
 
@@ -301,14 +302,14 @@ always_ff@(posedge clk) begin
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
         for (integer i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_wbHasResult[i]) begin
+            if (IN_flagsUOps[i].valid && !IN_flagsUOps[i].tagDst[$bits(Tag)-1]) begin
                 for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
                     if (|OUT_uop[j].validIQ) begin
-                        if (OUT_uop[j].tagA == IN_wbUOp[i].tagDst)
+                        if (OUT_uop[j].tagA == IN_flagsUOps[i].tagDst)
                             OUT_uop[j].availA <= 1;
-                        if (OUT_uop[j].tagB == IN_wbUOp[i].tagDst)
+                        if (OUT_uop[j].tagB == IN_flagsUOps[i].tagDst)
                             OUT_uop[j].availB <= 1;
-                        if (OUT_uop[j].tagC == IN_wbUOp[i].tagDst)
+                        if (OUT_uop[j].tagC == IN_flagsUOps[i].tagDst)
                             OUT_uop[j].availC <= 1;
                     end
                 end

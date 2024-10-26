@@ -5,14 +5,14 @@ module ROB
     parameter ID_LEN = `ROB_SIZE_EXP,
     parameter WIDTH_RN = `DEC_WIDTH,
     parameter WIDTH = `DEC_WIDTH,
-    parameter WIDTH_WB = NUM_PORTS_TOTAL
+    parameter NUM_FLAG_UOPS = NUM_PORTS_TOTAL
 )
 (
     input wire clk,
     input wire rst,
 
     input R_UOp IN_uop[WIDTH_RN-1:0],
-    input RES_UOp IN_wbUOps[WIDTH_WB-1:0],
+    input FlagsUOp IN_flagUOps[NUM_FLAG_UOPS-1:0],
 
     input wire IN_interruptPending /*verilator public*/,
 
@@ -445,12 +445,12 @@ always_ff@(posedge clk) begin
                 lastIndex <= IN_uop[i].sqN + 1;
 
         // Mark committed ops as valid and set flags
-        for (integer i = 0; i < WIDTH_WB; i=i+1) begin
-            if (IN_wbUOps[i].valid && (!IN_branch.taken || $signed(IN_wbUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_wbUOps[i].doNotCommit) begin
+        for (integer i = 0; i < NUM_FLAG_UOPS; i=i+1) begin
+            if (IN_flagUOps[i].valid && (!IN_branch.taken || $signed(IN_flagUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_flagUOps[i].doNotCommit) begin
 
-                reg[$clog2(LENGTH)-1:0] id = IN_wbUOps[i].sqN[ID_LEN-1:0];
-                flags[id] <= IN_wbUOps[i].flags;
-                assert(IN_wbUOps[i].flags != FLAGS_NX);
+                reg[$clog2(LENGTH)-1:0] id = IN_flagUOps[i].sqN[ID_LEN-1:0];
+                flags[id] <= IN_flagUOps[i].flags;
+                assert(IN_flagUOps[i].flags != FLAGS_NX);
             end
         end
     end

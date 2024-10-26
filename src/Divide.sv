@@ -15,11 +15,12 @@ module Divide
 
 EX_UOp uop;
 reg[5:0] cnt;
-// could use single register for r/q
 reg[64:0] r;
-reg[31:0] q;
 reg[31:0] d;
 reg invert;
+
+wire[32:0] d_inv = -{1'b0, d};
+wire[31:0] q = r[31:0];
 
 reg running;
 
@@ -64,15 +65,7 @@ always_ff@(posedge clk) begin
             end
             else if (cnt != 63) begin
                 running <= 1;
-
-                if (!r[64]) begin
-                    q[cnt[4:0]] <= 1;
-                    r <= 2 * r - {1'b0, d, 32'b0};
-                end
-                else begin
-                    q[cnt[4:0]] <= 0;
-                    r <= 2 * r + {1'b0, d, 32'b0};
-                end
+                r <= (r << 1) + {r[64] ? {1'b0, d} : d_inv, 31'b0, !r[64]};
                 cnt <= cnt - 1;
                 OUT_uop.valid <= 0;
             end

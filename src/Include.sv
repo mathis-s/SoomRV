@@ -678,6 +678,23 @@ typedef struct packed
 
 typedef struct packed
 {
+    Tag tagDst;
+    SqN sqN;
+    Flags flags;
+    logic doNotCommit;
+    logic valid;
+} FlagsUOp;
+
+typedef struct packed
+{
+    logic[31:0] result;
+    Tag tagDst;
+    logic doNotCommit;
+    logic valid;
+} ResultUOp;
+
+typedef struct packed
+{
     logic[31:0] result;
     SqN storeSqN;
     SqN sqN;

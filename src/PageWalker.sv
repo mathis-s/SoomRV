@@ -9,7 +9,7 @@ module PageWalker#(parameter NUM_RQS=3)
     input wire IN_ldStall,
     output PW_LD_UOp OUT_ldUOp,
     input LD_Ack IN_ldAck[NUM_AGUS-1:0],
-    input RES_UOp IN_ldResUOp[NUM_AGUS-1:0]
+    input ResultUOp IN_ldResUOp[NUM_AGUS-1:0]
 );
 
 
@@ -22,12 +22,11 @@ enum logic[1:0]
     IDLE, WAIT_FOR_LOAD
 } state;
 
-RES_UOp pwLdRes;
+ResultUOp pwLdRes;
 always_comb begin
-    pwLdRes = RES_UOp'{valid: 0, default: 'x};
+    pwLdRes = ResultUOp'{valid: 0, default: 'x};
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-        if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit &&
-            IN_ldResUOp[i].sqN == 0 && IN_ldResUOp[i].tagDst == TAG_ZERO
+        if (IN_ldResUOp[i].valid && IN_ldResUOp[i].doNotCommit && IN_ldResUOp[i].tagDst == TAG_ZERO
         ) begin
             pwLdRes = IN_ldResUOp[i];
         end

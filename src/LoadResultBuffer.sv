@@ -10,7 +10,8 @@ module LoadResultBuffer#(parameter SIZE=8)
     output wire OUT_ready,
 
     input wire IN_ready,
-    output RES_UOp OUT_uop
+    output ResultUOp OUT_resultUOp,
+    output FlagsUOp OUT_flagsUOp
 );
 
 typedef struct packed
@@ -116,29 +117,39 @@ always_ff@(posedge clk) begin
     end
 end
 
-// Shift/Mask raw loaded data to produce final result uop
+// Shift/Mask raw loaded data to produce final result/flag uops
+ResultUOp resultUOp_c;
 always_comb begin
-    OUT_uop = RES_UOp'{valid: 0, default: 'x};
+    resultUOp_c = ResultUOp'{valid: 0, default: 'x};
+    OUT_flagsUOp = FlagsUOp'{valid: 0, default: 'x};
+
     if (outLMQ_c.valid) begin
-        OUT_uop.valid = 1;
-        OUT_uop.flags = FLAGS_NONE;
-        OUT_uop.doNotCommit = outLMQ_c.doNotCommit;
-        OUT_uop.tagDst = outLMQ_c.tagDst;
-        OUT_uop.sqN = outLMQ_c.sqN;
+        OUT_flagsUOp.valid = 1;
+        OUT_flagsUOp.flags = FLAGS_NONE;
+        OUT_flagsUOp.doNotCommit = outLMQ_c.doNotCommit;
+        OUT_flagsUOp.tagDst = outLMQ_c.tagDst;
+        OUT_flagsUOp.sqN = outLMQ_c.sqN;
+
+        resultUOp_c.valid = 1;
+        resultUOp_c.doNotCommit = outLMQ_c.doNotCommit;
+        resultUOp_c.tagDst = outLMQ_c.tagDst;
 
         case (outLMQ_c.size)
-            0: OUT_uop.result =
+            0: resultUOp_c.result =
                 {{24{outLMQ_c.sext ? outLMQ_c.data[8*(outLMQ_c.addr[1:0])+7] : 1'b0}},
                 outLMQ_c.data[8*(outLMQ_c.addr[1:0])+:8]};
 
-            1: OUT_uop.result =
+            1: resultUOp_c.result =
                 {{16{outLMQ_c.sext ? outLMQ_c.data[16*(outLMQ_c.addr[1])+15] : 1'b0}},
                 outLMQ_c.data[16*(outLMQ_c.addr[1])+:16]};
 
-            2: OUT_uop.result = outLMQ_c.data;
+            2: resultUOp_c.result = outLMQ_c.data;
             default: assert(0);
         endcase
     end
 end
+
+always_ff@(posedge clk)
+    OUT_resultUOp <= resultUOp_c;
 
 endmodule

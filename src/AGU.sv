@@ -22,7 +22,7 @@ module AGU
     input EX_UOp IN_uop,
     output AGU_UOp OUT_aguOp,
     output ELD_UOp OUT_eldOp,
-    output RES_UOp OUT_uop
+    output FlagsUOp OUT_uop
 );
 
 function logic IsPermFault(logic[2:0] pte_rwx, logic pte_user, logic isLoad, logic isStore);
@@ -225,7 +225,7 @@ TLBMissQueue#(`DTLB_MISS_QUEUE_SIZE) tmq
 // Select waiting op from TLB queue or incoming uop
 // for execution
 AGU_UOp issUOp_c;
-RES_UOp issResUOp_c;
+FlagsUOp issResUOp_c;
 always_comb begin
     issUOp_c = 'x;
     issUOp_c.valid = 0;
@@ -241,7 +241,6 @@ always_comb begin
         issResUOp_c.flags = isIllegalInstr_c ? FLAGS_ILLEGAL_INSTR : FLAGS_NONE;
         issResUOp_c.sqN = aguUOp_c.sqN;
         issResUOp_c.tagDst = aguUOp_c.tagDst;
-        issResUOp_c.result = 'x;
     end
     else if (TMQ_uop.valid) begin
 
@@ -252,7 +251,6 @@ always_comb begin
         issResUOp_c.flags = FLAGS_NONE;
         issResUOp_c.sqN = TMQ_uop.sqN;
         issResUOp_c.tagDst = TMQ_uop.tagDst;
-        issResUOp_c.result = 'x;
     end
 end
 

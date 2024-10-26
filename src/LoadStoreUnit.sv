@@ -66,7 +66,8 @@ module LoadStoreUnit
     input MemController_Res IN_memc,
 
     input wire[NUM_AGUS-1:0] IN_ready,
-    output RES_UOp OUT_uopLd[NUM_AGUS-1:0]
+    output ResultUOp OUT_resultUOp[NUM_AGUS-1:0],
+    output FlagsUOp OUT_flagsUOp[NUM_AGUS-1:0]
 );
 
 LoadResUOp ldResUOp[NUM_AGUS-1:0];
@@ -615,7 +616,8 @@ LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
     .OUT_ready(LRB_ready),
 
     .IN_ready(IN_ready),
-    .OUT_uop(OUT_uopLd)
+    .OUT_resultUOp(OUT_resultUOp),
+    .OUT_flagsUOp(OUT_flagsUOp)
 );
 
 // Store Pipeline

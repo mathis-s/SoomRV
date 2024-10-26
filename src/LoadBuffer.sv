@@ -237,7 +237,7 @@ always_comb begin
         // In-order late ltIssue (MMIO)
         if (h == 0 &&
             entries[deqIndex].valid && !entries[deqIndex].issued && entries[deqIndex].nonSpec &&
-            ((IN_comSqN == entries[deqIndex].sqN && IN_SQ_done))
+            ((IN_comLoadSqN == GetLoadSqN(deqIndex) && IN_SQ_done))
         ) begin
             // Overwrite. This load is in-order, so it always has top priority.
             ltIssue[h].isLdFwd = 0;

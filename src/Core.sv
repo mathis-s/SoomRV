@@ -34,13 +34,6 @@ assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
-RES_UOp wbUOp[NUM_PORTS_TOTAL-1:0] /*verilator public*/;
-reg wbHasResult[NUM_PORTS-1:0];
-always_comb begin
-    for (integer i = 0; i < NUM_PORTS; i=i+1)
-        wbHasResult[i] = wbUOp[i].valid && !wbUOp[i].tagDst[$bits(Tag)-1];
-end
-
 CommitUOp comUOps[3:0] /*verilator public*/;
 
 wire ifetchEn = en && !TH_disableIFetch;
@@ -178,8 +171,7 @@ Rename#(.WIDTH_WR(NUM_PORTS)) rn
 
     .IN_comUOp(comUOps),
 
-    .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp[NUM_PORTS-1:0]),
+    .IN_flagsUOps(flagUOps[NUM_PORTS-1:0]),
 
     .IN_branch(branch),
     .IN_mispredFlush(mispredFlush),
@@ -222,8 +214,7 @@ generate for (genvar i = 0; i < NUM_PORTS; i=i+1)
         .IN_uop(RN_uop),
         .IN_uopOrdering(RN_uopOrdering),
 
-        .IN_resultValid(wbHasResult),
-        .IN_resultUOp(wbUOp[NUM_PORTS-1:0]),
+        .IN_resultUOp(resultUOps[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
@@ -250,8 +241,7 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
         .OUT_stall(IQ_stalls[NUM_PORTS+i]),
         .IN_uop(RN_uop),
 
-        .IN_resultValid(wbHasResult),
-        .IN_resultUOp(wbUOp[NUM_PORTS-1:0]),
+        .IN_resultUOp(resultUOps[NUM_PORTS-1:0]),
 
         .IN_branch(branch),
 
@@ -281,9 +271,9 @@ RFTag[NUM_RF_WRITES-1:0] RF_writeAddress;
 RegT[NUM_RF_WRITES-1:0] RF_writeData;
 always_comb begin
     for (integer i = 0; i < NUM_RF_WRITES; i=i+1) begin
-        RF_writeAddress[i] = RFTag'(wbUOp[i].tagDst);
-        RF_writeData[i] = wbUOp[i].result;
-        RF_writeEnable[i] = wbHasResult[i];
+        RF_writeAddress[i] = RFTag'(resultUOps[i].tagDst);
+        RF_writeData[i] = resultUOps[i].result;
+        RF_writeEnable[i] = resultUOps[i].valid && !resultUOps[i].tagDst[$bits(Tag)-1];
     end
 end
 RegFile#(32, 1 << $bits(RFTag), NUM_RF_READS, NUM_RF_WRITES, 1) rf
@@ -315,8 +305,7 @@ Load#(
 
     .IN_uop(IS_uop),
 
-    .IN_wbHasResult(wbHasResult),
-    .IN_wbUOp(wbUOp[NUM_PORTS-1:0]),
+    .IN_resultUOps(resultUOps[NUM_PORTS-1:0]),
 
     .IN_branch(branch),
     .IN_stall(stall),
@@ -358,6 +347,9 @@ TrapControlState CSR_trapControl /*verilator public*/;
 wire[2:0] CSR_fRoundMode;
 DecodeState CSR_dec;
 VirtMemState CSR_vmem;
+
+ResultUOp resultUOps[NUM_PORTS-1:0] /*verilator public*/;
+FlagsUOp flagUOps[NUM_PORTS_TOTAL-1:0] /*verilator public*/;
 
 generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     // verilator lint_off UNDRIVEN
@@ -504,13 +496,16 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
         );
     end
 
+    RES_UOp wbUOp;
     always_comb begin
-        wbUOp[i] = RES_UOp'{valid: 0, default: 'x};
+        wbUOp = RES_UOp'{valid: 0, default: 'x};
         for (integer j = 0; j < (1 << $bits(FuncUnit)); j=j+1) begin
             if ((PORT_FUS[i] & (1 << j)) != 0 && resUOps[j].valid)
-                wbUOp[i] = resUOps[j];
+                wbUOp = resUOps[j];
         end
     end
+
+    ResultFlagsSplit wbUOpSplit(wbUOp, flagUOps[i], resultUOps[i]);
 end endgenerate
 
 TValProv TVS_tvalProvs[NUM_AGUS-1:0];
@@ -541,7 +536,7 @@ PageWalker#(NUM_AGUS+1) pageWalker
     .IN_ldStall(CC_PW_LD_stall[0]),
     .OUT_ldUOp(PW_LD_uop[0]),
     .IN_ldAck(LSU_ldAck),
-    .IN_ldResUOp(wbUOp[NUM_ALUS+:NUM_AGUS])
+    .IN_ldResUOp(resultUOps[NUM_ALUS+:NUM_AGUS])
 );
 
 wire LS_AGULD_uopStall[NUM_AGUS-1:0];
@@ -595,7 +590,7 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin : aguPortsGen
         .IN_uop(LD_uop[NUM_ALUS+i]),
         .OUT_aguOp(AGU_uop[i]),
         .OUT_eldOp(AGU_eLdUOp[i]),
-        .OUT_uop(wbUOp[NUM_ALUS+NUM_AGUS+i])
+        .OUT_uop(flagUOps[NUM_ALUS+NUM_AGUS+i])
     );
 end endgenerate
 
@@ -733,13 +728,13 @@ LoadStoreUnit lsu
     .IN_memc(IN_memc),
 
     .IN_ready({NUM_AGUS{1'b1}}),
-    .OUT_uopLd(wbUOp[NUM_ALUS+:NUM_AGUS])
+    .OUT_resultUOp(resultUOps[NUM_ALUS+:NUM_AGUS]),
+    .OUT_flagsUOp(flagUOps[NUM_ALUS+:NUM_AGUS])
 );
 
 SqN ROB_maxSqN;
 FetchID_t ROB_curFetchID;
 wire[4:0] ROB_fpNewFlags;
-
 ROB_PERFC_Info ROB_perfcInfo /*verilator public*/;
 
 BPUpdate ROB_bpUpdate;
@@ -751,7 +746,7 @@ ROB rob
     .clk(clk),
     .rst(rst),
     .IN_uop(RN_uop),
-    .IN_wbUOps(wbUOp),
+    .IN_flagUOps(flagUOps),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
     .OUT_perfcInfo(ROB_perfcInfo),

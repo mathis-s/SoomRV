@@ -12,8 +12,7 @@ module Load
     input IS_UOp IN_uop[NUM_UOPS-1:0],
 
     // Writeback Port (snoop) read
-    input wire IN_wbHasResult[NUM_WBS-1:0],
-    input RES_UOp IN_wbUOp[NUM_WBS-1:0],
+    input ResultUOp IN_resultUOps[NUM_WBS-1:0],
 
     input BranchProv IN_branch,
 
@@ -42,9 +41,9 @@ always_comb begin
         forwards[i] = IN_zcFwd[i];
     end
     for (integer i = 0; i < NUM_WBS; i=i+1) begin
-        forwards[i+NUM_ZC_FWDS].valid = IN_wbHasResult[i];
-        forwards[i+NUM_ZC_FWDS].tag = IN_wbUOp[i].tagDst;
-        forwards[i+NUM_ZC_FWDS].result = IN_wbUOp[i].result;
+        forwards[i+NUM_ZC_FWDS].valid = IN_resultUOps[i].valid && !IN_resultUOps[i].tagDst[$bits(Tag)-1];
+        forwards[i+NUM_ZC_FWDS].tag = IN_resultUOps[i].tagDst;
+        forwards[i+NUM_ZC_FWDS].result = IN_resultUOps[i].result;
     end
 end
 
