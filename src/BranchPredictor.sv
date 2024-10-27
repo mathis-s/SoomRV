@@ -142,7 +142,7 @@ always_comb begin
         OUT_pc = OUT_predBr.dst;
         OUT_lastOffs = OUT_predBr.offs;
     end
-    else if (TAGE_tageID > 0) begin
+    else begin
         // No target found, but we still output the direction prediction.
         OUT_predBr.valid = 1;
         OUT_predBr.btype = BT_BRANCH;

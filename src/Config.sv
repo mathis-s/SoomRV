@@ -4,7 +4,7 @@
 `define BTB_TAG_SIZE 16
 
 // TAGE Predictor
-`define BP_BASEP_ID_LEN 10
+`define BP_BASEP_ID_LEN 12
 `define TAGE_CLEAR_ENABLE
 `define TAGE_CLEAR_INTERVAL 20
 `define TAGE_BASE 4
