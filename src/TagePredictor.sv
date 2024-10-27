@@ -58,6 +58,7 @@ reg[TAG_SIZE-1:0] writeTags[NUM_STAGES-2:0];
 always_comb begin
 
     for (integer i = 0; i < NUM_STAGES-1; i=i+1) begin
+        integer hist_bits = (BASE * (FACTOR ** i));
 
         predTags[i] = IN_predAddr[TAG_SIZE-1:0];
         writeTags[i] = IN_writeAddr[TAG_SIZE-1:0];
@@ -70,13 +71,12 @@ always_comb begin
             writeHashes[i] = writeHashes[i] ^ IN_writeAddr[j*HASH_SIZE+:HASH_SIZE];
         end
 
+        for (integer j = 0; j < hist_bits; j=j+1) begin
+            predHashes[i][j % HASH_SIZE] ^= IN_predHistory[j];
+            writeHashes[i][j % HASH_SIZE] ^= IN_writeHistory[j];
 
-        for (integer j = 0; j < (BASE * (FACTOR ** i)); j=j+1) begin
-            predHashes[i][j % HASH_SIZE] = predHashes[i][j % HASH_SIZE] ^ IN_predHistory[j];
-            writeHashes[i][j % HASH_SIZE] = writeHashes[i][j % HASH_SIZE] ^ IN_writeHistory[j];
-
-            predTags[i][j % TAG_SIZE] = predTags[i][j % TAG_SIZE] ^ IN_predHistory[j] ^ IN_predHistory[(j+1) % $bits(BHist_t)];
-            writeTags[i][j % TAG_SIZE] = writeTags[i][j % TAG_SIZE] ^ IN_writeHistory[j] ^ IN_writeHistory[(j+1) % $bits(BHist_t)];
+            predTags[i][j % TAG_SIZE] ^= IN_predHistory[j] ^ IN_predHistory[(j+1) % hist_bits];
+            writeTags[i][j % TAG_SIZE] ^= IN_writeHistory[j] ^ IN_writeHistory[(j+1) % hist_bits];
         end
     end
 end
