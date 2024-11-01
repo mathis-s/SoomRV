@@ -53,7 +53,7 @@ std::vector<uint32_t> pram(1 << 26);
 
 double sc_time_stamp()
 {
-    return wrap->main_time;
+    return wrap ? wrap->main_time : 0;
 }
 
 Registers registers(wrap->top.get());
