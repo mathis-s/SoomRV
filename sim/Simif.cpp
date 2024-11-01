@@ -184,7 +184,8 @@ int SpikeSimif::cosim_instr(const Inst& inst)
     for (auto read : mem_reads)
     {
         uint32_t phy = get_phy_addr(std::get<0>(read), LOAD);
-        // if (phy == 0x83ff5c00) printf("[%lu] load sqn = %x\n", main_time, inst.sqn);
+        if (processor->debug)
+            fprintf(stderr, "%.8x -> %.8x\n", (uint32_t)std::get<0>(read), phy);
 
 
         phy &= ~3;

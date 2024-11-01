@@ -259,6 +259,7 @@ always_ff@(posedge clk) begin
             evicted[evInsert.idx].addr <= fusedUOp_r.addr;
             evicted[evInsert.idx].issued <= 0;
             evicted[evInsert.idx].nonce <= newNonce;
+            evicted[evInsert.idx].isMgmt <= fusedUOp_r.isMgmt;
             evicted[evInsert.idx].valid <= 1;
 
             if (!reIssue.valid) begin
