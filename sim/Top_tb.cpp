@@ -10,7 +10,6 @@
 
 #include "model_headers.h"
 #include <array>
-#include <asm-generic/ioctls.h>
 #include <cstdio>
 #include <cstring>
 #include <getopt.h>
