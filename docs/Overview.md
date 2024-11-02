@@ -20,24 +20,27 @@ typedef struct packed
     logic[31:0] srcA;
     logic[31:0] srcB;
     logic[31:0] pc;
+    FetchOff_t fetchOffs;
+    FetchOff_t fetchStartOffs;
+    FetchOff_t fetchPredOffs;
     logic[31:0] imm;
     logic[5:0] opcode;
     Tag tagDst;
     SqN sqN;
     FetchID_t fetchID;
     BranchPredInfo bpi;
-    BHist_t history;
     SqN storeSqN;
     SqN loadSqN;
     FuncUnit fu;
     logic compressed;
     logic valid;
 } EX_UOp;
+
 ```
 What follows are short explanations of the most important fields. While `EX_UOp` is shown as an example, these fields can be found in almost all UOp structs.
 
 ### `sqN` (sequence number)
-During rename, all instructions are given a unique identifier in the form of a sequence number. 
+During rename, all instructions are given a unique identifier in the form of a sequence number.
 
 The sequence number is one bit longer than an index into the reorder buffer,
 which allows us to use two's complement arithmetic to compare the order of
@@ -83,8 +86,12 @@ IFetch outputs a fetch bundle (`IF_Instr`), which (depending on alignment and br
 In each cycle, the next program counter is predicted based on the current program counter and branch prediction state. We predict at most one branch per cycle, taken or not.
 Branch prediction handles both target prediction ([`BranchTargetBuffer`](../src/BranchTargetBuffer.sv)) and direction prediction ([`TagePredictor`](../src/TagePredictor.sv)). In addition, [`ReturnStack`](../src/ReturnStack.sv) handles return prediction.
 
-#### [PCFile](../src/PCFile.sv)
-The PCFile stores every fetch bundle's source program counter and branch prediction state. Branch prediction state includes branch history, and which one of the instructions in the bundle was predicted to be a branch (if any). A fetch bundle's PCFile entry is freed after all of its instruction have been committed.
+#### [BranchHandler](../src/BranchHandler.sv)
+As soon as instructions are loaded from ICache, the BranchHandler corrects earlier predictions by comparing them to the actual instructions. For example, if a jump target is wrong due to branch aliasing, the BranchHandler corrects it. Almost everything can be corrected,
+except conditional branch direction and indirect branch destinations, which are instead handled during execute. Everything else, notably direct jump targets & conditional branch targets are guaranteed to be correct after the BranchHandler, and do not have to be checked downstream.
+
+#### PCFile \& BPFile
+The PCFile stores every fetch bundle's source program counter, the BPFile its branch prediction state. Branch prediction state includes branch history, and which one of the instructions in the bundle was predicted to be a branch (if any). The files are used to reset front-end state after mispredict. A fetch bundle's PCFile and BPFile entries are freed after all of its instruction have been committed.
 
 ### [PreDecode](../src/PreDecode.sv)
 PreDecode is a buffer, and also splits IFetch's instruction bundles into one or more discrete
@@ -93,7 +100,6 @@ The individual instructions are then distributed to decoder ports.
 
 ### [InstrDecoder](../src/InstrDecoder.sv)
 In the decoder, RISC-V's instruction format is decoded to SoomRV's internal format.
-In addition, we handle some branch mispredicts here, like immediate jumps that have not been predicted by IFetch.
 
 ### [Rename](../src/Rename.sv)
 In the Rename module, we assign `sqN`s and `tagDst` to instructions. Operand registers are also renamed to corresponding tags using the RenameTable.
@@ -139,15 +145,18 @@ The load buffer stores every executed but not-yet-committed load. This is used f
 We also use the LoadBuffer to store deferred loads until they become ready for execution.
 
 ### [StoreQueue](../src/StoreQueue.sv)
-The store queue stores every executed store. After a store commits, it is removed from the store queue and written to memory.
-In addition, the store queue forwards stored data to loads. All non-MMIO loads do a lookup in the store queue simultaneously to reading from actual memory.
+The store queue stores every executed store. After a store commits, it is handed over to the StoreQueueBackend.
+In addition, the store queue forwards stored data to loads. All non-MMIO loads do a lookup in the store queue simultaneously to reading from cache.
+
+### [StoreQueueBackend](../src/StoreQueueBackend.sv)
+The SQB essentially acts as an issue queue for stores, the difference to other issue queues being that stores may one be executed _after_ commit as there's no rollback mechanism for them. The SQB receives committed stores from the SQ, then fuses and executes them. All stores going to the same 16-byte region are fused as cache write ports are 16-byte wide. This conveniently also removes the need for store alias checking.
 
 ### [LoadStoreUnit](../src/LoadStoreUnit.sv)
 The LSU handles memory access at a low level. It executes loads and stores by accessing cache, and also handles cache misses if they occur.
 All stores entering the LSU come from the StoreQueue. Loads commonly enter directly from the load AGU, but may also come from the LoadBuffer or PageWalker.
 
 #### [BypassLSU](../src/BypassLSU.sv)
-The BLSU (I like to say "bless you") handles external MMIO. Instead of reading cache, it communicates with the memory controller directly to access MMIO devices. It may also be used to implement regular loads/stores which bypass cache in the future.
+The BLSU handles external MMIO. Instead of reading cache, it communicates with the memory controller directly to access MMIO devices. It may also be used to implement regular loads/stores which bypass cache in the future.
 
 ### [MemoryController](../src/MemoryController.sv)
 The memory controller handles transfers of cache lines between cache and main memory.
