@@ -501,6 +501,8 @@ always_comb begin
         else if (ld.valid) begin
             reg isExtMMIO = !ldOps[i][1].valid;
             reg isIntMMIO = ld.valid && ld.isMMIO;
+            reg isMMIO = isExtMMIO || isIntMMIO;
+            reg isCache = !isExtMMIO && !isIntMMIO;
             reg noEvict = !IF_ct.rdata[i][assocCnt].valid;
             reg doCacheLoad = 1;
 
@@ -509,13 +511,16 @@ always_comb begin
 
             if (ld.dataValid) begin
                 readData = ld.data;
+                doCacheLoad = 0;
             end
             else if (isExtMMIO) begin
                 readData = BLSU_ldResult;
                 blsuLoadHandled = 1;
+                doCacheLoad = 0;
             end
             else if (isIntMMIO) begin
                 readData = IF_mmio.rdata;
+                doCacheLoad = 0;
             end
             else begin
                 for (integer j = 0; j < `CASSOC; j=j+1) begin
@@ -553,49 +558,61 @@ always_comb begin
             ldResUOp[i].size = ld.size;
             ldResUOp[i].addr = ld.addr;
 
-            if ((!loadCacheAccessFailed[i][1] || isExtMMIO || isIntMMIO || ld.dataValid) &&
-                (cacheHit || isExtMMIO || isIntMMIO || ld.dataValid) &&
-                (!loadWasExtIOBusy[i] || isExtMMIO) &&
-                (isExtMMIO || isIntMMIO || !stFwd[i].conflict)
-            ) begin
-                // Use forwarded store data if available
-                if (!(isExtMMIO || isIntMMIO)) begin
+
+            miss[i].writeAddr = {IF_ct.rdata[i][assocCnt].addr, ld.addr[`VIRT_IDX_LEN-1:0]};
+            miss[i].missAddr = ld.addr;
+            miss[i].assoc = assocCnt;
+
+            // Go through all possible miss or hit cases
+            if (!isExtMMIO && loadWasExtIOBusy[i]) begin
+                miss[i].mtype = IO_BUSY;
+                miss[i].valid = 1;
+            end
+            else if (!isMMIO && stFwd[i].conflict) begin
+                miss[i].mtype = SQ_CONFLICT;
+                miss[i].valid = 1;
+            end
+            else if (!isMMIO && !ld.dataValid && loadCacheAccessFailed[i][1]) begin
+                miss[i].mtype = IO_BUSY;
+                miss[i].valid = 1;
+            end
+            else if (doCacheLoad) begin
+                miss[i].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
+                miss[i].valid = 1;
+
+                ldResUOp[i].valid = 1;
+                ldResUOp[i].dataAvail = 0;
+                ldResUOp[i].fwdMask = stFwd[i].mask;
+                ldResUOp[i].data = stFwd[i].data;
+            end
+            else if (!isMMIO) begin
+
+                if (cacheHit || ld.dataValid) begin
                     for (integer j = 0; j < 4; j=j+1) begin
                         if (stFwd[i].mask[j]) readData[j*8+:8] = stFwd[i].data[j*8+:8];
                     end
+
+                    ldResUOp[i].valid = 1;
+                    ldResUOp[i].dataAvail = 1;
+                    ldResUOp[i].fwdMask = 4'b1111;
+                    ldResUOp[i].data = readData;
                 end
-
-                ldResUOp[i].valid = 1;
-                ldResUOp[i].dataAvail = 1;
-                ldResUOp[i].fwdMask = 4'b1111;
-                ldResUOp[i].data = readData;
-            end
-            else begin
-                // Signal Miss
-                miss[i].valid = 1;
-                if (stFwd[i].conflict)
-                    miss[i].mtype = SQ_CONFLICT;
-                else if (loadWasExtIOBusy[i])
-                    miss[i].mtype = IO_BUSY;
-                else if (doCacheLoad)
-                    miss[i].mtype = noEvict ? REGULAR_NO_EVICT : REGULAR;
-                else if (loadCacheAccessFailed[i][1])
-                    miss[i].mtype = IO_BUSY;
-                else
+                else begin
                     miss[i].mtype = TRANS_IN_PROG;
-                miss[i].writeAddr = {IF_ct.rdata[i][assocCnt].addr, ld.addr[`VIRT_IDX_LEN-1:0]};
-                miss[i].missAddr = ld.addr;
-                miss[i].assoc = assocCnt;
+                    miss[i].valid = 1;
 
-                if (miss[i].mtype == TRANS_IN_PROG ||
-                    miss[i].mtype == REGULAR ||
-                    miss[i].mtype == REGULAR_NO_EVICT
-                ) begin
                     ldResUOp[i].valid = 1;
                     ldResUOp[i].dataAvail = 0;
                     ldResUOp[i].fwdMask = stFwd[i].mask;
                     ldResUOp[i].data = stFwd[i].data;
                 end
+
+            end
+            else if (isMMIO) begin
+                ldResUOp[i].valid = 1;
+                ldResUOp[i].dataAvail = 1;
+                ldResUOp[i].fwdMask = 4'b1111;
+                ldResUOp[i].data = readData;
             end
         end
     end
