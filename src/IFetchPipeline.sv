@@ -247,7 +247,7 @@ always_comb begin
             packet.lastValid = fetch1.lastValid;
 
             packet.predPos = fetch1.predBr.offs;
-            packet.predTaken = fetch1.predBr.valid && fetch1.predBr.taken;
+            packet.predTaken = fetch1.predBr.valid && fetch1.predBr.taken && !fetch1.predBr.dirOnly;
             packet.predTarget = fetch1.predBr.dst;
 
             packet.fetchID = fetch1.fetchID;
