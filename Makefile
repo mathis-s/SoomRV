@@ -35,7 +35,6 @@ SRC_FILES = \
 	src/LZCnt.sv \
 	src/PopCnt.sv \
 	src/BranchSelector.sv \
-	src/PreDecode.sv \
 	src/MemRTL.sv \
 	src/MemRTL2W.sv \
 	src/Top.sv \
