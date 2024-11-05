@@ -190,15 +190,6 @@ void LogPredec(Inst& inst)
     {
         fprintf(konataFile, "L\t%u\t%u\t[%.5lu]%.8x (%.8x): %s\n", inst.id, 0, wrap->main_time, inst.pc, inst.inst,
                 simif.disasm(inst.inst).c_str());
-
-        fprintf(konataFile, "C\t-%lu\n", (wrap->main_time - state.fetches[inst.fetchID].fetchTime) / 2);
-        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "IF");
-        fprintf(konataFile, "C\t%lu\n",
-                (state.fetches[inst.fetchID].pdTime - state.fetches[inst.fetchID].fetchTime) / 2);
-
-        fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "PD");
-        fprintf(konataFile, "C\t%lu\n", (wrap->main_time - state.fetches[inst.fetchID].pdTime) / 2);
-
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "DEC");
     }
 #endif
@@ -457,20 +448,6 @@ void LogInstructions()
                 }
                 else
                     state.pd[i].valid = false;
-        }
-
-        if (core->ifetch->ifp->fetch0[0] & 1)
-        {
-            for (int i = 0; i < 4; i++)
-                state.fetches[core->ifetch->ifp->fetchID].returnAddr[i] = core->ifetch->bp->retStack->rstack[i];
-
-            state.fetches[core->ifetch->ifp->fetchID].fetchTime = wrap->main_time;
-        }
-
-        if ((core->IF_instrs[0] & 1))
-        {
-            int fetchID = ExtractField(core->ifetch->ifp->packetRePred, 1 + 128 + 31 + 1 + 3 + 3 + 3 + 2, 5);
-            state.fetches[fetchID].pdTime = wrap->main_time + 2;
         }
     }
     LogCycle();
@@ -732,6 +709,7 @@ void Restore(std::string fileName)
         state.de[i].id -= offset;
     }
     state.id -= offset;
+    state.curCycInstRet = 0;
 #endif
 }
 

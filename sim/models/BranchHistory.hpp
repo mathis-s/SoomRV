@@ -17,6 +17,7 @@ class BranchHistory : public Model
 
     uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs)
     {
+#ifdef COSIM
         auto core = top->Top->soc->core;
         auto bpFile = core->ifetch->bp->bpFile->mem;
         bool pred = ExtractField(bpFile[fetchID], 0, 1);
@@ -29,6 +30,9 @@ class BranchHistory : public Model
         if (pred && isRegularBranch && fetchOffs > predOffs)
             return (history << 1) | predTaken;
         return history;
+#else
+        return 0;
+#endif
     }
 
     bool compare_history (const Inst& i)

@@ -79,6 +79,7 @@ SRC_FILES = \
 	src/RangeMaskGen.sv \
 	src/Scheduler.sv \
 	src/ResultFlagsSplit.sv \
+	src/InstrAligner.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

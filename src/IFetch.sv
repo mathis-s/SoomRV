@@ -31,7 +31,7 @@ module IFetch
     output PCFileEntry OUT_pcReadDataTH,
 
     input wire IN_ready,
-    output IF_Instr OUT_instrs,
+    output PD_Instr OUT_instrs[`DEC_WIDTH-1:0],
 
     input VirtMemState IN_vmem,
     output PageWalk_Req OUT_pw,

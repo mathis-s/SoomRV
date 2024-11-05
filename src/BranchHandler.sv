@@ -405,7 +405,7 @@ always_comb begin
                 end
             end
             // Also flush IFetch pipeline for unpredicted branches to correct history.
-            else if ((!predicted && curBr.btype == BRANCH && !dirOnlyTaken) || (curBr.btype == ICALL) || (curBr.btype == IJUMP)) begin
+            else if ((!predicted && curBr.btype == BRANCH && !dirOnlyTaken) || (curBr.btype == ICALL)) begin
                 decBranch_c.taken = 1;
                 decBranch_c.fetchID = IN_op.fetchID;
                 decBranch_c.fetchOffs = FetchOff_t'(i);
@@ -413,8 +413,7 @@ always_comb begin
                 decBranch_c.retAct = (curBr.btype == ICALL) ? RET_PUSH : RET_NONE;
                 decBranch_c.histAct = (curBr.btype == BRANCH) ? HIST_APPEND_0 : HIST_NONE;
                 decBranch_c.tgtSpec = BR_TGT_MANUAL;
-                // we have no idea what the target is for unpredicted icall/ijump, so just wait.
-                decBranch_c.wfi = (curBr.btype == ICALL) || (curBr.btype == IJUMP);
+                decBranch_c.wfi = 0;
 
                 if (actualOffs != {$bits(FetchOff_t) {1'b1}}) begin
                     endOffsValid = 1;

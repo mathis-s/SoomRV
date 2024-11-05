@@ -1,6 +1,6 @@
 
 
-module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=4)
+module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=8)
 (
     input logic clk,
     input logic rst,
@@ -43,7 +43,7 @@ module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(
     IF_ICTable.HOST IF_ict,
 
     input logic IN_ready,
-    output IF_Instr OUT_instrs,
+    output PD_Instr OUT_instrs[`DEC_WIDTH-1:0],
 
     input wire IN_clearICache,
     input wire IN_flushTLB,
@@ -79,6 +79,21 @@ BranchHandler branchHandler
 
     .OUT_newPredTaken(BH_newPredTaken),
     .OUT_newPredPos(BH_newPredPos)
+);
+
+wire IA_ready;
+InstrAligner instrAligner
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_clear(IN_mispr),
+    .IN_accept(1'b1),
+    .OUT_ready(IA_ready),
+    .IN_op(FIFO_out),
+
+    .IN_ready(IN_ready),
+    .OUT_instr(OUT_instrs)
 );
 
 always_ff@(posedge clk) begin
@@ -143,7 +158,7 @@ end
 TLB_Req TLB_req;
 always_comb begin
     TLB_req.vpn = fetch0.pc[31:12];
-    TLB_req.valid = fetch0.valid && !IN_mispr && !cacheMiss;
+    TLB_req.valid = fetch0.valid && !IN_mispr && !cacheMiss; // do we need dependency on IN_mispr & cacheMiss?
 end
 TLB_Res TLB_res_c;
 TLB_Res TLB_res;
@@ -318,7 +333,7 @@ always_comb begin
     else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
         OUT_memc_c = OUT_memc;
     end
-    else if (cacheMiss && doCacheLoad && !IN_mispr) begin
+    else if (cacheMiss && doCacheLoad && !IN_mispr) begin // do we need dependency on IN_mispr?
         OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
         OUT_memc_c.cacheAddr = {assocCnt, phyPC[`VIRT_IDX_LEN-1:4], 2'b0};
         OUT_memc_c.readAddr = {phyPC[31:4], 4'b0}; // todo: adjust alignment based on AXI width
@@ -369,30 +384,23 @@ always_comb begin
 end
 
 // Output Buffering
-wire FIFO_outValid;
 IF_Instr FIFO_out;
 wire[$clog2(FIFO_SIZE):0] FIFO_free;
 wire FIFO_ready;
-FIFO#($bits(IF_Instr), FIFO_SIZE, 1, 1) outFIFO
+FIFO#($bits(IF_Instr)-1, FIFO_SIZE, 1, 1) outFIFO
 (
     .clk(clk),
     .rst(rst || IN_mispr),
     .free(FIFO_free),
 
     .IN_valid(packetRePred.valid),
-    .IN_data(packetRePred),
+    .IN_data(packetRePred[1+:$bits(packetRePred)-1]),
     .OUT_ready(FIFO_ready),
 
-    .OUT_valid(FIFO_outValid),
-    .IN_ready(IN_ready),
-    .OUT_data(FIFO_out)
+    .OUT_valid(FIFO_out.valid),
+    .IN_ready(IA_ready),
+    .OUT_data(FIFO_out[1+:$bits(packetRePred)-1])
 );
-always_comb begin
-    OUT_instrs = 'x;
-    OUT_instrs.valid = 0;
-    if (FIFO_outValid)
-        OUT_instrs = FIFO_out;
-end
 
 always_ff@(posedge clk) begin
     if (!(rst || IN_mispr) && packetRePred.valid)

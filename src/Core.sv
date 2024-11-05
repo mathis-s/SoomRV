@@ -63,7 +63,7 @@ BranchSelector#(4) bsel
     .IN_mispredFlush(mispredFlush)
 );
 
-IF_Instr IF_instrs /*verilator public*/;
+//IF_Instr IF_instrs /*verilator public*/;
 BTUpdate BP_btUpdates[NUM_ALUS-1:0];
 
 PCFileReadReq PC_readReq[NUM_BRANCH_PORTS-1:0];
@@ -100,8 +100,8 @@ IFetch ifetch
     .IN_pcReadTH(PC_readReqTH),
     .OUT_pcReadDataTH(PC_readDataTH),
 
-    .IN_ready(!PD_full),
-    .OUT_instrs(IF_instrs),
+    .IN_ready(!RN_stall && frontendEn),
+    .OUT_instrs(PD_instrs),
 
     .IN_vmem(CSR_vmem),
     .OUT_pw(PW_reqs[0]),
@@ -114,20 +114,7 @@ IFetch ifetch
 SqN RN_nextSqN;
 SqN ROB_curSqN /*verilator public*/;
 
-wire PD_full;
 PD_Instr PD_instrs[`DEC_WIDTH-1:0] /*verilator public*/;
-PreDecode preDec
-(
-    .clk(clk),
-    .rst(rst),
-
-    .IN_en(!RN_stall && frontendEn),
-    .IN_invalidate(branch.taken || decBranch.taken),
-    .OUT_full(PD_full),
-
-    .IN_instrs(IF_instrs),
-    .OUT_instrs(PD_instrs)
-);
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
 DecodeBranch decBranch;
