@@ -44,10 +44,13 @@ always_comb begin
         rstack_dbg[i] = {rstack[i], 1'b0};
 end
 
-reg[$clog2(RQSIZE)-1:0] qindex;
-reg[$clog2(RQSIZE)-1:0] qindexEnd;
-RetRecQEntry rrqueue[RQSIZE-1:0]; // return addr recovery
+reg[$clog2(RQSIZE):0] qindex_r;
+reg[$clog2(RQSIZE):0] qindexEnd_r;
 
+wire[$clog2(RQSIZE)-1:0] qindex = qindex_r[$clog2(RQSIZE)-1:0];
+wire[$clog2(RQSIZE)-1:0] qindexEnd = qindexEnd_r[$clog2(RQSIZE)-1:0];
+
+RetRecQEntry rrqueue[RQSIZE-1:0]; // return addr recovery
 
 reg forwardRindex;
 
@@ -122,13 +125,16 @@ typedef struct packed
 
 PostRecSave postRecSave;
 
+wire queueEmpty = qindex_r == qindexEnd_r;
+wire queueFull = qindex_r == qindexEnd_r + RQSIZE;
+
 always_ff@(posedge clk) begin
 
     forwardRindex <= 0;
 
     if (rst) begin
-        qindex <= 0;
-        qindexEnd <= 0;
+        qindex_r <= 0;
+        qindexEnd_r <= 0;
         recoveryInProgress <= 0;
         lastInvalComFetchID <= 0;
         lastValid <= 0;
@@ -144,7 +150,7 @@ always_ff@(posedge clk) begin
         lastValid <= IN_valid;
 
         if (IN_mispr.taken) begin
-            reg startRecovery = qindex != qindexEnd;
+            reg startRecovery = !queueEmpty;
 
             forwardRindex <= 1;
             recoveryInProgress <= startRecovery;
@@ -169,7 +175,7 @@ always_ff@(posedge clk) begin
                     rrqueue[qindex].offs <= IN_mispr.fetchOffs;
                     rrqueue[qindex].idx <= IN_returnUpd.idx + RetStackIdx_t'(1);
                     rrqueue[qindex].addr <= rstack[IN_returnUpd.idx + RetStackIdx_t'(1)];
-                    qindex <= qindex + 1;
+                    qindex_r <= qindex_r + 1;
 
                     rstack[IN_returnUpd.idx + RetStackIdx_t'(1)] <= IN_returnUpd.addr + 1;
                 end
@@ -181,7 +187,7 @@ always_ff@(posedge clk) begin
             // Recover entries by copying from rrqueue back to stack after mispredict
             if (recoveryInProgress) begin
 
-                if (qindex != qindexEnd &&
+                if (!queueEmpty &&
                     // fine-grained compare based on fetch offs
                     ( ((rrqueue[qindex-1].fetchID - recoveryBase) > (recoveryID - recoveryBase)) ||
                     ((rrqueue[qindex-1].fetchID - recoveryBase) == (recoveryID - recoveryBase) &&
@@ -192,7 +198,7 @@ always_ff@(posedge clk) begin
                 ) begin
                     rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
                     rrqueue[qindex-1] <= 'x;
-                    qindex <= qindex - 1; // entry restored, ok to overwrite
+                    qindex_r <= qindex_r - 1; // entry restored, ok to overwrite
                 end
                 else begin
                     recoveryInProgress <= 0;
@@ -204,24 +210,22 @@ always_ff@(posedge clk) begin
                         rrqueue[qindex].idx <= postRecSave.rIdx;
                         rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
                         rstack[postRecSave.rIdx] <= postRecSave.addr;
-                        qindex <= qindex + 1;
+                        qindex_r <= qindex_r + 1;
                     end
                 end
             end
-
             // Delete committed (ie correctly speculated) entries from rrqueue
-            if (!recoveryInProgress && lastInvalComFetchID != IN_comFetchID) begin
+            else if (lastInvalComFetchID != IN_comFetchID) begin
 
                 // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
                 // of easy ordering comparison. Thus, we have to do all comparisons relative
                 // to some base. We use the last checked fetchID as the base.
-                if (qindex != qindexEnd &&
+                if (!queueEmpty &&
                     (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
                 ) begin
                     lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
                     rrqueue[qindexEnd] <= 'x;
-                    if (qindex != qindexEnd)
-                        qindexEnd <= qindexEnd + 1;
+                    qindexEnd_r <= qindexEnd_r + 1;
                 end
                 // There has been no speculated return in [lastInvalComFetchID, IN_comFetchID),
                 // nothing to do.
@@ -229,6 +233,7 @@ always_ff@(posedge clk) begin
             end
 
             if (lastValid) begin
+                assert(!recoveryInProgress);
                 if (IN_branch.valid && IN_branch.btype == BT_RETURN) begin
 
                 end
@@ -236,16 +241,16 @@ always_ff@(posedge clk) begin
                     rstack[rindex] <= addrToPush;
 
                     // Store the overwritten address in the return recovery queue
-                    if (qindexEnd != qindex + 1'b1) begin
+                    if (!queueFull) begin
                         rrqueue[qindex].fetchID <= IN_fetchID;
                         rrqueue[qindex].offs <= IN_branch.offs;
                         rrqueue[qindex].idx <= rindex;
                         rrqueue[qindex].addr <= rstack[rindex];
-                        qindex <= qindex + 1;
+                        qindex_r <= qindex_r + 1;
                     end
-
                 end
             end
+
         end
     end
 end
