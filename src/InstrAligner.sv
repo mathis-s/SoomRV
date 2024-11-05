@@ -140,8 +140,10 @@ always_comb begin
             is32bit_c = windowStart32_c[pencIdx[i]];
             idxLastWord_c = pencIdx[i] + $clog2(WINDOW_SIZE)'(is32bit_c);
 
+            // verilator lint_off WIDTHEXPAND
             ifetchOp = cycles_c[idxLastWord_c / NUM_PACKETS].op;
             ifetchOpFirst = cycles_c[pencIdx[i] / NUM_PACKETS].op;
+            // verilator lint_off WIDTHEXPAND
 
             instr_c[i] = PD_Instr'{
                 instr:           {window_c[pencIdx[i] + 1], window_c[pencIdx[i]]},
