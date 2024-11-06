@@ -150,7 +150,8 @@ always_ff@(posedge clk) begin
         lastValid <= IN_valid;
 
         if (IN_mispr.taken) begin
-            reg startRecovery = !queueEmpty;
+            reg doPostRecSave = IN_mispr.isFetchBranch && IN_returnUpd.valid;
+            reg startRecovery = !queueEmpty || doPostRecSave;
 
             forwardRindex <= 1;
             recoveryInProgress <= startRecovery;
@@ -162,24 +163,12 @@ always_ff@(posedge clk) begin
             lastValid <= 0;
 
             postRecSave <= PostRecSave'{valid: 0, default: 'x};
-            if (IN_mispr.isFetchBranch && IN_returnUpd.valid) begin
-                if (startRecovery) begin
-                    postRecSave.valid <= 1;
-                    postRecSave.fetchID <= IN_mispr.fetchID;
-                    postRecSave.offs <= IN_mispr.fetchOffs;
-                    postRecSave.rIdx <= IN_returnUpd.idx + RetStackIdx_t'(1);
-                    postRecSave.addr <= IN_returnUpd.addr + 1;
-                end
-                else begin
-                    rrqueue[qindex].fetchID <= IN_mispr.fetchID;
-                    rrqueue[qindex].offs <= IN_mispr.fetchOffs;
-                    rrqueue[qindex].idx <= IN_returnUpd.idx + RetStackIdx_t'(1);
-                    rrqueue[qindex].addr <= rstack[IN_returnUpd.idx + RetStackIdx_t'(1)];
-                    qindex_r <= qindex_r + 1;
-
-                    rstack[IN_returnUpd.idx + RetStackIdx_t'(1)] <= IN_returnUpd.addr + 1;
-                end
-
+            if (doPostRecSave) begin
+                postRecSave.valid <= 1;
+                postRecSave.fetchID <= IN_mispr.fetchID;
+                postRecSave.offs <= IN_mispr.fetchOffs;
+                postRecSave.rIdx <= IN_returnUpd.idx + RetStackIdx_t'(1);
+                postRecSave.addr <= IN_returnUpd.addr + 1;
             end
         end
         else begin

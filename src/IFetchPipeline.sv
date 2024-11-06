@@ -55,13 +55,15 @@ module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(
     input MemController_Res IN_memc
 );
 
+localparam NUM_INST = 1 << (`FSIZE_E - 1);
+
 logic BH_endOffsetValid;
 FetchOff_t BH_endOffset;
 
 logic BH_newPredTaken;
 FetchOff_t BH_newPredPos;
 FetchBranchProv BH_decBranch;
-BranchHandler branchHandler
+BranchHandler#(.NUM_INST(NUM_INST)) branchHandler
 (
     .clk(clk),
     .rst(rst),
@@ -69,7 +71,7 @@ BranchHandler branchHandler
     .IN_clear(IN_mispr),
     .IN_accept(packet.valid),
     .IN_op(fetch1),
-    .IN_instrs(IF_icache.rdata[assocHit]),
+    .IN_instrs(assocHitInstrs),
 
     .OUT_decBranch(BH_decBranch),
     .OUT_btUpdate(OUT_btUpdate),
@@ -158,7 +160,7 @@ end
 TLB_Req TLB_req;
 always_comb begin
     TLB_req.vpn = fetch0.pc[31:12];
-    TLB_req.valid = fetch0.valid && !IN_mispr && !cacheMiss; // do we need dependency on IN_mispr & cacheMiss?
+    TLB_req.valid = fetch0.valid;
 end
 TLB_Res TLB_res_c;
 TLB_Res TLB_res;
@@ -175,47 +177,69 @@ always_ff@(posedge clk) TLB_res <= TLB_res_c;
 
 
 logic[$clog2(`CASSOC)-1:0] assocCnt;
-logic tlbMiss;
 logic cacheHit;
 logic cacheMiss;
 logic doCacheLoad;
-logic[$clog2(`CASSOC)-1:0] assocHit;
+
+// Check for TLB hit
 logic[31:0] phyPC;
+logic pageFault;
+logic tlbMiss;
+always_comb begin
+    phyPC = 'x;
+    pageFault = 0;
+    tlbMiss = 0;
+
+    // Check TLB
+    if (fetch1.valid && fetch1.fetchFault == IF_FAULT_NONE && IN_vmem.sv32en_ifetch) begin
+        if (TLB_res.hit) begin
+            if ((TLB_res.pageFault) ||
+                (!TLB_res.rwx[0]) ||
+                (IN_vmem.priv == PRIV_USER && !TLB_res.user) ||
+                (IN_vmem.priv == PRIV_SUPERVISOR && TLB_res.user && !IN_vmem.supervUserMemory)
+            ) begin
+                pageFault = 1;
+            end
+            else phyPC = {TLB_res.isSuper ? {TLB_res.ppn[19:10], fetch1.pc[21:12]} : TLB_res.ppn, fetch1.pc[11:0]};
+        end
+        else tlbMiss = 1;
+    end
+    else phyPC = fetch1.pc;
+end
 
 // Check Tags
+logic[`CASSOC-1:0] assocHitUnary_c;
+always_comb begin
+    for (integer i = 0; i < `CASSOC; i=i+1) begin
+        assocHitUnary_c[i] = IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == phyPC[31:`VIRT_IDX_LEN];
+    end
+end
+typedef struct packed
+{
+    logic[$clog2(`CASSOC)-1:0] idx;
+    logic valid;
+} AssocIdxN;
+AssocIdxN assocHit;
+OHEncoder#(`CASSOC, 1) assocEnc(assocHitUnary_c, assocHit.idx, assocHit.valid);
+wire[NUM_INST-1:0][15:0] assocHitInstrs = IF_icache.rdata[assocHit.idx];
+
+// Check for errors
 IF_Instr packet;
 always_comb begin
     logic transferExists = 'x;
     logic allowPassThru = 'x;
 
-    phyPC = 'x;
-
     packet = IF_Instr'{valid: 0, default: 'x};
     packet.fetchFault = fetch1.fetchFault;
 
-    tlbMiss = 0;
     cacheHit = 0;
     cacheMiss = 0;
-    assocHit = 'x;
     doCacheLoad = 1;
 
     if (fetch1.valid) begin
 
-        // Check TLB
-        if (IN_vmem.sv32en_ifetch && packet.fetchFault == IF_FAULT_NONE) begin
-            if (TLB_res.hit) begin
-                if ((TLB_res.pageFault) ||
-                    (!TLB_res.rwx[0]) ||
-                    (IN_vmem.priv == PRIV_USER && !TLB_res.user) ||
-                    (IN_vmem.priv == PRIV_SUPERVISOR && TLB_res.user && !IN_vmem.supervUserMemory)
-                ) begin
-                    packet.fetchFault = IF_PAGE_FAULT;
-                end
-                else phyPC = {TLB_res.isSuper ? {TLB_res.ppn[19:10], fetch1.pc[21:12]} : TLB_res.ppn, fetch1.pc[11:0]};
-            end
-            else tlbMiss = 1;
-        end
-        else phyPC = fetch1.pc;
+        if (pageFault)
+            packet.fetchFault = IF_PAGE_FAULT;
 
         // Check PMAs
         if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
@@ -225,14 +249,10 @@ always_comb begin
 
         // Check cache tags
         if (!tlbMiss && packet.fetchFault == IF_FAULT_NONE) begin
-            for (integer i = 0; i < `CASSOC; i=i+1) begin
-                if (IF_ict.rdata[i].valid && IF_ict.rdata[i].addr == phyPC[31:`VIRT_IDX_LEN]) begin
-                    assert(!cacheHit);
-                    cacheHit = 1;
-                    doCacheLoad = 0;
-                    assocHit = i[$clog2(`CASSOC)-1:0];
-                    packet.instrs = IF_icache.rdata[i];
-                end
+            if (assocHit.valid) begin
+                cacheHit = 1;
+                doCacheLoad = 0;
+                packet.instrs = assocHitInstrs;
             end
             begin
                 {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, phyPC, 0);
@@ -241,7 +261,6 @@ always_comb begin
                     cacheHit &= allowPassThru;
                 end
             end
-
             cacheMiss = !cacheHit;
         end
 
@@ -333,7 +352,7 @@ always_comb begin
     else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
         OUT_memc_c = OUT_memc;
     end
-    else if (cacheMiss && doCacheLoad && !IN_mispr) begin // do we need dependency on IN_mispr?
+    else if (cacheMiss && doCacheLoad) begin // do we need dependency on IN_mispr?
         OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
         OUT_memc_c.cacheAddr = {assocCnt, phyPC[`VIRT_IDX_LEN-1:4], 2'b0};
         OUT_memc_c.readAddr = {phyPC[31:4], 4'b0}; // todo: adjust alignment based on AXI width
@@ -387,7 +406,7 @@ end
 IF_Instr FIFO_out;
 wire[$clog2(FIFO_SIZE):0] FIFO_free;
 wire FIFO_ready;
-FIFO#($bits(IF_Instr)-1, FIFO_SIZE, 1, 1) outFIFO
+FIFO#($bits(IF_Instr)-1, FIFO_SIZE, 1, 0) outFIFO
 (
     .clk(clk),
     .rst(rst || IN_mispr),

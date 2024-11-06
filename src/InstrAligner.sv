@@ -28,7 +28,7 @@ typedef struct packed
 } FetchCycle;
 
 wire canShift = !|(unhandled_c[0+:NUM_PACKETS] & windowStart_c[0+:NUM_PACKETS]);
-wire validCycle = !IN_clear && IN_accept && IN_op.valid && canShift;
+wire validCycle = IN_accept && IN_op.valid && canShift;
 assign OUT_ready = validCycle;
 
 // Propagate instruction boundaries

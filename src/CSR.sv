@@ -417,26 +417,26 @@ assign OUT_dec.allowWFI = (priv == PRIV_MACHINE) || (priv == PRIV_SUPERVISOR && 
 assign OUT_dec.allowCustom = misa_X;
 assign OUT_dec.allowSFENCE = !mstatus.tvm;
 
+VirtMemState vmem_c;
 always_comb begin
-
     PrivLevel epm = mstatus.mprv ? mstatus.mpp : priv;
 
-    OUT_vmem.rootPPN = satp.ppn;
-    OUT_vmem.sv32en_ifetch = satp.mode && priv != PRIV_MACHINE;
-    OUT_vmem.sv32en = satp.mode;
-    OUT_vmem.priv = epm;
-    OUT_vmem.makeExecReadable = mstatus.mxr;
-    OUT_vmem.supervUserMemory = 0;
+    vmem_c.rootPPN = satp.ppn;
+    vmem_c.sv32en_ifetch = satp.mode && priv != PRIV_MACHINE;
+    vmem_c.sv32en = satp.mode;
+    vmem_c.priv = epm;
+    vmem_c.makeExecReadable = mstatus.mxr;
+    vmem_c.supervUserMemory = 0;
 
     if (epm == PRIV_MACHINE) begin
-        OUT_vmem.sv32en_ifetch = 0;
-        OUT_vmem.sv32en = 0;
+        vmem_c.sv32en_ifetch = 0;
+        vmem_c.sv32en = 0;
     end
     else if (epm == PRIV_SUPERVISOR) begin
-        OUT_vmem.supervUserMemory = mstatus.sum;
+        vmem_c.supervUserMemory = mstatus.sum;
     end
 
-    OUT_vmem.cbcfe =
+    vmem_c.cbcfe =
     !(
         (priv != PRIV_MACHINE && !menvcfg.cbcfe) ||
         (priv == PRIV_USER && !senvcfg.cbcfe)
@@ -444,14 +444,15 @@ always_comb begin
 
     if ((priv != PRIV_MACHINE && menvcfg.cbie == 0) ||
         (priv == PRIV_USER && senvcfg.cbie == 0))
-        OUT_vmem.cbie = 0;
+        vmem_c.cbie = 0;
     else if ((priv != PRIV_MACHINE && menvcfg.cbie == 1) ||
         (priv == PRIV_USER && senvcfg.cbie == 1))
-        OUT_vmem.cbie = 1;
+        vmem_c.cbie = 1;
     else
-        OUT_vmem.cbie = 3;
-
+        vmem_c.cbie = 3;
 end
+
+always_ff@(posedge clk) OUT_vmem <= vmem_c;
 
 reg[31:0] rdata;
 reg invalidCSR;

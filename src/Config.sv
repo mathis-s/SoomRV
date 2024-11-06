@@ -84,7 +84,7 @@
 `define ENABLE_INT_DIV
 `define ENABLE_INT_MUL
 `define ENABLE_ZCB
-//`define SQ_LINEAR
+`define SQ_LINEAR
 
 //`define DEBUG
 parameter HANG_COUNTER_LEN = 16;

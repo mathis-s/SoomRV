@@ -366,6 +366,32 @@ always_comb begin
     end
 end
 
+typedef struct packed
+{
+    logic[$clog2(`CASSOC)-1:0] idx;
+    logic valid;
+} IdxN;
+
+IdxN ldAssocHit_c[NUM_AGUS-1:0];
+IdxN stAssocHit_c;
+
+// OHEncoder for checking load tags
+generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
+logic[`CASSOC-1:0] ldAssocHitUnary_c;
+always_comb begin
+    for(integer j = 0; j < `CASSOC; j=j+1)
+        ldAssocHitUnary_c[j] = IF_ct.rdata[i][j].valid && IF_ct.rdata[i][j].addr == ldOps[i][1].addr[31:`VIRT_IDX_LEN];
+end
+OHEncoder#(`CASSOC, 1) ohEncLd(ldAssocHitUnary_c, ldAssocHit_c[i].idx, ldAssocHit_c[i].valid);
+end endgenerate
+
+// OHEncoder for checking store tags
+logic[`CASSOC-1:0] stAssocHitUnary_c;
+always_comb begin
+    for(integer j = 0; j < `CASSOC; j=j+1)
+        stAssocHitUnary_c[j] = IF_ct.rdata[0][j].valid && IF_ct.rdata[0][j].addr == stOps[1].addr[31:`VIRT_IDX_LEN];
+end
+OHEncoder#(`CASSOC, 1) ohEncSt(stAssocHitUnary_c, stAssocHit_c.idx, stAssocHit_c.valid);
 
 typedef enum logic[3:0]
 {
@@ -430,14 +456,11 @@ always_comb begin
             reg noEvict = !IF_ct.rdata[i][assocCnt].valid;
 
             // check for hit in cache table
-            for (integer j = 0; j < `CASSOC; j=j+1) begin
-                if (IF_ct.rdata[i][j].valid && IF_ct.rdata[i][j].addr == st.addr[31:`VIRT_IDX_LEN]) begin
-                    assert(!cacheHit); // multiple hits are invalid
-                    doCacheLoad = 0;
-                    cacheHit = 1;
-                    cacheHitAssoc = j[$clog2(`CASSOC)-1:0];
-                    cacheTableHit = 1;
-                end
+            if (stAssocHit_c.valid) begin
+                doCacheLoad = 0;
+                cacheHit = 1;
+                cacheHitAssoc = stAssocHit_c.idx;
+                cacheTableHit = 1;
             end
 
             // check if address is already being transferred
@@ -523,12 +546,10 @@ always_comb begin
                 doCacheLoad = 0;
             end
             else begin
-                for (integer j = 0; j < `CASSOC; j=j+1) begin
-                    if (IF_ct.rdata[i][j].valid && IF_ct.rdata[i][j].addr == ld.addr[31:`VIRT_IDX_LEN]) begin
-                        cacheHit = 1;
-                        doCacheLoad = 0;
-                        readData = IF_cache.rdata[i][j];
-                    end
+                if (ldAssocHit_c[i].valid) begin
+                    cacheHit = 1;
+                    doCacheLoad = 0;
+                    readData = IF_cache.rdata[i][ldAssocHit_c[i].idx];
                 end
 
                 // check if address is already being transferred

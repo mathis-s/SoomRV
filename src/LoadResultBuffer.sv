@@ -27,30 +27,25 @@ LoadResUOp outLMQ_c;
 LoadResUOp enqLMQ_c;
 
 IdxN deq_c;
+logic[SIZE-1:0] entryReady;
+always_comb
+    for (integer i = 0; i < SIZE; i=i+1)
+        entryReady[i] = entries[i].valid && entries[i].dataAvail;
+PriorityEncoder#(SIZE, 1) deqEnc(entryReady, '{deq_c.idx}, '{deq_c.valid});
+
 always_comb begin
     outLMQ_c = LoadResUOp'{valid: 0, default: 'x};
-    deq_c = IdxN'{valid: 0, default: 'x};
     enqLMQ_c = IN_uop;
 
     // Select load result op to output
     if (IN_ready) begin
-        // TODO: build compare tree manually
-        for (integer i = 0; i < SIZE; i=i+1) begin
-            if (entries[i].valid && entries[i].dataAvail &&
-                (!outLMQ_c.valid || outLMQ_c.external || $signed(entries[i].sqN - outLMQ_c.sqN) <= 0)
-            ) begin
-                outLMQ_c = entries[i];
-                deq_c.valid = 1;
-                deq_c.idx = i[$clog2(SIZE)-1:0];
-            end
-        end
 
-        // immediately pass through incoming load if older
-        if (IN_uop.valid && IN_uop.dataAvail &&
-            (!outLMQ_c.valid || outLMQ_c.external || $signed(IN_uop.sqN - outLMQ_c.sqN) <= 0)
-        ) begin
+        if (deq_c.valid) begin
+            outLMQ_c = entries[deq_c.idx];
+            end
+        else if (IN_uop.valid && IN_uop.dataAvail) begin
             outLMQ_c = IN_uop;
-            deq_c = IdxN'{valid: 0, default: 'x};
+            // do not enqueue, we're forwarding
             enqLMQ_c = LoadResUOp'{valid: 0, default: 'x};
         end
     end
@@ -59,20 +54,11 @@ end
 // Get enqueue index
 IdxN enq;
 assign OUT_ready = enq.valid;
-always_comb begin
-    enq = IdxN'{valid: 0, default: 'x};
-
-    if (rst) ;
-    else begin
-        // TODO: optimize
-        for (integer i = 0; i < SIZE; i=i+1) begin
-            if (!entries[i].valid) begin
-                enq.valid = 1;
-                enq.idx = i[$clog2(SIZE)-1:0];
-            end
-        end
-    end
-end
+logic[SIZE-1:0] entryFree;
+always_comb
+    for (integer i = 0; i < SIZE; i=i+1)
+        entryFree[i] = !entries[i].valid;
+PriorityEncoder#(SIZE, 1) freeEnc(entryFree, '{enq.idx}, '{enq.valid});
 
 always_ff@(posedge clk) begin
     if (rst) begin
