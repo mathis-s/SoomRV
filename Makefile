@@ -125,10 +125,14 @@ prepare_header:
 	python scripts/prepare_header.py obj_dir/\*.h sim/model_headers.h
 
 $(SLANG_HEADER_OUTPUT): src/Config.sv src/Include.sv
-	mkdir -p sim/slang
-	slang-reflect $^ $(SLANG_FLAGS) --output-dir sim/slang/
-	mv sim/slang/.h $@
-	sed -i '/#include <systemc.h>/d' $@
+	@if [ -x "`command -v slang-reflect`" ]; then \
+	mkdir -p sim/slang && \
+	slang-reflect $^ $(SLANG_FLAGS) --output-dir sim/slang/ && \
+	mv sim/slang/.h $@ && \
+	sed -i '/#include <systemc.h>/d' $@;\
+	else \
+		echo "warning: Could not find slang-reflect, continuing without. Cosim will not be updated if parameters change.";\
+	fi
 
 .PHONY: clean
 clean:
