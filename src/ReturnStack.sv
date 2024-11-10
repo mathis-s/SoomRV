@@ -105,7 +105,7 @@ end
 assign OUT_lateRetAddr = OUT_curRetAddr;
 
 reg recoveryInProgress;
-assign OUT_stall = recoveryInProgress;
+assign OUT_stall = recoveryInProgress && (recoveryContinue_c || postRecSave.valid);
 FetchID_t recoveryID;
 FetchID_t recoveryBase;
 FetchOff_t recoveryOffs;
@@ -126,7 +126,21 @@ typedef struct packed
 PostRecSave postRecSave;
 
 wire queueEmpty = qindex_r == qindexEnd_r;
-wire queueFull = qindex_r == qindexEnd_r + RQSIZE;
+wire queueFull = qindex_r == (qindexEnd_r + $bits(qindex_r)'(RQSIZE));
+
+logic recoveryContinue_c;
+always_comb begin
+    FetchID_t queueRel = (rrqueue[qindex-1].fetchID - recoveryBase);
+    FetchID_t recRel = (recoveryID - recoveryBase);
+
+    recoveryContinue_c = !queueEmpty &&
+        (queueRel >  recRel ||
+        (queueRel == recRel &&
+            (recoveryOverwOwn ?
+                (rrqueue[qindex-1].offs >= recoveryOffs) :
+                (rrqueue[qindex-1].offs >  recoveryOffs))
+        ));
+end
 
 always_ff@(posedge clk) begin
 
@@ -156,7 +170,7 @@ always_ff@(posedge clk) begin
             forwardRindex <= 1;
             recoveryInProgress <= startRecovery;
             recoveryID <= IN_mispr.fetchID;
-            recoveryBase <= lastInvalComFetchID;
+            recoveryBase <= IN_comFetchID;
             recoveryOffs <= IN_mispr.fetchOffs;
             recoveryOverwOwn <= IN_mispr.isFetchBranch && !IN_returnUpd.valid;
 
@@ -175,16 +189,7 @@ always_ff@(posedge clk) begin
             rindexReg <= rindex;
             // Recover entries by copying from rrqueue back to stack after mispredict
             if (recoveryInProgress) begin
-
-                if (!queueEmpty &&
-                    // fine-grained compare based on fetch offs
-                    ( ((rrqueue[qindex-1].fetchID - recoveryBase) > (recoveryID - recoveryBase)) ||
-                    ((rrqueue[qindex-1].fetchID - recoveryBase) == (recoveryID - recoveryBase) &&
-                        (recoveryOverwOwn ?
-                            (rrqueue[qindex-1].offs >= recoveryOffs) :
-                            (rrqueue[qindex-1].offs >  recoveryOffs))
-                    ))
-                ) begin
+                if (recoveryContinue_c) begin
                     rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
                     rrqueue[qindex-1] <= 'x;
                     qindex_r <= qindex_r - 1; // entry restored, ok to overwrite
@@ -194,34 +199,18 @@ always_ff@(posedge clk) begin
                     if (postRecSave.valid) begin
                         postRecSave <= PostRecSave'{valid: 0, default: 'x};
 
-                        rrqueue[qindex].fetchID <= postRecSave.fetchID;
-                        rrqueue[qindex].offs <= postRecSave.offs;
-                        rrqueue[qindex].idx <= postRecSave.rIdx;
-                        rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
-                        rstack[postRecSave.rIdx] <= postRecSave.addr;
-                        qindex_r <= qindex_r + 1;
+                        if (!queueFull) begin
+                            rrqueue[qindex].fetchID <= postRecSave.fetchID;
+                            rrqueue[qindex].offs <= postRecSave.offs;
+                            rrqueue[qindex].idx <= postRecSave.rIdx;
+                            rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
+                            rstack[postRecSave.rIdx] <= postRecSave.addr;
+                            qindex_r <= qindex_r + 1;
+                        end
                     end
                 end
             end
-            // Delete committed (ie correctly speculated) entries from rrqueue
-            else if (lastInvalComFetchID != IN_comFetchID) begin
-
-                // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
-                // of easy ordering comparison. Thus, we have to do all comparisons relative
-                // to some base. We use the last checked fetchID as the base.
-                if (!queueEmpty &&
-                    (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
-                ) begin
-                    lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
-                    rrqueue[qindexEnd] <= 'x;
-                    qindexEnd_r <= qindexEnd_r + 1;
-                end
-                // There has been no speculated return in [lastInvalComFetchID, IN_comFetchID),
-                // nothing to do.
-                else lastInvalComFetchID <= IN_comFetchID;
-            end
-
-            if (lastValid) begin
+            else if (lastValid) begin
                 assert(!recoveryInProgress);
                 if (IN_branch.valid && IN_branch.btype == BT_RETURN) begin
 
@@ -239,8 +228,26 @@ always_ff@(posedge clk) begin
                     end
                 end
             end
-
         end
+
+        // Delete committed (ie correctly speculated) entries from rrqueue
+        if (lastInvalComFetchID != IN_comFetchID) begin
+
+            // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
+            // of easy ordering comparison. Thus, we have to do all comparisons relative
+            // to some base. We use the last checked fetchID as the base.
+            if (!queueEmpty &&
+                (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
+            ) begin
+                lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
+                rrqueue[qindexEnd] <= 'x;
+                qindexEnd_r <= qindexEnd_r + 1;
+            end
+            // There has been no speculated return in [lastInvalComFetchID, IN_comFetchID),
+            // nothing to do.
+            else lastInvalComFetchID <= IN_comFetchID;
+        end
+
     end
 end
 
