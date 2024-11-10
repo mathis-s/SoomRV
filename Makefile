@@ -91,6 +91,7 @@ SRC_FILES = \
 	src/Scheduler.sv \
 	src/ResultFlagsSplit.sv \
 	src/InstrAligner.sv \
+	src/RFReadMux.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

@@ -244,15 +244,7 @@ generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
     );
 end endgenerate
 
-RF_ReadReq[NUM_RF_READS-1:0] RF_reads;
 
-logic[NUM_RF_READS-1:0] RF_readEnable;
-RFTag[NUM_RF_READS-1:0] RF_readAddress;
-RegT[NUM_RF_READS-1:0] RF_readData;
-for (genvar i = 0; i < NUM_RF_READS; i=i+1) begin
-    assign RF_readEnable[i] = RF_reads[i].valid;
-    assign RF_readAddress[i] = RF_reads[i].tag;
-end
 logic[NUM_RF_WRITES-1:0] RF_writeEnable;
 RFTag[NUM_RF_WRITES-1:0] RF_writeAddress;
 RegT[NUM_RF_WRITES-1:0] RF_writeData;
@@ -263,13 +255,32 @@ always_comb begin
         RF_writeEnable[i] = resultUOps[i].valid && !resultUOps[i].tagDst[$bits(Tag)-1];
     end
 end
-RegFile#(32, 1 << $bits(RFTag), NUM_RF_READS, NUM_RF_WRITES, 1) rf
+
+RF_ReadReq[NUM_RF_READS-1:0] RFMUX_reads;
+logic[NUM_RF_READS-1:0] RFMUX_readReady;
+RegT[NUM_RF_READS-1:0] RFMUX_readData;
+RFReadMux#(NUM_RF_READS, NUM_RF_READS_PHY) rfMux
+(
+    .clk(clk),
+
+    .IN_read(RFMUX_reads),
+    .OUT_readReady(RFMUX_readReady),
+    .OUT_readData(RFMUX_readData),
+
+    .OUT_readEnable(RF_readEnable),
+    .OUT_readAddress(RF_readAddress),
+    .IN_readData(RF_readDataRaw)
+);
+logic[NUM_RF_READS_PHY-1:0] RF_readEnable;
+RFTag[NUM_RF_READS_PHY-1:0] RF_readAddress;
+RegT[NUM_RF_READS_PHY-1:0] RF_readDataRaw;
+RegFile#(32, 1 << $bits(RFTag), NUM_RF_READS_PHY, NUM_RF_WRITES, 1) rf
 (
     .clk(clk),
 
     .IN_re(RF_readEnable),
     .IN_raddr(RF_readAddress),
-    .OUT_rdata(RF_readData),
+    .OUT_rdata(RF_readDataRaw),
 
     .IN_we(RF_writeEnable),
     .IN_waddr(RF_writeAddress),
@@ -302,15 +313,13 @@ Load#(
     .OUT_pcRead(PC_readReq),
     .IN_pcReadData(PC_readData),
 
-    .OUT_rfReadReq(RF_reads[0 +: 2*NUM_ALUS + NUM_AGUS]),
-    .IN_rfReadData(RF_readData[0 +: 2*NUM_ALUS + NUM_AGUS]),
+    .OUT_rfReadReq(RFMUX_reads[0 +: 2*NUM_ALUS + NUM_AGUS]),
+    .IN_rfReadData(RFMUX_readData[0 +: 2*NUM_ALUS + NUM_AGUS]),
 
     .OUT_uop(LD_uop)
 );
 
 AMO_Data_UOp SDL_amoData[NUM_ALUS-1:0];
-logic SDL_readEnable[NUM_AGUS-1:0];
-RFTag SDL_readTag[NUM_AGUS-1:0];
 StDataUOp SDL_stDataUOp[NUM_AGUS-1:0];
 StoreDataLoad#(NUM_AGUS) stDataLd
 (
@@ -324,8 +333,9 @@ StoreDataLoad#(NUM_AGUS) stDataLd
 
     .IN_atomicUOp(SDL_amoData[NUM_AGUS-1:0]),
 
-    .OUT_readReq(RF_reads[NUM_RF_READS-1 -: NUM_AGUS]),
-    .IN_readData(RF_readData[NUM_RF_READS-1 -: NUM_AGUS]),
+    .OUT_readReq(RFMUX_reads[NUM_RF_READS-1 -: NUM_AGUS]),
+    .IN_readReady(RFMUX_readReady[NUM_RF_READS-1 -: NUM_AGUS]),
+    .IN_readData(RFMUX_readData[NUM_RF_READS-1 -: NUM_AGUS]),
 
     .OUT_uop(SDL_stDataUOp)
 );
