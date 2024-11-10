@@ -4,6 +4,8 @@
 #include "VTop_ReturnStack.h"
 #include "models/BranchHistory.hpp"
 #include "models/ReturnStack.hpp"
+#include "sc_stub.hpp"
+#include <csignal>
 #include <memory>
 #include <regex>
 #define TOOLCHAIN "riscv32-unknown-elf-"
@@ -20,12 +22,22 @@
 #include "Inst.hpp"
 #include "Registers.hpp"
 #include "Simif.hpp"
-#include "Utils.hpp"
 #include "Debug.hpp"
+#include "slang/slang.hpp"
+#define GET(type, raw) type{sc_bv<type::_size>{(char*)raw}}
 
 uint64_t DEBUG_TIME;
 
 #define LEN(x) (sizeof((x)) / sizeof((x[0])))
+std::unique_ptr<TopWrapper> wrap = std::make_unique<TopWrapper>();
+std::vector<uint32_t> pram(1 << 26);
+
+constexpr size_t SqN_Bits = R_UOp::sqN_w;
+constexpr size_t SqN_Mask = (1 << SqN_Bits) - 1;
+constexpr size_t FetchID_Bits = R_UOp::fetchID_w;
+constexpr size_t FetchID_Mask = (1 << FetchID_Bits) - 1;
+constexpr size_t Tag_Bits = R_UOp::tagA_w;
+constexpr size_t Tag_Mask = (1 << Tag_Bits) - 1;
 
 struct
 {
@@ -35,20 +47,15 @@ struct
 
     uint64_t committed = 0;
 
-    Inst pd[4];
-    Inst de[4];
-    Inst insts[128];
-    uint32_t phyRF[64];
-    FetchPacket fetches[32];
+    Inst pd[LEN(wrap->core->PD_instrs)];
+    Inst de[LEN(wrap->core->DE_uop)];
+    Inst insts[1 << SqN_Bits];
+    uint32_t phyRF[1 << (Tag_Bits - 1)];
+    FetchPacket fetches[1 << FetchID_Bits];
     FetchPacket fetch0;
     FetchPacket fetch1;
     int curCycInstRet = 0;
 } state;
-
-std::vector<Store> inFlightStores;
-
-std::unique_ptr<TopWrapper> wrap = std::make_unique<TopWrapper>();
-std::vector<uint32_t> pram(1 << 26);
 
 double sc_time_stamp()
 {
@@ -87,7 +94,6 @@ static void HandleInput()
 
 void DumpState(FILE* stream, Inst inst)
 {
-    auto core = wrap->top->Top->soc->core;
     fprintf(stream, "time=%lu\n", wrap->main_time);
     fprintf(stream, "ir=%.8lx ppc=%.8x inst=%.8x sqn=%.2x\n", wrap->csr->minstret, inst.pc, inst.inst,
             state.lastComSqN);
@@ -228,7 +234,7 @@ void LogResult(Inst& inst)
     if (wrap->main_time > DEBUG_TIME)
     {
         fprintf(konataFile, "S\t%u\t0\t%s\n", inst.id, "WFC");
-        if (!(inst.tag & 0x40))
+        if (!(inst.tag & (1 << Tag_Bits)))
             fprintf(konataFile, "L\t%u\t%u\tres=%.8x\n", inst.id, 1, inst.result);
     }
 #endif
@@ -273,15 +279,14 @@ void LogInstructions()
     auto core = wrap->top->Top->soc->core;
 
     bool brTaken = core->branch[0] & 1;
-    int brSqN = ExtractField(core->branch, 1 + 5 + 1 + 7 + 7, 8);
 
     // Issue
     for (size_t i = 0; i < LEN(core->LD_uop); i++)
     {
         if (!core->stall[i] && core->IS_uop[i][0] & 1)
         {
-            uint32_t sqn = ExtractField<4>(core->IS_uop[i], 116 - (32 + 12 + 1 + 7 + 1 + 7 + 1 + 7 + 7), 7);
-            LogIssue(state.insts[sqn]);
+            auto isUOp = GET(IS_UOp, core->IS_uop[i].data());
+            LogIssue(state.insts[isUOp.sqN]);
         }
     }
 
@@ -291,10 +296,12 @@ void LogInstructions()
         // EX valid
         if ((core->LD_uop[i][0] & 1) && !core->stall[i])
         {
-            uint32_t sqn = ExtractField(core->LD_uop[i], 1 + 1 + 4 + 7 + 7 + 1 + 5, 7);
-            state.insts[sqn].srcA = ExtractField(core->LD_uop[i], 183 - 32, 32);
-            state.insts[sqn].srcB = ExtractField(core->LD_uop[i], 183 - 32 - 32, 32);
-            state.insts[sqn].imm = ExtractField(core->LD_uop[i], 183 - 32 - 32 - 32 - 3 - 3 - 32, 32);
+            auto exUOp = GET(EX_UOp, core->LD_uop[i].data());
+
+            uint32_t sqn = exUOp.sqN;
+            state.insts[sqn].srcA = exUOp.srcA;
+            state.insts[sqn].srcB = exUOp.srcB;
+            state.insts[sqn].imm = exUOp.imm;
             LogExec(state.insts[sqn]);
         }
     }
@@ -302,16 +309,21 @@ void LogInstructions()
     // Flags
     for (size_t i = 0; i < LEN(core->flagUOps); i++)
     {
-        uint32_t sqn = (core->flagUOps[i] >> 6) & 127;
+
         // WB valid
         if ((core->flagUOps[i] & 1) && !(core->flagUOps[i] & 2))
         {
-            state.insts[sqn].flags = (core->flagUOps[i] >> 2) & 0xF;
+            auto flagsUOp = GET(FlagsUOp, &core->flagUOps[i]);
+            uint32_t sqn = flagsUOp.sqN;
+            state.insts[sqn].flags = flagsUOp.flags;
 
             // FP ops use a different flag encoding. These are not traps, so ignore them.
-            if ((state.insts[sqn].fu == 6 || state.insts[sqn].fu == 7 || state.insts[sqn].fu == 8) &&
-                state.insts[sqn].flags >= 8 && state.insts[sqn].flags <= 13)
-                state.insts[sqn].flags = 0;
+            const auto fp = {FuncUnit::FU_FPU, FuncUnit::FU_FMUL, FuncUnit::FU_FDIV};
+            if (std::find(fp.begin(), fp.end(), state.insts[sqn].fu) != fp.end())
+            {
+                if (state.insts[sqn].flags >= Flags::FLAGS_LD_MA && state.insts[sqn].flags < Flags::FLAGS_ST_PF)
+                    state.insts[sqn].flags = 0;
+            }
 
             LogResult(state.insts[sqn]);
         }
@@ -321,11 +333,13 @@ void LogInstructions()
     for (size_t i = 0; i < LEN(core->resultUOps); i++)
     {
         // WB valid
-        if ((core->resultUOps[i] & 1) && !(core->resultUOps[i] & 2))
+        if ((core->resultUOps[i] & 1))
         {
-            uint32_t tag = (core->resultUOps[i] >> 2) & 127;
-            uint32_t result = (core->resultUOps[i] >> 9) & 0xffff'ffff;
-            if (tag < 64)
+            auto resultUOp = GET(ResultUOp, &core->resultUOps[i]);
+
+            uint32_t tag = resultUOp.tagDst;
+            uint32_t result = resultUOp.result;
+            if (tag < LEN(state.phyRF))
                 state.phyRF[tag] = result;
         }
     }
@@ -333,22 +347,22 @@ void LogInstructions()
     // Commit
     {
         uint32_t curComSqN = core->ROB_curSqN;
-        for (size_t i = 0; i < 4; i++)
+        for (size_t i = 0; i < LEN(core->comUOps); i++)
         {
             if ((core->comUOps[i] & 1) && !core->mispredFlush)
             {
-                int sqn = (core->comUOps[i] >> 4) & 127;
+                auto comuOp = GET(CommitUOp, &core->comUOps[i]);
 
-                // assert(state.insts[sqn].valid);
-                // assert(state.insts[sqn].sqn == (uint32_t)sqn);
+                int sqn = comuOp.sqN;
 
                 bool isInterrupt = false;
                 bool isXRETinterrupt = false;
                 if (core->ROB_trapUOp & 1)
                 {
-                    int trapSQN = (core->ROB_trapUOp >> (15 + 14)) & 127;
-                    int flags = (core->ROB_trapUOp >> (29 + 14)) & 15;
-                    int rd = (core->ROB_trapUOp >> 10) & 31;
+                    auto trapUOp = GET(Trap_UOp, &core->ROB_trapUOp);
+                    int trapSQN = trapUOp.sqN;
+                    int flags = trapUOp.flags;
+                    int rd = trapUOp.rd;
                     isInterrupt = (trapSQN == sqn) && flags == 7 && rd == 16;
                     isXRETinterrupt =
                         (trapSQN == sqn) && ((flags == 5 || flags == 14) && core->rob->IN_interruptPending);
@@ -361,7 +375,7 @@ void LogInstructions()
                 state.insts[sqn].incMinstret = (core->ROB_perfcInfo & (1 << i));
 
                 state.lastComSqN = curComSqN;
-                if (state.insts[sqn].tag < 64)
+                if (state.insts[sqn].tag < LEN(state.phyRF))
                     state.insts[sqn].result = state.phyRF[state.insts[sqn].tag];
                 LogCommit(state.insts[sqn]);
                 mostRecentPC = state.insts[sqn].pc;
@@ -373,15 +387,17 @@ void LogInstructions()
     // Branch Taken
     if (brTaken)
     {
-        uint32_t i = (brSqN + 1) & 127;
+        auto branch = GET(BranchProv, core->branch.data());
+
+        uint32_t i = (branch.sqN + 1) & SqN_Mask;
         while (i != state.nextSqN)
         {
             if (state.insts[i].valid)
                 LogFlush(state.insts[i]);
-            i = (i + 1) & 127;
+            i = (i + 1) & SqN_Mask;
         }
 
-        for (size_t i = 0; i < 4; i++)
+        for (size_t i = 0; i < LEN(state.de); i++)
         {
             if (state.de[i].valid)
                 LogFlush(state.de[i]);
@@ -392,19 +408,20 @@ void LogInstructions()
     else
     {
         // Rename
-        for (size_t i = 0; i < 4; i++)
+        for (size_t i = 0; i < LEN(core->RN_uop); i++)
             if (core->RN_uop[i][0] & 1)
             {
-                int sqn = ExtractField(core->RN_uop[i], 46 + 7, 7);
-                int fu = ExtractField(core->RN_uop[i], 2 + 7, 4);
-                uint8_t tagDst = ExtractField(core->RN_uop[i], 46 + 7 - 7, 7);
+                auto rnUOp = GET(R_UOp, core->RN_uop[i].data());
+                int sqn = rnUOp.sqN;
+                int fu = rnUOp.fu;
+                auto tagDst = rnUOp.tagDst;
 
                 state.insts[sqn].valid = 1;
                 state.insts[sqn] = state.de[i];
                 state.insts[sqn].sqn = sqn;
                 state.insts[sqn].fu = fu;
                 state.insts[sqn].tag = tagDst;
-                state.nextSqN = (sqn + 1) & 127;
+                state.nextSqN = (sqn + 1) & SqN_Mask;
 
                 LogRename(state.insts[sqn]);
             }
@@ -412,11 +429,12 @@ void LogInstructions()
         // Decode
         if (core->frontendEn && !core->RN_stall)
         {
-            for (size_t i = 0; i < 4; i++)
-                if (wrap->top->Top->soc->core->DE_uop[i].at(0) & (1 << 0))
+            for (size_t i = 0; i < LEN(core->DE_uop); i++)
+                if (core->DE_uop[i][0] & (1 << 0))
                 {
+                    auto deUOp = GET(D_UOp, core->DE_uop[i].data());
                     state.de[i] = state.pd[i];
-                    state.de[i].rd = ExtractField(core->DE_uop[i], 80 - 32 - 12 - 5 - 5 - 1 - 5, 5);
+                    state.de[i].rd = deUOp.rd;
                     LogDecode(state.de[i]);
                 }
                 else
@@ -429,18 +447,17 @@ void LogInstructions()
         // Predec
         if (!core->RN_stall && core->frontendEn)
         {
-            for (size_t i = 0; i < 4; i++)
-                if ((core->PD_instrs[i].at(0) & 1))
+            for (size_t i = 0; i < LEN(core->PD_instrs); i++)
+                if ((core->PD_instrs[i][0] & 1))
                 {
+                    auto pdInstr = GET(PD_Instr, core->PD_instrs[i].data());
                     state.pd[i].valid = true;
                     state.pd[i].flags = 0;
                     state.pd[i].id = state.id++;
-                    state.pd[i].pc = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 124 - 12 - 31 - 32, 31) << 1;
-                    state.pd[i].inst = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 124 - 12 - 32, 32);
-                    state.pd[i].fetchID = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 4, 5);
-                    state.pd[i].predTarget = ExtractField(wrap->top->Top->soc->core->PD_instrs[i], 4 + 5 + 3, 31) << 1;
-                    // state.pd[i].retIdx =
-                    //     ExtractField(top->Top->soc->core->PD_instrs[i], 120 - 32 - 31 - 31 - 1 - 12 - 2, 2);
+                    state.pd[i].pc = pdInstr.pc << 1;
+                    state.pd[i].inst = pdInstr.instr;
+                    state.pd[i].fetchID = pdInstr.fetchID;
+                    state.pd[i].predTarget = pdInstr.predTarget << 1;
                     if ((state.pd[i].inst & 3) != 3)
                         state.pd[i].inst &= 0xffff;
 

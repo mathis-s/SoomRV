@@ -1,8 +1,8 @@
 VERILATOR_FLAGS = \
 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
-	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE -Wno-GENUNNAMED --x-assign unique --x-initial unique -O3 -sv \
+	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE -Wno-GENUNNAMED -O3 -sv \
 	$(VFLAGS) \
-	-CFLAGS "-march=native" \
+	-CFLAGS "-std=c++17 -march=native" \
 	-LDFLAGS "-ldl" \
 	-MAKEFLAGS -j$(nproc) \
 	-CFLAGS -DNOKONATA \
@@ -13,6 +13,18 @@ VERILATOR_FLAGS = \
 VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
 VERILATOR_TRACE_FLAGS = --trace --trace-fst --trace-structs --trace-max-width 128 --trace-max-array 256 -CFLAGS -DTRACE
+
+SLANG_FLAGS = \
+	--single-unit \
+	--std latest \
+	--allow-use-before-declare \
+	--relax-enum-conversions \
+	--ignore-unknown-modules \
+	--allow-toplevel-iface-ports \
+	-Wno-explicit-static \
+	-Wno-missing-top
+
+SLANG_HEADER_OUTPUT = sim/slang/slang.hpp
 
 SRC_FILES = \
 	src/Config.sv \
@@ -90,7 +102,7 @@ SRC_FILES = \
 	hardfloat/HardFloat_rawFN.v
 
 .PHONY: soomrv
-soomrv:
+soomrv: $(SLANG_HEADER_OUTPUT)
 	verilator $(VERILATOR_FLAGS) $(VERILATOR_CFG) $(SRC_FILES)
 
 .PHONY: linux
@@ -111,6 +123,12 @@ setup:
 .PHONY: prepare_header
 prepare_header:
 	python scripts/prepare_header.py obj_dir/\*.h sim/model_headers.h
+
+$(SLANG_HEADER_OUTPUT): src/Config.sv src/Include.sv
+	mkdir -p sim/slang
+	slang-reflect $^ $(SLANG_FLAGS) --output-dir sim/slang/
+	mv sim/slang/.h $@
+	sed -i '/#include <systemc.h>/d' $@
 
 .PHONY: clean
 clean:

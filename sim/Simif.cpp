@@ -289,8 +289,8 @@ void SpikeSimif::restore_from_top(TopWrapper& wrap, Inst& inst)
     // processor->put_csr(CSR_FFLAGS, csr->__PVT__fflags);
     // processor->put_csr(CSR_FRM, csr->__PVT__frm);
 
-    processor->put_csr(CSR_INSTRET, csr->minstret & 0xFFFFFFFF);
-    processor->put_csr(CSR_INSTRETH, csr->minstret >> 32);
+    processor->put_csr(CSR_INSTRET, (csr->minstret + 1) & 0xFFFFFFFF);
+    processor->put_csr(CSR_INSTRETH, (csr->minstret + 1) >> 32);
 
     processor->put_csr(CSR_MSTATUS, csr->__PVT__mstatus);
     processor->put_csr(CSR_MCOUNTEREN, csr->__PVT__mcounteren);

@@ -34,6 +34,7 @@
 
 // ROB Size
 `define ROB_SIZE_EXP 6
+`define RF_SIZE_EXP 6
 
 // PC at reset
 `define ENTRY_POINT (32'h8000_0000)
@@ -78,8 +79,6 @@
 
 // Enable floating point (zfinx) support
 //`define ENABLE_FP
-
-`define NUM_TAGS 64
 
 `define ENABLE_INT_DIV
 `define ENABLE_INT_MUL
