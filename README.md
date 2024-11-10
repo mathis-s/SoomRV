@@ -15,7 +15,7 @@ For running SoomRV on FPGA, have a look at the [SoomRV-Arty Repo](https://github
 - Implements RISC-V Privileged Spec (M/S/U mode, virtual memory, boots Linux)
 - IFetch: 16 byte fetch, TAGE direction predictor, recovering return stack
 - Memory: 2 loads per cycle, VIPT cache, late store data gathering, through-memory dependency tracking
-- Default configuration scores 4.92 CoreMark/MHz and 4.0 to 11.8 DMIPS/MHz depending on compiler flags (see CI).
+- Default configuration scores 5.42 CoreMark/MHz and 4.0 to 11.8 DMIPS/MHz depending on compiler flags (see CI).
 
 ## Simulating
 1. Install the [RV32 Linux Toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator (at least version 5.0).
