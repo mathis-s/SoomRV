@@ -253,12 +253,7 @@ always_comb begin
 
         if (uop.valid) begin
 
-            if (IN_instrs[i].predInvalid) begin
-                // A branch was predicted that is impossible considering actual instruction boundaries
-                assert(IN_instrs[i].predTaken);
-            end
-            else if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
-
+            if (IN_instrs[i].fetchFault != IF_FAULT_NONE) begin
                 uop.fu = FU_TRAP;
                 invalidEnc = 0;
 

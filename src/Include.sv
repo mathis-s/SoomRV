@@ -552,9 +552,7 @@ typedef struct packed
     FetchOff_t fetchStartOffs;
     FetchOff_t fetchPredOffs;
     logic[30:0] predTarget;
-    logic targetIsRetAddr;
     logic predTaken;
-    logic predInvalid;
     FetchID_t fetchID;
     IFetchFault fetchFault;
     logic is16bit;
