@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     git \
     autoconf \
     automake \
+    cmake \
     curl \
     bison \
     flex \
@@ -27,8 +28,12 @@ RUN apt-get update && apt-get install -y \
 ENV RISCV=/opt/riscv
 ENV PATH=$RISCV/bin:$PATH
 
-RUN git clone --recursive https://github.com/riscv-collab/riscv-gnu-toolchain.git && \
+RUN git clone https://github.com/riscv-collab/riscv-gnu-toolchain.git && \
     cd riscv-gnu-toolchain && \
+    git checkout 2024.10.28 && \
+    git submodule init && \
+    rm -rf qemu && \
+    git submodule update --recursive && \
     ./configure --prefix=/opt/riscv --with-arch=rv32imac_zba_zbb --with-abi=ilp32 && \
     make -j $(nproc) && \
     make install && \
@@ -49,6 +54,14 @@ RUN cd /opt && \
     rm -rf .git && \
     ./configure --with-xlen=32 --prefix=/opt/riscv/ && \
     make isa
+
+RUN cd /opt && \
+    wget https://github.com/MikePopoloski/slang/archive/refs/tags/v7.0.tar.gz -O slang.tar.gz && \
+    tar -xzf slang.tar.gz && \
+    cd slang-7.0 && \
+    cmake -B build && \
+    cmake --build build -j $(nproc) && \
+    cmake --install build --strip
 
 RUN riscv32-unknown-elf-gcc --version && verilator --version
 
