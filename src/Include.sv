@@ -1,9 +1,9 @@
 typedef logic[4:0] RegNm;
-typedef logic[6:0] Tag;
-typedef logic[5:0] RFTag;
+typedef logic[`RF_SIZE_EXP:0] Tag;
+typedef logic[`RF_SIZE_EXP-1:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[31:0] RegT;
-typedef logic[4:0] FetchID_t;
+typedef logic[5:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[$clog2(`RETURN_SIZE)-1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
@@ -251,7 +251,7 @@ typedef enum logic[3:0]
     FU_ATOMIC,
     FU_CSR,
     FU_TRAP
-} FuncUnit;
+} FuncUnit /* public */;
 
 typedef enum logic[3:0]
 {
@@ -277,7 +277,7 @@ typedef enum logic[3:0]
     // Invalid (or not-yet-executed) flag
     FLAGS_NX = 4'b1111
 
-} Flags;
+} Flags /* public */;
 
 // Floating Point Ops use a different flag encoding to store
 // floating point exceptions
@@ -464,6 +464,19 @@ typedef struct packed
 
 typedef struct packed
 {
+    TageID_t tageID;
+    logic altPred;
+
+    BHist_t history;
+    RetStackIdx_t rIdx;
+    logic isRegularBranch;
+    logic predTaken;
+    FetchOff_t predOffs;
+    logic pred;
+} BPBackup /* public */;
+
+typedef struct packed
+{
     logic isFetchBranch;
     BranchTargetSpec tgtSpec;
     FetchOff_t fetchOffs;
@@ -570,7 +583,7 @@ typedef struct packed
     FetchOff_t fetchOffs;
     logic compressed;
     logic valid;
-} D_UOp;
+} D_UOp /* public */;
 
 typedef struct packed
 {
@@ -595,7 +608,7 @@ typedef struct packed
     logic compressed;
     logic[NUM_PORTS_TOTAL-1:0] validIQ; // valids for individual Issue Queues
     logic valid;
-} R_UOp;
+} R_UOp /* public */;
 
 typedef struct packed
 {
@@ -616,7 +629,7 @@ typedef struct packed
     FuncUnit fu;
     logic compressed;
     logic valid;
-} IS_UOp;
+} IS_UOp /* public */;
 
 typedef struct packed
 {
@@ -664,7 +677,7 @@ typedef struct packed
     FuncUnit fu;
     logic compressed;
     logic valid;
-} EX_UOp;
+} EX_UOp /* public */;
 
 typedef struct packed
 {
@@ -674,7 +687,7 @@ typedef struct packed
     Flags flags;
     logic doNotCommit;
     logic valid;
-} RES_UOp;
+} RES_UOp /* public */;
 
 typedef struct packed
 {
@@ -683,7 +696,7 @@ typedef struct packed
     Flags flags;
     logic doNotCommit;
     logic valid;
-} FlagsUOp;
+} FlagsUOp /* public */;
 
 typedef struct packed
 {
@@ -691,7 +704,7 @@ typedef struct packed
     Tag tagDst;
     logic doNotCommit;
     logic valid;
-} ResultUOp;
+} ResultUOp /* public */;
 
 typedef struct packed
 {
@@ -889,7 +902,7 @@ typedef struct packed
     logic branchTaken;
     logic compressed;
     logic valid;
-} CommitUOp;
+} CommitUOp /* public */;
 
 typedef struct packed
 {
@@ -904,8 +917,7 @@ typedef struct packed
     FetchID_t fetchID;
     logic compressed;
     logic valid;
-
-} Trap_UOp;
+} Trap_UOp /* public */;
 
 typedef struct packed
 {

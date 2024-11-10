@@ -41,19 +41,6 @@ module BranchPredictor
 
 assign OUT_stall = RET_stall;
 
-typedef struct packed
-{
-    TageID_t tageID;
-    logic altPred;
-
-    BHist_t history;
-    RetStackIdx_t rIdx;
-    logic isRegularBranch;
-    logic predTaken;
-    FetchOff_t predOffs;
-    logic pred;
-} BPBackup;
-
 BPBackup bpBackup;
 always_comb begin
     bpBackup.history = history;

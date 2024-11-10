@@ -24,7 +24,7 @@ module TagBuffer
 );
 // half of tag space is for eliminating immediates
 localparam PTAG_LEN = $bits(Tag) - 1;
-localparam NUM_TAGS = `NUM_TAGS;
+localparam NUM_TAGS = 1 << PTAG_LEN;
 
 logic[NUM_TAGS-1:0] free /*verilator public*/;
 logic[NUM_TAGS-1:0] freeCom /*verilator public*/;

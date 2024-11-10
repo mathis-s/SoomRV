@@ -18,7 +18,7 @@ struct Inst
     uint8_t sqn;
     uint8_t fu;
     uint8_t rd;
-    uint8_t tag;
+    uint16_t tag;
     uint8_t flags;
     uint8_t interruptCause;
     uint8_t retIdx;

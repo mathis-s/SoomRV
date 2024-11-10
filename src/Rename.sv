@@ -40,7 +40,7 @@ typedef struct packed
     logic valid;
 } LrScRsv;
 
-reg[3:0] portStall;
+reg[WIDTH_ISSUE-1:0] portStall;
 always_comb begin
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
         portStall[i] = 0;
@@ -72,8 +72,8 @@ Tag RAT_wbTags[WIDTH_WR-1:0];
 
 SqN nextCounterSqN;
 
-reg isSc[3:0];
-reg scSuccessful[3:0];
+reg isSc[WIDTH_ISSUE-1:0];
+reg scSuccessful[WIDTH_ISSUE-1:0];
 
 always_comb begin
 

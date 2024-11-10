@@ -7,6 +7,8 @@
 
 #include "../model_headers.h"
 #include "riscv/processor.h"
+#include "../sc_stub.hpp"
+#include "../slang/slang.hpp"
 
 
 class BranchHistory : public Model
@@ -14,22 +16,17 @@ class BranchHistory : public Model
   public:
     uint64_t bhist = 0;
     bool historyEqual;
-
     uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs)
     {
 #ifdef COSIM
         auto core = top->Top->soc->core;
         auto bpFile = core->ifetch->bp->bpFile->mem;
-        bool pred = ExtractField(bpFile[fetchID], 0, 1);
-        uint8_t predOffs = ExtractField(bpFile[fetchID], 1, 3);
-        bool predTaken = ExtractField(bpFile[fetchID], 4, 1);
-        bool isRegularBranch = ExtractField(bpFile[fetchID], 5, 1);
-        uint64_t history = ExtractField(bpFile[fetchID], 11, 32) |
-            ((uint64_t)ExtractField(bpFile[fetchID], 11+32, 32) << 32);
 
-        if (pred && isRegularBranch && fetchOffs > predOffs)
-            return (history << 1) | predTaken;
-        return history;
+        BPBackup backup{sc_bv<BPBackup::_size>{(char*)bpFile[fetchID].data()}};
+
+        if (backup.pred && backup.isRegularBranch && fetchOffs > backup.predOffs)
+            return (backup.history << 1) | backup.predTaken;
+        return backup.history;
 #else
         return 0;
 #endif
