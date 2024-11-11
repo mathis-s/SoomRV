@@ -93,12 +93,13 @@ parameter NUM_ALUS = 3;
 // How many of the ALU ports support branches?
 parameter NUM_BRANCH_PORTS = 2;
 
-
 parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
 parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
 parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
 parameter NUM_RF_READS_PHY = NUM_ALUS * 2 + NUM_AGUS * 1;
 parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
+
+parameter SQ_DEQ_PORTS = 2;
 
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
     8,

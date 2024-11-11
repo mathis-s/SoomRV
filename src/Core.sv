@@ -521,7 +521,9 @@ PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[NUM_AGUS-1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
-assign PW_LD_uop[1] = PW_LD_UOp'{valid: 0, default: 'x};
+always_comb
+    for (integer i = 1; i < NUM_AGUS; i=i+1)
+        PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
 PageWalker#(NUM_AGUS+1) pageWalker
 (
     .clk(clk),
@@ -630,9 +632,9 @@ StFwdResult SQB_fwd[NUM_AGUS-1:0];
 
 SqN SQ_maxStoreSqN;
 wire SQ_flush;
-SQ_UOp SQ_uops[NUM_AGUS-1:0];
-wire SQ_stall[NUM_AGUS-1:0];
-StoreQueue sq
+SQ_UOp SQ_uops[SQ_DEQ_PORTS-1:0];
+wire SQ_stall[SQ_DEQ_PORTS-1:0];
+StoreQueue#(.NUM_OUT(SQ_DEQ_PORTS)) sq
 (
     .clk(clk),
     .rst(rst),
@@ -661,7 +663,7 @@ StoreQueue sq
 
 ST_UOp SQB_uop;
 wire SQB_busy;
-StoreQueueBackend sqb
+StoreQueueBackend#(.NUM_IN(SQ_DEQ_PORTS)) sqb
 (
     .clk(clk),
     .rst(rst),

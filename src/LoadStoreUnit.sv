@@ -70,6 +70,9 @@ module LoadStoreUnit
     output FlagsUOp OUT_flagsUOp[NUM_AGUS-1:0]
 );
 
+localparam PORT_IDX_BITS = NUM_AGUS == 1 ? 1 : $clog2(NUM_AGUS);
+typedef logic[PORT_IDX_BITS-1:0] PortIdx;
+
 LoadResUOp ldResUOp[NUM_AGUS-1:0];
 
 MemController_Req BLSU_memc;
@@ -92,9 +95,9 @@ wire isCacheBypassStUOp =
 
 wire ignoreSt = isCacheBypassStUOp;
 
-wire[$clog2(NUM_AGUS)-1:0] blsuLdIdx;
+PortIdx blsuLdIdx;
 wire blsuLdIdxValid;
- OHEncoder#(NUM_AGUS, 1) ohEnc(
+OHEncoder#(NUM_AGUS, 1) ohEnc(
     .IN_idxOH(isCacheBypassLdUOp), .OUT_idx(blsuLdIdx), .OUT_valid(blsuLdIdxValid));
 
 wire BLSU_stStall;
@@ -140,7 +143,7 @@ end
 // Loads work fine but require write forwaring in the cache table.
 assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) || !uopStPortValid) && IN_uopSt.valid;
 
-reg[$clog2(NUM_AGUS)-1:0] uopStPort;
+PortIdx uopStPort;
 reg uopStPortValid;
 
 always_comb begin
@@ -162,11 +165,10 @@ assign uopSt = IN_uopSt;
 // Both load and store read from cache table
 always_comb begin
 
-    IF_ct.re[0] = uopLd[0].valid && !uopLd[0].isMMIO;
-    IF_ct.raddr[0] = uopLd[0].addr[`VIRT_IDX_LEN-1:0];
-
-    IF_ct.re[1] = uopLd[1].valid && !uopLd[1].isMMIO;
-    IF_ct.raddr[1] = uopLd[1].addr[`VIRT_IDX_LEN-1:0];
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+        IF_ct.re[i] = uopLd[i].valid && !uopLd[i].isMMIO;
+        IF_ct.raddr[i] = uopLd[i].addr[`VIRT_IDX_LEN-1:0];
+    end
 
     if (uopStPortValid) begin
         IF_ct.re[uopStPort] = uopSt.valid && !uopSt.isMMIO && !(isCacheBypassStUOp || OUT_stStall) && !ignoreSt;
@@ -180,20 +182,25 @@ always_comb begin
     end
 end
 
-reg[$clog2(NUM_AGUS)-1:0] startIdx;
-always_ff@(posedge clk)
-    startIdx <= rst ? 0 : (startIdx + 1);
-
-// Stores only go through port 0. To still make port
-// pressure even we shuffle incoming loads.
-reg[NUM_AGUS-1:0][$clog2(NUM_AGUS)-1:0] idxs_c;
-always_comb begin
-    for (integer i = 0; i < NUM_AGUS; i=i+1)
-        idxs_c[i] = startIdx + $clog2(NUM_AGUS)'(i);
-end
-
-reg[NUM_AGUS-1:0][$clog2(NUM_AGUS)-1:0] idxs_r;
+PortIdx[NUM_AGUS-1:0] idxs_c;
+PortIdx[NUM_AGUS-1:0] idxs_r;
 always_ff@(posedge clk) idxs_r <= idxs_c;
+
+if (NUM_AGUS > 1) begin
+    PortIdx startIdx;
+    always_ff@(posedge clk)
+        startIdx <= rst ? 0 : (startIdx + 1);
+
+    // Stores only go through port 0. To still make port
+    // pressure even we shuffle incoming loads.
+    always_comb begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1)
+            idxs_c[i] = startIdx + PortIdx'(i);
+    end
+end
+else begin
+    always_comb idxs_c[0] = 0;
+end
 
 reg[NUM_AGUS-1:0] regularLd_c;
 reg[NUM_AGUS-1:0] regularLd_r;
@@ -210,7 +217,7 @@ always_comb begin
     end
 
     for (integer i = NUM_AGUS-1; i >= 0; i=i-1) begin
-        reg[$clog2(NUM_AGUS)-1:0] idx = idxs_c[i];
+        PortIdx idx = idxs_c[i];
 
         uopLd[i] = 'x;
         uopLd[i].valid = 0;
@@ -223,7 +230,7 @@ always_comb begin
         if (flushActive) begin
             // do not issue load
         end
-        else if (i[$clog2(NUM_AGUS)-1:0] == stOpPort[1] && stOps[1].valid) begin
+        else if (PortIdx'(i) == stOpPort[1] && stOps[1].valid) begin
             // port is being used by store during store's write cycle
         end
         else if (i == 1 && cacheTableWrite) begin
@@ -255,7 +262,7 @@ end
 LD_UOp uopLd_0[NUM_AGUS-1:0];
 always_comb begin
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-        reg[$clog2(NUM_AGUS)-1:0] idx = idxs_r[i];
+        PortIdx idx = idxs_r[i];
         uopLd_0[i] = ldOps[i][0];
 
         // For regular loads, we only get the full address and other
@@ -305,7 +312,7 @@ end
 // delay lines, waiting for cache response
 LD_UOp ldOps[NUM_AGUS-1:0][1:0];
 ST_UOp stOps[1:0];
-reg[$clog2(NUM_AGUS)-1:0] stOpPort[1:0];
+PortIdx stOpPort[1:0];
 
 reg loadWasExtIOBusy[NUM_AGUS-1:0];
 reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
@@ -439,7 +446,7 @@ always_comb begin
 
         // only one of these is valid
         LD_UOp ld = ldOps[i][1];
-        ST_UOp st = (i[$clog2(NUM_AGUS)-1:0] == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
+        ST_UOp st = (PortIdx'(i) == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
         assert(!(ld.valid && st.valid));
 
         if (!ld.valid && !st.valid && !blsuLoadHandled)
