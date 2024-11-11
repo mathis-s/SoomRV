@@ -3,7 +3,7 @@ typedef logic[`RF_SIZE_EXP:0] Tag;
 typedef logic[`RF_SIZE_EXP-1:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[31:0] RegT;
-typedef logic[5:0] FetchID_t;
+typedef logic[4:0] FetchID_t;
 typedef logic[2:0] FetchOff_t;
 typedef logic[$clog2(`RETURN_SIZE)-1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
