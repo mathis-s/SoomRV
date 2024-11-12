@@ -9,6 +9,7 @@ module MemoryController
 
     output ICacheIF OUT_icacheW,
     output CacheIF OUT_dcacheW,
+    input logic IN_dcacheRReady,
     output CacheIF OUT_dcacheR,
     input wire[32*`CWIDTH-1:0] IN_dcacheR,
 
@@ -455,7 +456,7 @@ CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 32, `AXI_ID_LEN) dcac
     .OUT_data(DCR_data),
     .OUT_last(DCR_dataLast),
 
-    .IN_CACHE_ready(1'b1),
+    .IN_CACHE_ready(IN_dcacheRReady),
     .OUT_CACHE_ce(OUT_dcacheR.ce),
     .OUT_CACHE_we(OUT_dcacheR.we),
     .OUT_CACHE_addr(OUT_dcacheR.addr),

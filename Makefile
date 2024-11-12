@@ -92,6 +92,8 @@ SRC_FILES = \
 	src/ResultFlagsSplit.sv \
 	src/InstrAligner.sv \
 	src/RFReadMux.sv \
+	src/CacheArbiter.sv \
+	src/MemRTL1RW.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

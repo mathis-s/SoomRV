@@ -1077,18 +1077,17 @@ interface IF_Cache();
     logic[NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
     logic[NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
     logic[NUM_AGUS-1:0] busy;
-    logic[NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
 
     modport HOST
     (
         output we, wassoc, wdata, wmask, re, addr,
-        input rdata, busy, rbusyBank
+        input rdata, busy
     );
 
     modport MEM
     (
         input we, wassoc, wdata, wmask, re, addr,
-        output rdata, busy, rbusyBank
+        output rdata, busy
     );
 endinterface
 
