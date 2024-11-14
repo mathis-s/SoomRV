@@ -203,87 +203,90 @@ always_ff@(posedge clk) begin
         OUT_fwd[i].valid <= 0;
     end
 
+    if (OUT_uopSt.valid) begin
+        OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
+        if (IN_stallSt)
+            evicted[OUT_uopSt.id].issued <= 0;
+    end
+
+    if (stAck_r.valid && stAck_r.nonce == evicted[stAck_r.idx].nonce) begin
+        // delete if store ack has most recent nonce and successful
+        if (evicted[stAck_r.idx].nonce == stAck_r.nonce) begin
+            evicted[stAck_r.idx].issued <= 0;
+            if (!stAck_r.fail) begin
+                evicted[stAck_r.idx] <= 'x;
+                evicted[stAck_r.idx].wmask <= 0;
+                evicted[stAck_r.idx].valid <= 0;
+            end
+        end
+    end
+
+    // Issue op from evicted
+    if (reIssue.valid) begin
+        evicted[reIssue.idx].issued <= 1;
+
+        OUT_uopSt.valid <= 1;
+        OUT_uopSt.id <= reIssue.idx;
+        OUT_uopSt.nonce <= evicted[reIssue.idx].nonce;
+        OUT_uopSt.addr <= {evicted[reIssue.idx].addr, 2'b0};
+        OUT_uopSt.data <= evicted[reIssue.idx].data;
+        OUT_uopSt.wmask <= evicted[reIssue.idx].wmask;
+        OUT_uopSt.isMgmt <= evicted[reIssue.idx].isMgmt;
+        OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssue.idx].addr);
+    end
+
+    // Enqueue into evicted
+    if (fusedUOp_r.valid && evInsert.valid) begin
+        reg[`AXI_WIDTH-1:0] data = 'x;
+        reg[`AXI_WIDTH/8-1:0] mask = 'x;
+        StNonce_t newNonce = evicted[evInsert.idx].nonce + 1;
+
+        mask = evicted[evInsert.idx].wmask | fusedUOp_r.wmask;
+        data = evicted[evInsert.idx].data;
+        for (integer i = 0; i < AXI_BWIDTH; i=i+1)
+            if (fusedUOp_r.wmask[i] || fusedUOp_r.wmask == 0)
+                data[i*8+:8] = fusedUOp_r.data[i*8+:8];
+
+        evicted[evInsert.idx].data <= data;
+        evicted[evInsert.idx].wmask <= mask;
+        evicted[evInsert.idx].addr <= fusedUOp_r.addr;
+        evicted[evInsert.idx].issued <= 0;
+        evicted[evInsert.idx].nonce <= newNonce;
+        evicted[evInsert.idx].isMgmt <= fusedUOp_r.isMgmt;
+        evicted[evInsert.idx].valid <= 1;
+
+        if (!reIssue.valid) begin
+            evicted[evInsert.idx].issued <= 1;
+
+            OUT_uopSt.valid <= 1;
+            OUT_uopSt.id <= evInsert.idx;
+            OUT_uopSt.nonce <= newNonce;
+            OUT_uopSt.addr <= {fusedUOp_r.addr, 2'b0};
+            OUT_uopSt.data <= data;
+            OUT_uopSt.wmask <= mask;
+            OUT_uopSt.isMgmt <= fusedUOp_r.isMgmt;
+            OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(fusedUOp_r.addr);
+        end
+
+    end
+
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
+        if (IN_uopLd[i].valid) begin
+            OUT_fwd[i].valid <= 1;
+            OUT_fwd[i].data <= lookupData[i];
+            OUT_fwd[i].mask <= lookupMask[i];
+            OUT_fwd[i].conflict <= 0;
+        end
+
     if (rst) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+            OUT_fwd[i] <= 'x;
+            OUT_fwd[i].valid <= 0;
+        end
+
         for (integer i = 0; i < NUM_EVICTED; i=i+1)
             evicted[i].valid <= 0;
         OUT_uopSt.valid <= 0;
-    end
-    else begin
-
-        if (OUT_uopSt.valid) begin
-            OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
-            if (IN_stallSt)
-                evicted[OUT_uopSt.id].issued <= 0;
-        end
-
-        if (stAck_r.valid && stAck_r.nonce == evicted[stAck_r.idx].nonce) begin
-            // delete if store ack has most recent nonce and successful
-            if (evicted[stAck_r.idx].nonce == stAck_r.nonce) begin
-                evicted[stAck_r.idx].issued <= 0;
-                if (!stAck_r.fail) begin
-                    evicted[stAck_r.idx] <= 'x;
-                    evicted[stAck_r.idx].wmask <= 0;
-                    evicted[stAck_r.idx].valid <= 0;
-                end
-            end
-        end
-
-        // Issue op from evicted
-        if (reIssue.valid) begin
-            evicted[reIssue.idx].issued <= 1;
-
-            OUT_uopSt.valid <= 1;
-            OUT_uopSt.id <= reIssue.idx;
-            OUT_uopSt.nonce <= evicted[reIssue.idx].nonce;
-            OUT_uopSt.addr <= {evicted[reIssue.idx].addr, 2'b0};
-            OUT_uopSt.data <= evicted[reIssue.idx].data;
-            OUT_uopSt.wmask <= evicted[reIssue.idx].wmask;
-            OUT_uopSt.isMgmt <= evicted[reIssue.idx].isMgmt;
-            OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(evicted[reIssue.idx].addr);
-        end
-
-        // Enqueue into evicted
-        if (fusedUOp_r.valid && evInsert.valid) begin
-            reg[`AXI_WIDTH-1:0] data = 'x;
-            reg[`AXI_WIDTH/8-1:0] mask = 'x;
-            StNonce_t newNonce = evicted[evInsert.idx].nonce + 1;
-
-            mask = evicted[evInsert.idx].wmask | fusedUOp_r.wmask;
-            data = evicted[evInsert.idx].data;
-            for (integer i = 0; i < AXI_BWIDTH; i=i+1)
-                if (fusedUOp_r.wmask[i] || fusedUOp_r.wmask == 0)
-                    data[i*8+:8] = fusedUOp_r.data[i*8+:8];
-
-            evicted[evInsert.idx].data <= data;
-            evicted[evInsert.idx].wmask <= mask;
-            evicted[evInsert.idx].addr <= fusedUOp_r.addr;
-            evicted[evInsert.idx].issued <= 0;
-            evicted[evInsert.idx].nonce <= newNonce;
-            evicted[evInsert.idx].isMgmt <= fusedUOp_r.isMgmt;
-            evicted[evInsert.idx].valid <= 1;
-
-            if (!reIssue.valid) begin
-                evicted[evInsert.idx].issued <= 1;
-
-                OUT_uopSt.valid <= 1;
-                OUT_uopSt.id <= evInsert.idx;
-                OUT_uopSt.nonce <= newNonce;
-                OUT_uopSt.addr <= {fusedUOp_r.addr, 2'b0};
-                OUT_uopSt.data <= data;
-                OUT_uopSt.wmask <= mask;
-                OUT_uopSt.isMgmt <= fusedUOp_r.isMgmt;
-                OUT_uopSt.isMMIO <= `IS_MMIO_PMA_W(fusedUOp_r.addr);
-            end
-
-        end
-
-        for (integer i = 0; i < NUM_AGUS; i=i+1)
-            if (IN_uopLd[i].valid) begin
-                OUT_fwd[i].valid <= 1;
-                OUT_fwd[i].data <= lookupData[i];
-                OUT_fwd[i].mask <= lookupMask[i];
-                OUT_fwd[i].conflict <= 0;
-            end
     end
 end
 

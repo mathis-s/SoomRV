@@ -141,7 +141,7 @@ end
 // During a cache table write cycle, we cannot issue a store as
 // the cache table write port is the same as the store read port.
 // Loads work fine but require write forwaring in the cache table.
-assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (cacheTableWrite || flushActive)) || !uopStPortValid) && IN_uopSt.valid;
+assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (flushActive)) || !uopStPortValid) && IN_uopSt.valid;
 
 PortIdx uopStPort;
 reg uopStPortValid;
@@ -322,6 +322,7 @@ always_ff@(posedge clk) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1)
         for (integer j = 0; j < 2; j=j+1) begin
+            loadCacheAccessFailed[i][j] <= 'x;
             ldOps[i][j] <= 'x;
             ldOps[i][j].valid <= 0;
         end
@@ -454,8 +455,7 @@ always_comb begin
 
         curLd[i] = ld;
 
-        if (rst) ; // todo: really needed?
-        else if (st.valid) begin
+        if (st.valid) begin
             reg cacheHit = 0;
             reg cacheTableHit = 1;
             reg doCacheLoad = 1;
@@ -667,26 +667,25 @@ LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
 
 // Store Pipeline
 always_ff@(posedge clk) begin
+    stOps[0] <= 'x;
+    stOps[0].valid <= 0;
+    stOps[1] <= 'x;
+    stOps[1].valid <= 0;
+
+    // Progress the delay line
+    if (uopSt.valid && !OUT_stStall) begin
+        stOps[0] <= uopSt;
+        stOpPort[0] <= uopStPort;
+    end
+
+    if (stOps[0].valid) begin
+        stOps[1] <= stOps[0];
+        stOpPort[1] <= stOpPort[0];
+    end
+
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
             stOps[i].valid <= 0;
-    end
-    else begin
-        stOps[0] <= 'x;
-        stOps[0].valid <= 0;
-        stOps[1] <= 'x;
-        stOps[1].valid <= 0;
-
-        // Progress the delay line
-        if (uopSt.valid && !OUT_stStall) begin
-            stOps[0] <= uopSt;
-            stOpPort[0] <= uopStPort;
-        end
-
-        if (stOps[0].valid) begin
-            stOps[1] <= stOps[0];
-            stOpPort[1] <= stOpPort[0];
-        end
     end
 end
 
@@ -815,7 +814,7 @@ always_comb begin;
     IF_ct.wassoc = 'x;
     newMiss = 0;
 
-    if (!rst && state == IDLE) begin
+    if (state == IDLE) begin
         for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (forwardMiss[i]) begin
                 newMiss = 1;
@@ -848,7 +847,7 @@ always_comb begin;
             end
         end
     end
-    else if (!rst && state == FLUSH) begin
+    else if (state == FLUSH) begin
         if (!flushDone) begin
             IF_ct.we = 1;
             IF_ct.waddr = {flushIdx, {`CLSIZE_E{1'b0}}};
@@ -904,6 +903,120 @@ always_ff@(posedge clk) begin
         LSU_memc.cmd <= MEMC_NONE;
     end
 
+    if (IN_flush) flushQueued <= 1;
+    if (setDirty) dirty[setDirtyIdx] <= 1;
+
+    case (state)
+        IDLE: begin
+            for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+
+                reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
+                MissType missType = miss[i].mtype;
+
+                if (forwardMiss[i]) begin
+                    assocCnt <= assocCnt + 1;
+
+                    // if not dirty, do not copy back to main memory
+                    if (missType == REGULAR && !dirty[missIdx] && (!setDirty || setDirtyIdx != missIdx))
+                        missType = REGULAR_NO_EVICT;
+
+                    case (missType)
+                        REGULAR: begin
+                            LSU_memc.cmd <= MEMC_REPLACE;
+                            LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
+                            LSU_memc.writeAddr <= {miss[i].writeAddr[31:`VIRT_IDX_LEN], miss[i].missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
+                            LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
+                            LSU_memc.cacheID <= 0;
+                            LSU_memc.mask <= 0;
+                        end
+
+                        REGULAR_NO_EVICT: begin
+                            LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
+                            LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
+                            LSU_memc.writeAddr <= 'x;
+                            LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
+                            LSU_memc.cacheID <= 0;
+                            LSU_memc.mask <= 0;
+                        end
+
+                        MGMT_CLEAN,
+                        MGMT_FLUSH: begin
+                            LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                            LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
+                            LSU_memc.writeAddr <= {miss[i].writeAddr[31:`VIRT_IDX_LEN], miss[i].missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
+                            LSU_memc.readAddr <= 'x;
+                            LSU_memc.cacheID <= 0;
+                            LSU_memc.mask <= 0;
+                        end
+                        default: ; // MGMT_INVAL does not evict the cache line
+                    endcase
+
+                    // We can forward a single store to the memory controller, which will then splice
+                    // the store value into the data stream from external RAM.
+                    if ((missType == REGULAR || missType == REGULAR_NO_EVICT) && stOps[1].valid && fuseStoreMiss) begin
+                        LSU_memc.mask <= stOps[1].wmask;
+                        LSU_memc.data <= stOps[1].data;
+                        dirty[missIdx] <= 1;
+                    end
+                    else begin
+                        // new cache line is not dirty
+                        dirty[missIdx] <= 0;
+                    end
+                end
+            end
+
+            if (flushQueued && flushReady) begin
+                state <= FLUSH_WAIT;
+                flushQueued <= 0;
+                flushIdx <= 0;
+                flushAssocIdx <= 0;
+                flushDone <= 0;
+            end
+        end
+
+        FLUSH_WAIT: begin
+            state <= FLUSH_READ0;
+            if (LSU_memc.cmd != MEMC_NONE || BLSU_memc.cmd != MEMC_NONE)
+                state <= FLUSH_WAIT;
+            for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
+                if (IN_memc.transfers[i].valid) state <= FLUSH_WAIT;
+        end
+        FLUSH_READ0: begin
+            state <= FLUSH_READ1;
+        end
+        FLUSH_READ1: begin
+            state <= FLUSH;
+        end
+        FLUSH: begin
+            if (flushDone) begin
+                state <= FLUSH_FINALIZE;
+                initialFlush <= 0;
+            end
+            else if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
+                CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
+
+                if (entry.valid && dirty[{flushAssocIdx, flushIdx}] && !initialFlush) begin
+                    LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
+                    LSU_memc.cacheAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
+                    LSU_memc.writeAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
+                    LSU_memc.readAddr <= 'x;
+                    LSU_memc.cacheID <= 0;
+                    LSU_memc.mask <= 0;
+                end
+
+                {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
+                if (flushAssocIdx == $clog2(`CASSOC)'(`CASSOC-1)) state <= FLUSH_READ0;
+            end
+        end
+        FLUSH_FINALIZE: begin
+            state <= IDLE;
+            for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
+                if (IN_memc.transfers[i].valid)
+                    state <= FLUSH_FINALIZE;
+        end
+        default: state <= IDLE;
+    endcase
+
     if (rst) begin
         state <= IDLE;
         flushQueued <= 1;
@@ -911,122 +1024,6 @@ always_ff@(posedge clk) begin
         LSU_memc <= 'x;
         LSU_memc.cmd <= MEMC_NONE;
         assocCnt <= 0;
-    end
-    else begin
-
-        if (IN_flush) flushQueued <= 1;
-        if (setDirty) dirty[setDirtyIdx] <= 1;
-
-        case (state)
-            IDLE: begin
-                for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-
-                    reg[$clog2(SIZE)-1:0] missIdx = {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
-                    MissType missType = miss[i].mtype;
-
-                    if (forwardMiss[i]) begin
-                        assocCnt <= assocCnt + 1;
-
-                        // if not dirty, do not copy back to main memory
-                        if (missType == REGULAR && !dirty[missIdx] && (!setDirty || setDirtyIdx != missIdx))
-                            missType = REGULAR_NO_EVICT;
-
-                        case (missType)
-                            REGULAR: begin
-                                LSU_memc.cmd <= MEMC_REPLACE;
-                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
-                                LSU_memc.writeAddr <= {miss[i].writeAddr[31:`VIRT_IDX_LEN], miss[i].missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
-                                LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
-                                LSU_memc.cacheID <= 0;
-                                LSU_memc.mask <= 0;
-                            end
-
-                            REGULAR_NO_EVICT: begin
-                                LSU_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
-                                LSU_memc.writeAddr <= 'x;
-                                LSU_memc.readAddr <= {miss[i].missAddr[31:2], 2'b0};
-                                LSU_memc.cacheID <= 0;
-                                LSU_memc.mask <= 0;
-                            end
-
-                            MGMT_CLEAN,
-                            MGMT_FLUSH: begin
-                                LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                                LSU_memc.cacheAddr <= {miss[i].assoc, miss[i].missAddr[`VIRT_IDX_LEN-1:2]};
-                                LSU_memc.writeAddr <= {miss[i].writeAddr[31:`VIRT_IDX_LEN], miss[i].missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
-                                LSU_memc.readAddr <= 'x;
-                                LSU_memc.cacheID <= 0;
-                                LSU_memc.mask <= 0;
-                            end
-                            default: ; // MGMT_INVAL does not evict the cache line
-                        endcase
-
-                        // We can forward a single store to the memory controller, which will then splice
-                        // the store value into the data stream from external RAM.
-                        if ((missType == REGULAR || missType == REGULAR_NO_EVICT) && stOps[1].valid && fuseStoreMiss) begin
-                            LSU_memc.mask <= stOps[1].wmask;
-                            LSU_memc.data <= stOps[1].data;
-                            dirty[missIdx] <= 1;
-                        end
-                        else begin
-                            // new cache line is not dirty
-                            dirty[missIdx] <= 0;
-                        end
-                    end
-                end
-
-                if (flushQueued && flushReady) begin
-                    state <= FLUSH_WAIT;
-                    flushQueued <= 0;
-                    flushIdx <= 0;
-                    flushAssocIdx <= 0;
-                    flushDone <= 0;
-                end
-            end
-
-            FLUSH_WAIT: begin
-                state <= FLUSH_READ0;
-                if (LSU_memc.cmd != MEMC_NONE || BLSU_memc.cmd != MEMC_NONE)
-                    state <= FLUSH_WAIT;
-                for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
-                    if (IN_memc.transfers[i].valid) state <= FLUSH_WAIT;
-            end
-            FLUSH_READ0: begin
-                state <= FLUSH_READ1;
-            end
-            FLUSH_READ1: begin
-                state <= FLUSH;
-            end
-            FLUSH: begin
-                if (flushDone) begin
-                    state <= FLUSH_FINALIZE;
-                    initialFlush <= 0;
-                end
-                else if (LSU_memc.cmd == MEMC_NONE || !IN_memc.stall[1]) begin
-                    CTEntry entry = IF_ct.rdata[0][flushAssocIdx];
-
-                    if (entry.valid && dirty[{flushAssocIdx, flushIdx}] && !initialFlush) begin
-                        LSU_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                        LSU_memc.cacheAddr <= {flushAssocIdx, flushIdx, {(`CLSIZE_E-2){1'b0}}};
-                        LSU_memc.writeAddr <= {entry.addr, flushIdx, {(`CLSIZE_E){1'b0}}};
-                        LSU_memc.readAddr <= 'x;
-                        LSU_memc.cacheID <= 0;
-                        LSU_memc.mask <= 0;
-                    end
-
-                    {flushDone, flushIdx, flushAssocIdx} <= {flushIdx, flushAssocIdx} + 1;
-                    if (flushAssocIdx == $clog2(`CASSOC)'(`CASSOC-1)) state <= FLUSH_READ0;
-                end
-            end
-            FLUSH_FINALIZE: begin
-                state <= IDLE;
-                for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1)
-                    if (IN_memc.transfers[i].valid)
-                        state <= FLUSH_FINALIZE;
-            end
-            default: state <= IDLE;
-        endcase
     end
 end
 

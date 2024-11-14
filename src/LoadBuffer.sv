@@ -351,6 +351,142 @@ always_ff@(posedge clk)
 LoadRsv specRsv;
 LoadRsv comRsv;
 always_ff@(posedge clk) begin
+    reg[NUM_AGUS-1:0] lateLoadPassthru = 0;
+
+    lastBaseIndex <= baseIndex;
+
+    // Handle late load outputs
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+        if (!IN_stall[i]) begin
+            lateLoadUOp[i] <= 'x;
+            lateLoadUOp[i].valid <= 0;
+        end
+    end
+
+    // Process negative load acks
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+        if (IN_ldAck[i].valid && IN_ldAck[i].fail && !IN_ldAck[i].external) begin
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
+            entries[index].issued <= 0;
+        end
+    end
+
+    // Delete reservation on SC
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+        if (IN_uop[i].valid &&
+            (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) &&
+            IN_uop[i].isStore && IN_uop[i].isLrSc
+        ) begin
+            comRsv <= LoadRsv'{valid: 0, default: 'x};
+        end
+    end
+
+    // Commit Load Reservations
+    if (specRsv.valid && (!IN_branch.taken || $signed(specRsv.sqN - IN_branch.sqN) < 0) &&
+        ($signed(specRsv.sqN - IN_comSqN) < 0)
+    ) begin
+        comRsv <= specRsv;
+        specRsv <= LoadRsv'{valid: 0, default: 'x};
+    end
+
+    // Invalidate entries (both post-commit and misspeculated)
+    for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
+        if (invalMaskBr[i] || invalMask[i])
+            entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
+    end
+
+    // Invalidate misspeculated state
+    if (IN_branch.taken) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1)
+            if ($signed(lateLoadUOp[i].sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
+                lateLoadUOp[i] <= 'x;
+                lateLoadUOp[i].valid <= 0;
+            end
+
+        if (specRsv.valid && $signed(specRsv.sqN - IN_branch.sqN) >= 0)
+            specRsv <= LoadRsv'{valid: 0, default: 'x};
+    end
+    else begin
+        // Issue Late Loads
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+            if (!lateLoadUOp[i].valid || !IN_stall[i] || (ltIssue[i].valid && ltIssue[i].isLdFwd)) begin
+
+                if (IN_stall[i] && lateLoadUOp[i].valid)
+                    entries[lateLoadUOp[i].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
+
+                // Issue non-speculative or cache missed loads, currently only on port 0.
+                if (ltIssue[i].valid) begin
+                    LBEntry e = entries[ltIssue[i].idx];
+
+                    entries[ltIssue[i].idx].issued <= 1;
+                    lateLoadUOp[i].data <= 'x;
+                    lateLoadUOp[i].dataValid <= 0;
+                    lateLoadUOp[i].addr <= e.addr;
+                    lateLoadUOp[i].signExtend <= e.signExtend;
+                    lateLoadUOp[i].size <= e.size;
+                    lateLoadUOp[i].storeSqN <= e.storeSqN;
+                    lateLoadUOp[i].loadSqN <= GetLoadSqN(ltIssue[i].idx);
+                    lateLoadUOp[i].tagDst <= e.tagDst;
+                    lateLoadUOp[i].sqN <= e.sqN;
+                    lateLoadUOp[i].atomic <= e.atomic;
+                    lateLoadUOp[i].doNotCommit <= e.doNotCommit;
+                    lateLoadUOp[i].external <= 0;
+                    lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(e.addr);
+                    lateLoadUOp[i].valid <= 1;
+                end
+                else begin
+
+                    // Use the read port on entries to move load reservations into dedicated registers
+                    if (i == 0 && !specRsv.valid && loadRsv.valid) begin
+                        entries[loadRsv.idx].hasRsv <= 0;
+                        specRsv.valid <= 1;
+                        specRsv.sqN <= entries[loadRsv.idx].sqN;
+                        specRsv.addr <= entries[loadRsv.idx].addr[31:2];
+                    end
+
+                    // Try to pass through ops for which early lookup failed
+                    if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i]) begin
+                        lateLoadUOp[i].data <= 'x;
+                        lateLoadUOp[i].dataValid <= 0;
+
+                        lateLoadUOp[i].addr <= IN_uop[i].addr;
+                        lateLoadUOp[i].signExtend <= IN_uop[i].signExtend;
+                        lateLoadUOp[i].size <= IN_uop[i].size;
+                        lateLoadUOp[i].storeSqN <= IN_uop[i].storeSqN;
+                        lateLoadUOp[i].loadSqN <= IN_uop[i].loadSqN;
+                        lateLoadUOp[i].tagDst <= IN_uop[i].tagDst;
+                        lateLoadUOp[i].sqN <= IN_uop[i].sqN;
+                        lateLoadUOp[i].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
+                        lateLoadUOp[i].doNotCommit <= IN_uop[i].doNotCommit;
+                        lateLoadUOp[i].external <= 0;
+                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(IN_uop[i].addr);
+                        lateLoadUOp[i].valid <= 1;
+
+                        lateLoadPassthru[i] = 1;
+                    end
+                end
+            end
+        end
+    end
+
+    // Insert new entries, check stores
+    for (integer i = 0; i < NUM_AGUS; i=i+1)
+        if (IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
+
+            reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
+            entries[index].storeSqN <= IN_uop[i].storeSqN;
+            entries[index].sqN <= IN_uop[i].sqN;
+            entries[index].tagDst <= IN_uop[i].tagDst;
+            entries[index].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
+            entries[index].signExtend <= IN_uop[i].signExtend;
+            entries[index].addr <= IN_uop[i].addr;
+            entries[index].size <= IN_uop[i].size;
+            entries[index].hasRsv <= IN_uop[i].isLrSc;
+            entries[index].doNotCommit <= IN_uop[i].doNotCommit;
+            entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
+            entries[index].nonSpec <= nonSpeculative[i];
+            entries[index].valid <= 1;
+        end
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
@@ -366,144 +502,6 @@ always_ff@(posedge clk) begin
 
         specRsv <= LoadRsv'{valid: 0, default: 'x};
         comRsv <= LoadRsv'{valid: 0, default: 'x};
-    end
-    else begin
-        reg[NUM_AGUS-1:0] lateLoadPassthru = 0;
-
-        lastBaseIndex <= baseIndex;
-
-        // Handle late load outputs
-        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-            if (!IN_stall[i]) begin
-                lateLoadUOp[i] <= 'x;
-                lateLoadUOp[i].valid <= 0;
-            end
-        end
-
-        // Process negative load acks
-        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-            if (IN_ldAck[i].valid && IN_ldAck[i].fail && !IN_ldAck[i].external) begin
-                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_ldAck[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
-                entries[index].issued <= 0;
-            end
-        end
-
-        // Delete reservation on SC
-        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-            if (IN_uop[i].valid &&
-                (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0) &&
-                IN_uop[i].isStore && IN_uop[i].isLrSc
-            ) begin
-                comRsv <= LoadRsv'{valid: 0, default: 'x};
-            end
-        end
-
-        // Commit Load Reservations
-        if (specRsv.valid && (!IN_branch.taken || $signed(specRsv.sqN - IN_branch.sqN) < 0) &&
-            ($signed(specRsv.sqN - IN_comSqN) < 0)
-        ) begin
-            comRsv <= specRsv;
-            specRsv <= LoadRsv'{valid: 0, default: 'x};
-        end
-
-        // Invalidate entries (both post-commit and misspeculated)
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin
-            if (invalMaskBr[i] || invalMask[i])
-                entries[i] <= LBEntry'{valid: 0, hasRsv: 1, default: 'x};
-        end
-
-        // Invalidate misspeculated state
-        if (IN_branch.taken) begin
-            for (integer i = 0; i < NUM_AGUS; i=i+1)
-                if ($signed(lateLoadUOp[i].sqN - IN_branch.sqN) > 0 || IN_branch.flush) begin
-                    lateLoadUOp[i] <= 'x;
-                    lateLoadUOp[i].valid <= 0;
-                end
-
-            if (specRsv.valid && $signed(specRsv.sqN - IN_branch.sqN) >= 0)
-                specRsv <= LoadRsv'{valid: 0, default: 'x};
-        end
-        else begin
-            // Issue Late Loads
-            for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-                if (!lateLoadUOp[i].valid || !IN_stall[i] || (ltIssue[i].valid && ltIssue[i].isLdFwd)) begin
-
-                    if (IN_stall[i] && lateLoadUOp[i].valid)
-                        entries[lateLoadUOp[i].loadSqN[$clog2(NUM_ENTRIES)-1:0]].issued <= 0;
-
-                    // Issue non-speculative or cache missed loads, currently only on port 0.
-                    if (ltIssue[i].valid) begin
-                        LBEntry e = entries[ltIssue[i].idx];
-
-                        entries[ltIssue[i].idx].issued <= 1;
-                        lateLoadUOp[i].data <= 'x;
-                        lateLoadUOp[i].dataValid <= 0;
-                        lateLoadUOp[i].addr <= e.addr;
-                        lateLoadUOp[i].signExtend <= e.signExtend;
-                        lateLoadUOp[i].size <= e.size;
-                        lateLoadUOp[i].storeSqN <= e.storeSqN;
-                        lateLoadUOp[i].loadSqN <= GetLoadSqN(ltIssue[i].idx);
-                        lateLoadUOp[i].tagDst <= e.tagDst;
-                        lateLoadUOp[i].sqN <= e.sqN;
-                        lateLoadUOp[i].atomic <= e.atomic;
-                        lateLoadUOp[i].doNotCommit <= e.doNotCommit;
-                        lateLoadUOp[i].external <= 0;
-                        lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(e.addr);
-                        lateLoadUOp[i].valid <= 1;
-                    end
-                    else begin
-
-                        // Use the read port on entries to move load reservations into dedicated registers
-                        if (i == 0 && !specRsv.valid && loadRsv.valid) begin
-                            entries[loadRsv.idx].hasRsv <= 0;
-                            specRsv.valid <= 1;
-                            specRsv.sqN <= entries[loadRsv.idx].sqN;
-                            specRsv.addr <= entries[loadRsv.idx].addr[31:2];
-                        end
-
-                        // Try to pass through ops for which early lookup failed
-                        if (IN_uop[i].valid && IN_uop[i].isLoad && delayLoad[i] && !nonSpeculative[i]) begin
-                            lateLoadUOp[i].data <= 'x;
-                            lateLoadUOp[i].dataValid <= 0;
-
-                            lateLoadUOp[i].addr <= IN_uop[i].addr;
-                            lateLoadUOp[i].signExtend <= IN_uop[i].signExtend;
-                            lateLoadUOp[i].size <= IN_uop[i].size;
-                            lateLoadUOp[i].storeSqN <= IN_uop[i].storeSqN;
-                            lateLoadUOp[i].loadSqN <= IN_uop[i].loadSqN;
-                            lateLoadUOp[i].tagDst <= IN_uop[i].tagDst;
-                            lateLoadUOp[i].sqN <= IN_uop[i].sqN;
-                            lateLoadUOp[i].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
-                            lateLoadUOp[i].doNotCommit <= IN_uop[i].doNotCommit;
-                            lateLoadUOp[i].external <= 0;
-                            lateLoadUOp[i].isMMIO <= `IS_MMIO_PMA(IN_uop[i].addr);
-                            lateLoadUOp[i].valid <= 1;
-
-                            lateLoadPassthru[i] = 1;
-                        end
-                    end
-                end
-            end
-        end
-
-        // Insert new entries, check stores
-        for (integer i = 0; i < NUM_AGUS; i=i+1)
-            if (IN_uop[i].valid && IN_uop[i].isLoad && (!IN_branch.taken || $signed(IN_uop[i].sqN - IN_branch.sqN) <= 0)) begin
-
-                reg[$clog2(NUM_ENTRIES)-1:0] index = IN_uop[i].loadSqN[$clog2(NUM_ENTRIES)-1:0];
-                entries[index].storeSqN <= IN_uop[i].storeSqN;
-                entries[index].sqN <= IN_uop[i].sqN;
-                entries[index].tagDst <= IN_uop[i].tagDst;
-                entries[index].atomic <= IN_uop[i].isLoad && IN_uop[i].isStore;
-                entries[index].signExtend <= IN_uop[i].signExtend;
-                entries[index].addr <= IN_uop[i].addr;
-                entries[index].size <= IN_uop[i].size;
-                entries[index].hasRsv <= IN_uop[i].isLrSc;
-                entries[index].doNotCommit <= IN_uop[i].doNotCommit;
-                entries[index].issued <= !delayLoad[i] || lateLoadPassthru[i];
-                entries[index].nonSpec <= nonSpeculative[i];
-                entries[index].valid <= 1;
-            end
     end
 end
 

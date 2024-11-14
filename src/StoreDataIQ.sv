@@ -152,11 +152,7 @@ always_ff@(posedge clk) begin
         queue[i].offs <= newOffs[i];
     end
 
-    if (rst) begin
-        insertIndex <= 0;
-        OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
-    end
-    else if (IN_branch.taken) begin
+    if (IN_branch.taken) begin
 
         newInsertIndex = 0;
         // Set insert index to first invalid entry
@@ -235,6 +231,11 @@ always_ff@(posedge clk) begin
             end
         end
         insertIndex <= newInsertIndex;
+    end
+
+    if (rst) begin
+        insertIndex <= 0;
+        OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
     end
 end
 

@@ -57,35 +57,35 @@ generate for (genvar i = 0; i < WIDTH; i=i+1) begin
         regFileLookup <= 0;
         offs <= 'x;
 
-        if (rst) begin
+        if (regFileLookup) begin
+            assert(uopIQ.valid);
+            uopIQ.data <= readDataShifted;
+        end
+
+        if (!uopATO.valid ||
+            (IN_branch.taken && (IN_branch.flush || $signed(uopIQ.storeSqN - IN_branch.storeSqN) > 0))
+        ) begin
             uopIQ <= StDataUOp'{valid: 0, default: 'x};
         end
-        else begin
-            if (regFileLookup) begin
-                assert(uopIQ.valid);
-                uopIQ.data <= readDataShifted;
-            end
 
-            if (!uopATO.valid ||
-                (IN_branch.taken && (IN_branch.flush || $signed(uopIQ.storeSqN - IN_branch.storeSqN) > 0))
-            ) begin
-                uopIQ <= StDataUOp'{valid: 0, default: 'x};
-            end
+        if (IN_uop[i].valid && OUT_ready[i] && (!IN_branch.taken ||
+            (!IN_branch.flush && $signed(IN_uop[i].storeSqN - IN_branch.storeSqN) <= 0))
+        ) begin
+            uopIQ.valid <= 1;
+            uopIQ.storeSqN <= IN_uop[i].storeSqN;
 
-            if (IN_uop[i].valid && OUT_ready[i] && (!IN_branch.taken ||
-                (!IN_branch.flush && $signed(IN_uop[i].storeSqN - IN_branch.storeSqN) <= 0))
-            ) begin
-                uopIQ.valid <= 1;
-                uopIQ.storeSqN <= IN_uop[i].storeSqN;
-
-                if (IN_uop[i].tag[$bits(Tag)-1]) begin
-                    uopIQ.data <= ShiftData({{26{IN_uop[i].tag[5]}}, IN_uop[i].tag[5:0]}, IN_uop[i].offs);
-                end
-                else begin
-                    regFileLookup <= 1;
-                    offs <= IN_uop[i].offs;
-                end
+            if (IN_uop[i].tag[$bits(Tag)-1]) begin
+                uopIQ.data <= ShiftData({{26{IN_uop[i].tag[5]}}, IN_uop[i].tag[5:0]}, IN_uop[i].offs);
             end
+            else begin
+                regFileLookup <= 1;
+                offs <= IN_uop[i].offs;
+            end
+        end
+
+        if (rst) begin
+            uopIQ <= StDataUOp'{valid: 0, default: 'x};
+            regFileLookup <= 0;
         end
     end
 

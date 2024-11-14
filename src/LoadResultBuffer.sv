@@ -61,45 +61,43 @@ always_comb
 PriorityEncoder#(SIZE, 1) freeEnc(entryFree, '{enq.idx}, '{enq.valid});
 
 always_ff@(posedge clk) begin
+    // Snoop Results
+    for (integer i = 0; i < SIZE; i=i+1) begin
+        if (entries[i].valid && !entries[i].dataAvail && IN_memc.ldDataFwd.valid &&
+            entries[i].addr[31:$clog2(`AXI_WIDTH/8)] == IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
+        ) begin
+            entries[i].dataAvail <= 1;
+            for (integer j = 0; j < 4; j=j+1)
+                if (!entries[i].fwdMask[j])
+                    entries[i].data[8*j+:8] <=
+                        IN_memc.ldDataFwd.data[{entries[i].addr[$clog2(`AXI_WIDTH/8)-1:2], j[1:0]}*8+:8];
+        end
+    end
+
+    // Dequeue
+    if (deq_c.valid)
+        entries[deq_c.idx] <= LoadResUOp'{valid: 0, default: 'x};
+
+    // Enqueue
+    if (enqLMQ_c.valid && enq.valid &&
+        (!IN_branch.taken || enqLMQ_c.external || $signed(enqLMQ_c.sqN - IN_branch.sqN) <= 0)) begin
+        entries[enq.idx] <= enqLMQ_c;
+    end
+
+    // Invalidate
+    if (IN_branch.taken)
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            if (entries[i].valid && !entries[i].external &&
+                $signed(entries[i].sqN - IN_branch.sqN) > 0
+            ) begin
+                entries[i] <= LoadResUOp'{valid: 0, default: 'x};
+            end
+        end
+
     if (rst) begin
         for (integer i = 0; i < SIZE; i=i+1) begin
             entries[i] <= LoadResUOp'{valid: 0, default: 'x};
         end
-    end
-    else begin
-
-        // Snoop Results
-        for (integer i = 0; i < SIZE; i=i+1) begin
-            if (entries[i].valid && !entries[i].dataAvail && IN_memc.ldDataFwd.valid &&
-                entries[i].addr[31:$clog2(`AXI_WIDTH/8)] == IN_memc.ldDataFwd.addr[31:$clog2(`AXI_WIDTH/8)]
-            ) begin
-                entries[i].dataAvail <= 1;
-                for (integer j = 0; j < 4; j=j+1)
-                    if (!entries[i].fwdMask[j])
-                        entries[i].data[8*j+:8] <=
-                            IN_memc.ldDataFwd.data[{entries[i].addr[$clog2(`AXI_WIDTH/8)-1:2], j[1:0]}*8+:8];
-            end
-        end
-
-        // Dequeue
-        if (deq_c.valid)
-            entries[deq_c.idx] <= LoadResUOp'{valid: 0, default: 'x};
-
-        // Enqueue
-        if (enqLMQ_c.valid && enq.valid &&
-            (!IN_branch.taken || enqLMQ_c.external || $signed(enqLMQ_c.sqN - IN_branch.sqN) <= 0)) begin
-            entries[enq.idx] <= enqLMQ_c;
-        end
-
-        // Invalidate
-        if (IN_branch.taken)
-            for (integer i = 0; i < SIZE; i=i+1) begin
-                if (entries[i].valid && !entries[i].external &&
-                    $signed(entries[i].sqN - IN_branch.sqN) > 0
-                ) begin
-                    entries[i] <= LoadResUOp'{valid: 0, default: 'x};
-                end
-            end
     end
 end
 

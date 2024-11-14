@@ -45,7 +45,74 @@ always_ff@(posedge clk) begin
 
     mispredWait <= 0;
 
+    if (IN_mispr) begin
+        // Issue
+        mispredWait <= 1;
+        for (integer i = 0; i < NUM_TAGS; i=i+1) begin
+            if (freeCom[i])
+                free[i] <= 1;
+        end
+
+        for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
+            OUT_issueTagsValid[i] <= 0;
+            OUT_issueTags[i] <= 'x;
+        end
+    end
+    else begin
+
+        // Invalidate current tags if they're used
+        for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
+            if (IN_issueValid[i]) begin
+                assert(OUT_issueTagsValid[i]);
+
+                OUT_issueTagsValid[i] <= 0;
+                OUT_issueTags[i] <= 'x;
+            end
+        end
+
+        // Output Tags for next cycle
+        for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
+            if ((!OUT_issueTagsValid[i] || IN_issueValid[i]) && issueTagsValid[i] && !(mispredWait || IN_mispredFlush)) begin
+
+                OUT_issueTagsValid[i] <= 1;
+                OUT_issueTags[i] <= issueTags[i];
+
+                free[issueTags[i]] <= 0;
+            end
+        end
+    end
+
+    // Commit
+    for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
+        if (IN_commitValid[i]) begin
+
+            if (IN_mispredFlush) begin
+                if (!IN_mispr && !IN_commitTagDst[i][$bits(Tag)-1]) begin
+                    free[RFTag'(IN_commitTagDst[i])] <= 0;
+                end
+            end
+            else begin
+                if (IN_commitNewest[i]) begin
+                    if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
+                        freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                        free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                    end
+
+                    if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
+                        freeCom[RFTag'(IN_commitTagDst[i])] <= 0;
+                        free[RFTag'(IN_commitTagDst[i])] <= 0;
+                    end
+                end
+                else if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
+                    freeCom[RFTag'(IN_commitTagDst[i])] <= 1;
+                    free[RFTag'(IN_commitTagDst[i])] <= 1;
+                end
+            end
+        end
+    end
+
     if (rst) begin
+        mispredWait <= 0;
         for (integer i = 0; i < NUM_TAGS; i=i+1) begin
             free[i] <= 1'b1;
             freeCom[i] <= 1'b1;
@@ -53,73 +120,7 @@ always_ff@(posedge clk) begin
         for (integer i = 0; i < NUM_ISSUE; i=i+1)
             OUT_issueTagsValid[i] <= 0;
     end
-    else begin
-        if (IN_mispr) begin
-            // Issue
-            mispredWait <= 1;
-            for (integer i = 0; i < NUM_TAGS; i=i+1) begin
-                if (freeCom[i])
-                    free[i] <= 1;
-            end
 
-            for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
-                OUT_issueTagsValid[i] <= 0;
-                OUT_issueTags[i] <= 'x;
-            end
-        end
-        else begin
-
-            // Invalidate current tags if they're used
-            for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
-                if (IN_issueValid[i]) begin
-                    assert(OUT_issueTagsValid[i]);
-
-                    OUT_issueTagsValid[i] <= 0;
-                    OUT_issueTags[i] <= 'x;
-                end
-            end
-
-            // Output Tags for next cycle
-            for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
-                if ((!OUT_issueTagsValid[i] || IN_issueValid[i]) && issueTagsValid[i] && !(mispredWait || IN_mispredFlush)) begin
-
-                    OUT_issueTagsValid[i] <= 1;
-                    OUT_issueTags[i] <= issueTags[i];
-
-                    free[issueTags[i]] <= 0;
-                end
-            end
-        end
-
-        // Commit
-        for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
-            if (IN_commitValid[i]) begin
-
-                if (IN_mispredFlush) begin
-                    if (!IN_mispr && !IN_commitTagDst[i][$bits(Tag)-1]) begin
-                        free[RFTag'(IN_commitTagDst[i])] <= 0;
-                    end
-                end
-                else begin
-                    if (IN_commitNewest[i]) begin
-                        if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
-                            freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
-                            free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
-                        end
-
-                        if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
-                            freeCom[RFTag'(IN_commitTagDst[i])] <= 0;
-                            free[RFTag'(IN_commitTagDst[i])] <= 0;
-                        end
-                    end
-                    else if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
-                        freeCom[RFTag'(IN_commitTagDst[i])] <= 1;
-                        free[RFTag'(IN_commitTagDst[i])] <= 1;
-                    end
-                end
-            end
-        end
-    end
 end
 
 endmodule

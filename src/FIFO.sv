@@ -50,54 +50,53 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
+
+    if (outputReady)
+        outDataReg <= 'x;
+    if (IN_ready)
+        outValidReg <= 0;
+
+    if (combPassthru && IN_ready) begin
+        // Nothing to do, purely comb
+    end
+    else if (empty && doInsert && outputReady && FORWARD1) begin
+        outDataReg <= IN_data;
+        outValidReg <= 1;
+    end
+    else begin
+        // Insert
+        if (doInsert) begin
+            mem[indexIn] <= IN_data;
+            // verilator lint_off WIDTHEXPAND
+            // verilator lint_off WIDTHTRUNC
+            indexIn <= (indexIn + 1) % NUM;
+            // verilator lint_on WIDTHTRUNC
+            // verilator lint_on WIDTHEXPAND
+        end
+
+        // Extract
+        if (doExtract) begin
+            // verilator lint_off WIDTHEXPAND
+            // verilator lint_off WIDTHTRUNC
+            indexOut <= (indexOut + 1) % NUM;
+            // verilator lint_on WIDTHTRUNC
+            // verilator lint_on WIDTHEXPAND
+            outDataReg <= mem[indexOut];
+            outValidReg <= 1;
+        end
+
+        // When pointers equal: full if last action was insert,
+        // empty if last action was extract
+        if (doInsert != doExtract)
+            fullCond <= doInsert;
+    end
+
     if (rst) begin
         fullCond <= 0;
         indexIn <= 0;
         indexOut <= 0;
         outDataReg <= '0;
         outValidReg <= 0;
-    end
-    else begin
-
-        if (outputReady)
-            outDataReg <= 'x;
-        if (IN_ready)
-            outValidReg <= 0;
-
-        if (combPassthru && IN_ready) begin
-            // Nothing to do, purely comb
-        end
-        else if (empty && doInsert && outputReady && FORWARD1) begin
-            outDataReg <= IN_data;
-            outValidReg <= 1;
-        end
-        else begin
-            // Insert
-            if (doInsert) begin
-                mem[indexIn] <= IN_data;
-                // verilator lint_off WIDTHEXPAND
-                // verilator lint_off WIDTHTRUNC
-                indexIn <= (indexIn + 1) % NUM;
-                // verilator lint_on WIDTHTRUNC
-                // verilator lint_on WIDTHEXPAND
-            end
-
-            // Extract
-            if (doExtract) begin
-                // verilator lint_off WIDTHEXPAND
-                // verilator lint_off WIDTHTRUNC
-                indexOut <= (indexOut + 1) % NUM;
-                // verilator lint_on WIDTHTRUNC
-                // verilator lint_on WIDTHEXPAND
-                outDataReg <= mem[indexOut];
-                outValidReg <= 1;
-            end
-
-            // When pointers equal: full if last action was insert,
-            // empty if last action was extract
-            if (doInsert != doExtract)
-                fullCond <= doInsert;
-        end
     end
 end
 endmodule

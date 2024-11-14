@@ -66,6 +66,52 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
+
+    // Translate
+    if (IN_pw.valid) begin
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            if (queue[i].valid && !ready[i] &&
+                (IN_pw.isSuperPage ?
+                    (IN_pw.vpn[19:10] == queue[i].addr[31:22]) :
+                    (IN_pw.vpn == queue[i].addr[31:12]))
+            ) begin
+                ready[i] <= 1;
+            end
+        end
+    end
+
+    // Invalidate
+    if (IN_branch.taken) begin
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            if (queue[i].valid && $signed(queue[i].sqN - IN_branch.sqN) > 0) begin
+                ready[i] <= 'x;
+                queue[i] <= 'x;
+                queue[i].valid <= 0;
+            end
+        end
+    end
+
+    // Enqueue
+    if (IN_enqueue && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+        assert(idxInValid);
+        ready[idxIn] <= (!IN_vmem.sv32en) || IN_uopReady;
+        queue[idxIn] <= IN_uop;
+    end
+
+    // Dequeue
+    if (IN_dequeue || (IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0)) begin
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
+    end
+    if ((!OUT_uop.valid || IN_dequeue) && idxOutValid) begin
+        if (queue[idxOut].valid && (!IN_branch.taken || $signed(queue[idxOut].sqN - IN_branch.sqN) <= 0)) begin
+            OUT_uop <= queue[idxOut];
+            ready[idxOut] <= 'x;
+            queue[idxOut] <= 'x;
+            queue[idxOut].valid <= 0;
+        end
+    end
+
     if (rst) begin
         for (integer i = 0; i < SIZE; i=i+1) begin
             queue[i] <= 'x;
@@ -73,54 +119,6 @@ always_ff@(posedge clk) begin
         end
         OUT_uop <= 'x;
         OUT_uop.valid <= 0;
-    end
-    else begin
-
-        // Translate
-        if (IN_pw.valid) begin
-            for (integer i = 0; i < SIZE; i=i+1) begin
-                if (queue[i].valid && !ready[i] &&
-                    (IN_pw.isSuperPage ?
-                        (IN_pw.vpn[19:10] == queue[i].addr[31:22]) :
-                        (IN_pw.vpn == queue[i].addr[31:12]))
-                ) begin
-                    ready[i] <= 1;
-                end
-            end
-        end
-
-        // Invalidate
-        if (IN_branch.taken) begin
-            for (integer i = 0; i < SIZE; i=i+1) begin
-                if (queue[i].valid && $signed(queue[i].sqN - IN_branch.sqN) > 0) begin
-                    ready[i] <= 'x;
-                    queue[i] <= 'x;
-                    queue[i].valid <= 0;
-                end
-            end
-        end
-
-        // Enqueue
-        if (IN_enqueue && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-            assert(idxInValid);
-            ready[idxIn] <= (!IN_vmem.sv32en) || IN_uopReady;
-            queue[idxIn] <= IN_uop;
-        end
-
-        // Dequeue
-        if (IN_dequeue || (IN_branch.taken && $signed(OUT_uop.sqN - IN_branch.sqN) > 0)) begin
-            OUT_uop <= 'x;
-            OUT_uop.valid <= 0;
-        end
-        if ((!OUT_uop.valid || IN_dequeue) && idxOutValid) begin
-            if (queue[idxOut].valid && (!IN_branch.taken || $signed(queue[idxOut].sqN - IN_branch.sqN) <= 0)) begin
-                OUT_uop <= queue[idxOut];
-                ready[idxOut] <= 'x;
-                queue[idxOut] <= 'x;
-                queue[idxOut].valid <= 0;
-            end
-        end
-
     end
 end
 endmodule

@@ -125,74 +125,73 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+        if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || ($signed(IN_uop[i].sqN - IN_branch.sqN) <= 0))) begin
+
+            outUOpReg[i].imm <= IN_uop[i].imm;
+
+            // jalr uses a different encoding
+            if ((i == 0 || i == 1) && IN_uop[i].fu == FU_BRANCH &&
+                (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR || IN_uop[i].opcode == BR_V_RET)
+            ) begin
+                outUOpReg[i].imm <= 'x;
+                outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
+            end
+
+            outUOpReg[i].fetchOffs <= IN_uop[i].fetchOffs;
+            outUOpReg[i].sqN <= IN_uop[i].sqN;
+            outUOpReg[i].tagDst <= IN_uop[i].tagDst;
+            outUOpReg[i].fetchID <= IN_uop[i].fetchID;
+            outUOpReg[i].loadSqN <= IN_uop[i].loadSqN;
+            outUOpReg[i].storeSqN <= IN_uop[i].storeSqN;
+            outUOpReg[i].compressed <= IN_uop[i].compressed;
+            outUOpReg[i].opcode <= IN_uop[i].opcode;
+            outUOpReg[i].fu <= IN_uop[i].fu;
+            outUOpReg[i].valid <= 1;
+
+            operandIsReg[i] <= 2'b00;
+
+            outUOpReg[i].srcA <= 'x;
+            if (IN_uop[i].tagA[$bits(Tag)-1]) begin
+                outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
+            end
+            else if (matchValid[i]) begin
+                outUOpReg[i].srcA <= forwards[matchIdx[i]].result;
+            end
+            else begin
+                operandIsReg[i][0] <= 1;
+            end
+
+            outUOpReg[i].srcB <= 'x;
+            if (IN_uop[i].immB || i >= NUM_ALUS) begin
+                outUOpReg[i].srcB <= IN_uop[i].imm;
+            end
+            else if (IN_uop[i].tagB[$bits(Tag)-1]) begin
+                outUOpReg[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
+            end
+            else if (matchValid[NUM_UOPS+i]) begin
+                outUOpReg[i].srcB <= forwards[matchIdx[NUM_UOPS+i]].result;
+            end
+            else begin
+                operandIsReg[i][1] <= 1;
+            end
+        end
+        else if (!IN_stall[i] || (outUOpReg[i].valid && IN_branch.taken && $signed(outUOpReg[i].sqN - IN_branch.sqN) > 0)) begin
+            outUOpReg[i] <= 'x;
+            outUOpReg[i].valid <= 0;
+        end
+        else if (IN_stall[i]) begin
+            if (operandIsReg[i][0]) outUOpReg[i].srcA <= IN_rfReadData[i];
+            if (operandIsReg[i][1] && i < NUM_ALUS) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
+            operandIsReg[i] <= 2'b00;
+        end
+
+    end
+
     if (rst) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             outUOpReg[i] <= 'x;
             outUOpReg[i].valid <= 0;
-        end
-    end
-    else begin
-        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            if (!IN_stall[i] && IN_uop[i].valid && (!IN_branch.taken || ($signed(IN_uop[i].sqN - IN_branch.sqN) <= 0))) begin
-
-                outUOpReg[i].imm <= IN_uop[i].imm;
-
-                // jalr uses a different encoding
-                if ((i == 0 || i == 1) && IN_uop[i].fu == FU_BRANCH &&
-                    (IN_uop[i].opcode == BR_V_JALR || IN_uop[i].opcode == BR_V_JR || IN_uop[i].opcode == BR_V_RET)
-                ) begin
-                    outUOpReg[i].imm <= 'x;
-                    outUOpReg[i].imm[11:0] <= IN_uop[i].imm12;
-                end
-
-                outUOpReg[i].fetchOffs <= IN_uop[i].fetchOffs;
-                outUOpReg[i].sqN <= IN_uop[i].sqN;
-                outUOpReg[i].tagDst <= IN_uop[i].tagDst;
-                outUOpReg[i].fetchID <= IN_uop[i].fetchID;
-                outUOpReg[i].loadSqN <= IN_uop[i].loadSqN;
-                outUOpReg[i].storeSqN <= IN_uop[i].storeSqN;
-                outUOpReg[i].compressed <= IN_uop[i].compressed;
-                outUOpReg[i].opcode <= IN_uop[i].opcode;
-                outUOpReg[i].fu <= IN_uop[i].fu;
-                outUOpReg[i].valid <= 1;
-
-                operandIsReg[i] <= 2'b00;
-
-                outUOpReg[i].srcA <= 'x;
-                if (IN_uop[i].tagA[$bits(Tag)-1]) begin
-                    outUOpReg[i].srcA <= {{26{IN_uop[i].tagA[5]}}, IN_uop[i].tagA[5:0]};
-                end
-                else if (matchValid[i]) begin
-                    outUOpReg[i].srcA <= forwards[matchIdx[i]].result;
-                end
-                else begin
-                    operandIsReg[i][0] <= 1;
-                end
-
-                outUOpReg[i].srcB <= 'x;
-                if (IN_uop[i].immB || i >= NUM_ALUS) begin
-                    outUOpReg[i].srcB <= IN_uop[i].imm;
-                end
-                else if (IN_uop[i].tagB[$bits(Tag)-1]) begin
-                    outUOpReg[i].srcB <= {{26{IN_uop[i].tagB[5]}}, IN_uop[i].tagB[5:0]};
-                end
-                else if (matchValid[NUM_UOPS+i]) begin
-                    outUOpReg[i].srcB <= forwards[matchIdx[NUM_UOPS+i]].result;
-                end
-                else begin
-                    operandIsReg[i][1] <= 1;
-                end
-            end
-            else if (!IN_stall[i] || (outUOpReg[i].valid && IN_branch.taken && $signed(outUOpReg[i].sqN - IN_branch.sqN) > 0)) begin
-                outUOpReg[i] <= 'x;
-                outUOpReg[i].valid <= 0;
-            end
-            else if (IN_stall[i]) begin
-                if (operandIsReg[i][0]) outUOpReg[i].srcA <= IN_rfReadData[i];
-                if (operandIsReg[i][1] && i < NUM_ALUS) outUOpReg[i].srcB <= IN_rfReadData[i+NUM_UOPS];
-                operandIsReg[i] <= 2'b00;
-            end
-
         end
     end
 end

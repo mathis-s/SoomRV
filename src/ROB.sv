@@ -225,6 +225,224 @@ always_ff@(posedge clk) begin
         OUT_comUOp[i].valid <= 0;
     end
 
+    stop <= 0;
+
+    if (IN_branch.taken) begin
+        if (IN_branch.flush)
+            OUT_curFetchID <= IN_branch.fetchID;
+        lastIndex <= IN_branch.sqN + 1;
+    end
+
+    // After mispredict, we replay all ops from last committed to the branch
+    // without actually committing them to roll back the Rename Map.
+    if (misprReplay_c.valid) begin
+        for (integer i = 0; i < WIDTH; i=i+1) begin
+            if (misprReplayFwdMask[i]) begin
+                OUT_comUOp[i].valid <= 1;
+                OUT_comUOp[i].sqN <= 'x;
+                OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
+                OUT_comUOp[i].tagDst <= deqEntries[i].tag;
+                OUT_comUOp[i].compressed <= 'x;
+            end
+        end
+    end
+
+    else if (!stop) begin
+
+        reg temp = 0;
+        reg temp2 = 0;
+        reg pred = 0;
+        reg[ID_LEN-1:0] cnt = 0;
+
+        OUT_perfcInfo.stallCause <= STALL_NONE;
+
+        for (integer i = 0; i < WIDTH; i=i+1) begin
+
+            reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
+            SqN loadSqN = loadSqNs_c[i];
+            SqN storeSqN = storeSqNs_c[i+1]; // +1 for pre-increment
+
+            reg timeoutCommit = (i == 0) && hangDetected;
+
+            reg isRenamed = (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex));
+            reg isExecuted = deqFlags[i] != FLAGS_NX;
+            reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
+            reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(loadSqN - IN_ldComLimit.sqN) < 0);
+            reg sqAllowsCommit = 1;
+            for (integer j = 0; j < NUM_AGUS; j=j+1)
+                sqAllowsCommit &= (!IN_stComLimit[j].valid ||
+                    $signed(storeSqN - IN_stComLimit[j].sqN) < 0);
+
+            if (!temp && isRenamed &&
+                ((isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) || timeoutCommit)
+            ) begin
+
+                reg isBranch = deqFlags[i] == FLAGS_BRANCH ||
+                    deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN;
+                // Synchronous exceptions do not increment minstret, but mret/sret do.
+                reg minstretRetire = (deqFlags[i] <= FLAGS_ORDERING) ||
+                    (deqFlags[i] == FLAGS_XRET) ||
+                    (deqEntries[i].isFP && deqFlags[i] != FLAGS_ILLEGAL_INSTR) ||
+                    (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
+
+                reg isException = timeoutCommit ||
+                    (deqFlags[i] >= FLAGS_ILLEGAL_INSTR && deqFlags[i] <= FLAGS_ST_PF);
+
+                reg sendTrapUOp = timeoutCommit ||
+                    (deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR));
+
+                SqN sqN = GetSqN(id);
+
+                OUT_comUOp[i].rd <= deqEntries[i].rd;
+                OUT_comUOp[i].tagDst <= deqEntries[i].tag;
+                OUT_comUOp[i].sqN <= sqN;
+                OUT_comUOp[i].isBranch <= isBranch;
+                OUT_comUOp[i].compressed <= deqEntries[i].compressed;
+                OUT_comUOp[i].valid <= 1;
+
+                OUT_perfcInfo.validRetire[i] <= minstretRetire && !timeoutCommit;
+                OUT_perfcInfo.branchRetire[i] <= minstretRetire && isBranch && !timeoutCommit;
+
+                OUT_curFetchID <= deqEntries[i].fetchID;
+
+                if (!isException) begin
+                    if (deqEntries[i].isLd) OUT_lastLoadSqN <= loadSqN + 1;
+                    if (deqEntries[i].isSt) OUT_lastStoreSqN <= storeSqN + 1;
+                    storeSqN_r <= storeSqN;
+                    loadSqN_r <= loadSqNs_c[i+1];
+                end
+
+
+                if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
+                    OUT_bpUpdate.valid <= 1;
+                    OUT_bpUpdate.branchTaken <= (deqFlags[i] == FLAGS_PRED_TAKEN);
+                    OUT_bpUpdate.fetchID <= deqEntries[i].fetchID;
+                    OUT_bpUpdate.fetchOffs <= deqEntries[i].fetchOffs;
+                    pred = 1;
+                end
+
+                if (sendTrapUOp) begin
+                    OUT_trapUOp.timeout <= timeoutCommit;
+                    OUT_trapUOp.flags <= deqFlags[i];
+                    OUT_trapUOp.tag <= deqEntries[i].tag;
+                    OUT_trapUOp.sqN <= sqN;
+                    OUT_trapUOp.loadSqN <= loadSqN;
+                    OUT_trapUOp.storeSqN <= storeSqN;
+                    OUT_trapUOp.rd <= deqEntries[i].rd;
+                    OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
+                    OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
+                    OUT_trapUOp.compressed <= deqEntries[i].compressed;
+                    OUT_trapUOp.valid <= 1;
+
+                    // Redirect result of exception to x0
+                    // The exception causes an invalidation to committed state,
+                    // so changing these is fine (does not leave us with inconsistent RAT/TB)
+                    if (isException) begin
+                        OUT_comUOp[i].rd <= 0;
+                        OUT_comUOp[i].tagDst <= TAG_ZERO;
+                    end
+
+                    stop <= 1;
+                    temp = 1;
+                end
+                else if (deqEntries[i].isFP &&
+                    (deqFlags[i] >= Flags'(FLAGS_FP_NX) && deqFlags[i] <= Flags'(FLAGS_FP_NV))
+                ) begin
+                    OUT_fpNewFlags[deqFlags[i][2:0] - 3'(FLAGS_FP_NX)] <= 1;
+
+                    // Underflow and overflow imply inexact
+                    if (deqFlags[i] == Flags'(FLAGS_FP_UF) || deqFlags[i] == Flags'(FLAGS_FP_OF)) begin
+                        OUT_fpNewFlags[3'(FLAGS_FP_NX)] <= 1;
+                    end
+                end
+
+                didCommit <= 1;
+                cnt = cnt + 1;
+            end
+            else begin
+                // If we are unable to commit anything in this cycle, we use the TrapHandler's PCFile
+                // lookup to get the address of the instruction we're stalled on (for debugging/analysis).
+                if (i == 0 && (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex))) begin
+                    OUT_trapUOp.timeout <= 0;
+                    OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
+                    OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
+                    OUT_trapUOp.compressed <= deqEntries[i].compressed;
+                    OUT_trapUOp.flags <= FLAGS_NX;
+                    OUT_trapUOp.valid <= 1;
+                end
+
+                // General stall/commit debug info
+                if (!temp2) begin
+                    OUT_perfcInfo.stallWeigth <= 3 - i[1:0];
+
+                    if (!isRenamed || temp) OUT_perfcInfo.stallCause <= STALL_FRONTEND;
+                    else if (!isExecuted) begin
+                        if (deqPorts[i].isSt) OUT_perfcInfo.stallCause <= STALL_STORE;
+                        else if (deqPorts[i].isLd) OUT_perfcInfo.stallCause <= STALL_LOAD;
+                        else OUT_perfcInfo.stallCause <= STALL_BACKEND;
+                    end
+                    else if (!sqAllowsCommit) OUT_perfcInfo.stallCause <= STALL_STORE;
+                    else if (!lbAllowsCommit) OUT_perfcInfo.stallCause <= STALL_LOAD;
+                    else if (!noFlagConflict) OUT_perfcInfo.stallCause <= STALL_ROB;
+                    temp2 = 1;
+                end
+
+                temp = 1;
+            end
+
+        end
+        baseIndex <= baseIndex + cnt;
+    end
+
+    // Enqueue ops directly from Rename
+    for (integer i = 0; i < WIDTH_RN; i=i+1) begin
+        if (rnUOpSorted[i].valid && (!IN_branch.taken)) begin
+
+            reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
+            reg[$clog2(LENGTH/WIDTH_RN)-1:0] id1 = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)]};
+            reg[$clog2(WIDTH_RN)-1:0] id0 = {i[$clog2(`DEC_WIDTH)-1:0]};
+
+            ROBEntry entry = 'x;
+
+            entry.tag = rnUOpSorted[i].tagDst;
+            entry.rd = rnUOpSorted[i].rd;
+            entry.compressed = rnUOpSorted[i].compressed;
+            entry.fetchID = rnUOpSorted[i].fetchID;
+            entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
+            entry.fetchOffs = rnUOpSorted[i].fetchOffs;
+            entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
+            entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
+
+            case (id0)
+                0: gen[0].entries[id1] <= entry;
+                1: gen[1].entries[id1] <= entry;
+                2: gen[2].entries[id1] <= entry;
+                3: gen[3].entries[id1] <= entry;
+            endcase
+
+            if (rnUOpSorted[i].fu == FU_RN)
+                flags[id] <= FLAGS_NONE;
+            else if (rnUOpSorted[i].fu == FU_TRAP)
+                flags[id] <= FLAGS_TRAP;
+            else
+                flags[id] <= FLAGS_NX;
+        end
+    end
+
+    for (integer i = 0; i < WIDTH_RN; i=i+1)
+        if (IN_uop[i].valid && !IN_branch.taken)
+            lastIndex <= IN_uop[i].sqN + 1;
+
+    // Mark committed ops as valid and set flags
+    for (integer i = 0; i < NUM_FLAG_UOPS; i=i+1) begin
+        if (IN_flagUOps[i].valid && (!IN_branch.taken || $signed(IN_flagUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_flagUOps[i].doNotCommit) begin
+
+            reg[$clog2(LENGTH)-1:0] id = IN_flagUOps[i].sqN[ID_LEN-1:0];
+            flags[id] <= IN_flagUOps[i].flags;
+            assert(IN_flagUOps[i].flags != FLAGS_NX);
+        end
+    end
+
     if (rst) begin
         baseIndex <= 0;
         OUT_curFetchID <= -1;
@@ -234,225 +452,29 @@ always_ff@(posedge clk) begin
         OUT_lastStoreSqN <= 0;
         loadSqN_r <= 0;
         storeSqN_r <= -1;
-    end
-    else begin
+
+        // replace all
+        OUT_fpNewFlags <= 0;
+        OUT_perfcInfo.validRetire <= 0;
+        OUT_perfcInfo.branchRetire <= 0;
+        // by default (if nothing is in the pipeline at all), blame the frontend
+        OUT_perfcInfo.stallWeigth <= 3;
+        OUT_perfcInfo.stallCause <= STALL_FRONTEND;
+
+        OUT_trapUOp <= 'x;
+        OUT_trapUOp.valid <= 0;
+
+        OUT_bpUpdate <= 'x;
+        OUT_bpUpdate.valid <= 0;
+
+        didCommit <= 0;
+
+        for (integer i = 0; i < WIDTH; i=i+1) begin
+            OUT_comUOp[i] <= 'x;
+            OUT_comUOp[i].valid <= 0;
+        end
+
         stop <= 0;
-
-        if (IN_branch.taken) begin
-            if (IN_branch.flush)
-                OUT_curFetchID <= IN_branch.fetchID;
-            lastIndex <= IN_branch.sqN + 1;
-        end
-
-        // After mispredict, we replay all ops from last committed to the branch
-        // without actually committing them to roll back the Rename Map.
-        if (misprReplay_c.valid) begin
-            for (integer i = 0; i < WIDTH; i=i+1) begin
-                if (misprReplayFwdMask[i]) begin
-                    OUT_comUOp[i].valid <= 1;
-                    OUT_comUOp[i].sqN <= 'x;
-                    OUT_comUOp[i].rd <= (deqFlags[i] == FLAGS_TRAP) ? 5'b0 : deqEntries[i].rd;
-                    OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                    OUT_comUOp[i].compressed <= 'x;
-                end
-            end
-        end
-
-        else if (!stop) begin
-
-            reg temp = 0;
-            reg temp2 = 0;
-            reg pred = 0;
-            reg[ID_LEN-1:0] cnt = 0;
-
-            OUT_perfcInfo.stallCause <= STALL_NONE;
-
-            for (integer i = 0; i < WIDTH; i=i+1) begin
-
-                reg[ID_LEN-1:0] id = baseIndex[ID_LEN-1:0] + i[ID_LEN-1:0];
-                SqN loadSqN = loadSqNs_c[i];
-                SqN storeSqN = storeSqNs_c[i+1]; // +1 for pre-increment
-
-                reg timeoutCommit = (i == 0) && hangDetected;
-
-                reg isRenamed = (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex));
-                reg isExecuted = deqFlags[i] != FLAGS_NX;
-                reg noFlagConflict = (!pred || (deqFlags[i] == FLAGS_NONE));
-                reg lbAllowsCommit = (!IN_ldComLimit.valid || $signed(loadSqN - IN_ldComLimit.sqN) < 0);
-                reg sqAllowsCommit = 1;
-                for (integer j = 0; j < NUM_AGUS; j=j+1)
-                    sqAllowsCommit &= (!IN_stComLimit[j].valid ||
-                        $signed(storeSqN - IN_stComLimit[j].sqN) < 0);
-
-                if (!temp && isRenamed &&
-                    ((isExecuted && noFlagConflict && sqAllowsCommit && lbAllowsCommit) || timeoutCommit)
-                ) begin
-
-                    reg isBranch = deqFlags[i] == FLAGS_BRANCH ||
-                        deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN;
-                    // Synchronous exceptions do not increment minstret, but mret/sret do.
-                    reg minstretRetire = (deqFlags[i] <= FLAGS_ORDERING) ||
-                        (deqFlags[i] == FLAGS_XRET) ||
-                        (deqEntries[i].isFP && deqFlags[i] != FLAGS_ILLEGAL_INSTR) ||
-                        (deqFlags[i] == FLAGS_TRAP && deqEntries[i].rd == RegNm'(TRAP_V_SFENCE_VMA));
-
-                    reg isException = timeoutCommit ||
-                        (deqFlags[i] >= FLAGS_ILLEGAL_INSTR && deqFlags[i] <= FLAGS_ST_PF);
-
-                    reg sendTrapUOp = timeoutCommit ||
-                        (deqFlags[i] >= FLAGS_FENCE && (!deqEntries[i].isFP || deqFlags[i] == FLAGS_ILLEGAL_INSTR));
-
-                    SqN sqN = GetSqN(id);
-
-                    OUT_comUOp[i].rd <= deqEntries[i].rd;
-                    OUT_comUOp[i].tagDst <= deqEntries[i].tag;
-                    OUT_comUOp[i].sqN <= sqN;
-                    OUT_comUOp[i].isBranch <= isBranch;
-                    OUT_comUOp[i].compressed <= deqEntries[i].compressed;
-                    OUT_comUOp[i].valid <= 1;
-
-                    OUT_perfcInfo.validRetire[i] <= minstretRetire && !timeoutCommit;
-                    OUT_perfcInfo.branchRetire[i] <= minstretRetire && isBranch && !timeoutCommit;
-
-                    OUT_curFetchID <= deqEntries[i].fetchID;
-
-                    if (!isException) begin
-                        if (deqEntries[i].isLd) OUT_lastLoadSqN <= loadSqN + 1;
-                        if (deqEntries[i].isSt) OUT_lastStoreSqN <= storeSqN + 1;
-                        storeSqN_r <= storeSqN;
-                        loadSqN_r <= loadSqNs_c[i+1];
-                    end
-
-
-                    if (deqFlags[i] == FLAGS_PRED_TAKEN || deqFlags[i] == FLAGS_PRED_NTAKEN) begin
-                        OUT_bpUpdate.valid <= 1;
-                        OUT_bpUpdate.branchTaken <= (deqFlags[i] == FLAGS_PRED_TAKEN);
-                        OUT_bpUpdate.fetchID <= deqEntries[i].fetchID;
-                        OUT_bpUpdate.fetchOffs <= deqEntries[i].fetchOffs;
-                        pred = 1;
-                    end
-
-                    if (sendTrapUOp) begin
-                        OUT_trapUOp.timeout <= timeoutCommit;
-                        OUT_trapUOp.flags <= deqFlags[i];
-                        OUT_trapUOp.tag <= deqEntries[i].tag;
-                        OUT_trapUOp.sqN <= sqN;
-                        OUT_trapUOp.loadSqN <= loadSqN;
-                        OUT_trapUOp.storeSqN <= storeSqN;
-                        OUT_trapUOp.rd <= deqEntries[i].rd;
-                        OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
-                        OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
-                        OUT_trapUOp.compressed <= deqEntries[i].compressed;
-                        OUT_trapUOp.valid <= 1;
-
-                        // Redirect result of exception to x0
-                        // The exception causes an invalidation to committed state,
-                        // so changing these is fine (does not leave us with inconsistent RAT/TB)
-                        if (isException) begin
-                            OUT_comUOp[i].rd <= 0;
-                            OUT_comUOp[i].tagDst <= TAG_ZERO;
-                        end
-
-                        stop <= 1;
-                        temp = 1;
-                    end
-                    else if (deqEntries[i].isFP &&
-                        (deqFlags[i] >= Flags'(FLAGS_FP_NX) && deqFlags[i] <= Flags'(FLAGS_FP_NV))
-                    ) begin
-                        OUT_fpNewFlags[deqFlags[i][2:0] - 3'(FLAGS_FP_NX)] <= 1;
-
-                        // Underflow and overflow imply inexact
-                        if (deqFlags[i] == Flags'(FLAGS_FP_UF) || deqFlags[i] == Flags'(FLAGS_FP_OF)) begin
-                            OUT_fpNewFlags[3'(FLAGS_FP_NX)] <= 1;
-                        end
-                    end
-
-                    didCommit <= 1;
-                    cnt = cnt + 1;
-                end
-                else begin
-                    // If we are unable to commit anything in this cycle, we use the TrapHandler's PCFile
-                    // lookup to get the address of the instruction we're stalled on (for debugging/analysis).
-                    if (i == 0 && (i[$clog2(LENGTH):0] < $signed(lastIndex - baseIndex))) begin
-                        OUT_trapUOp.timeout <= 0;
-                        OUT_trapUOp.fetchOffs <= deqEntries[i].fetchOffs;
-                        OUT_trapUOp.fetchID <= deqEntries[i].fetchID;
-                        OUT_trapUOp.compressed <= deqEntries[i].compressed;
-                        OUT_trapUOp.flags <= FLAGS_NX;
-                        OUT_trapUOp.valid <= 1;
-                    end
-
-                    // General stall/commit debug info
-                    if (!temp2) begin
-                        OUT_perfcInfo.stallWeigth <= 3 - i[1:0];
-
-                        if (!isRenamed || temp) OUT_perfcInfo.stallCause <= STALL_FRONTEND;
-                        else if (!isExecuted) begin
-                            if (deqPorts[i].isSt) OUT_perfcInfo.stallCause <= STALL_STORE;
-                            else if (deqPorts[i].isLd) OUT_perfcInfo.stallCause <= STALL_LOAD;
-                            else OUT_perfcInfo.stallCause <= STALL_BACKEND;
-                        end
-                        else if (!sqAllowsCommit) OUT_perfcInfo.stallCause <= STALL_STORE;
-                        else if (!lbAllowsCommit) OUT_perfcInfo.stallCause <= STALL_LOAD;
-                        else if (!noFlagConflict) OUT_perfcInfo.stallCause <= STALL_ROB;
-                        temp2 = 1;
-                    end
-
-                    temp = 1;
-                end
-
-            end
-            baseIndex <= baseIndex + cnt;
-        end
-
-        // Enqueue ops directly from Rename
-        for (integer i = 0; i < WIDTH_RN; i=i+1) begin
-            if (rnUOpSorted[i].valid && (!IN_branch.taken)) begin
-
-                reg[ID_LEN-1:0] id = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)], i[$clog2(`DEC_WIDTH)-1:0]};
-                reg[$clog2(LENGTH/WIDTH_RN)-1:0] id1 = {rnUOpSorted[i].sqN[ID_LEN-1:$clog2(`DEC_WIDTH)]};
-                reg[$clog2(WIDTH_RN)-1:0] id0 = {i[$clog2(`DEC_WIDTH)-1:0]};
-
-                ROBEntry entry = 'x;
-
-                entry.tag = rnUOpSorted[i].tagDst;
-                entry.rd = rnUOpSorted[i].rd;
-                entry.compressed = rnUOpSorted[i].compressed;
-                entry.fetchID = rnUOpSorted[i].fetchID;
-                entry.isFP = rnUOpSorted[i].fu == FU_FPU || rnUOpSorted[i].fu == FU_FDIV || rnUOpSorted[i].fu == FU_FMUL;
-                entry.fetchOffs = rnUOpSorted[i].fetchOffs;
-                entry.isLd = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode <  LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
-                entry.isSt = (rnUOpSorted[i].fu == FU_AGU && rnUOpSorted[i].opcode >= LSU_SC_W) || rnUOpSorted[i].fu == FU_ATOMIC;
-
-                case (id0)
-                    0: gen[0].entries[id1] <= entry;
-                    1: gen[1].entries[id1] <= entry;
-                    2: gen[2].entries[id1] <= entry;
-                    3: gen[3].entries[id1] <= entry;
-                endcase
-
-                if (rnUOpSorted[i].fu == FU_RN)
-                    flags[id] <= FLAGS_NONE;
-                else if (rnUOpSorted[i].fu == FU_TRAP)
-                    flags[id] <= FLAGS_TRAP;
-                else
-                    flags[id] <= FLAGS_NX;
-            end
-        end
-
-        for (integer i = 0; i < WIDTH_RN; i=i+1)
-            if (IN_uop[i].valid && !IN_branch.taken)
-                lastIndex <= IN_uop[i].sqN + 1;
-
-        // Mark committed ops as valid and set flags
-        for (integer i = 0; i < NUM_FLAG_UOPS; i=i+1) begin
-            if (IN_flagUOps[i].valid && (!IN_branch.taken || $signed(IN_flagUOps[i].sqN - IN_branch.sqN) <= 0) && !IN_flagUOps[i].doNotCommit) begin
-
-                reg[$clog2(LENGTH)-1:0] id = IN_flagUOps[i].sqN[ID_LEN-1:0];
-                flags[id] <= IN_flagUOps[i].flags;
-                assert(IN_flagUOps[i].flags != FLAGS_NX);
-            end
-        end
     end
 end
 

@@ -111,15 +111,13 @@ always_comb begin
     end
 end
 always_ff@(posedge clk) begin
+    accIdx_r <= accIdx_c;
+    if (doAcc) begin
+        acc[accIdx_r * CWIDTH +: CWIDTH] <= IN_CACHE_data;
+        assert(!readMetaSR[1].last);
+    end
     if (rst) begin
         accIdx_r <= 0;
-    end
-    else begin
-        accIdx_r <= accIdx_c;
-        if (doAcc) begin
-            acc[accIdx_r * CWIDTH +: CWIDTH] <= IN_CACHE_data;
-            assert(!readMetaSR[1].last);
-        end
     end
 end
 
@@ -177,6 +175,39 @@ end
 
 ReadMeta[1:0] readMetaSR;
 always_ff@(posedge clk) begin
+    Transfer incoming = Transfer'{default: 'x, valid: 0};
+
+    if (IN_valid && OUT_ready) begin
+        incoming.valid = 1;
+        incoming.id = IN_id;
+        incoming.addr = IN_addr;
+        incoming.progress = 0;
+        incoming.len = IN_len;
+
+        incoming.mmio = IN_mmio;
+        incoming.mmioData = IN_mmioData;
+    end
+
+    readMetaSR <= {readMetaSR[0], readSucc ? readMeta : '0};
+
+    if (readSucc) begin
+        if (readMeta.last) begin
+            if (next.valid) begin
+                cur <= next;
+                next <= Transfer'{default: 'x, valid: 0};
+            end
+            else begin
+                cur <= incoming;
+                incoming = Transfer'{default: 'x, valid: 0};
+            end
+        end
+        else cur.progress <= cur.progress + CWIDTH_W;
+    end
+
+    if (incoming.valid) begin
+        if (!cur.valid) cur <= incoming;
+        else next <= incoming;
+    end
 
     if (rst) begin
         cur <= 'x;
@@ -184,41 +215,6 @@ always_ff@(posedge clk) begin
         next <= 'x;
         next.valid <= 0;
         readMetaSR <= '0;
-    end
-    else begin
-        Transfer incoming = Transfer'{default: 'x, valid: 0};
-
-        if (IN_valid && OUT_ready) begin
-            incoming.valid = 1;
-            incoming.id = IN_id;
-            incoming.addr = IN_addr;
-            incoming.progress = 0;
-            incoming.len = IN_len;
-
-            incoming.mmio = IN_mmio;
-            incoming.mmioData = IN_mmioData;
-        end
-
-        readMetaSR <= {readMetaSR[0], readSucc ? readMeta : '0};
-
-        if (readSucc) begin
-            if (readMeta.last) begin
-                if (next.valid) begin
-                    cur <= next;
-                    next <= Transfer'{default: 'x, valid: 0};
-                end
-                else begin
-                    cur <= incoming;
-                    incoming = Transfer'{default: 'x, valid: 0};
-                end
-            end
-            else cur.progress <= cur.progress + CWIDTH_W;
-        end
-
-        if (incoming.valid) begin
-            if (!cur.valid) cur <= incoming;
-            else next <= incoming;
-        end
     end
 end
 

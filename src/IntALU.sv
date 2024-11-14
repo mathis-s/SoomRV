@@ -183,8 +183,7 @@ if (HasFU(FU_BRANCH)) begin
         btUpdate_c = 'x;
         btUpdate_c.valid = 0;
 
-        if (rst) ;
-        else if (IN_uop.valid && IN_uop.fu == FU_BRANCH &&
+        if (IN_uop.valid && IN_uop.fu == FU_BRANCH &&
             (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)
         ) begin
             branch_c.sqN = IN_uop.sqN;

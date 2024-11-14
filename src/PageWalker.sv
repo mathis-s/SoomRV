@@ -79,78 +79,73 @@ end
 always_ff@(posedge clk) begin
 
     OUT_res.valid <= 0;
+    case (state)
+        default: begin
+            OUT_res.busy <= 0;
+            for (integer i = 0; i < NUM_RQS; i=i+1) begin
+                if (IN_rqs[i].valid) begin
+
+                    state <= WAIT_FOR_LOAD;
+                    pageWalkIter <= 1;
+                    pageWalkAddr <= IN_rqs[i].addr;
+                    rqID <= i[1:0];
+
+                    OUT_ldUOp.valid <= 1;
+                    OUT_ldUOp.addr <= {IN_rqs[i].rootPPN[19:0], IN_rqs[i].addr[31:22], 2'b0};
+
+                    OUT_res <= 'x;
+                    OUT_res.rqID <= i[1:0];
+                    OUT_res.busy <= 1;
+                    OUT_res.valid <= 0;
+                end
+            end
+        end
+
+        WAIT_FOR_LOAD: begin
+            if (OUT_ldUOp.valid) begin
+                if (!IN_ldStall) OUT_ldUOp.valid <= 0;
+            end
+            else if (pwLdRes.valid) begin
+                // Pointer to next page
+                if (pwLdRes.result[3:0] == 4'b0001 && pwLdRes.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
+
+                    OUT_ldUOp.valid <= 1;
+                    OUT_ldUOp.addr <= nextLookup;
+
+                    pageWalkIter <= 0;
+
+                    state <= WAIT_FOR_LOAD;
+                end
+                else begin
+                    OUT_res.busy <= 0;
+                    OUT_res.valid <= 1;
+                    OUT_res.isSuperPage <= isSuperPage_c;
+                    OUT_res.pageFault <= pageFault_c;
+                    OUT_res.ppn <= ppn_c;
+                    OUT_res.vpn <= pageWalkAddr[31:12];
+                    OUT_res.rwx <= rwx_c;
+
+                    OUT_res.globl <= dagu_c[1];
+                    OUT_res.user <= dagu_c[0];
+                    state <= IDLE;
+                end
+            end
+            else begin
+                // If a lot of misses are coming in, the LSU might not have capacity to
+                // buffer our op. Page walk loads cannot use the LB as fallback buffering,
+                // so we just re-issue on NACK.
+                for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+                    if (IN_ldAck[i].valid && IN_ldAck[i].external && IN_ldAck[i].fail)
+                        OUT_ldUOp.valid <= 1;
+                end
+            end
+        end
+    endcase
 
     if (rst) begin
         OUT_ldUOp.valid <= 0;
         state <= IDLE;
         OUT_res.busy <= 0;
-    end
-    else begin
-
-        case (state)
-            default: begin
-                OUT_res.busy <= 0;
-                for (integer i = 0; i < NUM_RQS; i=i+1) begin
-                    if (IN_rqs[i].valid) begin
-
-                        state <= WAIT_FOR_LOAD;
-                        pageWalkIter <= 1;
-                        pageWalkAddr <= IN_rqs[i].addr;
-                        rqID <= i[1:0];
-
-                        OUT_ldUOp.valid <= 1;
-                        OUT_ldUOp.addr <= {IN_rqs[i].rootPPN[19:0], IN_rqs[i].addr[31:22], 2'b0};
-
-                        OUT_res <= 'x;
-                        OUT_res.rqID <= i[1:0];
-                        OUT_res.busy <= 1;
-                        OUT_res.valid <= 0;
-                    end
-                end
-            end
-
-            WAIT_FOR_LOAD: begin
-                if (OUT_ldUOp.valid) begin
-                    if (!IN_ldStall) OUT_ldUOp.valid <= 0;
-                end
-                else if (pwLdRes.valid) begin
-                    // Pointer to next page
-                    if (pwLdRes.result[3:0] == 4'b0001 && pwLdRes.result[31:30] == 0 && pageWalkIter == 1 && `IS_LEGAL_ADDR(nextLookup)) begin
-
-                        OUT_ldUOp.valid <= 1;
-                        OUT_ldUOp.addr <= nextLookup;
-
-                        pageWalkIter <= 0;
-
-                        state <= WAIT_FOR_LOAD;
-                    end
-                    else begin
-                        OUT_res.busy <= 0;
-                        OUT_res.valid <= 1;
-                        OUT_res.isSuperPage <= isSuperPage_c;
-                        OUT_res.pageFault <= pageFault_c;
-                        OUT_res.ppn <= ppn_c;
-                        OUT_res.vpn <= pageWalkAddr[31:12];
-                        OUT_res.rwx <= rwx_c;
-
-                        OUT_res.globl <= dagu_c[1];
-                        OUT_res.user <= dagu_c[0];
-                        state <= IDLE;
-                    end
-                end
-                else begin
-                    // If a lot of misses are coming in, the LSU might not have capacity to
-                    // buffer our op. Page walk loads cannot use the LB as fallback buffering,
-                    // so we just re-issue on NACK.
-                    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-                        if (IN_ldAck[i].valid && IN_ldAck[i].external && IN_ldAck[i].fail)
-                            OUT_ldUOp.valid <= 1;
-                    end
-                end
-            end
-        endcase
-
-
     end
 end
 

@@ -209,13 +209,7 @@ always_ff@(posedge clk) begin
     end
     reservedWBs <= {1'b0, reservedWBs[32:1]};
 
-    if (rst) begin
-        insertIndex <= 0;
-        reservedWBs <= 0;
-        OUT_uop <= 'x;
-        OUT_uop.valid <= 0;
-    end
-    else if (IN_branch.taken) begin
+    if (IN_branch.taken) begin
 
         newInsertIndex = 0;
         // Set insert index to first invalid entry
@@ -368,6 +362,13 @@ always_ff@(posedge clk) begin
             end
         end
         insertIndex <= newInsertIndex;
+    end
+
+    if (rst) begin
+        insertIndex <= 0;
+        reservedWBs <= 0;
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
     end
 end
 

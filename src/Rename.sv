@@ -255,22 +255,7 @@ Scheduler scheduler
 
 always_ff@(posedge clk) begin
 
-    if (rst) begin
-        counterSqN <= 0;
-        counterStoreSqN <= -1;
-        counterLoadSqN <= 0;
-
-        OUT_nextStoreSqN <= 0;
-        OUT_nextLoadSqN <= 0;
-        failSc <= 0;
-
-        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i] <= 'x;
-            OUT_uop[i].valid <= 0;
-            OUT_uop[i].validIQ <= 0;
-        end
-    end
-    else if (IN_branch.taken) begin
+    if (IN_branch.taken) begin
 
         counterSqN <= IN_branch.sqN + 1;
 
@@ -297,7 +282,7 @@ always_ff@(posedge clk) begin
         OUT_nextStoreSqN <= storeSqNs[WIDTH_ISSUE] + 1;
     end
 
-    if (!rst && |portStall) begin
+    if (|portStall) begin
         // If frontend is stalled right now we need to make sure
         // the ops we're stalled on are kept up-to-date, as they will be
         // read later.
@@ -317,8 +302,7 @@ always_ff@(posedge clk) begin
         end
     end
 
-    if (rst) ;
-    else if (cycleValid) begin
+    if (cycleValid) begin
         // Set seqnum/tags for next instruction(s)
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
             OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
@@ -391,6 +375,22 @@ always_ff@(posedge clk) begin
             for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1) begin
                 if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
             end
+        end
+    end
+
+    if (rst) begin
+        counterSqN <= 0;
+        counterStoreSqN <= -1;
+        counterLoadSqN <= 0;
+
+        OUT_nextStoreSqN <= 0;
+        OUT_nextLoadSqN <= 0;
+        failSc <= 0;
+
+        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+            OUT_uop[i] <= 'x;
+            OUT_uop[i].valid <= 0;
+            OUT_uop[i].validIQ <= 0;
         end
     end
 end

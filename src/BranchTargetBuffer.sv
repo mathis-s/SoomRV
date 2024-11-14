@@ -75,11 +75,7 @@ SetMultiple setMult;
 logic[$clog2(LENGTH):0] resetIdx;
 
 always_ff@(posedge clk) begin
-    if (rst) begin
-        setMult <= SetMultiple'{valid: 0, default: 'x};
-        resetIdx <= 0;
-    end
-    else if (!resetIdx[$clog2(LENGTH)]) begin
+    if (!resetIdx[$clog2(LENGTH)]) begin
         multiple[resetIdx[$clog2(LENGTH)-1:0]] <= 0;
         entries[resetIdx[$clog2(LENGTH)-1:0]] <= '0;
         resetIdx <= resetIdx + 1;
@@ -124,6 +120,11 @@ always_ff@(posedge clk) begin
                 setMult <= SetMultiple'{valid: 0, default: 'x};
             end
         end
+    end
+
+    if (rst) begin
+        setMult <= SetMultiple'{valid: 0, default: 'x};
+        resetIdx <= 0;
     end
 end
 

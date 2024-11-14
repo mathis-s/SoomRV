@@ -65,6 +65,49 @@ end
 
 always_ff@(posedge clk) begin
 
+    // Written back values are speculatively available
+    for (integer i = 0; i < NUM_WB; i=i+1) begin
+        if (IN_wbValid[i] && !IN_wbTag[i][TAG_SIZE-1]) begin
+            tagAvail[IN_wbTag[i][TAG_SIZE-2:0]] <= 1;
+        end
+    end
+
+    if (IN_mispred) begin
+        for (integer i = 1; i < NUM_REGS; i=i+1) begin
+            // Ideally we would set specTag to the last specTag that isn't post incoming branch.
+            // We can't keep such a history for every register though. Instead we reset to committed
+            // state, then the ROB re-applies all non-committed but pre-mispredict changes.
+            specTag[i] <= comTag[i];
+        end
+    end
+    else begin
+        for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
+            if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
+                specTag[IN_issueIDs[i]] <= IN_issueTags[i];
+
+                if (!IN_issueTags[i][TAG_SIZE-1]) begin
+                    tagAvail[IN_issueTags[i][TAG_SIZE-2:0]] <= 0;
+                    assert(IN_issueAvail[i] == 0);
+                end
+            end
+        end
+    end
+
+    for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
+        if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
+            if (IN_mispredFlush) begin
+                if (!IN_mispred) begin
+                    specTag[IN_commitIDs[i]] <= IN_commitTags[i];
+                end
+            end
+            else begin
+                comTag[IN_commitIDs[i]] <= IN_commitTags[i];
+                if (IN_mispred)
+                    specTag[IN_commitIDs[i]] <= IN_commitTags[i];
+            end
+        end
+    end
+
     if (rst) begin
         // Registers initialized with 0
         for (integer i = 0; i < NUM_REGS; i=i+1) begin
@@ -72,50 +115,6 @@ always_ff@(posedge clk) begin
             specTag[i] <= TAG_ZERO;
         end
         tagAvail <= {NUM_TAGS{1'b1}};
-    end
-    else begin
-        // Written back values are speculatively available
-        for (integer i = 0; i < NUM_WB; i=i+1) begin
-            if (IN_wbValid[i] && !IN_wbTag[i][TAG_SIZE-1]) begin
-                tagAvail[IN_wbTag[i][TAG_SIZE-2:0]] <= 1;
-            end
-        end
-
-        if (IN_mispred) begin
-            for (integer i = 1; i < NUM_REGS; i=i+1) begin
-                // Ideally we would set specTag to the last specTag that isn't post incoming branch.
-                // We can't keep such a history for every register though. Instead we reset to committed
-                // state, then the ROB re-applies all non-committed but pre-mispredict changes.
-                specTag[i] <= comTag[i];
-            end
-        end
-        else begin
-            for (integer i = 0; i < NUM_ISSUE; i=i+1) begin
-                if (IN_issueValid[i] && IN_issueIDs[i] != 0) begin
-                    specTag[IN_issueIDs[i]] <= IN_issueTags[i];
-
-                    if (!IN_issueTags[i][TAG_SIZE-1]) begin
-                        tagAvail[IN_issueTags[i][TAG_SIZE-2:0]] <= 0;
-                        assert(IN_issueAvail[i] == 0);
-                    end
-                end
-            end
-        end
-
-        for (integer i = 0; i < NUM_COMMIT; i=i+1) begin
-            if (IN_commitValid[i] && IN_commitIDs[i] != 0) begin
-                if (IN_mispredFlush) begin
-                    if (!IN_mispred) begin
-                        specTag[IN_commitIDs[i]] <= IN_commitTags[i];
-                    end
-                end
-                else begin
-                    comTag[IN_commitIDs[i]] <= IN_commitTags[i];
-                    if (IN_mispred)
-                        specTag[IN_commitIDs[i]] <= IN_commitTags[i];
-                end
-            end
-        end
     end
 end
 

@@ -96,63 +96,60 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    if (rst) begin
-        active <= 0;
+    readRequests <= {readRequests[0], 1'b0};
+
+    if (!active && IN_en) begin
+        active <= 1;
+        isWrite <= IN_write;
+        lenCnt <= IN_len;
+        addrCnt <= IN_addr;
+        cacheID <= IN_cacheID;
+        readBufferInsertIdx = 0;
+        readBufferOutputIdx = 0;
+        readBufferCnt = 0;
+        readRequests <= 0;
     end
-    else begin
+    else if (active) begin
+        if (isWrite && progress) begin
+            if (lenCnt == 1) active <= 0;
+            addrCnt[`CLSIZE_E-3:0] <= addrCnt[`CLSIZE_E-3:0] + 1;
+            lenCnt <= lenCnt - 1;
 
-        readRequests <= {readRequests[0], 1'b0};
-
-        if (!active && IN_en) begin
-            active <= 1;
-            isWrite <= IN_write;
-            lenCnt <= IN_len;
-            addrCnt <= IN_addr;
-            cacheID <= IN_cacheID;
             readBufferInsertIdx = 0;
             readBufferOutputIdx = 0;
-            readBufferCnt = 0;
             readRequests <= 0;
         end
-        else if (active) begin
-            if (isWrite && progress) begin
-                if (lenCnt == 1) active <= 0;
+        else if (!isWrite) begin
+
+            // Read incoming cache data or from buffer
+            if (IN_valid) begin
+
+                if (lenCnt == 0 && readBufferRqCnt == 1) active <= 0;
+
+                if (readFromBuffer) begin
+                    readBufferOutputIdx = readBufferOutputIdx + 1;
+                    readBufferCnt = readBufferCnt - 1;
+                end
+            end
+
+            // Write incoming data from cache into buffer
+            if (readRequests[1] && (!IN_valid || readFromBuffer)) begin
+                readBuffer[readBufferInsertIdx] <= IN_CACHE_data;
+                readBufferCnt = readBufferCnt + 1;
+                readBufferInsertIdx = readBufferInsertIdx + 1;
+            end
+
+            // Read new data from cache into buffer if space is available
+            if (readToBuffer) begin
+                readRequests <= {readRequests[0], 1'b1};
+
                 addrCnt[`CLSIZE_E-3:0] <= addrCnt[`CLSIZE_E-3:0] + 1;
                 lenCnt <= lenCnt - 1;
-
-                readBufferInsertIdx = 0;
-                readBufferOutputIdx = 0;
-                readRequests <= 0;
-            end
-            else if (!isWrite) begin
-
-                // Read incoming cache data or from buffer
-                if (IN_valid) begin
-
-                    if (lenCnt == 0 && readBufferRqCnt == 1) active <= 0;
-
-                    if (readFromBuffer) begin
-                        readBufferOutputIdx = readBufferOutputIdx + 1;
-                        readBufferCnt = readBufferCnt - 1;
-                    end
-                end
-
-                // Write incoming data from cache into buffer
-                if (readRequests[1] && (!IN_valid || readFromBuffer)) begin
-                    readBuffer[readBufferInsertIdx] <= IN_CACHE_data;
-                    readBufferCnt = readBufferCnt + 1;
-                    readBufferInsertIdx = readBufferInsertIdx + 1;
-                end
-
-                // Read new data from cache into buffer if space is available
-                if (readToBuffer) begin
-                    readRequests <= {readRequests[0], 1'b1};
-
-                    addrCnt[`CLSIZE_E-3:0] <= addrCnt[`CLSIZE_E-3:0] + 1;
-                    lenCnt <= lenCnt - 1;
-                end
             end
         end
+    end
+    if (rst) begin
+        active <= 0;
     end
 end
 

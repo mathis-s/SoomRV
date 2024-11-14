@@ -326,9 +326,7 @@ PageWalk_Req OUT_pw_c;
 always_comb begin
     OUT_pw_c = PageWalk_Req'{valid: 0, default: 'x};
 
-    if (rst) begin
-    end
-    else if (OUT_pw.valid && IN_pw.busy) begin
+    if (OUT_pw.valid && IN_pw.busy) begin
         OUT_pw_c = OUT_pw;
     end
     else if (tlbMiss) begin
@@ -347,9 +345,7 @@ always_comb begin
     OUT_memc_c.cmd = MEMC_NONE;
     handlingMiss = 0;
 
-    if (rst) begin
-    end
-    else if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
+    if (OUT_memc.cmd != MEMC_NONE && IN_memc.stall[0]) begin
         OUT_memc_c = OUT_memc;
     end
     else if (cacheMiss && doCacheLoad) begin // do we need dependency on IN_mispr?
@@ -433,27 +429,11 @@ FetchID_t fetchID_c;
 IFetchOp fetch0 /* verilator public */;
 IFetchOp fetch1 /* verilator public */;
 
-typedef enum logic[1:0]
-{
-    FLUSH_IDLE,
-    FLUSH_QUEUED,
-    FLUSH_ACTIVE,
-    FLUSH_FINALIZE
-} FlushState;
-FlushState flushState;
-logic[$clog2(`CASSOC)-1:0] flushAssocIter;
-logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
-
 always_ff@(posedge clk) begin
     fetch0 <= IFetchOp'{valid: 0, default: 'x};
     fetch1 <= IFetchOp'{valid: 0, default: 'x};
 
-    if (rst) begin
-        fetchID <= 0;
-        flushState <= FLUSH_QUEUED;
-        assocCnt <= 0;
-    end
-    else if (IN_mispr) begin
+    if (IN_mispr) begin
         fetchID <= IN_misprFetchID + 1;
     end
     else if (BH_decBranch.taken) begin
@@ -484,36 +464,56 @@ always_ff@(posedge clk) begin
             assocCnt <= assocCnt + 1;
     end
 
-    if (!rst) begin
-        case (flushState)
-            default: begin
-                flushState <= FLUSH_IDLE;
-                if (IN_clearICache)
-                    flushState <= FLUSH_QUEUED;
-                flushAssocIter <= 0;
-                flushAddrIter <= 0;
-            end
-            FLUSH_QUEUED: begin
-                flushState <= FLUSH_ACTIVE;
-                if (fetch0.valid || fetch1.valid)
-                    flushState <= FLUSH_QUEUED;
-                flushAssocIter <= 0;
-                flushAddrIter <= 0;
-            end
-            FLUSH_ACTIVE: begin
-                reg flushDone;
-                reg[$bits(flushAssocIter)-1:0] nextFlushAssoc;
-                reg[$bits(flushAddrIter)-1:0] nextFlushAddr;
-                {flushDone, nextFlushAssoc, nextFlushAddr} = {flushAssocIter, flushAddrIter} + 1;
+    if (rst) begin
+        fetchID <= 0;
+        assocCnt <= 0;
+    end
+end
 
-                flushAssocIter <= nextFlushAssoc;
-                flushAddrIter <= nextFlushAddr;
-                if (flushDone) flushState <= IN_MEM_busy ? FLUSH_FINALIZE : FLUSH_IDLE;
-            end
-            FLUSH_FINALIZE: begin
-                if (!IN_MEM_busy) flushState <= FLUSH_IDLE;
-            end
-        endcase
+typedef enum logic[1:0]
+{
+    FLUSH_IDLE,
+    FLUSH_QUEUED,
+    FLUSH_ACTIVE,
+    FLUSH_FINALIZE
+} FlushState;
+FlushState flushState;
+logic[$clog2(`CASSOC)-1:0] flushAssocIter;
+logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
+
+always_ff@(posedge clk) begin
+    case (flushState)
+        default: begin
+            flushState <= FLUSH_IDLE;
+            if (IN_clearICache)
+                flushState <= FLUSH_QUEUED;
+            flushAssocIter <= 0;
+            flushAddrIter <= 0;
+        end
+        FLUSH_QUEUED: begin
+            flushState <= FLUSH_ACTIVE;
+            if (fetch0.valid || fetch1.valid)
+                flushState <= FLUSH_QUEUED;
+            flushAssocIter <= 0;
+            flushAddrIter <= 0;
+        end
+        FLUSH_ACTIVE: begin
+            reg flushDone;
+            reg[$bits(flushAssocIter)-1:0] nextFlushAssoc;
+            reg[$bits(flushAddrIter)-1:0] nextFlushAddr;
+            {flushDone, nextFlushAssoc, nextFlushAddr} = {flushAssocIter, flushAddrIter} + 1;
+
+            flushAssocIter <= nextFlushAssoc;
+            flushAddrIter <= nextFlushAddr;
+            if (flushDone) flushState <= IN_MEM_busy ? FLUSH_FINALIZE : FLUSH_IDLE;
+        end
+        FLUSH_FINALIZE: begin
+            if (!IN_MEM_busy) flushState <= FLUSH_IDLE;
+        end
+    endcase
+
+    if (rst) begin
+        flushState <= FLUSH_QUEUED;
     end
 end
 

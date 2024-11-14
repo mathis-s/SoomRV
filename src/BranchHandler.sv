@@ -486,32 +486,30 @@ always_comb begin
 end
 
 always_ff@(posedge clk) begin
-    if (rst) begin
+    if (IN_clear) begin
         lastInstr <= 'x;
         lastInstrValid <= 0;
     end
-    else begin
-        if (IN_clear) begin
-            lastInstr <= 'x;
+    else if (IN_accept) begin
+
+        reg[$bits(FetchOff_t):0] lastIdx = $bits(FetchOff_t)'(IN_op.lastValid) + 1;
+
+        // A 32-bit instr may span two fetch packages. In that case, we store the
+        // current fetch package's end, and handle it once the second half of the
+        // instruction arrives.
+        if (is32bit[lastIdx] && !decBranch_c.taken) begin
+            lastInstrValid <= 1;
+            lastInstr <= instrsView[NUM_INST];
+            lastInstrPC <= pc[NUM_INST];
+        end
+        else begin
             lastInstrValid <= 0;
+            lastInstr <= 'x;
         end
-        else if (IN_accept) begin
-
-            reg[$bits(FetchOff_t):0] lastIdx = $bits(FetchOff_t)'(IN_op.lastValid) + 1;
-
-            // A 32-bit instr may span two fetch packages. In that case, we store the
-            // current fetch package's end, and handle it once the second half of the
-            // instruction arrives.
-            if (is32bit[lastIdx] && !decBranch_c.taken) begin
-                lastInstrValid <= 1;
-                lastInstr <= instrsView[NUM_INST];
-                lastInstrPC <= pc[NUM_INST];
-            end
-            else begin
-                lastInstrValid <= 0;
-                lastInstr <= 'x;
-            end
-        end
+    end
+    if (rst) begin
+        lastInstr <= 'x;
+        lastInstrValid <= 0;
     end
 end
 

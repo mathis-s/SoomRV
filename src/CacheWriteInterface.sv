@@ -78,17 +78,16 @@ always_ff@(posedge clk) begin
     OUT_ackValid <= 0;
     OUT_ackId <= 'x;
 
+    cur_r <= cur_c;
+
+    if (writeLast) begin
+        OUT_ackValid <= 1;
+        OUT_ackId <= writeLastId;
+    end
+
     if (rst) begin
         cur_r <= 'x;
         cur_r.valid <= 0;
-    end
-    else begin
-        cur_r <= cur_c;
-
-        if (writeLast) begin
-            OUT_ackValid <= 1;
-            OUT_ackId <= writeLastId;
-        end
     end
 end
 

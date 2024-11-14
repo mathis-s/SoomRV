@@ -582,165 +582,163 @@ always_ff@(posedge clk) begin
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};
     ldDataFwd <= MemController_LdDataFwd'{default: 'x, valid: 0};
 
-    if (rst) begin
-        for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
+    // GC
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
+        if (transfers[i].valid && transfers[i].readDone && transfers[i].writeDone) begin
             transfers[i] <= 'x;
             transfers[i].valid <= 0;
         end
     end
-    else begin
 
-        // GC
+    // Enqueue
+    if (selReq.cmd != MEMC_NONE) begin
+        assert(enqIdxValid);
+        transfers[enqIdx].valid <= 1;
+        transfers[enqIdx].cmd <= selReq.cmd;
+        transfers[enqIdx].needReadRq <= '0;
+        transfers[enqIdx].needWriteRq <= '0;
+        transfers[enqIdx].progress <= 0;
+        transfers[enqIdx].addrCounter <= 0;
+        transfers[enqIdx].fwdAddrCounter <= 0;
+        transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
+        transfers[enqIdx].cacheID <= selReq.cacheID;
+
+        transfers[enqIdx].readDone <= 1;
+        transfers[enqIdx].writeDone <= 1;
+
+        if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_CACHE_TO_EXT || selReq.cmd == MEMC_CP_EXT_TO_CACHE) begin
+            // cache-line oriented ops use aligned addresses
+            transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
+            transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
+            transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
+
+            transfers[enqIdx].storeData <= selReq.data;
+            transfers[enqIdx].storeMask <= selReq.mask;
+        end
+        else begin
+            transfers[enqIdx].writeAddr <= selReq.writeAddr;
+            transfers[enqIdx].readAddr <= selReq.readAddr;
+            transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
+
+            transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data);
+            transfers[enqIdx].storeMask <= '1; // unused
+        end
+
+        case (selReq.cmd)
+            MEMC_REPLACE: begin
+                transfers[enqIdx].needReadRq <= '1;
+                transfers[enqIdx].needWriteRq <= 2'b11;
+                transfers[enqIdx].evictProgress <= 0;
+                transfers[enqIdx].readDone <= 0;
+                transfers[enqIdx].writeDone <= 0;
+            end
+            MEMC_CP_EXT_TO_CACHE: begin
+                transfers[enqIdx].needReadRq <= '1;
+                transfers[enqIdx].readDone <= 0;
+            end
+            MEMC_CP_CACHE_TO_EXT: begin
+                transfers[enqIdx].needWriteRq <= 2'b11;
+                transfers[enqIdx].writeDone <= 0;
+                transfers[enqIdx].evictProgress <= 0;
+            end
+            MEMC_READ_BYTE, MEMC_READ_HALF, MEMC_READ_WORD: begin
+                transfers[enqIdx].needReadRq <= '1;
+                transfers[enqIdx].readDone <= 0;
+            end
+            MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
+                transfers[enqIdx].needWriteRq <= 2'b11;
+                transfers[enqIdx].writeDone <= 0;
+            end
+            default: assert(0);
+        endcase
+    end
+
+    // Read Request
+    if (readReqSuccess) begin
+        transfers[arIdx].needReadRq <= 0;
+    end
+
+    // Read Data
+    if (buf_rvalid && buf_rready) begin
+
+        transfers[buf_rid].addrCounter <= transfers[buf_rid].addrCounter + WIDTH_W;
+
+        if (isMMIO[buf_rid]) begin
+            transfers[buf_rid] <= 'x;
+            transfers[buf_rid].valid <= 0;
+
+            sglLdRes.valid <= 1;
+            sglLdRes.id <= transfers[buf_rid].cacheAddr;
+            sglLdRes.data <= buf_rdata[31:0];
+        end
+    end
+
+    if (s_axi_rvalid && s_axi_rready) begin
+        if (transfers[s_axi_rid].cacheID == 0) begin
+            transfers[s_axi_rid].fwdAddrCounter <= transfers[s_axi_rid].fwdAddrCounter + WIDTH_W;
+
+            ldDataFwd.data <= s_axi_rdata;
+            if (transfers[s_axi_rid].fwdAddrCounter == 0) begin
+                for (integer i = 0; i < `AXI_WIDTH/8; i=i+1)
+                    if (transfers[s_axi_rid].storeMask[i])
+                        ldDataFwd.data[i*8+:8] <= transfers[s_axi_rid].storeData[8*i+:8];
+            end
+
+            ldDataFwd.addr <= {transfers[s_axi_rid].readAddr[31:`CLSIZE_E], (transfers[s_axi_rid].readAddr[`CLSIZE_E-1:2] + transfers[s_axi_rid].fwdAddrCounter[`CLSIZE_E-3:0]), 2'b0};
+            ldDataFwd.valid <= 1;
+        end
+    end
+
+    // Read ACK
+    if (DCW_ackValid) begin
+        transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + WIDTH_W;
+        if ((transfers[DCW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
+            transfers[DCW_ackId].readDone <= 1;
+            if (transfers[DCW_ackId].writeDone) begin
+                transfers[DCW_ackId] <= 'x;
+                transfers[DCW_ackId].valid <= 0;
+            end
+        end
+    end
+    if (ICW_ackValid) begin
+        transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + WIDTH_W;
+        if ((transfers[ICW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
+            transfers[ICW_ackId].readDone <= 1;
+            if (transfers[ICW_ackId].writeDone) begin
+                transfers[ICW_ackId] <= 'x;
+                transfers[ICW_ackId].valid <= 0;
+            end
+        end
+    end
+
+    // Write Request
+    if (awIdxValid) begin
+        if (DCR_reqValid && DCR_reqReady) transfers[awIdx].needWriteRq[0] <= 0;
+        if (axiAW.awvalid && awFIFO_ready) transfers[awIdx].needWriteRq[1] <= 0;
+    end
+
+    // Write Data
+    if (DCR_cacheReadValid) begin
+        transfers[DCR_cacheReadId].evictProgress <= transfers[DCR_cacheReadId].evictProgress + WIDTH_W;
+    end
+
+    // Write ACK
+    if (s_axi_bvalid) begin
+        if (isMMIO[s_axi_bid]) begin
+            sglStRes.valid <= 1;
+            sglStRes.id <= transfers[s_axi_bid].cacheAddr;
+        end
+        transfers[s_axi_bid].writeDone <= 1;
+        if (transfers[s_axi_bid].readDone) begin
+            transfers[s_axi_bid] <= 'x;
+            transfers[s_axi_bid].valid <= 0;
+        end
+    end
+
+    if (rst) begin
         for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
-            if (transfers[i].valid && transfers[i].readDone && transfers[i].writeDone) begin
-                transfers[i] <= 'x;
-                transfers[i].valid <= 0;
-            end
-        end
-
-        // Enqueue
-        if (selReq.cmd != MEMC_NONE) begin
-            assert(enqIdxValid);
-            transfers[enqIdx].valid <= 1;
-            transfers[enqIdx].cmd <= selReq.cmd;
-            transfers[enqIdx].needReadRq <= '0;
-            transfers[enqIdx].needWriteRq <= '0;
-            transfers[enqIdx].progress <= 0;
-            transfers[enqIdx].addrCounter <= 0;
-            transfers[enqIdx].fwdAddrCounter <= 0;
-            transfers[enqIdx].evictProgress <= (1 << (`CLSIZE_E - 2));
-            transfers[enqIdx].cacheID <= selReq.cacheID;
-
-            transfers[enqIdx].readDone <= 1;
-            transfers[enqIdx].writeDone <= 1;
-
-            if (selReq.cmd == MEMC_REPLACE || selReq.cmd == MEMC_CP_CACHE_TO_EXT || selReq.cmd == MEMC_CP_EXT_TO_CACHE) begin
-                // cache-line oriented ops use aligned addresses
-                transfers[enqIdx].writeAddr <= selReq.writeAddr & ~(WIDTH/8 - 1);
-                transfers[enqIdx].readAddr <= selReq.readAddr & ~(WIDTH/8 - 1);
-                transfers[enqIdx].cacheAddr <= selReq.cacheAddr & ~((WIDTH/8 - 1) >> 2);
-
-                transfers[enqIdx].storeData <= selReq.data;
-                transfers[enqIdx].storeMask <= selReq.mask;
-            end
-            else begin
-                transfers[enqIdx].writeAddr <= selReq.writeAddr;
-                transfers[enqIdx].readAddr <= selReq.readAddr;
-                transfers[enqIdx].cacheAddr <= selReq.cacheAddr;
-
-                transfers[enqIdx].storeData <= `AXI_WIDTH'(selReq.data);
-                transfers[enqIdx].storeMask <= '1; // unused
-            end
-
-            case (selReq.cmd)
-                MEMC_REPLACE: begin
-                    transfers[enqIdx].needReadRq <= '1;
-                    transfers[enqIdx].needWriteRq <= 2'b11;
-                    transfers[enqIdx].evictProgress <= 0;
-                    transfers[enqIdx].readDone <= 0;
-                    transfers[enqIdx].writeDone <= 0;
-                end
-                MEMC_CP_EXT_TO_CACHE: begin
-                    transfers[enqIdx].needReadRq <= '1;
-                    transfers[enqIdx].readDone <= 0;
-                end
-                MEMC_CP_CACHE_TO_EXT: begin
-                    transfers[enqIdx].needWriteRq <= 2'b11;
-                    transfers[enqIdx].writeDone <= 0;
-                    transfers[enqIdx].evictProgress <= 0;
-                end
-                MEMC_READ_BYTE, MEMC_READ_HALF, MEMC_READ_WORD: begin
-                    transfers[enqIdx].needReadRq <= '1;
-                    transfers[enqIdx].readDone <= 0;
-                end
-                MEMC_WRITE_BYTE, MEMC_WRITE_HALF, MEMC_WRITE_WORD: begin
-                    transfers[enqIdx].needWriteRq <= 2'b11;
-                    transfers[enqIdx].writeDone <= 0;
-                end
-                default: assert(0);
-            endcase
-        end
-
-        // Read Request
-        if (readReqSuccess) begin
-            transfers[arIdx].needReadRq <= 0;
-        end
-
-        // Read Data
-        if (buf_rvalid && buf_rready) begin
-
-            transfers[buf_rid].addrCounter <= transfers[buf_rid].addrCounter + WIDTH_W;
-
-            if (isMMIO[buf_rid]) begin
-                transfers[buf_rid] <= 'x;
-                transfers[buf_rid].valid <= 0;
-
-                sglLdRes.valid <= 1;
-                sglLdRes.id <= transfers[buf_rid].cacheAddr;
-                sglLdRes.data <= buf_rdata[31:0];
-            end
-        end
-
-        if (s_axi_rvalid && s_axi_rready) begin
-            if (transfers[s_axi_rid].cacheID == 0) begin
-                transfers[s_axi_rid].fwdAddrCounter <= transfers[s_axi_rid].fwdAddrCounter + WIDTH_W;
-
-                ldDataFwd.data <= s_axi_rdata;
-                if (transfers[s_axi_rid].fwdAddrCounter == 0) begin
-                    for (integer i = 0; i < `AXI_WIDTH/8; i=i+1)
-                        if (transfers[s_axi_rid].storeMask[i])
-                            ldDataFwd.data[i*8+:8] <= transfers[s_axi_rid].storeData[8*i+:8];
-                end
-
-                ldDataFwd.addr <= {transfers[s_axi_rid].readAddr[31:`CLSIZE_E], (transfers[s_axi_rid].readAddr[`CLSIZE_E-1:2] + transfers[s_axi_rid].fwdAddrCounter[`CLSIZE_E-3:0]), 2'b0};
-                ldDataFwd.valid <= 1;
-            end
-        end
-
-        // Read ACK
-        if (DCW_ackValid) begin
-            transfers[DCW_ackId].progress <= transfers[DCW_ackId].progress + WIDTH_W;
-            if ((transfers[DCW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
-                transfers[DCW_ackId].readDone <= 1;
-                if (transfers[DCW_ackId].writeDone) begin
-                    transfers[DCW_ackId] <= 'x;
-                    transfers[DCW_ackId].valid <= 0;
-                end
-            end
-        end
-        if (ICW_ackValid) begin
-            transfers[ICW_ackId].progress <= transfers[ICW_ackId].progress + WIDTH_W;
-            if ((transfers[ICW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
-                transfers[ICW_ackId].readDone <= 1;
-                if (transfers[ICW_ackId].writeDone) begin
-                    transfers[ICW_ackId] <= 'x;
-                    transfers[ICW_ackId].valid <= 0;
-                end
-            end
-        end
-
-        // Write Request
-        if (awIdxValid) begin
-            if (DCR_reqValid && DCR_reqReady) transfers[awIdx].needWriteRq[0] <= 0;
-            if (axiAW.awvalid && awFIFO_ready) transfers[awIdx].needWriteRq[1] <= 0;
-        end
-
-        // Write Data
-        if (DCR_cacheReadValid) begin
-            transfers[DCR_cacheReadId].evictProgress <= transfers[DCR_cacheReadId].evictProgress + WIDTH_W;
-        end
-
-        // Write ACK
-        if (s_axi_bvalid) begin
-            if (isMMIO[s_axi_bid]) begin
-                sglStRes.valid <= 1;
-                sglStRes.id <= transfers[s_axi_bid].cacheAddr;
-            end
-            transfers[s_axi_bid].writeDone <= 1;
-            if (transfers[s_axi_bid].readDone) begin
-                transfers[s_axi_bid] <= 'x;
-                transfers[s_axi_bid].valid <= 0;
-            end
+            transfers[i] <= 'x;
+            transfers[i].valid <= 0;
         end
     end
 end

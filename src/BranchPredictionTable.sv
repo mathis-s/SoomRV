@@ -46,11 +46,7 @@ logic[IDX_LEN:0] resetIdx;
 
 always_ff@(posedge clk) begin
 
-    if (rst) begin
-        write_r <= Write'{valid: 0, default: 'x};
-        resetIdx <= 0;
-    end
-    else if (!resetIdx[IDX_LEN]) begin
+    if (!resetIdx[IDX_LEN]) begin
         pred[resetIdx[IDX_LEN-1:0]] <= 0;
         hist[resetIdx[IDX_LEN-1:0]] <= 0;
         resetIdx <= resetIdx + 1;
@@ -69,6 +65,11 @@ always_ff@(posedge clk) begin
             if (write_r.init)
                 {pred[write_r.addr], hist[write_r.addr]} <= {write_r.taken, !write_r.taken};
         end
+    end
+
+    if (rst) begin
+        write_r <= Write'{valid: 0, default: 'x};
+        resetIdx <= 0;
     end
 end
 

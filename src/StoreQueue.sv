@@ -356,20 +356,7 @@ always_ff@(posedge clk) begin
         OUT_fwd[i].valid <= 0;
     end
 
-    if (rst) begin
-        baseIndex <= 0;
-
-        OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
-        OUT_empty <= 1;
-        flushing <= 0;
-
-        for (integer i = 0; i < NUM_OUT; i=i+1)
-            OUT_uop[i] <= SQ_UOp'{valid: 0, default: 'x};
-
-        for (integer i = 0; i < NUM_ENTRIES; i=i+1)
-            entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
-    end
-    else begin
+    begin
         reg modified = 0;
 
         // Dequeue
@@ -445,6 +432,25 @@ always_ff@(posedge clk) begin
             end
 
         baseIndex <= nextBaseIndex;
+    end
+
+    if (rst) begin
+        for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+            OUT_fwd[i] <= 'x;
+            OUT_fwd[i].valid <= 0;
+        end
+
+        baseIndex <= 0;
+
+        OUT_maxStoreSqN <= NUM_ENTRIES[$bits(SqN)-1:0] - 1;
+        OUT_empty <= 1;
+        flushing <= 0;
+
+        for (integer i = 0; i < NUM_OUT; i=i+1)
+            OUT_uop[i] <= SQ_UOp'{valid: 0, default: 'x};
+
+        for (integer i = 0; i < NUM_ENTRIES; i=i+1)
+            entries[i] <= SQEntry'{addrAvail: 0, loaded: 0, default: 'x};
     end
 end
 endmodule

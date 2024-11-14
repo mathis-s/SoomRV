@@ -145,6 +145,92 @@ end
 always_ff@(posedge clk) begin
 
     forwardRindex <= 0;
+    lastValid <= IN_valid;
+
+    if (IN_mispr.taken) begin
+        reg doPostRecSave = IN_mispr.isFetchBranch && IN_returnUpd.valid;
+        reg startRecovery = !queueEmpty || doPostRecSave;
+
+        forwardRindex <= 1;
+        recoveryInProgress <= startRecovery;
+        recoveryID <= IN_mispr.fetchID;
+        recoveryBase <= IN_comFetchID;
+        recoveryOffs <= IN_mispr.fetchOffs;
+        recoveryOverwOwn <= IN_mispr.isFetchBranch && !IN_returnUpd.valid;
+
+        lastValid <= 0;
+
+        postRecSave <= PostRecSave'{valid: 0, default: 'x};
+        if (doPostRecSave) begin
+            postRecSave.valid <= 1;
+            postRecSave.fetchID <= IN_mispr.fetchID;
+            postRecSave.offs <= IN_mispr.fetchOffs;
+            postRecSave.rIdx <= IN_returnUpd.idx + RetStackIdx_t'(1);
+            postRecSave.addr <= IN_returnUpd.addr + 1;
+        end
+    end
+    else begin
+        rindexReg <= rindex;
+        // Recover entries by copying from rrqueue back to stack after mispredict
+        if (recoveryInProgress) begin
+            if (recoveryContinue_c) begin
+                rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
+                rrqueue[qindex-1] <= 'x;
+                qindex_r <= qindex_r - 1; // entry restored, ok to overwrite
+            end
+            else begin
+                recoveryInProgress <= 0;
+                if (postRecSave.valid) begin
+                    postRecSave <= PostRecSave'{valid: 0, default: 'x};
+
+                    if (!queueFull) begin
+                        rrqueue[qindex].fetchID <= postRecSave.fetchID;
+                        rrqueue[qindex].offs <= postRecSave.offs;
+                        rrqueue[qindex].idx <= postRecSave.rIdx;
+                        rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
+                        rstack[postRecSave.rIdx] <= postRecSave.addr;
+                        qindex_r <= qindex_r + 1;
+                    end
+                end
+            end
+        end
+        else if (lastValid) begin
+            assert(!recoveryInProgress);
+            if (IN_branch.valid && IN_branch.btype == BT_RETURN) begin
+
+            end
+            else if (IN_branch.valid && IN_branch.btype == BT_CALL) begin
+                rstack[rindex] <= addrToPush;
+
+                // Store the overwritten address in the return recovery queue
+                if (!queueFull) begin
+                    rrqueue[qindex].fetchID <= IN_fetchID;
+                    rrqueue[qindex].offs <= IN_branch.offs;
+                    rrqueue[qindex].idx <= rindex;
+                    rrqueue[qindex].addr <= rstack[rindex];
+                    qindex_r <= qindex_r + 1;
+                end
+            end
+        end
+    end
+
+    // Delete committed (ie correctly speculated) entries from rrqueue
+    if (lastInvalComFetchID != IN_comFetchID) begin
+
+        // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
+        // of easy ordering comparison. Thus, we have to do all comparisons relative
+        // to some base. We use the last checked fetchID as the base.
+        if (!queueEmpty &&
+            (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
+        ) begin
+            lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
+            rrqueue[qindexEnd] <= 'x;
+            qindexEnd_r <= qindexEnd_r + 1;
+        end
+        // There has been no speculated return in [lastInvalComFetchID, IN_comFetchID),
+        // nothing to do.
+        else lastInvalComFetchID <= IN_comFetchID;
+    end
 
     if (rst) begin
         qindex_r <= 0;
@@ -152,102 +238,13 @@ always_ff@(posedge clk) begin
         recoveryInProgress <= 0;
         lastInvalComFetchID <= 0;
         lastValid <= 0;
+        forwardRindex <= 0;
 
         postRecSave <= PostRecSave'{valid: 0, default: 'x};
 
         rindexReg <= 0;
         for (integer i = 0; i < SIZE; i=i+1)
             rstack[i] <= 0;
-    end
-    else begin
-
-        lastValid <= IN_valid;
-
-        if (IN_mispr.taken) begin
-            reg doPostRecSave = IN_mispr.isFetchBranch && IN_returnUpd.valid;
-            reg startRecovery = !queueEmpty || doPostRecSave;
-
-            forwardRindex <= 1;
-            recoveryInProgress <= startRecovery;
-            recoveryID <= IN_mispr.fetchID;
-            recoveryBase <= IN_comFetchID;
-            recoveryOffs <= IN_mispr.fetchOffs;
-            recoveryOverwOwn <= IN_mispr.isFetchBranch && !IN_returnUpd.valid;
-
-            lastValid <= 0;
-
-            postRecSave <= PostRecSave'{valid: 0, default: 'x};
-            if (doPostRecSave) begin
-                postRecSave.valid <= 1;
-                postRecSave.fetchID <= IN_mispr.fetchID;
-                postRecSave.offs <= IN_mispr.fetchOffs;
-                postRecSave.rIdx <= IN_returnUpd.idx + RetStackIdx_t'(1);
-                postRecSave.addr <= IN_returnUpd.addr + 1;
-            end
-        end
-        else begin
-            rindexReg <= rindex;
-            // Recover entries by copying from rrqueue back to stack after mispredict
-            if (recoveryInProgress) begin
-                if (recoveryContinue_c) begin
-                    rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
-                    rrqueue[qindex-1] <= 'x;
-                    qindex_r <= qindex_r - 1; // entry restored, ok to overwrite
-                end
-                else begin
-                    recoveryInProgress <= 0;
-                    if (postRecSave.valid) begin
-                        postRecSave <= PostRecSave'{valid: 0, default: 'x};
-
-                        if (!queueFull) begin
-                            rrqueue[qindex].fetchID <= postRecSave.fetchID;
-                            rrqueue[qindex].offs <= postRecSave.offs;
-                            rrqueue[qindex].idx <= postRecSave.rIdx;
-                            rrqueue[qindex].addr <= rstack[postRecSave.rIdx];
-                            rstack[postRecSave.rIdx] <= postRecSave.addr;
-                            qindex_r <= qindex_r + 1;
-                        end
-                    end
-                end
-            end
-            else if (lastValid) begin
-                assert(!recoveryInProgress);
-                if (IN_branch.valid && IN_branch.btype == BT_RETURN) begin
-
-                end
-                else if (IN_branch.valid && IN_branch.btype == BT_CALL) begin
-                    rstack[rindex] <= addrToPush;
-
-                    // Store the overwritten address in the return recovery queue
-                    if (!queueFull) begin
-                        rrqueue[qindex].fetchID <= IN_fetchID;
-                        rrqueue[qindex].offs <= IN_branch.offs;
-                        rrqueue[qindex].idx <= rindex;
-                        rrqueue[qindex].addr <= rstack[rindex];
-                        qindex_r <= qindex_r + 1;
-                    end
-                end
-            end
-        end
-
-        // Delete committed (ie correctly speculated) entries from rrqueue
-        if (lastInvalComFetchID != IN_comFetchID) begin
-
-            // Unlike SqNs, fetchIDs are not given an extra bit of range for the sake
-            // of easy ordering comparison. Thus, we have to do all comparisons relative
-            // to some base. We use the last checked fetchID as the base.
-            if (!queueEmpty &&
-                (rrqueue[qindexEnd].fetchID - lastInvalComFetchID) < (IN_comFetchID - lastInvalComFetchID)
-            ) begin
-                lastInvalComFetchID <= rrqueue[qindexEnd].fetchID;
-                rrqueue[qindexEnd] <= 'x;
-                qindexEnd_r <= qindexEnd_r + 1;
-            end
-            // There has been no speculated return in [lastInvalComFetchID, IN_comFetchID),
-            // nothing to do.
-            else lastInvalComFetchID <= IN_comFetchID;
-        end
-
     end
 end
 

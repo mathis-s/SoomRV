@@ -109,7 +109,7 @@ always@(posedge clk) begin
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;
 
-    if (!rst && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+    if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
 
         reg[4:0] except = 0;
 
@@ -191,7 +191,11 @@ always@(posedge clk) begin
         if (IN_uop.opcode[5:3] == 3'b111 && IN_fRoundMode >= 3'b101)
             OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
 
+    end
 
+    if (rst) begin
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
     end
 end
 

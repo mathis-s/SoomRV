@@ -61,12 +61,7 @@ recFNToFN#(8, 24) recode
 reg running;
 always_ff@(posedge clk) begin
 
-    if (rst) begin
-        OUT_uop <= 'x;
-        OUT_uop.valid <= 0;
-        running <= 0;
-    end
-    else if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+    if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
 
         // Store metadata in output uop (without setting it valid)
         OUT_uop.tagDst <= IN_uop.tagDst;
@@ -105,7 +100,11 @@ always_ff@(posedge clk) begin
         end
     end
 
-
+    if (rst) begin
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
+        running <= 0;
+    end
 end
 
 endmodule

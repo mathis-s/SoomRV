@@ -223,48 +223,45 @@ reg resetWait;
 
 always_ff@(posedge clk) begin
 
+    if (waitForInterrupt) begin
+        reg[$bits(wfiCount)-1:0] wfiCount_next;
+        reg wfiDone;
+        {wfiDone, wfiCount_next} = wfiCount - 1;
+        wfiCount <= wfiCount_next;
+
+        if ((IN_interruptPending && !resetWait) || wfiDone)
+            waitForInterrupt <= 0;
+    end
+
+    if (IN_branch.taken || BH_fetchBranch.taken || IN_decBranch.taken) begin
+        if (IN_branch.taken) begin
+            waitForInterrupt <= 0;
+        end
+        else begin
+            // We also use WFI to temporarily disable the frontend for ops that always flush the pipeline
+            if ((BH_fetchBranch.taken && BH_fetchBranch.wfi) || (IN_decBranch.taken && IN_decBranch.wfi)) begin
+                waitForInterrupt <= 1;
+                wfiCount <= $bits(wfiCount)'(`WFI_DELAY - 1);
+            end
+        end
+        issuedInterrupt <= 0;
+    end
+    else if (ifetchEn) begin
+        // Interrupts
+        if (IN_interruptPending) begin
+            issuedInterrupt <= 1;
+        end
+        // Valid Fetch
+        else begin
+
+        end
+    end
+
     if (rst) begin
         issuedInterrupt <= 0;
-
         waitForInterrupt <= 1;
         wfiCount <= $bits(wfiCount)'(`RESET_DELAY - 1);
         resetWait <= 1;
-    end
-    else begin
-
-        if (waitForInterrupt) begin
-            reg[$bits(wfiCount)-1:0] wfiCount_next;
-            reg wfiDone;
-            {wfiDone, wfiCount_next} = wfiCount - 1;
-            wfiCount <= wfiCount_next;
-
-            if ((IN_interruptPending && !resetWait) || wfiDone)
-                waitForInterrupt <= 0;
-        end
-
-        if (IN_branch.taken || BH_fetchBranch.taken || IN_decBranch.taken) begin
-            if (IN_branch.taken) begin
-                waitForInterrupt <= 0;
-            end
-            else begin
-                // We also use WFI to temporarily disable the frontend for ops that always flush the pipeline
-                if ((BH_fetchBranch.taken && BH_fetchBranch.wfi) || (IN_decBranch.taken && IN_decBranch.wfi)) begin
-                    waitForInterrupt <= 1;
-                    wfiCount <= $bits(wfiCount)'(`WFI_DELAY - 1);
-                end
-            end
-            issuedInterrupt <= 0;
-        end
-        else if (ifetchEn) begin
-            // Interrupts
-            if (IN_interruptPending) begin
-                issuedInterrupt <= 1;
-            end
-            // Valid Fetch
-            else begin
-
-            end
-        end
     end
 end
 

@@ -654,134 +654,94 @@ end
 always_ff@(posedge clk) begin
 
     // implicit writes
-    if (!rst) begin
+    // CSR writes on trap/interrupt
+    if (IN_trapInfo.valid) begin
 
-        // CSR writes on trap/interrupt
-        if (IN_trapInfo.valid) begin
+        reg[31:0] tval = 0;
 
-            reg[31:0] tval = 0;
+        if (!IN_trapInfo.isInterrupt)
+            case (IN_trapInfo.cause)
+                RVP_TRAP_IF_PF,
+                RVP_TRAP_IF_AF: tval = IN_trapInfo.finalHalfwPC;
+                RVP_TRAP_BREAK: tval = IN_trapInfo.trapPC;
 
-            if (!IN_trapInfo.isInterrupt)
-                case (IN_trapInfo.cause)
-                    RVP_TRAP_IF_PF,
-                    RVP_TRAP_IF_AF: tval = IN_trapInfo.finalHalfwPC;
-                    RVP_TRAP_BREAK: tval = IN_trapInfo.trapPC;
+                RVP_TRAP_LD_MA,
+                RVP_TRAP_LD_AF,
+                RVP_TRAP_LD_PF,
+                RVP_TRAP_ST_MA,
+                RVP_TRAP_ST_AF,
+                RVP_TRAP_ST_PF: tval = IN_tvalState.tval;
 
-                    RVP_TRAP_LD_MA,
-                    RVP_TRAP_LD_AF,
-                    RVP_TRAP_LD_PF,
-                    RVP_TRAP_ST_MA,
-                    RVP_TRAP_ST_AF,
-                    RVP_TRAP_ST_PF: tval = IN_tvalState.tval;
+                default: ;
+            endcase
 
-                    default: ;
-                endcase
+        if (IN_trapInfo.delegate) begin
+            mstatus.spie <= mstatus.sie;
+            mstatus.sie <= 0;
+            mstatus.spp <= priv[0];
+            sepc <= IN_trapInfo.trapPC;
+            scause[0+:5] <= IN_trapInfo.cause;
+            scause[31] <= IN_trapInfo.isInterrupt;
+            stval <= tval;
 
-            if (IN_trapInfo.delegate) begin
-                mstatus.spie <= mstatus.sie;
-                mstatus.sie <= 0;
-                mstatus.spp <= priv[0];
-                sepc <= IN_trapInfo.trapPC;
-                scause[0+:5] <= IN_trapInfo.cause;
-                scause[31] <= IN_trapInfo.isInterrupt;
-                stval <= tval;
+            priv <= PRIV_SUPERVISOR;
+        end
+        else begin
+            mstatus.mpie <= mstatus.mie;
+            mstatus.mie <= 0;
+            mstatus.mpp <= priv;
+            mepc <= IN_trapInfo.trapPC;
+            mcause[0+:5] <= IN_trapInfo.cause;
+            mcause[4] <= 0;
+            mcause[31] <= IN_trapInfo.isInterrupt;
+            mtval <= tval;
 
-                priv <= PRIV_SUPERVISOR;
-            end
-            else begin
-                mstatus.mpie <= mstatus.mie;
-                mstatus.mie <= 0;
-                mstatus.mpp <= priv;
-                mepc <= IN_trapInfo.trapPC;
-                mcause[0+:5] <= IN_trapInfo.cause;
-                mcause[4] <= 0;
-                mcause[31] <= IN_trapInfo.isInterrupt;
-                mtval <= tval;
-
-                priv <= PRIV_MACHINE;
-            end
-
-            //$display("trap: pc=%x, dst=%x, cause=%x", IN_trapInfo.trapPC, {mtvec.base, 2'b0}, IN_trapInfo.cause);
+            priv <= PRIV_MACHINE;
         end
 
-        // Other implicit writes
-        fflags <= fflags | IN_fpNewFlags;
-
-        if (!mcountinhibit[0])
-            mcycle <= mcycle + 1;
-
-        // MTIP
-        mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
-        mip[11] <= IN_irq;
-
-        if (!mcountinhibit[2]) begin
-            reg[2:0] temp = 0;
-            for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-                if (IN_perfcInfo.validRetire[i]) temp = temp + 1;
-            minstret <= minstret + {32'b0, 29'b0, temp};
-        end
-
-        if (!mcountinhibit[3]) begin
-            reg[2:0] temp = 0;
-            for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-                if (IN_perfcInfo.branchRetire[i]) temp = temp + 1;
-            mhpmcounter[3] <= mhpmcounter[3] + {32'b0, 29'b0, temp};
-        end
-
-        if (!mcountinhibit[4] && IN_branchMispr)
-            mhpmcounter[4] <= mhpmcounter[4] + 1;
-
-        if (!mcountinhibit[5] && IN_branch.taken)
-            mhpmcounter[5] <= mhpmcounter[5] + 1;
-
-        // Mispredict Cause Counters
-        if (IN_branch.taken && !mcountinhibit[6 + IN_branch.cause])
-            mhpmcounter[6 + IN_branch.cause] <= mhpmcounter[6 + IN_branch.cause] + 1;
-
-        // Stall Cause Counters
-        if (IN_perfcInfo.stallCause != STALL_NONE)
-            mhpmcounter[11 + IN_perfcInfo.stallCause] <=
-                mhpmcounter[11 + IN_perfcInfo.stallCause] + 64'(IN_perfcInfo.stallWeigth) + 1;
+        //$display("trap: pc=%x, dst=%x, cause=%x", IN_trapInfo.trapPC, {mtvec.base, 2'b0}, IN_trapInfo.cause);
     end
 
-    if (rst) begin
-        priv <= PRIV_MACHINE;
-        fflags <= 0;
-        frm <= 0;
+    // Other implicit writes
+    fflags <= fflags | IN_fpNewFlags;
 
-        mstatus <= 0;
-        mcycle <= 0;
-        minstret <= 0;
-        mcounteren <= 0;
-        mcountinhibit <= 0;
-        mtvec.base <= 30'((`ENTRY_POINT) >> 2);
-        mtvec.mode <= 0;
-        mepc <= 0;
-        mcause <= 0;
-        mtval <= 0;
-        mideleg <= 0;
-        medeleg <= 0;
-        mip <= 0;
-        mie <= 0;
-        menvcfg <= 0;
+    if (!mcountinhibit[0])
+        mcycle <= mcycle + 1;
 
-        scounteren <= 0;
-        sepc <= 0;
-        scause <= 0;
-        stval <= 0;
-        stvec.base <= 30'((`ENTRY_POINT) >> 2);
-        stvec.mode <= 0;
-        satp <= 0;
-        senvcfg <= 0;
+    // MTIP
+    mip[7] <= IF_mmio.mtime >= IF_mmio.mtimecmp;
+    mip[11] <= IN_irq;
 
-        for (integer i = 0; i < NUM_PERFC; i=i+1)
-            mhpmcounter[i] <= 0;
-
-        OUT_uop.valid <= 0;
-
-        misa_X <= 1;
+    if (!mcountinhibit[2]) begin
+        reg[2:0] temp = 0;
+        for (integer i = 0; i < `DEC_WIDTH; i=i+1)
+            if (IN_perfcInfo.validRetire[i]) temp = temp + 1;
+        minstret <= minstret + {32'b0, 29'b0, temp};
     end
-    else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+
+    if (!mcountinhibit[3]) begin
+        reg[2:0] temp = 0;
+        for (integer i = 0; i < `DEC_WIDTH; i=i+1)
+            if (IN_perfcInfo.branchRetire[i]) temp = temp + 1;
+        mhpmcounter[3] <= mhpmcounter[3] + {32'b0, 29'b0, temp};
+    end
+
+    if (!mcountinhibit[4] && IN_branchMispr)
+        mhpmcounter[4] <= mhpmcounter[4] + 1;
+
+    if (!mcountinhibit[5] && IN_branch.taken)
+        mhpmcounter[5] <= mhpmcounter[5] + 1;
+
+    // Mispredict Cause Counters
+    if (IN_branch.taken && !mcountinhibit[6 + IN_branch.cause])
+        mhpmcounter[6 + IN_branch.cause] <= mhpmcounter[6 + IN_branch.cause] + 1;
+
+    // Stall Cause Counters
+    if (IN_perfcInfo.stallCause != STALL_NONE)
+        mhpmcounter[11 + IN_perfcInfo.stallCause] <=
+            mhpmcounter[11 + IN_perfcInfo.stallCause] + 64'(IN_perfcInfo.stallWeigth) + 1;
+
+    if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
 
         OUT_uop.valid <= 1;
         OUT_uop.doNotCommit <= 0;
@@ -1060,6 +1020,44 @@ always_ff@(posedge clk) begin
     end
     else begin
         OUT_uop.valid <= 0;
+    end
+
+    if (rst) begin
+        priv <= PRIV_MACHINE;
+        fflags <= 0;
+        frm <= 0;
+
+        mstatus <= 0;
+        mcycle <= 0;
+        minstret <= 0;
+        mcounteren <= 0;
+        mcountinhibit <= 0;
+        mtvec.base <= 30'((`ENTRY_POINT) >> 2);
+        mtvec.mode <= 0;
+        mepc <= 0;
+        mcause <= 0;
+        mtval <= 0;
+        mideleg <= 0;
+        medeleg <= 0;
+        mip <= 0;
+        mie <= 0;
+        menvcfg <= 0;
+
+        scounteren <= 0;
+        sepc <= 0;
+        scause <= 0;
+        stval <= 0;
+        stvec.base <= 30'((`ENTRY_POINT) >> 2);
+        stvec.mode <= 0;
+        satp <= 0;
+        senvcfg <= 0;
+
+        for (integer i = 0; i < NUM_PERFC; i=i+1)
+            mhpmcounter[i] <= 0;
+
+        OUT_uop.valid <= 0;
+
+        misa_X <= 1;
     end
 end
 
