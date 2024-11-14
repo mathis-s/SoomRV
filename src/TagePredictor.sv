@@ -71,7 +71,7 @@ always_comb begin
             writeHashes[i] = writeHashes[i] ^ IN_writeAddr[j*HASH_SIZE+:HASH_SIZE];
         end
 
-        for (integer j = 0; j < hist_bits; j=j+1) begin
+        for (integer j = 0; j < (BASE * (FACTOR ** i)); j=j+1) begin
             predHashes[i][j % HASH_SIZE] ^= IN_predHistory[j];
             writeHashes[i][j % HASH_SIZE] ^= IN_writeHistory[j];
 

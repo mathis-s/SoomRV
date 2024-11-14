@@ -228,7 +228,7 @@ always_comb begin
         else if (PortIdx'(i) == stOpPort[1] && stOps[1].valid) begin
             // port is being used by store during store's write cycle
         end
-        else if (i == (NUM_AGUS-1) && cacheTableWrite) begin
+        else if (/*i == (NUM_AGUS-1) &&*/ cacheTableWrite) begin
             // cache table port is being used to handle cache miss
         end
         else if (IN_uopLd[idx].valid &&

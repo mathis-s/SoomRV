@@ -172,7 +172,7 @@ always_comb begin
             ) begin
 
                 TrapCause_t trapCause = RVP_TRAP_ILLEGAL;
-                reg delegate;
+                reg delegate = 'x;
                 reg isInterrupt = !IN_trapInstr.timeout &&
                     (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT));
 

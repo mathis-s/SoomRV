@@ -1,22 +1,21 @@
 
 // Branch Target Buffer
-`define BTB_ENTRIES 4096
+`define BTB_ENTRIES 32
 `define BTB_TAG_SIZE 16
 
 // TAGE Predictor
-`define BP_BASEP_ID_LEN 12
+`define BP_BASEP_ID_LEN 8
 `define TAGE_CLEAR_ENABLE
 `define TAGE_CLEAR_INTERVAL 20
 `define TAGE_BASE 4
-`define TAGE_STAGES 6
-`define TAGE_TABLE_SIZE 256
-`define RETURN_SIZE 32
+`define TAGE_STAGES 3
+`define TAGE_TABLE_SIZE 64
+`define RETURN_SIZE 16
 `define RETURN_RQ_SIZE 8
 
 // IFetch
 `define FSIZE_E 4
 `define DEC_WIDTH 4
-`define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
 `define RESET_DELAY 4096
 

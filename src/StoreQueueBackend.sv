@@ -16,7 +16,9 @@ module StoreQueueBackend#(parameter NUM_IN = 2, parameter NUM_EVICTED = 4)
     input ST_Ack IN_stAck
 );
 localparam AXI_BWIDTH = `AXI_WIDTH/8;
-localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
+localparam AXI_WWIDTH = `AXI_WIDTH/32;
+localparam AXI_BWIDTH_E = $clog2(AXI_BWIDTH);
+localparam AXI_WWIDTH_E = $clog2(AXI_WWIDTH);
 
 typedef struct packed
 {
@@ -80,7 +82,7 @@ always_comb begin
         end
         else begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
-            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], 2'b0};
+            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], AXI_WWIDTH_E'(0)};
             fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*32;
 
             // Try to fuse in younger stores

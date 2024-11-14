@@ -22,7 +22,7 @@ class BranchHistory : public Model
         auto core = top->Top->soc->core;
         auto bpFile = core->ifetch->bp->bpFile->mem;
 
-        BPBackup backup{sc_bv<BPBackup::_size>{(char*)bpFile[fetchID].data()}};
+        BPBackup backup{sc_bv<BPBackup::_size>{(char*)&bpFile[fetchID]}};
 
         if (backup.pred && backup.isRegularBranch && fetchOffs > backup.predOffs)
             return (backup.history << 1) | backup.predTaken;
@@ -34,9 +34,10 @@ class BranchHistory : public Model
 
     bool compare_history (const Inst& i)
     {
+        constexpr uint64_t bhist_mask = (1UL << BPBackup::history_w) - 1;
         auto fetchOffset = (((i.pc & 15) >> 1) + (((i.inst & 3) == 3) ? 1 : 0)) & 7;
         auto coreHist = ReadBrHistory(i.fetchID, fetchOffset);
-        return coreHist == bhist;
+        return (coreHist & bhist_mask) == (bhist & bhist_mask);
     }
 
     std::pair<bool, bool> is_branch_taken (uint32_t instSIM)

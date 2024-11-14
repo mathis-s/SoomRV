@@ -5,22 +5,23 @@ module CacheArbiter
     parameter OUTPUT_PORTS = 2,
     parameter OUTPUT_BANKS = 4,
     parameter BANK_OFFSET = 0,
-    parameter DATA_WIDTH = 32
+    parameter DATA_WIDTH = 32,
+    parameter type IF_t
 )
 (
     input wire clk,
 
-    input CacheIF IN_ports[INPUT_PORTS-1:0],
+    input IF_t IN_ports[INPUT_PORTS-1:0],
     output logic OUT_portReady[INPUT_PORTS-1:0],
     output logic[DATA_WIDTH-1:0] OUT_portRData[INPUT_PORTS-1:0],
 
-    output CacheIF OUT_ports[OUTPUT_BANKS-1:0][OUTPUT_PORTS-1:0],
+    output IF_t OUT_ports[OUTPUT_BANKS-1:0][OUTPUT_PORTS-1:0],
     input logic[DATA_WIDTH-1:0] IN_portRData[OUTPUT_BANKS-1:0][OUTPUT_PORTS-1:0]
 );
 
 typedef logic[$clog2(INPUT_PORTS)-1:0] InPortIdx;
 typedef logic[OUTPUT_PORTS == 1 ? 0 : $clog2(OUTPUT_PORTS)-1:0] OutPortIdx;
-typedef logic[$clog2(OUTPUT_BANKS)-1:0] BankIdx;
+typedef logic[OUTPUT_BANKS == 1 ? 0 : $clog2(OUTPUT_BANKS)-1:0] BankIdx;
 
 OutPortIdx outPortIdx[INPUT_PORTS-1:0];
 
@@ -29,9 +30,14 @@ logic reqIdxValid[OUTPUT_BANKS-1:0][OUTPUT_PORTS-1:0];
 
 generate for (genvar bank = 0; bank < OUTPUT_BANKS; bank=bank+1) begin : gen_banks
     logic[INPUT_PORTS-1:0] reqUnary;
+    if (OUTPUT_BANKS > 1)
     always_comb
         for (integer i = 0; i < INPUT_PORTS; i=i+1)
             reqUnary[i] = !IN_ports[i].ce && IN_ports[i].addr[BANK_OFFSET+:$clog2(OUTPUT_BANKS)] == BankIdx'(bank);
+    else
+    always_comb
+        for (integer i = 0; i < INPUT_PORTS; i=i+1)
+            reqUnary[i] = !IN_ports[i].ce;
 
     PriorityEncoder#(INPUT_PORTS, OUTPUT_PORTS) penc(reqUnary, reqIdx[bank], reqIdxValid[bank]);
 end endgenerate
@@ -61,7 +67,7 @@ typedef struct packed
 Read readIdxs[1:0][INPUT_PORTS-1:0];
 always_ff@(posedge clk) begin
     for (integer i = 0; i < INPUT_PORTS; i=i+1) begin
-        readIdxs[0][i] <= Read'{bank: IN_ports[i].addr[BANK_OFFSET+:$clog2(OUTPUT_BANKS)], port: outPortIdx[i]};
+        readIdxs[0][i] <= Read'{bank: IN_ports[i].addr[BANK_OFFSET+:OUTPUT_BANKS == 1 ? 1 : $clog2(OUTPUT_BANKS)], port: outPortIdx[i]};
     end
     readIdxs[1] <= readIdxs[0];
 end

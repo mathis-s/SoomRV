@@ -775,7 +775,7 @@ namespace  {
         bool predTaken;
         bool isRegularBranch;
         uint32_t rIdx;
-        uint64_t history;
+        uint32_t history;
         bool altPred;
         uint32_t tageID;
 
@@ -788,18 +788,29 @@ namespace  {
         static constexpr size_t isRegularBranch_s = 5;
         static constexpr size_t isRegularBranch_w = 1;
         static constexpr size_t rIdx_s = 6;
-        static constexpr size_t rIdx_w = 5;
-        static constexpr size_t history_s = 11;
-        static constexpr size_t history_w = 64;
-        static constexpr size_t altPred_s = 75;
+        static constexpr size_t rIdx_w = 4;
+        static constexpr size_t history_s = 10;
+        static constexpr size_t history_w = 8;
+        static constexpr size_t altPred_s = 18;
         static constexpr size_t altPred_w = 1;
-        static constexpr size_t tageID_s = 76;
+        static constexpr size_t tageID_s = 19;
         static constexpr size_t tageID_w = 4;
-        static constexpr size_t _size = 80;
+        static constexpr size_t _size = 23;
 
         BPBackup() = default;
 
-        BPBackup(const sc_bv<80>& __data) {
+        BPBackup(const uint32_t& __data) {
+            pred = (__data >> pred_s) & (~0ULL >> (64 - 1));
+            predOffs = (__data >> predOffs_s) & (~0ULL >> (64 - 3));
+            predTaken = (__data >> predTaken_s) & (~0ULL >> (64 - 1));
+            isRegularBranch = (__data >> isRegularBranch_s) & (~0ULL >> (64 - 1));
+            rIdx = (__data >> rIdx_s) & (~0ULL >> (64 - 4));
+            history = (__data >> history_s) & (~0ULL >> (64 - 8));
+            altPred = (__data >> altPred_s) & (~0ULL >> (64 - 1));
+            tageID = (__data >> tageID_s) & (~0ULL >> (64 - 4));
+        }
+
+        BPBackup(const sc_bv<23>& __data) {
             pred = __data.get_bit(pred_s);
             predOffs = __data.range(predOffs_s + predOffs_w - 1, predOffs_s).to_uint64();
             predTaken = __data.get_bit(predTaken_s);
@@ -810,8 +821,21 @@ namespace  {
             tageID = __data.range(tageID_s + tageID_w - 1, tageID_s).to_uint64();
         }
 
-        operator sc_bv<80>() const {
-            auto ret = sc_bv<80>();
+        operator uint32_t() const {
+            uint32_t ret = 0;
+            ret |= static_cast<uint32_t>(pred) << pred_s;
+            ret |= static_cast<uint32_t>(predOffs) << predOffs_s;
+            ret |= static_cast<uint32_t>(predTaken) << predTaken_s;
+            ret |= static_cast<uint32_t>(isRegularBranch) << isRegularBranch_s;
+            ret |= static_cast<uint32_t>(rIdx) << rIdx_s;
+            ret |= static_cast<uint32_t>(history) << history_s;
+            ret |= static_cast<uint32_t>(altPred) << altPred_s;
+            ret |= static_cast<uint32_t>(tageID) << tageID_s;
+            return ret;
+        }
+
+        operator sc_bv<23>() const {
+            auto ret = sc_bv<23>();
             ret.set_bit(pred_s, pred);
             ret.range(predOffs_s + predOffs_w - 1, predOffs_s) = predOffs;
             ret.set_bit(predTaken_s, predTaken);
@@ -840,29 +864,29 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_pred (const sc_bv<80>& __data) {
-            return __data.get_bit(pred_s);
+        static bool get_pred (const uint32_t& __data) {
+            return (__data >> pred_s) & (~0ULL >> (64 - 1));
         }
-        static uint32_t get_predOffs (const sc_bv<80>& __data) {
-            return __data.range(predOffs_s + predOffs_w - 1, predOffs_s).to_uint64();
+        static uint32_t get_predOffs (const uint32_t& __data) {
+            return (__data >> predOffs_s) & (~0ULL >> (64 - 3));
         }
-        static bool get_predTaken (const sc_bv<80>& __data) {
-            return __data.get_bit(predTaken_s);
+        static bool get_predTaken (const uint32_t& __data) {
+            return (__data >> predTaken_s) & (~0ULL >> (64 - 1));
         }
-        static bool get_isRegularBranch (const sc_bv<80>& __data) {
-            return __data.get_bit(isRegularBranch_s);
+        static bool get_isRegularBranch (const uint32_t& __data) {
+            return (__data >> isRegularBranch_s) & (~0ULL >> (64 - 1));
         }
-        static uint32_t get_rIdx (const sc_bv<80>& __data) {
-            return __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
+        static uint32_t get_rIdx (const uint32_t& __data) {
+            return (__data >> rIdx_s) & (~0ULL >> (64 - 4));
         }
-        static uint64_t get_history (const sc_bv<80>& __data) {
-            return __data.range(history_s + history_w - 1, history_s).to_uint64();
+        static uint32_t get_history (const uint32_t& __data) {
+            return (__data >> history_s) & (~0ULL >> (64 - 8));
         }
-        static bool get_altPred (const sc_bv<80>& __data) {
-            return __data.get_bit(altPred_s);
+        static bool get_altPred (const uint32_t& __data) {
+            return (__data >> altPred_s) & (~0ULL >> (64 - 1));
         }
-        static uint32_t get_tageID (const sc_bv<80>& __data) {
-            return __data.range(tageID_s + tageID_w - 1, tageID_s).to_uint64();
+        static uint32_t get_tageID (const uint32_t& __data) {
+            return (__data >> tageID_s) & (~0ULL >> (64 - 4));
         }
     };
 
@@ -879,24 +903,24 @@ namespace  {
         static constexpr size_t valid_s = 0;
         static constexpr size_t valid_w = 1;
         static constexpr size_t rIdx_s = 1;
-        static constexpr size_t rIdx_w = 5;
-        static constexpr size_t predRetAddr_s = 6;
+        static constexpr size_t rIdx_w = 4;
+        static constexpr size_t predRetAddr_s = 5;
         static constexpr size_t predRetAddr_w = 31;
-        static constexpr size_t predBr_s = 37;
+        static constexpr size_t predBr_s = 36;
         static constexpr size_t predBr_w = 41;
-        static constexpr size_t lastValid_s = 78;
+        static constexpr size_t lastValid_s = 77;
         static constexpr size_t lastValid_w = 3;
-        static constexpr size_t fetchFault_s = 81;
+        static constexpr size_t fetchFault_s = 80;
         static constexpr size_t fetchFault_w = 2;
-        static constexpr size_t fetchID_s = 83;
+        static constexpr size_t fetchID_s = 82;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t pc_s = 88;
+        static constexpr size_t pc_s = 87;
         static constexpr size_t pc_w = 32;
-        static constexpr size_t _size = 120;
+        static constexpr size_t _size = 119;
 
         IFetchOp() = default;
 
-        IFetchOp(const sc_bv<120>& __data) {
+        IFetchOp(const sc_bv<119>& __data) {
             valid = __data.get_bit(valid_s);
             rIdx = __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
             predRetAddr = __data.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s).to_uint64();
@@ -907,8 +931,8 @@ namespace  {
             pc = __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
 
-        operator sc_bv<120>() const {
-            auto ret = sc_bv<120>();
+        operator sc_bv<119>() const {
+            auto ret = sc_bv<119>();
             ret.set_bit(valid_s, valid);
             ret.range(rIdx_s + rIdx_w - 1, rIdx_s) = rIdx;
             ret.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s) = predRetAddr;
@@ -937,28 +961,28 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<120>& __data) {
+        static bool get_valid (const sc_bv<119>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint32_t get_rIdx (const sc_bv<120>& __data) {
+        static uint32_t get_rIdx (const sc_bv<119>& __data) {
             return __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
         }
-        static uint32_t get_predRetAddr (const sc_bv<120>& __data) {
+        static uint32_t get_predRetAddr (const sc_bv<119>& __data) {
             return __data.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s).to_uint64();
         }
-        static PredBranch get_predBr (const sc_bv<120>& __data) {
+        static PredBranch get_predBr (const sc_bv<119>& __data) {
             return PredBranch(__data.range(predBr_s + predBr_w - 1, predBr_s).to_uint64());
         }
-        static uint32_t get_lastValid (const sc_bv<120>& __data) {
+        static uint32_t get_lastValid (const sc_bv<119>& __data) {
             return __data.range(lastValid_s + lastValid_w - 1, lastValid_s).to_uint64();
         }
-        static IFetchFault get_fetchFault (const sc_bv<120>& __data) {
+        static IFetchFault get_fetchFault (const sc_bv<119>& __data) {
             return IFetchFault(__data.range(fetchFault_s + fetchFault_w - 1, fetchFault_s).to_uint64());
         }
-        static uint32_t get_fetchID (const sc_bv<120>& __data) {
+        static uint32_t get_fetchID (const sc_bv<119>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_pc (const sc_bv<120>& __data) {
+        static uint32_t get_pc (const sc_bv<119>& __data) {
             return __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
     };

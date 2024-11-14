@@ -1,6 +1,6 @@
 
 
-module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=8)
+module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=4)
 (
     input logic clk,
     input logic rst,
