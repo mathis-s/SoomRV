@@ -221,7 +221,7 @@ reg[$clog2(`RESET_DELAY)-1:0] wfiCount;
 reg issuedInterrupt;
 reg resetWait;
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         issuedInterrupt <= 0;

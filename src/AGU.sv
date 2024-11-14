@@ -350,9 +350,9 @@ always_comb begin
 end
 
 reg[31:0] pageWalkAddr;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
-    OUT_pw.valid <= 0;
+    OUT_pw <= PageWalk_Req'{valid: 0, default: 'x};
 
     OUT_tvalProv <= 'x;
     OUT_tvalProv.valid <= 0;

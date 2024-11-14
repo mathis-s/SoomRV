@@ -1,5 +1,5 @@
 module MemoryController
-#(parameter NUM_CACHES=2, parameter NUM_TFS_IN=3, parameter ADDR_LEN=32, parameter WIDTH=128)
+#(parameter NUM_CACHES=2, parameter NUM_TFS_IN=3, parameter ADDR_LEN=32, parameter WIDTH=`AXI_WIDTH)
 (
     input wire clk,
     input wire rst,
@@ -277,7 +277,7 @@ logic[`AXI_ID_LEN-1:0] ICW_id;
 logic ICW_ackValid;
 logic[`AXI_ID_LEN-1:0] ICW_ackId;
 
-CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, `AXI_ID_LEN) icacheWriteIF
+CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, 8 << `FSIZE_E, `AXI_ID_LEN) icacheWriteIF
 (
     .clk(clk),
     .rst(rst),
@@ -294,6 +294,7 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, `AXI_ID_LEN) icacheW
     .IN_CACHE_ready(1'b1),
     .OUT_CACHE_ce(OUT_icacheW.ce),
     .OUT_CACHE_we(OUT_icacheW.we),
+    .OUT_CACHE_wm(OUT_icacheW.wm),
     .OUT_CACHE_addr(OUT_icacheW.addr),
     .OUT_CACHE_data(OUT_icacheW.data)
 );
@@ -329,6 +330,7 @@ CacheWriteInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, `AXI_ID_LEN) dcacheW
     .IN_CACHE_ready(1'b1),
     .OUT_CACHE_ce(OUT_dcacheW.ce),
     .OUT_CACHE_we(OUT_dcacheW.we),
+    .OUT_CACHE_wm(),
     .OUT_CACHE_addr(OUT_dcacheW.addr),
     .OUT_CACHE_data(OUT_dcacheW.data)
 );
@@ -577,7 +579,7 @@ assign DCR_dataReady = s_axi_wready;
 assign s_axi_bready = 1;
 
 // Input Transfers
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};

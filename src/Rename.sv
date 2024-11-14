@@ -253,7 +253,7 @@ Scheduler scheduler
 );
 
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         counterSqN <= 0;
@@ -270,126 +270,126 @@ always_ff@(posedge clk) begin
             OUT_uop[i].validIQ <= 0;
         end
     end
-    else if (IN_branch.taken) begin
+    else begin
+        if (IN_branch.taken) begin
+            counterSqN <= IN_branch.sqN + 1;
 
-        counterSqN <= IN_branch.sqN + 1;
+            counterLoadSqN <= IN_branch.loadSqN;
+            counterStoreSqN <= IN_branch.storeSqN;
 
-        counterLoadSqN <= IN_branch.loadSqN;
-        counterStoreSqN <= IN_branch.storeSqN;
+            OUT_nextLoadSqN <= IN_branch.loadSqN;
+            OUT_nextStoreSqN <= IN_branch.storeSqN + 1;
 
-        OUT_nextLoadSqN <= IN_branch.loadSqN;
-        OUT_nextStoreSqN <= IN_branch.storeSqN + 1;
+            failSc <= IN_branch.isSCFail;
 
-        failSc <= IN_branch.isSCFail;
-
-        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            if ($signed(OUT_uop[i].sqN - IN_branch.sqN) > 0) begin
-                OUT_uop[i] <= 'x;
-                OUT_uop[i].valid <= 0;
-                OUT_uop[i].validIQ <= 0;
+            for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+                if ($signed(OUT_uop[i].sqN - IN_branch.sqN) > 0) begin
+                    OUT_uop[i] <= 'x;
+                    OUT_uop[i].valid <= 0;
+                    OUT_uop[i].validIQ <= 0;
+                end
             end
         end
-    end
-    else begin
-        counterLoadSqN <= loadSqNs[WIDTH_ISSUE];
-        counterStoreSqN <= storeSqNs[WIDTH_ISSUE];
-        OUT_nextLoadSqN <= loadSqNs[WIDTH_ISSUE];
-        OUT_nextStoreSqN <= storeSqNs[WIDTH_ISSUE] + 1;
-    end
+        else begin
+            counterLoadSqN <= loadSqNs[WIDTH_ISSUE];
+            counterStoreSqN <= storeSqNs[WIDTH_ISSUE];
+            OUT_nextLoadSqN <= loadSqNs[WIDTH_ISSUE];
+            OUT_nextStoreSqN <= storeSqNs[WIDTH_ISSUE] + 1;
+        end
 
-    if (!rst && |portStall) begin
-        // If frontend is stalled right now we need to make sure
-        // the ops we're stalled on are kept up-to-date, as they will be
-        // read later.
-        for (integer i = 0; i < WIDTH_WR; i=i+1) begin
-            if (IN_flagsUOps[i].valid && !IN_flagsUOps[i].tagDst[$bits(Tag)-1]) begin
-                for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
-                    if (|OUT_uop[j].validIQ) begin
-                        if (OUT_uop[j].tagA == IN_flagsUOps[i].tagDst)
-                            OUT_uop[j].availA <= 1;
-                        if (OUT_uop[j].tagB == IN_flagsUOps[i].tagDst)
-                            OUT_uop[j].availB <= 1;
-                        if (OUT_uop[j].tagC == IN_flagsUOps[i].tagDst)
-                            OUT_uop[j].availC <= 1;
+        if (|portStall) begin
+            // If frontend is stalled right now we need to make sure
+            // the ops we're stalled on are kept up-to-date, as they will be
+            // read later.
+            for (integer i = 0; i < WIDTH_WR; i=i+1) begin
+                if (IN_flagsUOps[i].valid && !IN_flagsUOps[i].tagDst[$bits(Tag)-1]) begin
+                    for (integer j = 0; j < WIDTH_ISSUE; j=j+1) begin
+                        if (|OUT_uop[j].validIQ) begin
+                            if (OUT_uop[j].tagA == IN_flagsUOps[i].tagDst)
+                                OUT_uop[j].availA <= 1;
+                            if (OUT_uop[j].tagB == IN_flagsUOps[i].tagDst)
+                                OUT_uop[j].availB <= 1;
+                            if (OUT_uop[j].tagC == IN_flagsUOps[i].tagDst)
+                                OUT_uop[j].availC <= 1;
+                        end
                     end
                 end
             end
         end
-    end
 
-    if (rst) ;
-    else if (cycleValid) begin
-        // Set seqnum/tags for next instruction(s)
-        for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
-            if (IN_uop[i].valid) begin
+        if (cycleValid) begin
+            // Set seqnum/tags for next instruction(s)
+            for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+                OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
+                if (IN_uop[i].valid) begin
 
-                failSc <= 0;
+                    failSc <= 0;
 
-                OUT_uop[i] <= R_UOp'{
-                    imm:        IN_uop[i].imm,
-                    imm12:      IN_uop[i].imm12,
+                    OUT_uop[i] <= R_UOp'{
+                        imm:        IN_uop[i].imm,
+                        imm12:      IN_uop[i].imm12,
 
-                    availA:     RAT_lookupAvail[2*i+0],
-                    tagA:       RAT_lookupSpecTag[2*i+0],
-                    availB:     RAT_lookupAvail[2*i+1],
-                    tagB:       RAT_lookupSpecTag[2*i+1],
+                        availA:     RAT_lookupAvail[2*i+0],
+                        tagA:       RAT_lookupSpecTag[2*i+0],
+                        availB:     RAT_lookupAvail[2*i+1],
+                        tagB:       RAT_lookupSpecTag[2*i+1],
 
-                    tagC:       TAG_ZERO,
-                    availC:     1'b1,
+                        tagC:       TAG_ZERO,
+                        availC:     1'b1,
 
-                    sqN:        RAT_issueSqNs[i],
-                    tagDst:     newTags[i],
-                    rd:         IN_uop[i].rd,
+                        sqN:        RAT_issueSqNs[i],
+                        tagDst:     newTags[i],
+                        rd:         IN_uop[i].rd,
 
-                    opcode:     IN_uop[i].opcode,
-                    fu:         IN_uop[i].fu,
-                    fetchID:    IN_uop[i].fetchID,
-                    fetchOffs:  IN_uop[i].fetchOffs,
-                    storeSqN:   storeSqNs[i+1], // +1 here, store sqn pre-increments
-                    loadSqN:    loadSqNs[i],    // +0 here, load sqn post-increments
-                    immB:       IN_uop[i].immB,
-                    compressed: IN_uop[i].compressed,
+                        opcode:     IN_uop[i].opcode,
+                        fu:         IN_uop[i].fu,
+                        fetchID:    IN_uop[i].fetchID,
+                        fetchOffs:  IN_uop[i].fetchOffs,
+                        storeSqN:   storeSqNs[i+1], // +1 here, store sqn pre-increments
+                        loadSqN:    loadSqNs[i],    // +0 here, load sqn post-increments
+                        immB:       IN_uop[i].immB,
+                        compressed: IN_uop[i].compressed,
 
-                    valid:      1'b1,
-                    validIQ:    {NUM_PORTS_TOTAL{1'b1}},
-                    default:    'x
-                };
+                        valid:      1'b1,
+                        validIQ:    {NUM_PORTS_TOTAL{1'b1}},
+                        default:    'x
+                    };
 
-                // The cause for decode-time pure traps is encoded
-                // in rd. This saves encoding space, as these instructions
-                // have no result anyways.
-                if (IN_uop[i].fu == FU_TRAP)
-                    OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
+                    // The cause for decode-time pure traps is encoded
+                    // in rd. This saves encoding space, as these instructions
+                    // have no result anyways.
+                    if (IN_uop[i].fu == FU_TRAP)
+                        OUT_uop[i].rd <= IN_uop[i].opcode[4:0];
 
-                // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
-                if (isSc[i] && !scSuccessful[i])
-                    OUT_uop[i].fu <= FU_RN;
+                    // Don't execute unsuccessful SC, handle (ie eliminate) just like load-imm
+                    if (isSc[i] && !scSuccessful[i])
+                        OUT_uop[i].fu <= FU_RN;
 
-                // Atomics need a total of three source tags (addr, reg operand, mem operand).
-                // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
-                if (IN_uop[i].fu == FU_ATOMIC) begin
-                    OUT_uop[i].tagC <= newTags[i];
-                    OUT_uop[i].availC <= 0;
+                    // Atomics need a total of three source tags (addr, reg operand, mem operand).
+                    // The mem operand is the result tag of the LD uop, and thus the same as tagDst.
+                    if (IN_uop[i].fu == FU_ATOMIC) begin
+                        OUT_uop[i].tagC <= newTags[i];
+                        OUT_uop[i].availC <= 0;
+                    end
+
+                    OUT_uopOrdering[i] <= SCHED_uopOrder[i];
                 end
-
-                OUT_uopOrdering[i] <= SCHED_uopOrder[i];
             end
+
+            counterSqN <= nextCounterSqN;
         end
+        else begin
+            // R_UOp carries two seperate valid signals. "valid" is the plain signal
+            // used by ROB and SQ. This signal is only ever set for one cycle, ROB and SQ
+            // do not stall.
+            // "validIQ" contains an individual valid bit for each IQ, these bits may be set
+            // for multiple cycles should IQs stall.
+            for (integer i = 0; i < WIDTH_ISSUE; i++) begin
+                OUT_uop[i].valid <= 0;
 
-        counterSqN <= nextCounterSqN;
-    end
-    else begin
-        // R_UOp carries two seperate valid signals. "valid" is the plain signal
-        // used by ROB and SQ. This signal is only ever set for one cycle, ROB and SQ
-        // do not stall.
-        // "validIQ" contains an individual valid bit for each IQ, these bits may be set
-        // for multiple cycles should IQs stall.
-        for (integer i = 0; i < WIDTH_ISSUE; i++) begin
-            OUT_uop[i].valid <= 0;
-
-            for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1) begin
-                if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
+                for (integer j = 0; j < NUM_PORTS_TOTAL; j=j+1) begin
+                    if (!IN_stalls[j][i]) OUT_uop[i].validIQ[j] <= 0;
+                end
             end
         end
     end

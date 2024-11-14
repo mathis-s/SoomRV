@@ -82,8 +82,8 @@ always_comb begin
 end
 
 reg[7:0] random;
-always_ff@(posedge clk) begin
-    if (rst) random[0] <= 1;
+always_ff@(posedge clk or posedge rst) begin
+    if (rst) random <= 1;
     else random <= {random[6:0], random[7] ^ random[5] ^ random[4] ^ random[3]};
 end
 

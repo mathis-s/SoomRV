@@ -60,7 +60,7 @@ reg[19:0] divCnt;
 assign OUT_mtime = mtime;
 assign OUT_mtimecmp = mtimecmp;
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
     OUT_rvalid <= 0;
 
     if (rst) begin
@@ -116,7 +116,7 @@ assign OUT_rbusy = 0;
 assign OUT_rdata = 0;
 assign OUT_rvalid = 0;
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_powerOff <= 0;
     OUT_reboot <= 0;

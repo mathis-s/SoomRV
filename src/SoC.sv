@@ -1,4 +1,4 @@
-module SoC#(parameter WIDTH=128, parameter ADDR_LEN=32)
+module SoC#(parameter WIDTH=`AXI_WIDTH, parameter ADDR_LEN=32)
 (
     input wire clk,
     input wire rst,
@@ -278,6 +278,7 @@ always_comb begin
     IC_cacheIFs[1] = ICacheIF'{
         ce:   !IF_icache.re,
         we:   1'b1,
+        wm:   'x,
         data: 'x,
         addr: {{$clog2(`CASSOC){1'b0}}, IF_icache.raddr[11:2]}
     };
@@ -299,14 +300,14 @@ CacheArbiter#(2, 1, IC_BANKS, 0, `CASSOC * 128, ICacheIF) icacheArb
     .OUT_ports(IC_bankIFs),
     .IN_portRData(IC_bankRData)
 );
-MemRTL1RW#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 128) icache
+MemRTL1RW#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 32) icache
 (
     .clk(clk),
     .IN_nce(IC_bankIFs[0][0].ce),
     .IN_nwe(IC_bankIFs[0][0].we),
     .IN_addr(IC_bankIFs[0][0].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):2]),
     .IN_data({`CASSOC{IC_bankIFs[0][0].data}}),
-    .IN_wm(1 << (IC_bankIFs[0][0].addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])),
+    .IN_wm(16'(IC_bankIFs[0][0].wm) << (IC_bankIFs[0][0].addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])*4),
     .OUT_data(IC_bankRData[0][0])
 );
 assign IF_icache.busy = !MC_IC_wr.ce;

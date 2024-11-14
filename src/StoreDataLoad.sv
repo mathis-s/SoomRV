@@ -53,7 +53,7 @@ generate for (genvar i = 0; i < WIDTH; i=i+1) begin
     end
 
     logic regFileLookup;
-    always_ff@(posedge clk) begin
+    always_ff@(posedge clk or posedge rst) begin
         regFileLookup <= 0;
         offs <= 'x;
 

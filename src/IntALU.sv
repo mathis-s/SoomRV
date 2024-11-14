@@ -250,7 +250,7 @@ else begin
 end
 
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;

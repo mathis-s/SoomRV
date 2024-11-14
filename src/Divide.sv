@@ -26,7 +26,7 @@ reg running;
 
 assign OUT_busy = running && (cnt != 0 && cnt != 63);
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     running <= 0;
     OUT_uop <= 'x;

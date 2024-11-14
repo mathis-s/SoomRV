@@ -47,7 +47,9 @@ typedef struct packed
 } SQEntry;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
-always_ff@(posedge clk) entryReady_r <= rst ? 0 : entryReady_c;
+always_ff@(posedge clk or posedge rst)
+    if (rst) entryReady_r <= 0;
+    else entryReady_r <= entryReady_c;
 
 wire[NUM_ENTRIES-1:0] entryReady_c;
 RangeMaskGen#(NUM_ENTRIES, 0) readyRangeGen
@@ -134,7 +136,6 @@ reg lookupConflict[NUM_AGUS-1:0];
 for (genvar h = 0; h < NUM_AGUS; h=h+1)
 always_comb begin
 
-    reg[AXI_BWIDTH_E-3:0] shift = lookupAddr[h][2+:AXI_BWIDTH_E-2];
     reg[31:0] data = 'x;
     reg[3:0] mask = 'x;
 
@@ -349,7 +350,7 @@ wire SqN nextBaseIndex = baseIndex + SqN'(deqCount);
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;

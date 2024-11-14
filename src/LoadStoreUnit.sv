@@ -187,8 +187,9 @@ always_ff@(posedge clk) idxs_r <= idxs_c;
 
 if (NUM_AGUS > 1) begin
     PortIdx startIdx;
-    always_ff@(posedge clk)
-        startIdx <= rst ? 0 : (startIdx + 1);
+    always_ff@(posedge clk or posedge rst)
+        if (rst) startIdx <= 0;
+        else startIdx <= (startIdx + 1);
 
     // Stores only go through port 0. To still make port
     // pressure even we shuffle incoming loads.
@@ -331,7 +332,7 @@ reg loadWasExtIOBusy[NUM_AGUS-1:0];
 reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
 
 // Load Pipeline
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1)
         for (integer j = 0; j < 2; j=j+1) begin
@@ -679,10 +680,10 @@ LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
 );
 
 // Store Pipeline
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
-            stOps[i].valid <= 0;
+            stOps[i] <= ST_UOp'{valid: 0, default: 'x};
     end
     else begin
         stOps[0] <= 'x;
@@ -827,7 +828,7 @@ always_comb begin;
     IF_ct.wassoc = 'x;
     newMiss = 0;
 
-    if (!rst && state == IDLE) begin
+    if (state == IDLE) begin
         for (integer i = 0; i < NUM_AGUS; i=i+1) begin
             if (forwardMiss[i]) begin
                 newMiss = 1;
@@ -860,7 +861,7 @@ always_comb begin;
             end
         end
     end
-    else if (!rst && state == FLUSH) begin
+    else if (state == FLUSH) begin
         if (!flushDone) begin
             IF_ct.we = 1;
             IF_ct.waddr = {flushIdx, {`CLSIZE_E{1'b0}}};
@@ -909,12 +910,7 @@ always_comb begin
 end
 
 
-always_ff@(posedge clk) begin
-
-    if (canOutputMiss) begin
-        LSU_memc <= 'x;
-        LSU_memc.cmd <= MEMC_NONE;
-    end
+always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         state <= IDLE;
@@ -925,7 +921,10 @@ always_ff@(posedge clk) begin
         assocCnt <= 0;
     end
     else begin
-
+        if (canOutputMiss) begin
+            LSU_memc <= 'x;
+            LSU_memc.cmd <= MEMC_NONE;
+        end
         if (IN_flush) flushQueued <= 1;
         if (setDirty) dirty[setDirtyIdx] <= 1;
 

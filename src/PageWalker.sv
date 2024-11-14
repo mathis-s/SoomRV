@@ -76,13 +76,15 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_res.valid <= 0;
 
     if (rst) begin
+        OUT_ldUOp <= 'x;
         OUT_ldUOp.valid <= 0;
         state <= IDLE;
+        OUT_res <= 'x;
         OUT_res.busy <= 0;
     end
     else begin
@@ -149,8 +151,6 @@ always_ff@(posedge clk) begin
                 end
             end
         endcase
-
-
     end
 end
 

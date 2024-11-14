@@ -73,25 +73,35 @@ wire FetchCycle cur_c = FetchCycle'{
 FetchCycle[BUF_SIZE-1:0] prev_r;
 wire FetchCycle[BUF_SIZE:0] cycles_c = {cur_c, prev_r};
 
-always_ff@(posedge clk) begin
-    if (validCycle) begin
-        for (integer i = 0; i < BUF_SIZE; i=i+1) begin
-            prev_r[i].start   <= cycles_c[i+1].start & unhandled_c[(i+1)*NUM_PACKETS+:NUM_PACKETS];
-            prev_r[i].start32 <= cycles_c[i+1].start32;
-            prev_r[i].op      <= cycles_c[i+1].op;
-        end
-    end
-    else begin
-        for (integer i = 0; i < BUF_SIZE; i=i+1) begin
-            prev_r[i].start   <= prev_r[i].start & unhandled_c[i*NUM_PACKETS+:NUM_PACKETS];
-        end
-    end
+always_ff@(posedge clk or posedge rst) begin
 
-    if (rst || IN_clear) begin
+    if (rst) begin
         for (integer i = 0; i < BUF_SIZE; i=i+1) begin
             prev_r[i].start <= 0;
             prev_r[i].start32 <= 0;
             prev_r[i].op <= IF_Instr'{valid: 0, default: 'x};
+        end
+    end
+    else begin
+        if (validCycle) begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start   <= cycles_c[i+1].start & unhandled_c[(i+1)*NUM_PACKETS+:NUM_PACKETS];
+                prev_r[i].start32 <= cycles_c[i+1].start32;
+                prev_r[i].op      <= cycles_c[i+1].op;
+            end
+        end
+        else begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start   <= prev_r[i].start & unhandled_c[i*NUM_PACKETS+:NUM_PACKETS];
+            end
+        end
+
+        if (IN_clear) begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start <= 0;
+                prev_r[i].start32 <= 0;
+                prev_r[i].op <= IF_Instr'{valid: 0, default: 'x};
+            end
         end
     end
 end
@@ -163,16 +173,20 @@ end
 
 wire outputReady;
 if (FF_OUTPUT) begin
-    always_ff@(posedge clk) begin
-        for (integer i = 0; i < NUM_INSTRS; i=i+1) begin
-            if (rst || IN_clear) begin
-                OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
+    always_ff@(posedge clk or posedge rst) begin
+            if (rst) begin
+                for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                    OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
+            end
+            else if (IN_clear) begin
+                for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                    OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
             end
             else begin
-                if (outputReady)
-                    OUT_instr[i] <= instr_c[i];
+                for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                    if (outputReady)
+                        OUT_instr[i] <= instr_c[i];
             end
-        end
     end
     assign outputReady = !OUT_instr[0].valid || IN_ready;
 end

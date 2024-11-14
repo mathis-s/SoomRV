@@ -651,10 +651,47 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
-    // implicit writes
-    if (!rst) begin
+    if (rst) begin
+        priv <= PRIV_MACHINE;
+        fflags <= 0;
+        frm <= 0;
+
+        mstatus <= 0;
+        mcycle <= 0;
+        minstret <= 0;
+        mcounteren <= 0;
+        mcountinhibit <= 0;
+        mtvec.base <= 30'((`ENTRY_POINT) >> 2);
+        mtvec.mode <= 0;
+        mepc <= 0;
+        mcause <= 0;
+        mtval <= 0;
+        mideleg <= 0;
+        medeleg <= 0;
+        mip <= 0;
+        mie <= 0;
+        menvcfg <= 0;
+
+        scounteren <= 0;
+        sepc <= 0;
+        scause <= 0;
+        stval <= 0;
+        stvec.base <= 30'((`ENTRY_POINT) >> 2);
+        stvec.mode <= 0;
+        satp <= 0;
+        senvcfg <= 0;
+
+        for (integer i = 0; i < NUM_PERFC; i=i+1)
+            mhpmcounter[i] <= 0;
+
+        OUT_uop <= 'x;
+        OUT_uop.valid <= 0;
+
+        misa_X <= 1;
+    end
+    else begin
 
         // CSR writes on trap/interrupt
         if (IN_trapInfo.valid) begin
@@ -742,324 +779,287 @@ always_ff@(posedge clk) begin
         if (IN_perfcInfo.stallCause != STALL_NONE)
             mhpmcounter[11 + IN_perfcInfo.stallCause] <=
                 mhpmcounter[11 + IN_perfcInfo.stallCause] + 64'(IN_perfcInfo.stallWeigth) + 1;
-    end
 
-    if (rst) begin
-        priv <= PRIV_MACHINE;
-        fflags <= 0;
-        frm <= 0;
 
-        mstatus <= 0;
-        mcycle <= 0;
-        minstret <= 0;
-        mcounteren <= 0;
-        mcountinhibit <= 0;
-        mtvec.base <= 30'((`ENTRY_POINT) >> 2);
-        mtvec.mode <= 0;
-        mepc <= 0;
-        mcause <= 0;
-        mtval <= 0;
-        mideleg <= 0;
-        medeleg <= 0;
-        mip <= 0;
-        mie <= 0;
-        menvcfg <= 0;
+        if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
+            OUT_uop.valid <= 1;
+            OUT_uop.doNotCommit <= 0;
+            OUT_uop.flags <= FLAGS_NONE;
+            OUT_uop.sqN <= IN_uop.sqN;
+            OUT_uop.tagDst <= IN_uop.tagDst;
 
-        scounteren <= 0;
-        sepc <= 0;
-        scause <= 0;
-        stval <= 0;
-        stvec.base <= 30'((`ENTRY_POINT) >> 2);
-        stvec.mode <= 0;
-        satp <= 0;
-        senvcfg <= 0;
+            if (IN_uop.opcode == CSR_MRET || IN_uop.opcode == CSR_SRET) begin
 
-        for (integer i = 0; i < NUM_PERFC; i=i+1)
-            mhpmcounter[i] <= 0;
+                OUT_uop.flags <= FLAGS_XRET;
 
-        OUT_uop.valid <= 0;
+                if (IN_uop.opcode == CSR_MRET) begin
 
-        misa_X <= 1;
-    end
-    else if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
-
-        OUT_uop.valid <= 1;
-        OUT_uop.doNotCommit <= 0;
-        OUT_uop.flags <= FLAGS_NONE;
-        OUT_uop.sqN <= IN_uop.sqN;
-        OUT_uop.tagDst <= IN_uop.tagDst;
-
-        if (IN_uop.opcode == CSR_MRET || IN_uop.opcode == CSR_SRET) begin
-
-            OUT_uop.flags <= FLAGS_XRET;
-
-            if (IN_uop.opcode == CSR_MRET) begin
-
-                if (priv < PRIV_MACHINE)
-                    OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-                else begin
-                    mstatus.mie <= mstatus.mpie;
-                    mstatus.mpie <= 1;
-                    priv <= mstatus.mpp;
-                    mstatus.mpp <= PRIV_USER;
-                    if (mstatus.mpp != PRIV_MACHINE)
-                        mstatus.mprv <= 0;
-
-                    retvec <= mepc[31:1];
-                end
-            end
-            else begin
-                if (priv < PRIV_SUPERVISOR || (IN_uop.opcode == CSR_SRET && mstatus.tsr == 1))
-                    OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-                else begin
-                    mstatus.sie <= mstatus.spie;
-                    mstatus.spie <= 1;
-                    priv <= PrivLevel'({1'b0, mstatus.spp});
-                    mstatus.spp <= 1'b0;
-                    mstatus.mprv <= 0;
-
-                    retvec <= sepc[31:1];
-                end
-            end
-
-        end
-        else begin
-            if ($unsigned(priv) < IN_uop.imm[9:8] || invalidCSR) begin
-                OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
-            end
-            else begin
-                // Do write?
-                if (IN_uop.opcode != CSR_R) begin
-                    reg[31:0] wdata;
-
-                    // For CSRs with out-of-order implicit reads, we need to flush the pipeline
-                    case (IN_uop.imm[11:0])
-                        CSR_fflags,
-                        CSR_frm,
-                        CSR_fcsr,
-
-                        CSR_sstatus,
-                        CSR_sie,
-                        //CSR_stvec,
-                        CSR_scounteren,
-                        CSR_senvcfg,
-                        //CSR_sscratch,
-                        //CSR_sepc,
-                        //CSR_scause,
-                        //CSR_stval,
-                        CSR_sip,
-                        CSR_satp,
-                        //CSR_scontext,
-
-                        CSR_mstatus,
-                        CSR_misa,
-                        //CSR_medeleg,
-                        CSR_mideleg,
-                        CSR_mie,
-                        //CSR_mtvec,
-                        CSR_mcounteren,
-                        CSR_mstatush,
-                        //CSR_mscratch,
-                        //CSR_mepc,
-                        //CSR_mcause,
-                        //CSR_mtval,
-                        CSR_mip,
-                        //CSR_mtinst,
-                        //CSR_mtval2,
-                        CSR_menvcfg
-                        //CSR_menvcfgh,
-                        //CSR_mseccfg,
-                        //CSR_mseccfgh,
-                        : OUT_uop.flags <= FLAGS_ORDERING;
-
-                        default: ;
-                    endcase
-
-                    // Don't write to read-only CSRs (this could already be handled in decode)
-                    if (IN_uop.imm[11:10] == 2'b11)
+                    if (priv < PRIV_MACHINE)
                         OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
                     else begin
-                        case (IN_uop.opcode)
+                        mstatus.mie <= mstatus.mpie;
+                        mstatus.mpie <= 1;
+                        priv <= mstatus.mpp;
+                        mstatus.mpp <= PRIV_USER;
+                        if (mstatus.mpp != PRIV_MACHINE)
+                            mstatus.mprv <= 0;
 
-                            CSR_RW: wdata = IN_uop.srcA;
-                            CSR_RW_I: wdata = {27'b0, IN_uop.imm[16:12]};
+                        retvec <= mepc[31:1];
+                    end
+                end
+                else begin
+                    if (priv < PRIV_SUPERVISOR || (IN_uop.opcode == CSR_SRET && mstatus.tsr == 1))
+                        OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                    else begin
+                        mstatus.sie <= mstatus.spie;
+                        mstatus.spie <= 1;
+                        priv <= PrivLevel'({1'b0, mstatus.spp});
+                        mstatus.spp <= 1'b0;
+                        mstatus.mprv <= 0;
 
-                            CSR_RS: wdata = rdata | IN_uop.srcA;
-                            CSR_RS_I: wdata = rdata | {27'b0, IN_uop.imm[16:12]};
-
-                            CSR_RC: wdata = rdata & (~IN_uop.srcA);
-                            CSR_RC_I: wdata = rdata & (~{27'b0, IN_uop.imm[16:12]});
-
-                            default: begin end
-                        endcase
-
-                        for (integer i = 3; i <= 11; i=i+1) begin
-                            if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycle)
-                                mhpmcounter[i][31:0] <= wdata;
-                            if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycleh)
-                                mhpmcounter[i][63:32] <= wdata;
-                        end
-                        case (IN_uop.imm[11:0])
-`ifdef ENABLE_FP
-                            CSR_fflags: fflags <= wdata[4:0];
-                            CSR_frm: frm <= wdata[2:0];
-                            CSR_fcsr: {frm, fflags} <= wdata[7:0];
-`endif
-                            CSR_mstatus: begin
-                                MStatus_t temp = wdata;
-
-                                mstatus.tsr <= temp.tsr;
-                                mstatus.tw <= temp.tw;
-                                mstatus.tvm <= temp.tvm;
-                                mstatus.mxr <= temp.mxr;
-                                mstatus.sum <= temp.sum;
-                                mstatus.mprv <= temp.mprv;
-
-                                mstatus.sie <= temp.sie;
-                                mstatus.mie <= temp.mie;
-                                mstatus.spie <= temp.spie;
-                                mstatus.mpie <= temp.mpie;
-                                mstatus.spp <= temp.spp;
-                                mstatus.mpp <= temp.mpp;
-
-                                mstatus.fs_ <= temp.fs_;
-                                mstatus.sd <= |temp.fs_;
-                            end
-
-                            CSR_mcycle: mcycle[31:0] <= wdata;
-                            CSR_mcycleh: mcycle[63:32] <= wdata;
-
-                            CSR_minstret: minstret[31:0] <= wdata;
-                            CSR_minstreth: minstret[63:32] <= wdata;
-
-                            CSR_mcounteren: mcounteren[31:0] <= wdata[31:0];
-                            CSR_mcountinhibit: begin
-                                // do not allow disabling counters in verilator
-                                // simulation for performance measurement.
-                                `ifndef VERILATOR
-                                mcountinhibit <= wdata;
-                                `endif
-                            end
-
-                            CSR_mtvec: begin
-                                mtvec.base <= wdata[31:2];
-                                //mtvec.mode[0] <= wdata[0];
-                            end
-                            CSR_menvcfg: begin
-                                MEnvCfg_t temp = wdata;
-
-                                menvcfg.fiom <= temp.fiom;
-                                menvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
-                                menvcfg.cbcfe <= temp.cbcfe;
-                                menvcfg.cbze <= 0;//wdata.cbze;
-                            end
-
-                            CSR_medeleg: medeleg <= wdata[15:0];
-                            CSR_mideleg: mideleg <= wdata[15:0];
-
-                            CSR_mip: begin
-                                mip[1] <= wdata[1];
-                                // mip[3] <= wdata[3];   // MSIP
-                                mip[5] <= wdata[5];
-                                //mip[7] <= wdata[7];    // timer
-                                mip[9] <= wdata[9];
-                                // mip[11] <= wdata[11]; // external
-                            end
-                            CSR_mie: begin
-                                mie[1] <= wdata[1];
-                                mie[3] <= wdata[3];
-                                mie[5] <= wdata[5];
-                                mie[7] <= wdata[7];
-                                mie[9] <= wdata[9];
-                                mie[11] <= wdata[11];
-                            end
-
-                            CSR_mscratch: mscratch <= wdata;
-
-                            CSR_mepc: mepc[31:1] <= wdata[31:1];
-                            CSR_mcause: begin
-                                mcause[4:0] <= wdata[4:0];
-                                mcause[31] <= wdata[31];
-                            end
-                            CSR_mtval: mtval <= wdata;
-
-                            CSR_misa: begin
-                                misa_X <= wdata[23];
-                            end
-
-                            CSR_sstatus: begin
-                                MStatus_t temp = wdata;
-
-                                mstatus.mxr <= temp.mxr;
-                                mstatus.sum <= temp.sum;
-
-                                mstatus.sie <= temp.sie;
-                                mstatus.spie <= temp.spie;
-                                mstatus.spp <= temp.spp;
-                            end
-
-                            CSR_scounteren: scounteren[31:0] <= wdata[31:0];
-                            CSR_sepc: sepc[31:1] <= wdata[31:1];
-                            CSR_sscratch: sscratch <= wdata;
-                            CSR_scause: begin
-                                scause[0+:5] <= wdata[0+:5];
-                                scause[31] <= wdata[31];
-                            end
-                            CSR_stval: stval <= wdata;
-                            CSR_stvec: begin
-                                stvec.base <= wdata[31:2];
-                                //stvec.mode[0] <= wdata[0];
-                            end
-
-                            CSR_sip: begin
-                                if (mideleg[1]) mip[1] <= wdata[1];
-                                // mip[3] <= wdata[3];   // MSIP
-                                if (mideleg[5]) mip[5] <= wdata[5];
-                                //mip[7] <= wdata[7];    // timer
-                                if (mideleg[9]) mip[9] <= wdata[9];
-                                // mip[11] <= wdata[11]; // external
-                            end
-
-                            CSR_sie: begin
-                                if (mideleg[1]) mie[1] <= wdata[1];
-                                if (mideleg[3]) mie[3] <= wdata[3];
-                                if (mideleg[5]) mie[5] <= wdata[5];
-                                if (mideleg[7]) mie[7] <= wdata[7];
-                                if (mideleg[9]) mie[9] <= wdata[9];
-                                if (mideleg[11]) mie[11] <= wdata[11];
-                            end
-
-                            CSR_satp: begin
-                                satp <= wdata;
-                                // we only support 32 bits of physical address space.
-                                satp.ppn[21:20] <= 2'b0;
-                                satp.asid <= 0;
-                            end
-
-                            CSR_senvcfg: begin
-                                MEnvCfg_t temp = wdata;
-
-                                senvcfg.fiom <= temp.fiom;
-                                senvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
-                                senvcfg.cbcfe <= temp.cbcfe;
-                                senvcfg.cbze <= 0;//wdata.cbze;
-                            end
-
-                            default: begin end
-                        endcase
+                        retvec <= sepc[31:1];
                     end
                 end
 
-                // Do read?
-                if (!IN_uop.tagDst[$bits(Tag)-1]) begin
-                    OUT_uop.result <= rdata;
-                    // read side effects
+            end
+            else begin
+                if ($unsigned(priv) < IN_uop.imm[9:8] || invalidCSR) begin
+                    OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                end
+                else begin
+                    // Do write?
+                    if (IN_uop.opcode != CSR_R) begin
+                        reg[31:0] wdata;
+
+                        // For CSRs with out-of-order implicit reads, we need to flush the pipeline
+                        case (IN_uop.imm[11:0])
+                            CSR_fflags,
+                            CSR_frm,
+                            CSR_fcsr,
+
+                            CSR_sstatus,
+                            CSR_sie,
+                            //CSR_stvec,
+                            CSR_scounteren,
+                            CSR_senvcfg,
+                            //CSR_sscratch,
+                            //CSR_sepc,
+                            //CSR_scause,
+                            //CSR_stval,
+                            CSR_sip,
+                            CSR_satp,
+                            //CSR_scontext,
+
+                            CSR_mstatus,
+                            CSR_misa,
+                            //CSR_medeleg,
+                            CSR_mideleg,
+                            CSR_mie,
+                            //CSR_mtvec,
+                            CSR_mcounteren,
+                            CSR_mstatush,
+                            //CSR_mscratch,
+                            //CSR_mepc,
+                            //CSR_mcause,
+                            //CSR_mtval,
+                            CSR_mip,
+                            //CSR_mtinst,
+                            //CSR_mtval2,
+                            CSR_menvcfg
+                            //CSR_menvcfgh,
+                            //CSR_mseccfg,
+                            //CSR_mseccfgh,
+                            : OUT_uop.flags <= FLAGS_ORDERING;
+
+                            default: ;
+                        endcase
+
+                        // Don't write to read-only CSRs (this could already be handled in decode)
+                        if (IN_uop.imm[11:10] == 2'b11)
+                            OUT_uop.flags <= FLAGS_ILLEGAL_INSTR;
+                        else begin
+                            case (IN_uop.opcode)
+
+                                CSR_RW: wdata = IN_uop.srcA;
+                                CSR_RW_I: wdata = {27'b0, IN_uop.imm[16:12]};
+
+                                CSR_RS: wdata = rdata | IN_uop.srcA;
+                                CSR_RS_I: wdata = rdata | {27'b0, IN_uop.imm[16:12]};
+
+                                CSR_RC: wdata = rdata & (~IN_uop.srcA);
+                                CSR_RC_I: wdata = rdata & (~{27'b0, IN_uop.imm[16:12]});
+
+                                default: begin end
+                            endcase
+
+                            for (integer i = 3; i <= 11; i=i+1) begin
+                                if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycle)
+                                    mhpmcounter[i][31:0] <= wdata;
+                                if (IN_uop.imm[11:0] == CSR_Id'(i) + CSR_mcycleh)
+                                    mhpmcounter[i][63:32] <= wdata;
+                            end
+                            case (IN_uop.imm[11:0])
+    `ifdef ENABLE_FP
+                                CSR_fflags: fflags <= wdata[4:0];
+                                CSR_frm: frm <= wdata[2:0];
+                                CSR_fcsr: {frm, fflags} <= wdata[7:0];
+    `endif
+                                CSR_mstatus: begin
+                                    MStatus_t temp = wdata;
+
+                                    mstatus.tsr <= temp.tsr;
+                                    mstatus.tw <= temp.tw;
+                                    mstatus.tvm <= temp.tvm;
+                                    mstatus.mxr <= temp.mxr;
+                                    mstatus.sum <= temp.sum;
+                                    mstatus.mprv <= temp.mprv;
+
+                                    mstatus.sie <= temp.sie;
+                                    mstatus.mie <= temp.mie;
+                                    mstatus.spie <= temp.spie;
+                                    mstatus.mpie <= temp.mpie;
+                                    mstatus.spp <= temp.spp;
+                                    mstatus.mpp <= temp.mpp;
+
+                                    mstatus.fs_ <= temp.fs_;
+                                    mstatus.sd <= |temp.fs_;
+                                end
+
+                                CSR_mcycle: mcycle[31:0] <= wdata;
+                                CSR_mcycleh: mcycle[63:32] <= wdata;
+
+                                CSR_minstret: minstret[31:0] <= wdata;
+                                CSR_minstreth: minstret[63:32] <= wdata;
+
+                                CSR_mcounteren: mcounteren[31:0] <= wdata[31:0];
+                                CSR_mcountinhibit: begin
+                                    // do not allow disabling counters in verilator
+                                    // simulation for performance measurement.
+                                    `ifndef VERILATOR
+                                    mcountinhibit <= wdata;
+                                    `endif
+                                end
+
+                                CSR_mtvec: begin
+                                    mtvec.base <= wdata[31:2];
+                                    //mtvec.mode[0] <= wdata[0];
+                                end
+                                CSR_menvcfg: begin
+                                    MEnvCfg_t temp = wdata;
+
+                                    menvcfg.fiom <= temp.fiom;
+                                    menvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
+                                    menvcfg.cbcfe <= temp.cbcfe;
+                                    menvcfg.cbze <= 0;//wdata.cbze;
+                                end
+
+                                CSR_medeleg: medeleg <= wdata[15:0];
+                                CSR_mideleg: mideleg <= wdata[15:0];
+
+                                CSR_mip: begin
+                                    mip[1] <= wdata[1];
+                                    // mip[3] <= wdata[3];   // MSIP
+                                    mip[5] <= wdata[5];
+                                    //mip[7] <= wdata[7];    // timer
+                                    mip[9] <= wdata[9];
+                                    // mip[11] <= wdata[11]; // external
+                                end
+                                CSR_mie: begin
+                                    mie[1] <= wdata[1];
+                                    mie[3] <= wdata[3];
+                                    mie[5] <= wdata[5];
+                                    mie[7] <= wdata[7];
+                                    mie[9] <= wdata[9];
+                                    mie[11] <= wdata[11];
+                                end
+
+                                CSR_mscratch: mscratch <= wdata;
+
+                                CSR_mepc: mepc[31:1] <= wdata[31:1];
+                                CSR_mcause: begin
+                                    mcause[4:0] <= wdata[4:0];
+                                    mcause[31] <= wdata[31];
+                                end
+                                CSR_mtval: mtval <= wdata;
+
+                                CSR_misa: begin
+                                    misa_X <= wdata[23];
+                                end
+
+                                CSR_sstatus: begin
+                                    MStatus_t temp = wdata;
+
+                                    mstatus.mxr <= temp.mxr;
+                                    mstatus.sum <= temp.sum;
+
+                                    mstatus.sie <= temp.sie;
+                                    mstatus.spie <= temp.spie;
+                                    mstatus.spp <= temp.spp;
+                                end
+
+                                CSR_scounteren: scounteren[31:0] <= wdata[31:0];
+                                CSR_sepc: sepc[31:1] <= wdata[31:1];
+                                CSR_sscratch: sscratch <= wdata;
+                                CSR_scause: begin
+                                    scause[0+:5] <= wdata[0+:5];
+                                    scause[31] <= wdata[31];
+                                end
+                                CSR_stval: stval <= wdata;
+                                CSR_stvec: begin
+                                    stvec.base <= wdata[31:2];
+                                    //stvec.mode[0] <= wdata[0];
+                                end
+
+                                CSR_sip: begin
+                                    if (mideleg[1]) mip[1] <= wdata[1];
+                                    // mip[3] <= wdata[3];   // MSIP
+                                    if (mideleg[5]) mip[5] <= wdata[5];
+                                    //mip[7] <= wdata[7];    // timer
+                                    if (mideleg[9]) mip[9] <= wdata[9];
+                                    // mip[11] <= wdata[11]; // external
+                                end
+
+                                CSR_sie: begin
+                                    if (mideleg[1]) mie[1] <= wdata[1];
+                                    if (mideleg[3]) mie[3] <= wdata[3];
+                                    if (mideleg[5]) mie[5] <= wdata[5];
+                                    if (mideleg[7]) mie[7] <= wdata[7];
+                                    if (mideleg[9]) mie[9] <= wdata[9];
+                                    if (mideleg[11]) mie[11] <= wdata[11];
+                                end
+
+                                CSR_satp: begin
+                                    satp <= wdata;
+                                    // we only support 32 bits of physical address space.
+                                    satp.ppn[21:20] <= 2'b0;
+                                    satp.asid <= 0;
+                                end
+
+                                CSR_senvcfg: begin
+                                    MEnvCfg_t temp = wdata;
+
+                                    senvcfg.fiom <= temp.fiom;
+                                    senvcfg.cbie <= (temp.cbie == 2'b10) ? 0 : temp.cbie;
+                                    senvcfg.cbcfe <= temp.cbcfe;
+                                    senvcfg.cbze <= 0;//wdata.cbze;
+                                end
+
+                                default: begin end
+                            endcase
+                        end
+                    end
+
+                    // Do read?
+                    if (!IN_uop.tagDst[$bits(Tag)-1]) begin
+                        OUT_uop.result <= rdata;
+                        // read side effects
+                    end
                 end
             end
         end
-    end
-    else begin
-        OUT_uop.valid <= 0;
+        else begin
+            OUT_uop.valid <= 0;
+        end
     end
 end
 

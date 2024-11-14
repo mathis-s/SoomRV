@@ -1540,10 +1540,16 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_decBranch <= DecodeBranch'{taken: 0, default: 'x};
-    if (rst || IN_branch.taken) begin
+    if (rst) begin
+        for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+            OUT_uop[i] <= 'x;
+            OUT_uop[i].valid <= 0;
+        end
+    end
+    else if (IN_branch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
             OUT_uop[i].valid <= 0;

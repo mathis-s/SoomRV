@@ -53,8 +53,9 @@ end
 
 EQEntry fusedUOp_r;
 EQEntry fusedUOp_c;
-always_ff@(posedge clk)
-    fusedUOp_r <= rst ? EQEntry'{valid: 0, default: 'x} : fusedUOp_c;
+always_ff@(posedge clk or posedge rst)
+    if (rst) fusedUOp_r <= EQEntry'{valid: 0, default: 'x};
+    else fusedUOp_r <= fusedUOp_c;
 
 always_comb begin
     fusedUOp_c = fusedUOp_r;
@@ -81,9 +82,9 @@ always_comb begin
             fusedUOp_c.isMgmt = IN_uop[0].isMgmt;
         end
         else begin
-            fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
-            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], AXI_WWIDTH_E'(0)};
-            fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*32;
+            fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask);// << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
+            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], {AXI_WWIDTH_E{0}}};
+            fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data);// << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*32;
 
             // Try to fuse in younger stores
             for (integer i = 1; i < NUM_IN; i=i+1) begin
@@ -93,8 +94,7 @@ always_comb begin
                 ) begin
                     OUT_stall[i] = 0;
                     for (integer j = 0; j < AXI_BWIDTH; j=j+1) begin
-                        if (IN_uop[i].addr[AXI_BWIDTH_E-1:2] == j[AXI_BWIDTH_E-1:2] &&
-                            IN_uop[i].wmask[j[1:0]]
+                        if (IN_uop[i].wmask[j[1:0]]
                         ) begin
                             fusedUOp_c.data[j*8+:8] = IN_uop[i].data[j[1:0]*8+:8];
                             fusedUOp_c.wmask[j] = 1;
@@ -119,7 +119,6 @@ reg[31:0] lookupData[NUM_AGUS-1:0];
 for (genvar h = 0; h < NUM_AGUS; h=h+1)
 always_comb begin
 
-    reg[AXI_BWIDTH_E-3:0] shift = IN_uopLd[h].addr[2+:AXI_BWIDTH_E-2];
     reg[31:0] data = 'x;
     reg[3:0] mask = 'x;
 
@@ -128,8 +127,8 @@ always_comb begin
 
     for (integer i = 0; i < NUM_EVICTED+1; i=i+1) begin
 
-        data = evictedV[i].data[32*shift+:32];
-        mask = evictedV[i].wmask[4*shift+:4];
+        data = evictedV[i].data[32*0+:32];
+        mask = evictedV[i].wmask[4*0+:4];
 
         if (evictedV[i].valid &&
             evictedV[i].addr[29:AXI_BWIDTH_E-2] == IN_uopLd[h].addr[31:AXI_BWIDTH_E] &&
@@ -190,7 +189,7 @@ always_comb begin
 end
 
 ST_Ack stAck_r;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
     if (!rst) stAck_r <= IN_stAck;
     else begin
         stAck_r <= 'x;
@@ -198,7 +197,7 @@ always_ff@(posedge clk) begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
@@ -206,8 +205,11 @@ always_ff@(posedge clk) begin
     end
 
     if (rst) begin
-        for (integer i = 0; i < NUM_EVICTED; i=i+1)
+        for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+            evicted[i] <= 'x;
             evicted[i].valid <= 0;
+        end
+        OUT_uopSt <= 'x;
         OUT_uopSt.valid <= 0;
     end
     else begin

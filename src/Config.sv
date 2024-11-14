@@ -57,10 +57,10 @@
 `define CLSIZE_E 6
 
 `define CBANKS 4
-`define CWIDTH 4
+`define CWIDTH 1
 
 `define AXI_NUM_TRANS 4
-`define AXI_WIDTH 128
+`define AXI_WIDTH 32
 `define AXI_ID_LEN $clog2(`AXI_NUM_TRANS)
 
 `define ENABLE_EXT_MMIO 1

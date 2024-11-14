@@ -41,7 +41,7 @@ assign OUT_busy = active;
         OUT_data = IN_EXT_bus; // should probably register this...
 end*/
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_EXT_en <= 0;
     OUT_advance <= 0;

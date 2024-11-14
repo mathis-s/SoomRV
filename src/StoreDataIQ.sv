@@ -142,7 +142,7 @@ struct packed
 } deq;
 PriorityEncoder #(SIZE) penc(deqCandidate_c, '{deq.idx}, '{deq.valid});
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     reg[ID_LEN:0] newInsertIndex = 'x;
 
@@ -155,6 +155,10 @@ always_ff@(posedge clk) begin
     if (rst) begin
         insertIndex <= 0;
         OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
+
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            queue[i] <= R_ST_UOp'{avail: 0, offs: 0, default: 'x};
+        end
     end
     else if (IN_branch.taken) begin
 

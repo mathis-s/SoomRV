@@ -1010,6 +1010,7 @@ typedef struct packed
 {
     logic ce;
     logic we;
+    logic[3:0] wm;
     logic[`CACHE_SIZE_E-3:0] addr;
     logic[127:0] data;
 } ICacheIF;

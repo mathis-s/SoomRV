@@ -170,7 +170,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         misprReplay_r <= MisprReplay'{valid: 0, default: 'x};
     end
@@ -196,13 +196,14 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk)
-    OUT_mispredFlush <= rst ? 0 : (misprReplay_c.valid && (|misprReplayFwdMask));
+always_ff@(posedge clk or posedge rst)
+    if (rst) OUT_mispredFlush <= 0;
+    else OUT_mispredFlush <= misprReplay_c.valid && (|misprReplayFwdMask);
 
 reg stop;
 
 reg didCommit;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
 
     OUT_fpNewFlags <= 0;
 
@@ -459,7 +460,7 @@ end
 // Core Hang Detection
 logic[HANG_COUNTER_LEN-1:0] hangCounter;
 logic hangDetected;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         hangCounter <= 0;
         hangDetected <= 0;
