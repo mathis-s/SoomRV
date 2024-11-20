@@ -1,8 +1,8 @@
 module Rename
 #(
     parameter WIDTH_ISSUE = `DEC_WIDTH,
-    parameter WIDTH_COMMIT = 4,
-    parameter WIDTH_WR = 4
+    parameter WIDTH_COMMIT = `DEC_WIDTH,
+    parameter WIDTH_WR = `DEC_WIDTH
 )
 (
     input wire clk,

@@ -198,6 +198,7 @@ if (NUM_AGUS > 1) begin
             idxs_c[i] = startIdx + PortIdx'(i);
     end
 end
+else assign idxs_c[0] = 0;
 
 typedef enum logic[0:0]
 {

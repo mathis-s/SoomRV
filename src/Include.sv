@@ -4,7 +4,7 @@ typedef logic[`RF_SIZE_EXP-1:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[31:0] RegT;
 typedef logic[4:0] FetchID_t;
-typedef logic[2:0] FetchOff_t;
+typedef logic[`FSIZE_E-2:0] FetchOff_t;
 typedef logic[$clog2(`RETURN_SIZE)-1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
@@ -532,7 +532,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[27:0] pc;
+    logic[31-`FSIZE_E:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;
     FetchOff_t firstValid;
@@ -540,7 +540,7 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    logic[7:0][15:0] instrs;
+    logic[FETCH_WORDS-1:0][15:0] instrs;
 
     logic valid;
 } IF_Instr /* public */;
@@ -1010,9 +1010,9 @@ typedef struct packed
 {
     logic ce;
     logic we;
-    logic[3:0] wm;
+    logic[(FETCH_BITS/`AXI_WIDTH)-1:0] wm;
     logic[`CACHE_SIZE_E-3:0] addr;
-    logic[127:0] data;
+    logic[FETCH_BITS-1:0] data;
 } ICacheIF;
 
 typedef struct packed
@@ -1113,9 +1113,9 @@ interface IF_CTable();
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
 
-    logic re[1:0];
-    logic[`VIRT_IDX_LEN-1:0] raddr[1:0];
-    CTEntry[1:0][`CASSOC-1:0] rdata;
+    logic re[NUM_AGUS-1:0];
+    logic[`VIRT_IDX_LEN-1:0] raddr[NUM_AGUS-1:0];
+    CTEntry[NUM_AGUS-1:0][`CASSOC-1:0] rdata;
 
     modport HOST
     (
@@ -1188,7 +1188,7 @@ interface IF_ICache();
 
     logic re;
     logic[11:0] raddr;
-    logic[`CASSOC-1:0][127:0] rdata;
+    logic[`CASSOC-1:0][FETCH_BITS-1:0] rdata;
     logic busy;
 
     modport HOST

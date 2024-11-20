@@ -64,8 +64,8 @@ function automatic logic[1:0] CheckTransfersIF(MemController_Req memcReq, MemCon
             memcRes.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
         ) begin
             rv[0] = 1;
-            rv[1] = (memcRes.transfers[i].progress[`CLSIZE_E-2:2]) >
-                ({1'b0, addr[`CLSIZE_E-1:4]} - {1'b0, memcRes.transfers[i].readAddr[`CLSIZE_E-1:4]});
+            rv[1] = (memcRes.transfers[i].progress[`CLSIZE_E-2:`FSIZE_E-2]) >
+                ({1'b0, addr[`CLSIZE_E-1:`FSIZE_E]} - {1'b0, memcRes.transfers[i].readAddr[`CLSIZE_E-1:`FSIZE_E]});
         end
     end
 
@@ -108,7 +108,7 @@ BranchHandler#(.NUM_INST(NUM_INST)) branchHandler
 );
 
 wire IA_ready;
-InstrAligner instrAligner
+InstrAligner#(.NUM_PACKETS(NUM_INST), .NUM_INSTRS(`DEC_WIDTH)) instrAligner
 (
     .clk(clk),
     .rst(rst),

@@ -2,10 +2,10 @@
 
 module InstrAligner
 #(
-    localparam NUM_PACKETS = 8,
-    localparam NUM_INSTRS = 4,
-    localparam BUF_SIZE = 2,
-    localparam FF_OUTPUT = 1
+    parameter NUM_PACKETS = 8,
+    parameter NUM_INSTRS = 4,
+    parameter BUF_SIZE = 1,
+    parameter FF_OUTPUT = 1
 )
 (
     input wire clk,

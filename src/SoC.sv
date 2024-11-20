@@ -9,6 +9,13 @@ module SoC#(parameter WIDTH=`AXI_WIDTH, parameter ADDR_LEN=32)
     output wire OUT_powerOff,
     output wire OUT_reboot,
 
+    output logic OUT_busOE,
+    output logic[WIDTH-1:0] OUT_bus,
+    input logic[WIDTH-1:0] IN_bus,
+    input logic IN_busReady,
+    output logic OUT_busValid,
+
+    /*
     // write request
     output[`AXI_ID_LEN-1:0]  s_axi_awid,
     output[ADDR_LEN-1:0] s_axi_awaddr,
@@ -49,9 +56,86 @@ module SoC#(parameter WIDTH=`AXI_WIDTH, parameter ADDR_LEN=32)
     input[WIDTH-1:0] s_axi_rdata,
     input s_axi_rlast,
     input s_axi_rvalid,
+    */
 
     output DebugInfo OUT_dbg,
     output DebugInfoMemC OUT_dbgMemC
+);
+
+logic[`AXI_ID_LEN-1:0]  s_axi_awid;
+logic[ADDR_LEN-1:0] s_axi_awaddr;
+logic[7:0] s_axi_awlen;
+logic[2:0] s_axi_awsize;
+logic[1:0] s_axi_awburst;
+logic[0:0] s_axi_awlock;
+logic[3:0] s_axi_awcache;
+logic s_axi_awvalid;
+logic s_axi_awready;
+logic[WIDTH-1:0] s_axi_wdata;
+logic[(WIDTH/8)-1:0] s_axi_wstrb;
+logic s_axi_wlast;
+logic s_axi_wvalid;
+logic s_axi_wready;
+logic s_axi_bready;
+logic[`AXI_ID_LEN-1:0] s_axi_bid;
+logic s_axi_bvalid;
+logic[`AXI_ID_LEN-1:0] s_axi_arid;
+logic[ADDR_LEN-1:0] s_axi_araddr;
+logic[7:0] s_axi_arlen;
+logic[2:0] s_axi_arsize;
+logic[1:0] s_axi_arburst;
+logic[0:0] s_axi_arlock;
+logic[3:0] s_axi_arcache;
+logic s_axi_arvalid;
+logic s_axi_arready;
+logic s_axi_rready;
+logic[`AXI_ID_LEN-1:0] s_axi_rid;
+logic[WIDTH-1:0] s_axi_rdata;
+logic s_axi_rlast;
+logic s_axi_rvalid;
+
+ExternalBus extBus
+(
+    .clk(clk),
+    .rst(rst),
+
+    .OUT_busOE(OUT_busOE),
+    .OUT_bus(OUT_bus),
+    .IN_bus(IN_bus),
+    .OUT_busValid(OUT_busValid),
+    .IN_busReady(IN_busReady),
+
+    .s_axi_awid(s_axi_awid),
+    .s_axi_awaddr(s_axi_awaddr),
+    .s_axi_awlen(s_axi_awlen),
+    .s_axi_awsize(s_axi_awsize),
+    .s_axi_awburst(s_axi_awburst),
+    .s_axi_awlock(s_axi_awlock),
+    .s_axi_awcache(s_axi_awcache),
+    .s_axi_awvalid(s_axi_awvalid),
+    .s_axi_awready(s_axi_awready),
+    .s_axi_wdata(s_axi_wdata),
+    .s_axi_wstrb(s_axi_wstrb),
+    .s_axi_wlast(s_axi_wlast),
+    .s_axi_wvalid(s_axi_wvalid),
+    .s_axi_wready(s_axi_wready),
+    .s_axi_bready(s_axi_bready),
+    .s_axi_bid(s_axi_bid),
+    .s_axi_bvalid(s_axi_bvalid),
+    .s_axi_arid(s_axi_arid),
+    .s_axi_araddr(s_axi_araddr),
+    .s_axi_arlen(s_axi_arlen),
+    .s_axi_arsize(s_axi_arsize),
+    .s_axi_arburst(s_axi_arburst),
+    .s_axi_arlock(s_axi_arlock),
+    .s_axi_arcache(s_axi_arcache),
+    .s_axi_arvalid(s_axi_arvalid),
+    .s_axi_arready(s_axi_arready),
+    .s_axi_rready(s_axi_rready),
+    .s_axi_rid(s_axi_rid),
+    .s_axi_rdata(s_axi_rdata),
+    .s_axi_rlast(s_axi_rlast),
+    .s_axi_rvalid(s_axi_rvalid)
 );
 
 ICacheIF MC_IC_wr;
@@ -145,7 +229,7 @@ Core core
 
 
 localparam NUM_CACHE_PORTS = 1;
-localparam IN_PORTS = 4;
+localparam IN_PORTS = 3;
 
 CacheIF cacheIFs[IN_PORTS-1:0];
 always_comb begin
@@ -158,19 +242,19 @@ always_comb begin
         data: {IF_cache.wdata[0]},
         addr: {IF_cache.wassoc[0], IF_cache.addr[0][11:2]}
     };
-    cacheIFs[3] = CacheIF'{
-        ce:   IF_cache.re[1],
-        we:   IF_cache.we[1],
-        wm:   IF_cache.wmask[1],
-        data: {IF_cache.wdata[1]},
-        addr: {IF_cache.wassoc[1], IF_cache.addr[1][11:2]}
-    };
+    //cacheIFs[3] = CacheIF'{
+    //    ce:   IF_cache.re[1],
+    //    we:   IF_cache.we[1],
+    //    wm:   IF_cache.wmask[1],
+    //    data: {IF_cache.wdata[1]},
+    //    addr: {IF_cache.wassoc[1], IF_cache.addr[1][11:2]}
+    //};
 end
 
 always_comb begin
     MC_DC_rd_ready = cacheReady[1];
     IF_cache.busy[0] = !cacheReady[2];
-    IF_cache.busy[1] = !cacheReady[3];
+    //IF_cache.busy[1] = !cacheReady[3];
 end
 
 logic cacheReady[IN_PORTS-1:0];
@@ -234,7 +318,7 @@ else              assign IF_cache.rdata[i] = cacheRData_t[2+i] [CORE_raddr[i][1]
 end endgenerate
 
 wire[11:0] dctAddr_0 = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[0];
-wire[11:0] dctAddr_1 = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1];
+//wire[11:0] dctAddr_1 = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[1];
 
 MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable0
 (
@@ -247,16 +331,16 @@ MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`C
     .OUT_data(IF_ct.rdata[0])
 );
 
-MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable1
-(
-    .clk(clk),
-    .IN_nce(!(IF_ct.re[1] || IF_ct.we)),
-    .IN_nwe(!IF_ct.we),
-    .IN_addr(dctAddr_1[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
-    .IN_data({`CASSOC{IF_ct.wdata}}),
-    .IN_wm(1 << IF_ct.wassoc),
-    .OUT_data(IF_ct.rdata[1])
-);
+//MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable1
+//(
+//    .clk(clk),
+//    .IN_nce(!(IF_ct.re[1] || IF_ct.we)),
+//    .IN_nwe(!IF_ct.we),
+//    .IN_addr(dctAddr_1[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+//    .IN_data({`CASSOC{IF_ct.wdata}}),
+//    .IN_wm(1 << IF_ct.wassoc),
+//    .OUT_data(IF_ct.rdata[1])
+//);
 
 wire[11:0] ictAddr = IF_ict.we ? IF_ict.waddr : IF_ict.raddr;
 MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) ictable
@@ -285,12 +369,12 @@ always_comb begin
 end
 
 logic IC_cacheReady[1:0];
-logic[`CASSOC-1:0][127:0] IC_cacheRData[1:0];
+logic[`CASSOC-1:0][FETCH_BITS-1:0] IC_cacheRData[1:0];
 
 ICacheIF IC_bankIFs[IC_BANKS-1:0][0:0];
-logic[`CASSOC-1:0][127:0] IC_bankRData[IC_BANKS-1:0][0:0];
+logic[`CASSOC-1:0][FETCH_BITS-1:0] IC_bankRData[IC_BANKS-1:0][0:0];
 
-CacheArbiter#(2, 1, IC_BANKS, 0, `CASSOC * 128, ICacheIF) icacheArb
+CacheArbiter#(2, 1, IC_BANKS, 0, `CASSOC * FETCH_BITS, ICacheIF) icacheArb
 (
     .clk(clk),
     .IN_ports(IC_cacheIFs),
@@ -300,14 +384,14 @@ CacheArbiter#(2, 1, IC_BANKS, 0, `CASSOC * 128, ICacheIF) icacheArb
     .OUT_ports(IC_bankIFs),
     .IN_portRData(IC_bankRData)
 );
-MemRTL1RW#(128 * `CASSOC, (1 << (`CACHE_SIZE_E - 4 - $clog2(`CASSOC))), 32) icache
+MemRTL1RW#(FETCH_BITS * `CASSOC, (1 << (`CACHE_SIZE_E - `FSIZE_E - $clog2(`CASSOC))), 32) icache
 (
     .clk(clk),
     .IN_nce(IC_bankIFs[0][0].ce),
     .IN_nwe(IC_bankIFs[0][0].we),
-    .IN_addr(IC_bankIFs[0][0].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):2]),
+    .IN_addr(IC_bankIFs[0][0].addr[(`CACHE_SIZE_E-3-$clog2(`CASSOC)):`FSIZE_E-2]),
     .IN_data({`CASSOC{IC_bankIFs[0][0].data}}),
-    .IN_wm(16'(IC_bankIFs[0][0].wm) << (IC_bankIFs[0][0].addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])*4),
+    .IN_wm(((FETCH_BITS/`AXI_WIDTH)*`CASSOC)'(IC_bankIFs[0][0].wm) << (IC_bankIFs[0][0].addr[`CACHE_SIZE_E-3 -: $clog2(`CASSOC)])*(FETCH_BITS/`AXI_WIDTH)),
     .OUT_data(IC_bankRData[0][0])
 );
 assign IF_icache.busy = !MC_IC_wr.ce;

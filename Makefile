@@ -94,6 +94,8 @@ SRC_FILES = \
 	src/RFReadMux.sv \
 	src/CacheArbiter.sv \
 	src/MemRTL1RW.sv \
+	src/ExternalBus.sv \
+	src/ExternalBusMem.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

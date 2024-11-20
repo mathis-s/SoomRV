@@ -35,7 +35,9 @@ class BranchHistory : public Model
     bool compare_history (const Inst& i)
     {
         constexpr uint64_t bhist_mask = (1UL << BPBackup::history_w) - 1;
-        auto fetchOffset = (((i.pc & 15) >> 1) + (((i.inst & 3) == 3) ? 1 : 0)) & 7;
+        constexpr uint64_t fetchoffs_mask = (1UL << BPBackup::predOffs_w) - 1;
+
+        auto fetchOffset = (((i.pc) >> 1) + (((i.inst & 3) == 3) ? 1 : 0)) & fetchoffs_mask;
         auto coreHist = ReadBrHistory(i.fetchID, fetchOffset);
         return (coreHist & bhist_mask) == (bhist & bhist_mask);
     }

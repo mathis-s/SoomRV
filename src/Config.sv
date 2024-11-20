@@ -14,8 +14,10 @@
 `define RETURN_RQ_SIZE 8
 
 // IFetch
-`define FSIZE_E 4
-`define DEC_WIDTH 4
+`define FSIZE_E 3
+parameter FETCH_BITS = 16 << (`FSIZE_E - 1);
+parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
+`define DEC_WIDTH 2
 `define WFI_DELAY 1024
 `define RESET_DELAY 4096
 
@@ -25,10 +27,10 @@
 `define LRB_SIZE 4
 
 `define ITLB_SIZE 8
-`define ITLB_ASSOC 4
+`define ITLB_ASSOC 2
 
 `define DTLB_SIZE 8
-`define DTLB_ASSOC 4
+`define DTLB_ASSOC 2
 `define DTLB_MISS_QUEUE_SIZE 4
 
 // ROB Size
@@ -56,10 +58,10 @@
 `define CACHE_SIZE_E (`VIRT_IDX_LEN + $clog2(`CASSOC))
 `define CLSIZE_E 6
 
-`define CBANKS 4
+`define CBANKS 2
 `define CWIDTH 1
 
-`define AXI_NUM_TRANS 4
+`define AXI_NUM_TRANS 2
 `define AXI_WIDTH 32
 `define AXI_ID_LEN $clog2(`AXI_NUM_TRANS)
 
@@ -87,8 +89,8 @@
 //`define DEBUG
 parameter HANG_COUNTER_LEN = 16;
 
-parameter NUM_AGUS = 2;
-parameter NUM_ALUS = 3;
+parameter NUM_AGUS = 1;
+parameter NUM_ALUS = 2;
 // How many of the ALU ports support branches?
 parameter NUM_BRANCH_PORTS = 2;
 
@@ -101,9 +103,9 @@ parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
 parameter SQ_DEQ_PORTS = 2;
 
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
+    //8,
     8,
-    8,
-    8,
+    //6,
     8,
     8
 };
@@ -126,12 +128,12 @@ localparam[15:0] FU_TRAP_OH     = 1 << FU_TRAP;
 parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
 
     // NUM_AGUS x AGU Ports
-    FU_AGU_OH|FU_ATOMIC_OH,
+    //FU_AGU_OH|FU_ATOMIC_OH,
     FU_AGU_OH|FU_ATOMIC_OH,
 
     // NUM_ALUS x ALU Ports
-    FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
-    FU_INT_OH|FU_BRANCH_OH|FU_MUL_OH/*|FU_FDIV_OH|FU_FMUL_OH*/|FU_ATOMIC_OH,
+    //FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
+    FU_INT_OH|FU_BRANCH_OH|FU_MUL_OH|FU_BITMANIP_OH/*|FU_FDIV_OH|FU_FMUL_OH*/|FU_ATOMIC_OH,
     FU_INT_OH|FU_BRANCH_OH|FU_DIV_OH/*|FU_FPU_OH*/|FU_CSR_OH|FU_ATOMIC_OH
 };
 // verilator lint_on WIDTHEXPAND

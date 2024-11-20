@@ -262,8 +262,8 @@ end
 always_comb begin
     for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
         OUT_dbg.transfValid[i] = transfers[i].valid;
-        OUT_dbg.transfReadDone[i] = transfers[i].progress[4];
-        OUT_dbg.transfWriteDone[i] = transfers[i].evictProgress[4];
+        OUT_dbg.transfReadDone[i] = transfers[i].progress[`CLSIZE_E-2];
+        OUT_dbg.transfWriteDone[i] = transfers[i].evictProgress[`CLSIZE_E-2];
         OUT_dbg.transfIsMMIO[i] = isMMIO[i];
     end
 end
@@ -354,7 +354,7 @@ logic[WIDTH-1:0] buf_rdata;
 logic buf_rlast;
 logic buf_rvalid;
 logic buf_rready;
-FIFO#(R_LEN, 4, 1, 1) rFIFO
+FIFO#(R_LEN, 17, 1, 1) rFIFO
 (
     .clk(clk),
     .rst(rst),
@@ -439,7 +439,7 @@ logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
 
 logic DCR_cacheReadValid;
 logic[`AXI_ID_LEN-1:0] DCR_cacheReadId;
-CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 4, `AXI_ID_LEN) dcacheReadIF
+CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 16, `AXI_ID_LEN) dcacheReadIF
 (
     .clk(clk),
     .rst(rst),

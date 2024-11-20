@@ -1,7 +1,6 @@
 module StoreQueue
 #(
     parameter NUM_ENTRIES=`SQ_SIZE,
-    parameter RESULT_BUS_COUNT=4,
     parameter WIDTH_RN = `DEC_WIDTH,
     parameter NUM_OUT=2
 )
@@ -395,7 +394,7 @@ always_ff@(posedge clk or posedge rst) begin
             ) begin
                 logic[IDX_LEN-1:0] idx = IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
 
-                assert(idx[0] == i[0]); idx[0] = i[0];
+                //assert(idx[0] == i[0]); idx[0] = i[0];
 
                 entries[idx].loaded <= 1;
                 entries[idx].data <= IN_stDataUOp[i].data;
@@ -418,7 +417,7 @@ always_ff@(posedge clk or posedge rst) begin
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
                 reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
-                assert(index[0] == i[0]); index[0] = i[0];
+                //assert(index[0] == i[0]); index[0] = i[0];
 
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 assert(!entries[index].addrAvail);

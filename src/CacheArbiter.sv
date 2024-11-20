@@ -51,6 +51,8 @@ always_comb begin
     for (integer bank = 0; bank < OUTPUT_BANKS; bank=bank+1) begin
         for (integer i = 0; i < OUTPUT_PORTS; i=i+1) begin
             OUT_ports[bank][i] = IN_ports[reqIdx[bank][i]];
+            if (!reqIdxValid[bank][i])
+                OUT_ports[bank][i].ce = 1;
 
             OUT_portReady[reqIdx[bank][i]] |= reqIdxValid[bank][i];
             outPortIdx[reqIdx[bank][i]] = OutPortIdx'(i);
