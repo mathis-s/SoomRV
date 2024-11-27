@@ -60,6 +60,37 @@ end
 reg ignoreCur;
 
 always_ff@(posedge clk) begin
+
+    if (ignoreCur && !IN_pw.busy)
+        ignoreCur <= 0;
+
+    // FIXME: Currently, we might double insert if both AGUs tlb miss on the same address.
+    if (IN_pw.valid && !ignoreCur &&
+        // disambiguate between ifetch and regular ld/st
+        (IS_IFETCH ? IN_pw.rqID == 0 : IN_pw.rqID != 0)
+    ) begin
+        reg[$clog2(LEN)-1:0] idx = IN_pw.vpn[$clog2(LEN)-1:0];
+        reg[$clog2(ASSOC)-1:0] assocIdx = counters[idx];
+
+        tlb[idx][assocIdx].rwx <= IN_pw.rwx;
+
+        tlb[idx][assocIdx].isSuper <= IN_pw.isSuperPage;
+
+        tlb[idx][assocIdx].ppn <= IN_pw.ppn[19:0];
+        tlb[idx][assocIdx].vpn <= IN_pw.vpn[19:$clog2(LEN)];
+
+        tlb[idx][assocIdx].globl <= IN_pw.globl;
+        tlb[idx][assocIdx].user <= IN_pw.user;
+
+        tlb[idx][assocIdx].pageFault <= IN_pw.pageFault;
+        tlb[idx][assocIdx].accessFault <= IN_pw.ppn[21:20] != 0;
+
+        tlb[idx][assocIdx].valid <= 1;
+    end
+
+    for (integer i = 0; i < LEN; i=i+1)
+        if (inc[i]) counters[i] <= counters[i] + 1;
+
     if (rst || clear) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
@@ -68,40 +99,7 @@ always_ff@(posedge clk) begin
         // When an sfence.vma commits, the translation in progress
         // is also stale.
         if (clear) ignoreCur <= 1;
-
         if (rst) ignoreCur <= 0;
-    end
-    else begin
-
-        if (ignoreCur && !IN_pw.busy)
-            ignoreCur <= 0;
-
-        // FIXME: Currently, we might double insert if both AGUs tlb miss on the same address.
-        if (IN_pw.valid && !ignoreCur &&
-            // disambiguate between ifetch and regular ld/st
-            (IS_IFETCH ? IN_pw.rqID == 0 : IN_pw.rqID != 0)
-        ) begin
-            reg[$clog2(LEN)-1:0] idx = IN_pw.vpn[$clog2(LEN)-1:0];
-            reg[$clog2(ASSOC)-1:0] assocIdx = counters[idx];
-
-            tlb[idx][assocIdx].rwx <= IN_pw.rwx;
-
-            tlb[idx][assocIdx].isSuper <= IN_pw.isSuperPage;
-
-            tlb[idx][assocIdx].ppn <= IN_pw.ppn[19:0];
-            tlb[idx][assocIdx].vpn <= IN_pw.vpn[19:$clog2(LEN)];
-
-            tlb[idx][assocIdx].globl <= IN_pw.globl;
-            tlb[idx][assocIdx].user <= IN_pw.user;
-
-            tlb[idx][assocIdx].pageFault <= IN_pw.pageFault;
-            tlb[idx][assocIdx].accessFault <= IN_pw.ppn[21:20] != 0;
-
-            tlb[idx][assocIdx].valid <= 1;
-        end
-
-        for (integer i = 0; i < LEN; i=i+1)
-            if (inc[i]) counters[i] <= counters[i] + 1;
     end
 end
 

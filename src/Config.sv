@@ -22,7 +22,7 @@
 
 // Memory
 `define SQ_SIZE 16
-`define LB_SIZE 16
+`define LB_SIZE 32
 `define LRB_SIZE 4
 
 `define ITLB_SIZE 8
@@ -33,8 +33,8 @@
 `define DTLB_MISS_QUEUE_SIZE 4
 
 // ROB Size
-`define ROB_SIZE_EXP 6
-`define RF_SIZE_EXP 6
+`define ROB_SIZE_EXP 7
+`define RF_SIZE_EXP 7
 
 // PC at reset
 `define ENTRY_POINT (32'h8000_0000)
@@ -89,7 +89,7 @@
 parameter HANG_COUNTER_LEN = 16;
 
 parameter NUM_AGUS = 2;
-parameter NUM_ALUS = 3;
+parameter NUM_ALUS = 4;
 // How many of the ALU ports support branches?
 parameter NUM_BRANCH_PORTS = 2;
 
@@ -102,7 +102,8 @@ parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
 parameter SQ_DEQ_PORTS = 2;
 
 parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
-    8,
+    12,
+    12,
     8,
     8,
     8,
@@ -131,6 +132,7 @@ parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
     FU_AGU_OH|FU_ATOMIC_OH,
 
     // NUM_ALUS x ALU Ports
+    FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
     FU_INT_OH|FU_MUL_OH|FU_BITMANIP_OH,
     FU_INT_OH|FU_BRANCH_OH|FU_MUL_OH/*|FU_FDIV_OH|FU_FMUL_OH*/|FU_ATOMIC_OH,
     FU_INT_OH|FU_BRANCH_OH|FU_DIV_OH/*|FU_FPU_OH*/|FU_CSR_OH|FU_ATOMIC_OH

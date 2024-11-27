@@ -38,30 +38,30 @@ end
 
 always_ff@(posedge clk) begin
 
+
+    invalidateCurTVal <= invalidateCurTVal_c;
+    if (invalidateCurTVal) begin
+        // keep tval in the register
+        curTVal.sqN <= 'x;
+        curTVal.live <= 0;
+    end
+
+    // Do not overwrite yet if invalidateCurTVal(_c). In that case, the trap op has just committed.
+    // The trap then needs a few (2) cycles to fire, at which point everything will be flushed.
+    if (earliest.valid &&
+        (!IN_branch.taken || $signed(earliest.sqN - IN_branch.sqN) < 0) &&
+        (!curTVal.live || $signed(curTVal.sqN - earliest.sqN) >= 0)
+    ) begin
+        curTVal.tval <= earliest.tval;
+        curTVal.sqN <= earliest.sqN;
+        curTVal.live <= 1;
+        invalidateCurTVal <= 0;
+    end
+
     if (rst) begin
         curTVal <= 'x;
         curTVal.live <= 0;
         invalidateCurTVal <= 0;
-    end
-    else begin
-        invalidateCurTVal <= invalidateCurTVal_c;
-        if (invalidateCurTVal) begin
-            // keep tval in the register
-            curTVal.sqN <= 'x;
-            curTVal.live <= 0;
-        end
-
-        // Do not overwrite yet if invalidateCurTVal(_c). In that case, the trap op has just committed.
-        // The trap then needs a few (2) cycles to fire, at which point everything will be flushed.
-        if (earliest.valid &&
-            (!IN_branch.taken || $signed(earliest.sqN - IN_branch.sqN) < 0) &&
-            (!curTVal.live || $signed(curTVal.sqN - earliest.sqN) >= 0)
-        ) begin
-            curTVal.tval <= earliest.tval;
-            curTVal.sqN <= earliest.sqN;
-            curTVal.live <= 1;
-            invalidateCurTVal <= 0;
-        end
     end
 end
 
