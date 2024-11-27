@@ -83,7 +83,7 @@ always_comb begin
         end
         else begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask);// << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
-            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], {AXI_WWIDTH_E{0}}};
+            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], {AXI_WWIDTH_E{1'b0}}};
             fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data);// << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*32;
 
             // Try to fuse in younger stores
@@ -207,6 +207,8 @@ always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
             evicted[i] <= 'x;
+            evicted[i].nonce <= 0;
+            evicted[i].wmask <= 0;
             evicted[i].valid <= 0;
         end
         OUT_uopSt <= 'x;
@@ -225,7 +227,6 @@ always_ff@(posedge clk or posedge rst) begin
             if (evicted[stAck_r.idx].nonce == stAck_r.nonce) begin
                 evicted[stAck_r.idx].issued <= 0;
                 if (!stAck_r.fail) begin
-                    evicted[stAck_r.idx] <= 'x;
                     evicted[stAck_r.idx].wmask <= 0;
                     evicted[stAck_r.idx].valid <= 0;
                 end

@@ -93,7 +93,7 @@ typedef struct packed
     CacheID_t cacheID;
     MemC_Cmd cmd;
     logic valid;
-} Transfer;
+} Transfer /* public */;
 
 Transfer transfers[`AXI_NUM_TRANS-1:0];
 

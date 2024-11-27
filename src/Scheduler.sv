@@ -55,11 +55,16 @@ always_comb begin
         candidates[i] = GetCandidates(IN_uop[i].fu, IN_uopSqN[i], IN_uopLoadSqN[i], IN_uopStoreSqN[i]);
 end
 
-logic[$clog2(NUM_ALUS)-1:0] prio_r = 0;
-always_ff@(posedge clk) begin
-    for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-        if (IN_valid && IN_uop[i].valid)
-            prio_r <= modTable[PAD'(OUT_order[i]) + PAD'(1)];
+logic[$clog2(NUM_ALUS)-1:0] prio_r;
+always_ff@(posedge clk or posedge rst) begin
+    if (rst) begin
+        prio_r <= 0;
+    end
+    else begin
+        for (integer i = 0; i < `DEC_WIDTH; i=i+1)
+            if (IN_valid && IN_uop[i].valid)
+                prio_r <= modTable[PAD'(OUT_order[i]) + PAD'(1)];
+    end
 end
 
 // verilator lint_off UNOPTFLAT

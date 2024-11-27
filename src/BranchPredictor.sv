@@ -269,6 +269,7 @@ BPUpdate bpUpdateActive;
 always_ff@(posedge clk or posedge rst) begin
     if (rst) bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
     else if (updFIFO_deq) bpUpdateActive <= bpUpdate;
+    else bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
 end
 always_comb begin
     OUT_fetchLimit = FetchLimit'{valid: 0, default: 'x};

@@ -70,6 +70,9 @@ Read readIdxs[1:0][INPUT_PORTS-1:0];
 always_ff@(posedge clk) begin
     for (integer i = 0; i < INPUT_PORTS; i=i+1) begin
         readIdxs[0][i] <= Read'{bank: IN_ports[i].addr[BANK_OFFSET+:OUTPUT_BANKS == 1 ? 1 : $clog2(OUTPUT_BANKS)], port: outPortIdx[i]};
+
+        if (OUTPUT_BANKS == 1) readIdxs[0][i].bank <= 0;
+        if (OUTPUT_PORTS == 1) readIdxs[0][i].port <= 0;
     end
     readIdxs[1] <= readIdxs[0];
 end

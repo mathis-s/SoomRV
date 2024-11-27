@@ -521,9 +521,10 @@ PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[NUM_AGUS-1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
-always_comb
-    for (integer i = 1; i < NUM_AGUS; i=i+1)
-        PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+generate
+for (genvar i = 1; i < NUM_AGUS; i=i+1)
+    assign PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+endgenerate
 PageWalker#(NUM_AGUS+1) pageWalker
 (
     .clk(clk),

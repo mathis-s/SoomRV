@@ -39,7 +39,7 @@ logic is32bit;
 always_comb begin
     is32bit = 'x;
     // The first word may be consumed by a 32-bit instruction that started in the previous packet
-    validInstrStart_c = !(prev_r[BUF_SIZE-1].start[WINDOW_SIZE-1] && prev_r[BUF_SIZE-1].start32[WINDOW_SIZE-1]);
+    validInstrStart_c = !(prev_r[BUF_SIZE-1].start[NUM_PACKETS-1] && prev_r[BUF_SIZE-1].start32[NUM_PACKETS-1]);
 
     for (integer i = 0; i < NUM_PACKETS; i=i+1) begin
 

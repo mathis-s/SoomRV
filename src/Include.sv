@@ -337,27 +337,27 @@ typedef enum logic[3:0]
     MEMC_WRITE_BYTE,
     MEMC_WRITE_HALF,
     MEMC_WRITE_WORD
-} MemC_Cmd;
+} MemC_Cmd /* public */;
 
 typedef struct packed
 {
     logic[31:0] data;
     logic[`CACHE_SIZE_E-3:0] id;
     logic valid;
-} MemController_SglLdRes;
+} MemController_SglLdRes /* public */;
 
 typedef struct packed
 {
     logic[`CACHE_SIZE_E-3:0] id;
     logic valid;
-} MemController_SglStRes;
+} MemController_SglStRes /* public */;
 
 typedef struct packed
 {
     logic[`AXI_WIDTH-1:0] data;
     logic[31:0] addr;
     logic valid;
-} MemController_LdDataFwd;
+} MemController_LdDataFwd /* public */;
 
 typedef struct packed
 {
@@ -380,7 +380,7 @@ typedef struct packed
     logic[31:0] writeAddr;
     CacheID_t cacheID;
     MemC_Cmd cmd;
-} MemController_Req;
+} MemController_Req /* public */;
 
 typedef struct packed
 {
@@ -391,7 +391,7 @@ typedef struct packed
 
     logic[2:0] stall;
     logic busy;
-} MemController_Res;
+} MemController_Res /* public */;
 
 typedef enum logic[1:0]
 {
@@ -829,7 +829,7 @@ typedef struct packed
     logic external; // not part of normal execution, ignore sqn, tagDst and rd, don't commit
     logic isMMIO;
     logic valid;
-} LD_UOp;
+} LD_UOp /* public */;
 
 typedef struct packed
 {
@@ -866,7 +866,7 @@ typedef struct packed
     StNonce_t nonce;
     StID_t id;
     logic valid;
-} ST_UOp;
+} ST_UOp /* public */;
 
 typedef struct packed
 {

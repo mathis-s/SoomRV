@@ -488,6 +488,7 @@ end
 always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         lastInstr <= 'x;
+        lastInstrPC <= 0; // not required, for yosys
         lastInstrValid <= 0;
     end
     else begin
