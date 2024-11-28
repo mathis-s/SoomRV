@@ -6,7 +6,7 @@
 class ReturnStack : public Model
 {
   public:
-    static const size_t RET_STACK_SIZE = 16;
+    static const size_t RET_STACK_SIZE = 32;
     uint32_t returnStack[RET_STACK_SIZE] = {};
     int returnIdx;
 

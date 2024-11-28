@@ -77,7 +77,7 @@ always_ff@(posedge clk or posedge rst) begin
                 for (integer j = 0; j < 4; j=j+1)
                     if (!entries[i].fwdMask[j])
                         entries[i].data[8*j+:8] <=
-                            IN_memc.ldDataFwd.data[{j[1:0]}*8+:8];
+                            IN_memc.ldDataFwd.data[{entries[i].addr[$clog2(`AXI_WIDTH/8)-1:2], j[1:0]}*8+:8];
             end
         end
 

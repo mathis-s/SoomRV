@@ -30,16 +30,12 @@ reg[$clog2(NUM_WORDS)-1:0] addr1_reg;
 reg[WORD_SIZE-1:0] data_reg;
 reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
 
-reg dbgMultiple;
-
 initial begin
     for (integer i = 0; i < NUM_WORDS; i=i+1)
         mem[i] = 0;
 end
 
 always@(posedge clk) begin
-
-    dbgMultiple <= 0;
 
     ce_reg <= IN_nce;
     ce1_reg <= IN_nce1;

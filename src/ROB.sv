@@ -431,8 +431,8 @@ always_ff@(posedge clk or posedge rst) begin
                 case (id0)
                     0: gen[0].entries[id1] <= entry;
                     1: gen[1].entries[id1] <= entry;
-                    //2: gen[2].entries[id1] <= entry;
-                    //3: gen[3].entries[id1] <= entry;
+                    2: gen[2].entries[id1] <= entry;
+                    3: gen[3].entries[id1] <= entry;
                 endcase
 
                 if (rnUOpSorted[i].fu == FU_RN)

@@ -4,7 +4,7 @@ module InstrAligner
 #(
     parameter NUM_PACKETS = 8,
     parameter NUM_INSTRS = 4,
-    parameter BUF_SIZE = 1,
+    parameter BUF_SIZE = 2,
     parameter FF_OUTPUT = 1
 )
 (

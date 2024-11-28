@@ -460,26 +460,26 @@ namespace  {
     struct MemController_LdDataFwd {
         bool valid;
         uint32_t addr;
-        uint32_t data;
+        sc_bv<128> data;
 
         static constexpr size_t valid_s = 0;
         static constexpr size_t valid_w = 1;
         static constexpr size_t addr_s = 1;
         static constexpr size_t addr_w = 32;
         static constexpr size_t data_s = 33;
-        static constexpr size_t data_w = 32;
-        static constexpr size_t _size = 65;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t _size = 161;
 
         MemController_LdDataFwd() = default;
 
-        MemController_LdDataFwd(const sc_bv<65>& __data) {
+        MemController_LdDataFwd(const sc_bv<161>& __data) {
             valid = __data.get_bit(valid_s);
             addr = __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
-            data = __data.range(data_s + data_w - 1, data_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
         }
 
-        operator sc_bv<65>() const {
-            auto ret = sc_bv<65>();
+        operator sc_bv<161>() const {
+            auto ret = sc_bv<161>();
             ret.set_bit(valid_s, valid);
             ret.range(addr_s + addr_w - 1, addr_s) = addr;
             ret.range(data_s + data_w - 1, data_s) = data;
@@ -490,7 +490,7 @@ namespace  {
             std::stringstream ss;
             ss << "valid" << " = " << valid;
             ss << " addr" << " = " << addr;
-            ss << " data" << " = " << data;
+            ss << " data" << " = " << data.to_string();
             return std::move(ss.str());
         }
 
@@ -498,183 +498,14 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<65>& __data) {
+        static bool get_valid (const sc_bv<161>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint32_t get_addr (const sc_bv<65>& __data) {
+        static uint32_t get_addr (const sc_bv<161>& __data) {
             return __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
         }
-        static uint32_t get_data (const sc_bv<65>& __data) {
-            return __data.range(data_s + data_w - 1, data_s).to_uint64();
-        }
-    };
-
-    struct Transfer {
-        bool valid;
-        MemC_Cmd cmd;
-        bool cacheID;
-        bool writeDone;
-        bool readDone;
-        uint32_t needWriteRq;
-        bool needReadRq;
-        uint32_t writeAddr;
-        uint32_t readAddr;
-        uint32_t cacheAddr;
-        uint32_t fwdAddrCounter;
-        uint32_t addrCounter;
-        uint32_t progress;
-        uint32_t evictProgress;
-        uint32_t storeMask;
-        uint32_t storeData;
-
-        static constexpr size_t valid_s = 0;
-        static constexpr size_t valid_w = 1;
-        static constexpr size_t cmd_s = 1;
-        static constexpr size_t cmd_w = 4;
-        static constexpr size_t cacheID_s = 5;
-        static constexpr size_t cacheID_w = 1;
-        static constexpr size_t writeDone_s = 6;
-        static constexpr size_t writeDone_w = 1;
-        static constexpr size_t readDone_s = 7;
-        static constexpr size_t readDone_w = 1;
-        static constexpr size_t needWriteRq_s = 8;
-        static constexpr size_t needWriteRq_w = 2;
-        static constexpr size_t needReadRq_s = 10;
-        static constexpr size_t needReadRq_w = 1;
-        static constexpr size_t writeAddr_s = 11;
-        static constexpr size_t writeAddr_w = 32;
-        static constexpr size_t readAddr_s = 43;
-        static constexpr size_t readAddr_w = 32;
-        static constexpr size_t cacheAddr_s = 75;
-        static constexpr size_t cacheAddr_w = 12;
-        static constexpr size_t fwdAddrCounter_s = 87;
-        static constexpr size_t fwdAddrCounter_w = 5;
-        static constexpr size_t addrCounter_s = 92;
-        static constexpr size_t addrCounter_w = 5;
-        static constexpr size_t progress_s = 97;
-        static constexpr size_t progress_w = 5;
-        static constexpr size_t evictProgress_s = 102;
-        static constexpr size_t evictProgress_w = 5;
-        static constexpr size_t storeMask_s = 107;
-        static constexpr size_t storeMask_w = 4;
-        static constexpr size_t storeData_s = 111;
-        static constexpr size_t storeData_w = 32;
-        static constexpr size_t _size = 143;
-
-        Transfer() = default;
-
-        Transfer(const sc_bv<143>& __data) {
-            valid = __data.get_bit(valid_s);
-            cmd = MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
-            cacheID = __data.get_bit(cacheID_s);
-            writeDone = __data.get_bit(writeDone_s);
-            readDone = __data.get_bit(readDone_s);
-            needWriteRq = __data.range(needWriteRq_s + needWriteRq_w - 1, needWriteRq_s).to_uint64();
-            needReadRq = __data.get_bit(needReadRq_s);
-            writeAddr = __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
-            readAddr = __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
-            cacheAddr = __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
-            fwdAddrCounter = __data.range(fwdAddrCounter_s + fwdAddrCounter_w - 1, fwdAddrCounter_s).to_uint64();
-            addrCounter = __data.range(addrCounter_s + addrCounter_w - 1, addrCounter_s).to_uint64();
-            progress = __data.range(progress_s + progress_w - 1, progress_s).to_uint64();
-            evictProgress = __data.range(evictProgress_s + evictProgress_w - 1, evictProgress_s).to_uint64();
-            storeMask = __data.range(storeMask_s + storeMask_w - 1, storeMask_s).to_uint64();
-            storeData = __data.range(storeData_s + storeData_w - 1, storeData_s).to_uint64();
-        }
-
-        operator sc_bv<143>() const {
-            auto ret = sc_bv<143>();
-            ret.set_bit(valid_s, valid);
-            ret.range(cmd_s + cmd_w - 1, cmd_s) = cmd;
-            ret.set_bit(cacheID_s, cacheID);
-            ret.set_bit(writeDone_s, writeDone);
-            ret.set_bit(readDone_s, readDone);
-            ret.range(needWriteRq_s + needWriteRq_w - 1, needWriteRq_s) = needWriteRq;
-            ret.set_bit(needReadRq_s, needReadRq);
-            ret.range(writeAddr_s + writeAddr_w - 1, writeAddr_s) = writeAddr;
-            ret.range(readAddr_s + readAddr_w - 1, readAddr_s) = readAddr;
-            ret.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s) = cacheAddr;
-            ret.range(fwdAddrCounter_s + fwdAddrCounter_w - 1, fwdAddrCounter_s) = fwdAddrCounter;
-            ret.range(addrCounter_s + addrCounter_w - 1, addrCounter_s) = addrCounter;
-            ret.range(progress_s + progress_w - 1, progress_s) = progress;
-            ret.range(evictProgress_s + evictProgress_w - 1, evictProgress_s) = evictProgress;
-            ret.range(storeMask_s + storeMask_w - 1, storeMask_s) = storeMask;
-            ret.range(storeData_s + storeData_w - 1, storeData_s) = storeData;
-            return ret;
-        }
-
-        std::string to_string() const {
-            std::stringstream ss;
-            ss << "valid" << " = " << valid;
-            ss << " cmd" << " = " << cmd;
-            ss << " cacheID" << " = " << cacheID;
-            ss << " writeDone" << " = " << writeDone;
-            ss << " readDone" << " = " << readDone;
-            ss << " needWriteRq" << " = " << needWriteRq;
-            ss << " needReadRq" << " = " << needReadRq;
-            ss << " writeAddr" << " = " << writeAddr;
-            ss << " readAddr" << " = " << readAddr;
-            ss << " cacheAddr" << " = " << cacheAddr;
-            ss << " fwdAddrCounter" << " = " << fwdAddrCounter;
-            ss << " addrCounter" << " = " << addrCounter;
-            ss << " progress" << " = " << progress;
-            ss << " evictProgress" << " = " << evictProgress;
-            ss << " storeMask" << " = " << storeMask;
-            ss << " storeData" << " = " << storeData;
-            return std::move(ss.str());
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const Transfer& __data) {
-            os << __data.to_string();
-            return os;
-        }
-        static bool get_valid (const sc_bv<143>& __data) {
-            return __data.get_bit(valid_s);
-        }
-        static MemC_Cmd get_cmd (const sc_bv<143>& __data) {
-            return MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
-        }
-        static bool get_cacheID (const sc_bv<143>& __data) {
-            return __data.get_bit(cacheID_s);
-        }
-        static bool get_writeDone (const sc_bv<143>& __data) {
-            return __data.get_bit(writeDone_s);
-        }
-        static bool get_readDone (const sc_bv<143>& __data) {
-            return __data.get_bit(readDone_s);
-        }
-        static uint32_t get_needWriteRq (const sc_bv<143>& __data) {
-            return __data.range(needWriteRq_s + needWriteRq_w - 1, needWriteRq_s).to_uint64();
-        }
-        static bool get_needReadRq (const sc_bv<143>& __data) {
-            return __data.get_bit(needReadRq_s);
-        }
-        static uint32_t get_writeAddr (const sc_bv<143>& __data) {
-            return __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
-        }
-        static uint32_t get_readAddr (const sc_bv<143>& __data) {
-            return __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
-        }
-        static uint32_t get_cacheAddr (const sc_bv<143>& __data) {
-            return __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
-        }
-        static uint32_t get_fwdAddrCounter (const sc_bv<143>& __data) {
-            return __data.range(fwdAddrCounter_s + fwdAddrCounter_w - 1, fwdAddrCounter_s).to_uint64();
-        }
-        static uint32_t get_addrCounter (const sc_bv<143>& __data) {
-            return __data.range(addrCounter_s + addrCounter_w - 1, addrCounter_s).to_uint64();
-        }
-        static uint32_t get_progress (const sc_bv<143>& __data) {
-            return __data.range(progress_s + progress_w - 1, progress_s).to_uint64();
-        }
-        static uint32_t get_evictProgress (const sc_bv<143>& __data) {
-            return __data.range(evictProgress_s + evictProgress_w - 1, evictProgress_s).to_uint64();
-        }
-        static uint32_t get_storeMask (const sc_bv<143>& __data) {
-            return __data.range(storeMask_s + storeMask_w - 1, storeMask_s).to_uint64();
-        }
-        static uint32_t get_storeData (const sc_bv<143>& __data) {
-            return __data.range(storeData_s + storeData_w - 1, storeData_s).to_uint64();
+        static sc_bv<128> get_data (const sc_bv<161>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
         }
     };
 
@@ -684,7 +515,7 @@ namespace  {
         uint32_t writeAddr;
         uint32_t readAddr;
         uint32_t cacheAddr;
-        uint32_t data;
+        sc_bv<128> data;
         uint32_t mask;
 
         static constexpr size_t cmd_s = 0;
@@ -698,25 +529,25 @@ namespace  {
         static constexpr size_t cacheAddr_s = 69;
         static constexpr size_t cacheAddr_w = 12;
         static constexpr size_t data_s = 81;
-        static constexpr size_t data_w = 32;
-        static constexpr size_t mask_s = 113;
-        static constexpr size_t mask_w = 4;
-        static constexpr size_t _size = 117;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t mask_s = 209;
+        static constexpr size_t mask_w = 16;
+        static constexpr size_t _size = 225;
 
         MemController_Req() = default;
 
-        MemController_Req(const sc_bv<117>& __data) {
+        MemController_Req(const sc_bv<225>& __data) {
             cmd = MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
             cacheID = __data.get_bit(cacheID_s);
             writeAddr = __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
             readAddr = __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
             cacheAddr = __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
-            data = __data.range(data_s + data_w - 1, data_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
             mask = __data.range(mask_s + mask_w - 1, mask_s).to_uint64();
         }
 
-        operator sc_bv<117>() const {
-            auto ret = sc_bv<117>();
+        operator sc_bv<225>() const {
+            auto ret = sc_bv<225>();
             ret.range(cmd_s + cmd_w - 1, cmd_s) = cmd;
             ret.set_bit(cacheID_s, cacheID);
             ret.range(writeAddr_s + writeAddr_w - 1, writeAddr_s) = writeAddr;
@@ -734,7 +565,7 @@ namespace  {
             ss << " writeAddr" << " = " << writeAddr;
             ss << " readAddr" << " = " << readAddr;
             ss << " cacheAddr" << " = " << cacheAddr;
-            ss << " data" << " = " << data;
+            ss << " data" << " = " << data.to_string();
             ss << " mask" << " = " << mask;
             return std::move(ss.str());
         }
@@ -743,25 +574,25 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static MemC_Cmd get_cmd (const sc_bv<117>& __data) {
+        static MemC_Cmd get_cmd (const sc_bv<225>& __data) {
             return MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
         }
-        static bool get_cacheID (const sc_bv<117>& __data) {
+        static bool get_cacheID (const sc_bv<225>& __data) {
             return __data.get_bit(cacheID_s);
         }
-        static uint32_t get_writeAddr (const sc_bv<117>& __data) {
+        static uint32_t get_writeAddr (const sc_bv<225>& __data) {
             return __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
         }
-        static uint32_t get_readAddr (const sc_bv<117>& __data) {
+        static uint32_t get_readAddr (const sc_bv<225>& __data) {
             return __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
         }
-        static uint32_t get_cacheAddr (const sc_bv<117>& __data) {
+        static uint32_t get_cacheAddr (const sc_bv<225>& __data) {
             return __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
         }
-        static uint32_t get_data (const sc_bv<117>& __data) {
-            return __data.range(data_s + data_w - 1, data_s).to_uint64();
+        static sc_bv<128> get_data (const sc_bv<225>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
         }
-        static uint32_t get_mask (const sc_bv<117>& __data) {
+        static uint32_t get_mask (const sc_bv<225>& __data) {
             return __data.range(mask_s + mask_w - 1, mask_s).to_uint64();
         }
     };
@@ -771,7 +602,7 @@ namespace  {
         uint32_t stall;
         MemController_SglStRes sglStRes;
         MemController_SglLdRes sglLdRes;
-        sc_bv<168> transfers;
+        sc_bv<336> transfers;
         MemController_LdDataFwd ldDataFwd;
 
         static constexpr size_t busy_s = 0;
@@ -783,14 +614,14 @@ namespace  {
         static constexpr size_t sglLdRes_s = 17;
         static constexpr size_t sglLdRes_w = 45;
         static constexpr size_t transfers_s = 62;
-        static constexpr size_t transfers_w = 168;
-        static constexpr size_t ldDataFwd_s = 230;
-        static constexpr size_t ldDataFwd_w = 65;
-        static constexpr size_t _size = 295;
+        static constexpr size_t transfers_w = 336;
+        static constexpr size_t ldDataFwd_s = 398;
+        static constexpr size_t ldDataFwd_w = 161;
+        static constexpr size_t _size = 559;
 
         MemController_Res() = default;
 
-        MemController_Res(const sc_bv<295>& __data) {
+        MemController_Res(const sc_bv<559>& __data) {
             busy = __data.get_bit(busy_s);
             stall = __data.range(stall_s + stall_w - 1, stall_s).to_uint64();
             sglStRes = MemController_SglStRes(__data.range(sglStRes_s + sglStRes_w - 1, sglStRes_s).to_uint64());
@@ -799,14 +630,14 @@ namespace  {
             ldDataFwd = MemController_LdDataFwd(__data.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s));
         }
 
-        operator sc_bv<295>() const {
-            auto ret = sc_bv<295>();
+        operator sc_bv<559>() const {
+            auto ret = sc_bv<559>();
             ret.set_bit(busy_s, busy);
             ret.range(stall_s + stall_w - 1, stall_s) = stall;
             ret.range(sglStRes_s + sglStRes_w - 1, sglStRes_s) = sglStRes;
             ret.range(sglLdRes_s + sglLdRes_w - 1, sglLdRes_s) = sglLdRes;
             ret.range(transfers_s + transfers_w - 1, transfers_s) = transfers;
-            ret.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s) = sc_bv<65>(ldDataFwd);
+            ret.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s) = sc_bv<161>(ldDataFwd);
             return ret;
         }
 
@@ -825,22 +656,22 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_busy (const sc_bv<295>& __data) {
+        static bool get_busy (const sc_bv<559>& __data) {
             return __data.get_bit(busy_s);
         }
-        static uint32_t get_stall (const sc_bv<295>& __data) {
+        static uint32_t get_stall (const sc_bv<559>& __data) {
             return __data.range(stall_s + stall_w - 1, stall_s).to_uint64();
         }
-        static MemController_SglStRes get_sglStRes (const sc_bv<295>& __data) {
+        static MemController_SglStRes get_sglStRes (const sc_bv<559>& __data) {
             return MemController_SglStRes(__data.range(sglStRes_s + sglStRes_w - 1, sglStRes_s).to_uint64());
         }
-        static MemController_SglLdRes get_sglLdRes (const sc_bv<295>& __data) {
+        static MemController_SglLdRes get_sglLdRes (const sc_bv<559>& __data) {
             return MemController_SglLdRes(__data.range(sglLdRes_s + sglLdRes_w - 1, sglLdRes_s).to_uint64());
         }
-        static sc_bv<168> get_transfers (const sc_bv<295>& __data) {
+        static sc_bv<336> get_transfers (const sc_bv<559>& __data) {
             return __data.range(transfers_s + transfers_w - 1, transfers_s);
         }
-        static MemController_LdDataFwd get_ldDataFwd (const sc_bv<295>& __data) {
+        static MemController_LdDataFwd get_ldDataFwd (const sc_bv<559>& __data) {
             return MemController_LdDataFwd(__data.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s));
         }
     };
@@ -916,10 +747,10 @@ namespace  {
         static constexpr size_t compr_s = 6;
         static constexpr size_t compr_w = 1;
         static constexpr size_t offs_s = 7;
-        static constexpr size_t offs_w = 2;
-        static constexpr size_t dst_s = 9;
+        static constexpr size_t offs_w = 3;
+        static constexpr size_t dst_s = 10;
         static constexpr size_t dst_w = 31;
-        static constexpr size_t _size = 40;
+        static constexpr size_t _size = 41;
 
         PredBranch() = default;
 
@@ -930,11 +761,11 @@ namespace  {
             multiple = (__data >> multiple_s) & (~0ULL >> (64 - 1));
             btype = BranchType((__data >> btype_s) & (~0ULL >> (64 - 2)));
             compr = (__data >> compr_s) & (~0ULL >> (64 - 1));
-            offs = (__data >> offs_s) & (~0ULL >> (64 - 2));
+            offs = (__data >> offs_s) & (~0ULL >> (64 - 3));
             dst = (__data >> dst_s) & (~0ULL >> (64 - 31));
         }
 
-        PredBranch(const sc_bv<40>& __data) {
+        PredBranch(const sc_bv<41>& __data) {
             valid = __data.get_bit(valid_s);
             dirOnly = __data.get_bit(dirOnly_s);
             taken = __data.get_bit(taken_s);
@@ -958,8 +789,8 @@ namespace  {
             return ret;
         }
 
-        operator sc_bv<40>() const {
-            auto ret = sc_bv<40>();
+        operator sc_bv<41>() const {
+            auto ret = sc_bv<41>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(dirOnly_s, dirOnly);
             ret.set_bit(taken_s, taken);
@@ -1007,7 +838,7 @@ namespace  {
             return (__data >> compr_s) & (~0ULL >> (64 - 1));
         }
         static uint32_t get_offs (const uint64_t& __data) {
-            return (__data >> offs_s) & (~0ULL >> (64 - 2));
+            return (__data >> offs_s) & (~0ULL >> (64 - 3));
         }
         static uint32_t get_dst (const uint64_t& __data) {
             return (__data >> dst_s) & (~0ULL >> (64 - 31));
@@ -1236,18 +1067,18 @@ namespace  {
         static constexpr size_t retAct_s = 63;
         static constexpr size_t retAct_w = 2;
         static constexpr size_t fetchOffs_s = 65;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t isSCFail_s = 67;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t isSCFail_s = 68;
         static constexpr size_t isSCFail_w = 1;
-        static constexpr size_t tgtSpec_s = 68;
+        static constexpr size_t tgtSpec_s = 69;
         static constexpr size_t tgtSpec_w = 2;
-        static constexpr size_t cause_s = 70;
+        static constexpr size_t cause_s = 71;
         static constexpr size_t cause_w = 3;
-        static constexpr size_t _size = 73;
+        static constexpr size_t _size = 74;
 
         BranchProv() = default;
 
-        BranchProv(const sc_bv<73>& __data) {
+        BranchProv(const sc_bv<74>& __data) {
             taken = __data.get_bit(taken_s);
             fetchID = __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
             flush = __data.get_bit(flush_s);
@@ -1263,8 +1094,8 @@ namespace  {
             cause = FlushCause(__data.range(cause_s + cause_w - 1, cause_s).to_uint64());
         }
 
-        operator sc_bv<73>() const {
-            auto ret = sc_bv<73>();
+        operator sc_bv<74>() const {
+            auto ret = sc_bv<74>();
             ret.set_bit(taken_s, taken);
             ret.range(fetchID_s + fetchID_w - 1, fetchID_s) = fetchID;
             ret.set_bit(flush_s, flush);
@@ -1303,43 +1134,43 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_taken (const sc_bv<73>& __data) {
+        static bool get_taken (const sc_bv<74>& __data) {
             return __data.get_bit(taken_s);
         }
-        static uint32_t get_fetchID (const sc_bv<73>& __data) {
+        static uint32_t get_fetchID (const sc_bv<74>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static bool get_flush (const sc_bv<73>& __data) {
+        static bool get_flush (const sc_bv<74>& __data) {
             return __data.get_bit(flush_s);
         }
-        static uint32_t get_loadSqN (const sc_bv<73>& __data) {
+        static uint32_t get_loadSqN (const sc_bv<74>& __data) {
             return __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
         }
-        static uint32_t get_storeSqN (const sc_bv<73>& __data) {
+        static uint32_t get_storeSqN (const sc_bv<74>& __data) {
             return __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
         }
-        static uint32_t get_sqN (const sc_bv<73>& __data) {
+        static uint32_t get_sqN (const sc_bv<74>& __data) {
             return __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
         }
-        static uint32_t get_dstPC (const sc_bv<73>& __data) {
+        static uint32_t get_dstPC (const sc_bv<74>& __data) {
             return __data.range(dstPC_s + dstPC_w - 1, dstPC_s).to_uint64();
         }
-        static HistoryAction get_histAct (const sc_bv<73>& __data) {
+        static HistoryAction get_histAct (const sc_bv<74>& __data) {
             return HistoryAction(__data.range(histAct_s + histAct_w - 1, histAct_s).to_uint64());
         }
-        static RetStackAction get_retAct (const sc_bv<73>& __data) {
+        static RetStackAction get_retAct (const sc_bv<74>& __data) {
             return RetStackAction(__data.range(retAct_s + retAct_w - 1, retAct_s).to_uint64());
         }
-        static uint32_t get_fetchOffs (const sc_bv<73>& __data) {
+        static uint32_t get_fetchOffs (const sc_bv<74>& __data) {
             return __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
         }
-        static bool get_isSCFail (const sc_bv<73>& __data) {
+        static bool get_isSCFail (const sc_bv<74>& __data) {
             return __data.get_bit(isSCFail_s);
         }
-        static BranchTargetSpec get_tgtSpec (const sc_bv<73>& __data) {
+        static BranchTargetSpec get_tgtSpec (const sc_bv<74>& __data) {
             return BranchTargetSpec(__data.range(tgtSpec_s + tgtSpec_w - 1, tgtSpec_s).to_uint64());
         }
-        static FlushCause get_cause (const sc_bv<73>& __data) {
+        static FlushCause get_cause (const sc_bv<74>& __data) {
             return FlushCause(__data.range(cause_s + cause_w - 1, cause_s).to_uint64());
         }
     };
@@ -1350,42 +1181,31 @@ namespace  {
         bool predTaken;
         bool isRegularBranch;
         uint32_t rIdx;
-        uint32_t history;
+        uint64_t history;
         bool altPred;
         uint32_t tageID;
 
         static constexpr size_t pred_s = 0;
         static constexpr size_t pred_w = 1;
         static constexpr size_t predOffs_s = 1;
-        static constexpr size_t predOffs_w = 2;
-        static constexpr size_t predTaken_s = 3;
+        static constexpr size_t predOffs_w = 3;
+        static constexpr size_t predTaken_s = 4;
         static constexpr size_t predTaken_w = 1;
-        static constexpr size_t isRegularBranch_s = 4;
+        static constexpr size_t isRegularBranch_s = 5;
         static constexpr size_t isRegularBranch_w = 1;
-        static constexpr size_t rIdx_s = 5;
-        static constexpr size_t rIdx_w = 4;
-        static constexpr size_t history_s = 9;
-        static constexpr size_t history_w = 8;
-        static constexpr size_t altPred_s = 17;
+        static constexpr size_t rIdx_s = 6;
+        static constexpr size_t rIdx_w = 5;
+        static constexpr size_t history_s = 11;
+        static constexpr size_t history_w = 64;
+        static constexpr size_t altPred_s = 75;
         static constexpr size_t altPred_w = 1;
-        static constexpr size_t tageID_s = 18;
+        static constexpr size_t tageID_s = 76;
         static constexpr size_t tageID_w = 4;
-        static constexpr size_t _size = 22;
+        static constexpr size_t _size = 80;
 
         BPBackup() = default;
 
-        BPBackup(const uint32_t& __data) {
-            pred = (__data >> pred_s) & (~0ULL >> (64 - 1));
-            predOffs = (__data >> predOffs_s) & (~0ULL >> (64 - 2));
-            predTaken = (__data >> predTaken_s) & (~0ULL >> (64 - 1));
-            isRegularBranch = (__data >> isRegularBranch_s) & (~0ULL >> (64 - 1));
-            rIdx = (__data >> rIdx_s) & (~0ULL >> (64 - 4));
-            history = (__data >> history_s) & (~0ULL >> (64 - 8));
-            altPred = (__data >> altPred_s) & (~0ULL >> (64 - 1));
-            tageID = (__data >> tageID_s) & (~0ULL >> (64 - 4));
-        }
-
-        BPBackup(const sc_bv<22>& __data) {
+        BPBackup(const sc_bv<80>& __data) {
             pred = __data.get_bit(pred_s);
             predOffs = __data.range(predOffs_s + predOffs_w - 1, predOffs_s).to_uint64();
             predTaken = __data.get_bit(predTaken_s);
@@ -1396,21 +1216,8 @@ namespace  {
             tageID = __data.range(tageID_s + tageID_w - 1, tageID_s).to_uint64();
         }
 
-        operator uint32_t() const {
-            uint32_t ret = 0;
-            ret |= static_cast<uint32_t>(pred) << pred_s;
-            ret |= static_cast<uint32_t>(predOffs) << predOffs_s;
-            ret |= static_cast<uint32_t>(predTaken) << predTaken_s;
-            ret |= static_cast<uint32_t>(isRegularBranch) << isRegularBranch_s;
-            ret |= static_cast<uint32_t>(rIdx) << rIdx_s;
-            ret |= static_cast<uint32_t>(history) << history_s;
-            ret |= static_cast<uint32_t>(altPred) << altPred_s;
-            ret |= static_cast<uint32_t>(tageID) << tageID_s;
-            return ret;
-        }
-
-        operator sc_bv<22>() const {
-            auto ret = sc_bv<22>();
+        operator sc_bv<80>() const {
+            auto ret = sc_bv<80>();
             ret.set_bit(pred_s, pred);
             ret.range(predOffs_s + predOffs_w - 1, predOffs_s) = predOffs;
             ret.set_bit(predTaken_s, predTaken);
@@ -1439,29 +1246,29 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_pred (const uint32_t& __data) {
-            return (__data >> pred_s) & (~0ULL >> (64 - 1));
+        static bool get_pred (const sc_bv<80>& __data) {
+            return __data.get_bit(pred_s);
         }
-        static uint32_t get_predOffs (const uint32_t& __data) {
-            return (__data >> predOffs_s) & (~0ULL >> (64 - 2));
+        static uint32_t get_predOffs (const sc_bv<80>& __data) {
+            return __data.range(predOffs_s + predOffs_w - 1, predOffs_s).to_uint64();
         }
-        static bool get_predTaken (const uint32_t& __data) {
-            return (__data >> predTaken_s) & (~0ULL >> (64 - 1));
+        static bool get_predTaken (const sc_bv<80>& __data) {
+            return __data.get_bit(predTaken_s);
         }
-        static bool get_isRegularBranch (const uint32_t& __data) {
-            return (__data >> isRegularBranch_s) & (~0ULL >> (64 - 1));
+        static bool get_isRegularBranch (const sc_bv<80>& __data) {
+            return __data.get_bit(isRegularBranch_s);
         }
-        static uint32_t get_rIdx (const uint32_t& __data) {
-            return (__data >> rIdx_s) & (~0ULL >> (64 - 4));
+        static uint32_t get_rIdx (const sc_bv<80>& __data) {
+            return __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
         }
-        static uint32_t get_history (const uint32_t& __data) {
-            return (__data >> history_s) & (~0ULL >> (64 - 8));
+        static uint64_t get_history (const sc_bv<80>& __data) {
+            return __data.range(history_s + history_w - 1, history_s).to_uint64();
         }
-        static bool get_altPred (const uint32_t& __data) {
-            return (__data >> altPred_s) & (~0ULL >> (64 - 1));
+        static bool get_altPred (const sc_bv<80>& __data) {
+            return __data.get_bit(altPred_s);
         }
-        static uint32_t get_tageID (const uint32_t& __data) {
-            return (__data >> tageID_s) & (~0ULL >> (64 - 4));
+        static uint32_t get_tageID (const sc_bv<80>& __data) {
+            return __data.range(tageID_s + tageID_w - 1, tageID_s).to_uint64();
         }
     };
 
@@ -1478,24 +1285,24 @@ namespace  {
         static constexpr size_t valid_s = 0;
         static constexpr size_t valid_w = 1;
         static constexpr size_t rIdx_s = 1;
-        static constexpr size_t rIdx_w = 4;
-        static constexpr size_t predRetAddr_s = 5;
+        static constexpr size_t rIdx_w = 5;
+        static constexpr size_t predRetAddr_s = 6;
         static constexpr size_t predRetAddr_w = 31;
-        static constexpr size_t predBr_s = 36;
-        static constexpr size_t predBr_w = 40;
-        static constexpr size_t lastValid_s = 76;
-        static constexpr size_t lastValid_w = 2;
-        static constexpr size_t fetchFault_s = 78;
+        static constexpr size_t predBr_s = 37;
+        static constexpr size_t predBr_w = 41;
+        static constexpr size_t lastValid_s = 78;
+        static constexpr size_t lastValid_w = 3;
+        static constexpr size_t fetchFault_s = 81;
         static constexpr size_t fetchFault_w = 2;
-        static constexpr size_t fetchID_s = 80;
+        static constexpr size_t fetchID_s = 83;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t pc_s = 85;
+        static constexpr size_t pc_s = 88;
         static constexpr size_t pc_w = 32;
-        static constexpr size_t _size = 117;
+        static constexpr size_t _size = 120;
 
         IFetchOp() = default;
 
-        IFetchOp(const sc_bv<117>& __data) {
+        IFetchOp(const sc_bv<120>& __data) {
             valid = __data.get_bit(valid_s);
             rIdx = __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
             predRetAddr = __data.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s).to_uint64();
@@ -1506,8 +1313,8 @@ namespace  {
             pc = __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
 
-        operator sc_bv<117>() const {
-            auto ret = sc_bv<117>();
+        operator sc_bv<120>() const {
+            auto ret = sc_bv<120>();
             ret.set_bit(valid_s, valid);
             ret.range(rIdx_s + rIdx_w - 1, rIdx_s) = rIdx;
             ret.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s) = predRetAddr;
@@ -1536,35 +1343,35 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<117>& __data) {
+        static bool get_valid (const sc_bv<120>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint32_t get_rIdx (const sc_bv<117>& __data) {
+        static uint32_t get_rIdx (const sc_bv<120>& __data) {
             return __data.range(rIdx_s + rIdx_w - 1, rIdx_s).to_uint64();
         }
-        static uint32_t get_predRetAddr (const sc_bv<117>& __data) {
+        static uint32_t get_predRetAddr (const sc_bv<120>& __data) {
             return __data.range(predRetAddr_s + predRetAddr_w - 1, predRetAddr_s).to_uint64();
         }
-        static PredBranch get_predBr (const sc_bv<117>& __data) {
+        static PredBranch get_predBr (const sc_bv<120>& __data) {
             return PredBranch(__data.range(predBr_s + predBr_w - 1, predBr_s).to_uint64());
         }
-        static uint32_t get_lastValid (const sc_bv<117>& __data) {
+        static uint32_t get_lastValid (const sc_bv<120>& __data) {
             return __data.range(lastValid_s + lastValid_w - 1, lastValid_s).to_uint64();
         }
-        static IFetchFault get_fetchFault (const sc_bv<117>& __data) {
+        static IFetchFault get_fetchFault (const sc_bv<120>& __data) {
             return IFetchFault(__data.range(fetchFault_s + fetchFault_w - 1, fetchFault_s).to_uint64());
         }
-        static uint32_t get_fetchID (const sc_bv<117>& __data) {
+        static uint32_t get_fetchID (const sc_bv<120>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_pc (const sc_bv<117>& __data) {
+        static uint32_t get_pc (const sc_bv<120>& __data) {
             return __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
     };
 
     struct IF_Instr {
         bool valid;
-        uint64_t instrs;
+        sc_bv<128> instrs;
         uint32_t predTarget;
         bool predTaken;
         uint32_t predPos;
@@ -1577,30 +1384,30 @@ namespace  {
         static constexpr size_t valid_s = 0;
         static constexpr size_t valid_w = 1;
         static constexpr size_t instrs_s = 1;
-        static constexpr size_t instrs_w = 64;
-        static constexpr size_t predTarget_s = 65;
+        static constexpr size_t instrs_w = 128;
+        static constexpr size_t predTarget_s = 129;
         static constexpr size_t predTarget_w = 31;
-        static constexpr size_t predTaken_s = 96;
+        static constexpr size_t predTaken_s = 160;
         static constexpr size_t predTaken_w = 1;
-        static constexpr size_t predPos_s = 97;
-        static constexpr size_t predPos_w = 2;
-        static constexpr size_t lastValid_s = 99;
-        static constexpr size_t lastValid_w = 2;
-        static constexpr size_t firstValid_s = 101;
-        static constexpr size_t firstValid_w = 2;
-        static constexpr size_t fetchFault_s = 103;
+        static constexpr size_t predPos_s = 161;
+        static constexpr size_t predPos_w = 3;
+        static constexpr size_t lastValid_s = 164;
+        static constexpr size_t lastValid_w = 3;
+        static constexpr size_t firstValid_s = 167;
+        static constexpr size_t firstValid_w = 3;
+        static constexpr size_t fetchFault_s = 170;
         static constexpr size_t fetchFault_w = 2;
-        static constexpr size_t fetchID_s = 105;
+        static constexpr size_t fetchID_s = 172;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t pc_s = 110;
-        static constexpr size_t pc_w = 29;
-        static constexpr size_t _size = 139;
+        static constexpr size_t pc_s = 177;
+        static constexpr size_t pc_w = 28;
+        static constexpr size_t _size = 205;
 
         IF_Instr() = default;
 
-        IF_Instr(const sc_bv<139>& __data) {
+        IF_Instr(const sc_bv<205>& __data) {
             valid = __data.get_bit(valid_s);
-            instrs = __data.range(instrs_s + instrs_w - 1, instrs_s).to_uint64();
+            instrs = __data.range(instrs_s + instrs_w - 1, instrs_s);
             predTarget = __data.range(predTarget_s + predTarget_w - 1, predTarget_s).to_uint64();
             predTaken = __data.get_bit(predTaken_s);
             predPos = __data.range(predPos_s + predPos_w - 1, predPos_s).to_uint64();
@@ -1611,8 +1418,8 @@ namespace  {
             pc = __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
 
-        operator sc_bv<139>() const {
-            auto ret = sc_bv<139>();
+        operator sc_bv<205>() const {
+            auto ret = sc_bv<205>();
             ret.set_bit(valid_s, valid);
             ret.range(instrs_s + instrs_w - 1, instrs_s) = instrs;
             ret.range(predTarget_s + predTarget_w - 1, predTarget_s) = predTarget;
@@ -1629,7 +1436,7 @@ namespace  {
         std::string to_string() const {
             std::stringstream ss;
             ss << "valid" << " = " << valid;
-            ss << " instrs" << " = " << instrs;
+            ss << " instrs" << " = " << instrs.to_string();
             ss << " predTarget" << " = " << predTarget;
             ss << " predTaken" << " = " << predTaken;
             ss << " predPos" << " = " << predPos;
@@ -1645,34 +1452,34 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<139>& __data) {
+        static bool get_valid (const sc_bv<205>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint64_t get_instrs (const sc_bv<139>& __data) {
-            return __data.range(instrs_s + instrs_w - 1, instrs_s).to_uint64();
+        static sc_bv<128> get_instrs (const sc_bv<205>& __data) {
+            return __data.range(instrs_s + instrs_w - 1, instrs_s);
         }
-        static uint32_t get_predTarget (const sc_bv<139>& __data) {
+        static uint32_t get_predTarget (const sc_bv<205>& __data) {
             return __data.range(predTarget_s + predTarget_w - 1, predTarget_s).to_uint64();
         }
-        static bool get_predTaken (const sc_bv<139>& __data) {
+        static bool get_predTaken (const sc_bv<205>& __data) {
             return __data.get_bit(predTaken_s);
         }
-        static uint32_t get_predPos (const sc_bv<139>& __data) {
+        static uint32_t get_predPos (const sc_bv<205>& __data) {
             return __data.range(predPos_s + predPos_w - 1, predPos_s).to_uint64();
         }
-        static uint32_t get_lastValid (const sc_bv<139>& __data) {
+        static uint32_t get_lastValid (const sc_bv<205>& __data) {
             return __data.range(lastValid_s + lastValid_w - 1, lastValid_s).to_uint64();
         }
-        static uint32_t get_firstValid (const sc_bv<139>& __data) {
+        static uint32_t get_firstValid (const sc_bv<205>& __data) {
             return __data.range(firstValid_s + firstValid_w - 1, firstValid_s).to_uint64();
         }
-        static IFetchFault get_fetchFault (const sc_bv<139>& __data) {
+        static IFetchFault get_fetchFault (const sc_bv<205>& __data) {
             return IFetchFault(__data.range(fetchFault_s + fetchFault_w - 1, fetchFault_s).to_uint64());
         }
-        static uint32_t get_fetchID (const sc_bv<139>& __data) {
+        static uint32_t get_fetchID (const sc_bv<205>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_pc (const sc_bv<139>& __data) {
+        static uint32_t get_pc (const sc_bv<205>& __data) {
             return __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
     };
@@ -1702,18 +1509,18 @@ namespace  {
         static constexpr size_t predTarget_s = 10;
         static constexpr size_t predTarget_w = 31;
         static constexpr size_t fetchPredOffs_s = 41;
-        static constexpr size_t fetchPredOffs_w = 2;
-        static constexpr size_t fetchStartOffs_s = 43;
-        static constexpr size_t fetchStartOffs_w = 2;
-        static constexpr size_t pc_s = 45;
+        static constexpr size_t fetchPredOffs_w = 3;
+        static constexpr size_t fetchStartOffs_s = 44;
+        static constexpr size_t fetchStartOffs_w = 3;
+        static constexpr size_t pc_s = 47;
         static constexpr size_t pc_w = 31;
-        static constexpr size_t instr_s = 76;
+        static constexpr size_t instr_s = 78;
         static constexpr size_t instr_w = 32;
-        static constexpr size_t _size = 108;
+        static constexpr size_t _size = 110;
 
         PD_Instr() = default;
 
-        PD_Instr(const sc_bv<108>& __data) {
+        PD_Instr(const sc_bv<110>& __data) {
             valid = __data.get_bit(valid_s);
             is16bit = __data.get_bit(is16bit_s);
             fetchFault = IFetchFault(__data.range(fetchFault_s + fetchFault_w - 1, fetchFault_s).to_uint64());
@@ -1726,8 +1533,8 @@ namespace  {
             instr = __data.range(instr_s + instr_w - 1, instr_s).to_uint64();
         }
 
-        operator sc_bv<108>() const {
-            auto ret = sc_bv<108>();
+        operator sc_bv<110>() const {
+            auto ret = sc_bv<110>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(is16bit_s, is16bit);
             ret.range(fetchFault_s + fetchFault_w - 1, fetchFault_s) = fetchFault;
@@ -1760,34 +1567,34 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<108>& __data) {
+        static bool get_valid (const sc_bv<110>& __data) {
             return __data.get_bit(valid_s);
         }
-        static bool get_is16bit (const sc_bv<108>& __data) {
+        static bool get_is16bit (const sc_bv<110>& __data) {
             return __data.get_bit(is16bit_s);
         }
-        static IFetchFault get_fetchFault (const sc_bv<108>& __data) {
+        static IFetchFault get_fetchFault (const sc_bv<110>& __data) {
             return IFetchFault(__data.range(fetchFault_s + fetchFault_w - 1, fetchFault_s).to_uint64());
         }
-        static uint32_t get_fetchID (const sc_bv<108>& __data) {
+        static uint32_t get_fetchID (const sc_bv<110>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static bool get_predTaken (const sc_bv<108>& __data) {
+        static bool get_predTaken (const sc_bv<110>& __data) {
             return __data.get_bit(predTaken_s);
         }
-        static uint32_t get_predTarget (const sc_bv<108>& __data) {
+        static uint32_t get_predTarget (const sc_bv<110>& __data) {
             return __data.range(predTarget_s + predTarget_w - 1, predTarget_s).to_uint64();
         }
-        static uint32_t get_fetchPredOffs (const sc_bv<108>& __data) {
+        static uint32_t get_fetchPredOffs (const sc_bv<110>& __data) {
             return __data.range(fetchPredOffs_s + fetchPredOffs_w - 1, fetchPredOffs_s).to_uint64();
         }
-        static uint32_t get_fetchStartOffs (const sc_bv<108>& __data) {
+        static uint32_t get_fetchStartOffs (const sc_bv<110>& __data) {
             return __data.range(fetchStartOffs_s + fetchStartOffs_w - 1, fetchStartOffs_s).to_uint64();
         }
-        static uint32_t get_pc (const sc_bv<108>& __data) {
+        static uint32_t get_pc (const sc_bv<110>& __data) {
             return __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
-        static uint32_t get_instr (const sc_bv<108>& __data) {
+        static uint32_t get_instr (const sc_bv<110>& __data) {
             return __data.range(instr_s + instr_w - 1, instr_s).to_uint64();
         }
     };
@@ -1811,30 +1618,30 @@ namespace  {
         static constexpr size_t compressed_s = 1;
         static constexpr size_t compressed_w = 1;
         static constexpr size_t fetchOffs_s = 2;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t fetchID_s = 4;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t fetchID_s = 5;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t fu_s = 9;
+        static constexpr size_t fu_s = 10;
         static constexpr size_t fu_w = 4;
-        static constexpr size_t opcode_s = 13;
+        static constexpr size_t opcode_s = 14;
         static constexpr size_t opcode_w = 6;
-        static constexpr size_t rd_s = 19;
+        static constexpr size_t rd_s = 20;
         static constexpr size_t rd_w = 5;
-        static constexpr size_t immB_s = 24;
+        static constexpr size_t immB_s = 25;
         static constexpr size_t immB_w = 1;
-        static constexpr size_t rs2_s = 25;
+        static constexpr size_t rs2_s = 26;
         static constexpr size_t rs2_w = 5;
-        static constexpr size_t rs1_s = 30;
+        static constexpr size_t rs1_s = 31;
         static constexpr size_t rs1_w = 5;
-        static constexpr size_t imm12_s = 35;
+        static constexpr size_t imm12_s = 36;
         static constexpr size_t imm12_w = 12;
-        static constexpr size_t imm_s = 47;
+        static constexpr size_t imm_s = 48;
         static constexpr size_t imm_w = 32;
-        static constexpr size_t _size = 79;
+        static constexpr size_t _size = 80;
 
         D_UOp() = default;
 
-        D_UOp(const sc_bv<79>& __data) {
+        D_UOp(const sc_bv<80>& __data) {
             valid = __data.get_bit(valid_s);
             compressed = __data.get_bit(compressed_s);
             fetchOffs = __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
@@ -1849,8 +1656,8 @@ namespace  {
             imm = __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
 
-        operator sc_bv<79>() const {
-            auto ret = sc_bv<79>();
+        operator sc_bv<80>() const {
+            auto ret = sc_bv<80>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(compressed_s, compressed);
             ret.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s) = fetchOffs;
@@ -1887,40 +1694,40 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<79>& __data) {
+        static bool get_valid (const sc_bv<80>& __data) {
             return __data.get_bit(valid_s);
         }
-        static bool get_compressed (const sc_bv<79>& __data) {
+        static bool get_compressed (const sc_bv<80>& __data) {
             return __data.get_bit(compressed_s);
         }
-        static uint32_t get_fetchOffs (const sc_bv<79>& __data) {
+        static uint32_t get_fetchOffs (const sc_bv<80>& __data) {
             return __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
         }
-        static uint32_t get_fetchID (const sc_bv<79>& __data) {
+        static uint32_t get_fetchID (const sc_bv<80>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static FuncUnit get_fu (const sc_bv<79>& __data) {
+        static FuncUnit get_fu (const sc_bv<80>& __data) {
             return FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
         }
-        static uint32_t get_opcode (const sc_bv<79>& __data) {
+        static uint32_t get_opcode (const sc_bv<80>& __data) {
             return __data.range(opcode_s + opcode_w - 1, opcode_s).to_uint64();
         }
-        static uint32_t get_rd (const sc_bv<79>& __data) {
+        static uint32_t get_rd (const sc_bv<80>& __data) {
             return __data.range(rd_s + rd_w - 1, rd_s).to_uint64();
         }
-        static bool get_immB (const sc_bv<79>& __data) {
+        static bool get_immB (const sc_bv<80>& __data) {
             return __data.get_bit(immB_s);
         }
-        static uint32_t get_rs2 (const sc_bv<79>& __data) {
+        static uint32_t get_rs2 (const sc_bv<80>& __data) {
             return __data.range(rs2_s + rs2_w - 1, rs2_s).to_uint64();
         }
-        static uint32_t get_rs1 (const sc_bv<79>& __data) {
+        static uint32_t get_rs1 (const sc_bv<80>& __data) {
             return __data.range(rs1_s + rs1_w - 1, rs1_s).to_uint64();
         }
-        static uint32_t get_imm12 (const sc_bv<79>& __data) {
+        static uint32_t get_imm12 (const sc_bv<80>& __data) {
             return __data.range(imm12_s + imm12_w - 1, imm12_s).to_uint64();
         }
-        static uint32_t get_imm (const sc_bv<79>& __data) {
+        static uint32_t get_imm (const sc_bv<80>& __data) {
             return __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
     };
@@ -1951,50 +1758,50 @@ namespace  {
         static constexpr size_t valid_s = 0;
         static constexpr size_t valid_w = 1;
         static constexpr size_t validIQ_s = 1;
-        static constexpr size_t validIQ_w = 4;
-        static constexpr size_t compressed_s = 5;
+        static constexpr size_t validIQ_w = 7;
+        static constexpr size_t compressed_s = 8;
         static constexpr size_t compressed_w = 1;
-        static constexpr size_t fu_s = 6;
+        static constexpr size_t fu_s = 9;
         static constexpr size_t fu_w = 4;
-        static constexpr size_t loadSqN_s = 10;
+        static constexpr size_t loadSqN_s = 13;
         static constexpr size_t loadSqN_w = 7;
-        static constexpr size_t storeSqN_s = 17;
+        static constexpr size_t storeSqN_s = 20;
         static constexpr size_t storeSqN_w = 7;
-        static constexpr size_t fetchOffs_s = 24;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t fetchID_s = 26;
+        static constexpr size_t fetchOffs_s = 27;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t fetchID_s = 30;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t opcode_s = 31;
+        static constexpr size_t opcode_s = 35;
         static constexpr size_t opcode_w = 6;
-        static constexpr size_t rd_s = 37;
+        static constexpr size_t rd_s = 41;
         static constexpr size_t rd_w = 5;
-        static constexpr size_t tagDst_s = 42;
+        static constexpr size_t tagDst_s = 46;
         static constexpr size_t tagDst_w = 7;
-        static constexpr size_t sqN_s = 49;
+        static constexpr size_t sqN_s = 53;
         static constexpr size_t sqN_w = 7;
-        static constexpr size_t tagC_s = 56;
+        static constexpr size_t tagC_s = 60;
         static constexpr size_t tagC_w = 7;
-        static constexpr size_t availC_s = 63;
+        static constexpr size_t availC_s = 67;
         static constexpr size_t availC_w = 1;
-        static constexpr size_t immB_s = 64;
+        static constexpr size_t immB_s = 68;
         static constexpr size_t immB_w = 1;
-        static constexpr size_t tagB_s = 65;
+        static constexpr size_t tagB_s = 69;
         static constexpr size_t tagB_w = 7;
-        static constexpr size_t availB_s = 72;
+        static constexpr size_t availB_s = 76;
         static constexpr size_t availB_w = 1;
-        static constexpr size_t tagA_s = 73;
+        static constexpr size_t tagA_s = 77;
         static constexpr size_t tagA_w = 7;
-        static constexpr size_t availA_s = 80;
+        static constexpr size_t availA_s = 84;
         static constexpr size_t availA_w = 1;
-        static constexpr size_t imm12_s = 81;
+        static constexpr size_t imm12_s = 85;
         static constexpr size_t imm12_w = 12;
-        static constexpr size_t imm_s = 93;
+        static constexpr size_t imm_s = 97;
         static constexpr size_t imm_w = 32;
-        static constexpr size_t _size = 125;
+        static constexpr size_t _size = 129;
 
         R_UOp() = default;
 
-        R_UOp(const sc_bv<125>& __data) {
+        R_UOp(const sc_bv<129>& __data) {
             valid = __data.get_bit(valid_s);
             validIQ = __data.range(validIQ_s + validIQ_w - 1, validIQ_s).to_uint64();
             compressed = __data.get_bit(compressed_s);
@@ -2018,8 +1825,8 @@ namespace  {
             imm = __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
 
-        operator sc_bv<125>() const {
-            auto ret = sc_bv<125>();
+        operator sc_bv<129>() const {
+            auto ret = sc_bv<129>();
             ret.set_bit(valid_s, valid);
             ret.range(validIQ_s + validIQ_w - 1, validIQ_s) = validIQ;
             ret.set_bit(compressed_s, compressed);
@@ -2074,67 +1881,67 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<125>& __data) {
+        static bool get_valid (const sc_bv<129>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint32_t get_validIQ (const sc_bv<125>& __data) {
+        static uint32_t get_validIQ (const sc_bv<129>& __data) {
             return __data.range(validIQ_s + validIQ_w - 1, validIQ_s).to_uint64();
         }
-        static bool get_compressed (const sc_bv<125>& __data) {
+        static bool get_compressed (const sc_bv<129>& __data) {
             return __data.get_bit(compressed_s);
         }
-        static FuncUnit get_fu (const sc_bv<125>& __data) {
+        static FuncUnit get_fu (const sc_bv<129>& __data) {
             return FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
         }
-        static uint32_t get_loadSqN (const sc_bv<125>& __data) {
+        static uint32_t get_loadSqN (const sc_bv<129>& __data) {
             return __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
         }
-        static uint32_t get_storeSqN (const sc_bv<125>& __data) {
+        static uint32_t get_storeSqN (const sc_bv<129>& __data) {
             return __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
         }
-        static uint32_t get_fetchOffs (const sc_bv<125>& __data) {
+        static uint32_t get_fetchOffs (const sc_bv<129>& __data) {
             return __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
         }
-        static uint32_t get_fetchID (const sc_bv<125>& __data) {
+        static uint32_t get_fetchID (const sc_bv<129>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_opcode (const sc_bv<125>& __data) {
+        static uint32_t get_opcode (const sc_bv<129>& __data) {
             return __data.range(opcode_s + opcode_w - 1, opcode_s).to_uint64();
         }
-        static uint32_t get_rd (const sc_bv<125>& __data) {
+        static uint32_t get_rd (const sc_bv<129>& __data) {
             return __data.range(rd_s + rd_w - 1, rd_s).to_uint64();
         }
-        static uint32_t get_tagDst (const sc_bv<125>& __data) {
+        static uint32_t get_tagDst (const sc_bv<129>& __data) {
             return __data.range(tagDst_s + tagDst_w - 1, tagDst_s).to_uint64();
         }
-        static uint32_t get_sqN (const sc_bv<125>& __data) {
+        static uint32_t get_sqN (const sc_bv<129>& __data) {
             return __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
         }
-        static uint32_t get_tagC (const sc_bv<125>& __data) {
+        static uint32_t get_tagC (const sc_bv<129>& __data) {
             return __data.range(tagC_s + tagC_w - 1, tagC_s).to_uint64();
         }
-        static bool get_availC (const sc_bv<125>& __data) {
+        static bool get_availC (const sc_bv<129>& __data) {
             return __data.get_bit(availC_s);
         }
-        static bool get_immB (const sc_bv<125>& __data) {
+        static bool get_immB (const sc_bv<129>& __data) {
             return __data.get_bit(immB_s);
         }
-        static uint32_t get_tagB (const sc_bv<125>& __data) {
+        static uint32_t get_tagB (const sc_bv<129>& __data) {
             return __data.range(tagB_s + tagB_w - 1, tagB_s).to_uint64();
         }
-        static bool get_availB (const sc_bv<125>& __data) {
+        static bool get_availB (const sc_bv<129>& __data) {
             return __data.get_bit(availB_s);
         }
-        static uint32_t get_tagA (const sc_bv<125>& __data) {
+        static uint32_t get_tagA (const sc_bv<129>& __data) {
             return __data.range(tagA_s + tagA_w - 1, tagA_s).to_uint64();
         }
-        static bool get_availA (const sc_bv<125>& __data) {
+        static bool get_availA (const sc_bv<129>& __data) {
             return __data.get_bit(availA_s);
         }
-        static uint32_t get_imm12 (const sc_bv<125>& __data) {
+        static uint32_t get_imm12 (const sc_bv<129>& __data) {
             return __data.range(imm12_s + imm12_w - 1, imm12_s).to_uint64();
         }
-        static uint32_t get_imm (const sc_bv<125>& __data) {
+        static uint32_t get_imm (const sc_bv<129>& __data) {
             return __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
     };
@@ -2169,34 +1976,34 @@ namespace  {
         static constexpr size_t storeSqN_s = 13;
         static constexpr size_t storeSqN_w = 7;
         static constexpr size_t fetchOffs_s = 20;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t fetchID_s = 22;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t fetchID_s = 23;
         static constexpr size_t fetchID_w = 5;
-        static constexpr size_t opcode_s = 27;
+        static constexpr size_t opcode_s = 28;
         static constexpr size_t opcode_w = 6;
-        static constexpr size_t tagDst_s = 33;
+        static constexpr size_t tagDst_s = 34;
         static constexpr size_t tagDst_w = 7;
-        static constexpr size_t sqN_s = 40;
+        static constexpr size_t sqN_s = 41;
         static constexpr size_t sqN_w = 7;
-        static constexpr size_t immB_s = 47;
+        static constexpr size_t immB_s = 48;
         static constexpr size_t immB_w = 1;
-        static constexpr size_t tagB_s = 48;
+        static constexpr size_t tagB_s = 49;
         static constexpr size_t tagB_w = 7;
-        static constexpr size_t availB_s = 55;
+        static constexpr size_t availB_s = 56;
         static constexpr size_t availB_w = 1;
-        static constexpr size_t tagA_s = 56;
+        static constexpr size_t tagA_s = 57;
         static constexpr size_t tagA_w = 7;
-        static constexpr size_t availA_s = 63;
+        static constexpr size_t availA_s = 64;
         static constexpr size_t availA_w = 1;
-        static constexpr size_t imm12_s = 64;
+        static constexpr size_t imm12_s = 65;
         static constexpr size_t imm12_w = 12;
-        static constexpr size_t imm_s = 76;
+        static constexpr size_t imm_s = 77;
         static constexpr size_t imm_w = 32;
-        static constexpr size_t _size = 108;
+        static constexpr size_t _size = 109;
 
         IS_UOp() = default;
 
-        IS_UOp(const sc_bv<108>& __data) {
+        IS_UOp(const sc_bv<109>& __data) {
             valid = __data.get_bit(valid_s);
             compressed = __data.get_bit(compressed_s);
             fu = FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
@@ -2216,8 +2023,8 @@ namespace  {
             imm = __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
 
-        operator sc_bv<108>() const {
-            auto ret = sc_bv<108>();
+        operator sc_bv<109>() const {
+            auto ret = sc_bv<109>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(compressed_s, compressed);
             ret.range(fu_s + fu_w - 1, fu_s) = fu;
@@ -2264,55 +2071,55 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<108>& __data) {
+        static bool get_valid (const sc_bv<109>& __data) {
             return __data.get_bit(valid_s);
         }
-        static bool get_compressed (const sc_bv<108>& __data) {
+        static bool get_compressed (const sc_bv<109>& __data) {
             return __data.get_bit(compressed_s);
         }
-        static FuncUnit get_fu (const sc_bv<108>& __data) {
+        static FuncUnit get_fu (const sc_bv<109>& __data) {
             return FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
         }
-        static uint32_t get_loadSqN (const sc_bv<108>& __data) {
+        static uint32_t get_loadSqN (const sc_bv<109>& __data) {
             return __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
         }
-        static uint32_t get_storeSqN (const sc_bv<108>& __data) {
+        static uint32_t get_storeSqN (const sc_bv<109>& __data) {
             return __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
         }
-        static uint32_t get_fetchOffs (const sc_bv<108>& __data) {
+        static uint32_t get_fetchOffs (const sc_bv<109>& __data) {
             return __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
         }
-        static uint32_t get_fetchID (const sc_bv<108>& __data) {
+        static uint32_t get_fetchID (const sc_bv<109>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_opcode (const sc_bv<108>& __data) {
+        static uint32_t get_opcode (const sc_bv<109>& __data) {
             return __data.range(opcode_s + opcode_w - 1, opcode_s).to_uint64();
         }
-        static uint32_t get_tagDst (const sc_bv<108>& __data) {
+        static uint32_t get_tagDst (const sc_bv<109>& __data) {
             return __data.range(tagDst_s + tagDst_w - 1, tagDst_s).to_uint64();
         }
-        static uint32_t get_sqN (const sc_bv<108>& __data) {
+        static uint32_t get_sqN (const sc_bv<109>& __data) {
             return __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
         }
-        static bool get_immB (const sc_bv<108>& __data) {
+        static bool get_immB (const sc_bv<109>& __data) {
             return __data.get_bit(immB_s);
         }
-        static uint32_t get_tagB (const sc_bv<108>& __data) {
+        static uint32_t get_tagB (const sc_bv<109>& __data) {
             return __data.range(tagB_s + tagB_w - 1, tagB_s).to_uint64();
         }
-        static bool get_availB (const sc_bv<108>& __data) {
+        static bool get_availB (const sc_bv<109>& __data) {
             return __data.get_bit(availB_s);
         }
-        static uint32_t get_tagA (const sc_bv<108>& __data) {
+        static uint32_t get_tagA (const sc_bv<109>& __data) {
             return __data.range(tagA_s + tagA_w - 1, tagA_s).to_uint64();
         }
-        static bool get_availA (const sc_bv<108>& __data) {
+        static bool get_availA (const sc_bv<109>& __data) {
             return __data.get_bit(availA_s);
         }
-        static uint32_t get_imm12 (const sc_bv<108>& __data) {
+        static uint32_t get_imm12 (const sc_bv<109>& __data) {
             return __data.range(imm12_s + imm12_w - 1, imm12_s).to_uint64();
         }
-        static uint32_t get_imm (const sc_bv<108>& __data) {
+        static uint32_t get_imm (const sc_bv<109>& __data) {
             return __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
     };
@@ -2359,22 +2166,22 @@ namespace  {
         static constexpr size_t imm_s = 46;
         static constexpr size_t imm_w = 32;
         static constexpr size_t fetchPredOffs_s = 78;
-        static constexpr size_t fetchPredOffs_w = 2;
-        static constexpr size_t fetchStartOffs_s = 80;
-        static constexpr size_t fetchStartOffs_w = 2;
-        static constexpr size_t fetchOffs_s = 82;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t pc_s = 84;
+        static constexpr size_t fetchPredOffs_w = 3;
+        static constexpr size_t fetchStartOffs_s = 81;
+        static constexpr size_t fetchStartOffs_w = 3;
+        static constexpr size_t fetchOffs_s = 84;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t pc_s = 87;
         static constexpr size_t pc_w = 32;
-        static constexpr size_t srcB_s = 116;
+        static constexpr size_t srcB_s = 119;
         static constexpr size_t srcB_w = 32;
-        static constexpr size_t srcA_s = 148;
+        static constexpr size_t srcA_s = 151;
         static constexpr size_t srcA_w = 32;
-        static constexpr size_t _size = 180;
+        static constexpr size_t _size = 183;
 
         EX_UOp() = default;
 
-        EX_UOp(const sc_bv<180>& __data) {
+        EX_UOp(const sc_bv<183>& __data) {
             valid = __data.get_bit(valid_s);
             compressed = __data.get_bit(compressed_s);
             fu = FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
@@ -2394,8 +2201,8 @@ namespace  {
             srcA = __data.range(srcA_s + srcA_w - 1, srcA_s).to_uint64();
         }
 
-        operator sc_bv<180>() const {
-            auto ret = sc_bv<180>();
+        operator sc_bv<183>() const {
+            auto ret = sc_bv<183>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(compressed_s, compressed);
             ret.range(fu_s + fu_w - 1, fu_s) = fu;
@@ -2442,55 +2249,55 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<180>& __data) {
+        static bool get_valid (const sc_bv<183>& __data) {
             return __data.get_bit(valid_s);
         }
-        static bool get_compressed (const sc_bv<180>& __data) {
+        static bool get_compressed (const sc_bv<183>& __data) {
             return __data.get_bit(compressed_s);
         }
-        static FuncUnit get_fu (const sc_bv<180>& __data) {
+        static FuncUnit get_fu (const sc_bv<183>& __data) {
             return FuncUnit(__data.range(fu_s + fu_w - 1, fu_s).to_uint64());
         }
-        static uint32_t get_loadSqN (const sc_bv<180>& __data) {
+        static uint32_t get_loadSqN (const sc_bv<183>& __data) {
             return __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
         }
-        static uint32_t get_storeSqN (const sc_bv<180>& __data) {
+        static uint32_t get_storeSqN (const sc_bv<183>& __data) {
             return __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
         }
-        static BranchPredInfo get_bpi (const sc_bv<180>& __data) {
+        static BranchPredInfo get_bpi (const sc_bv<183>& __data) {
             return BranchPredInfo(__data.get_bit(bpi_s));
         }
-        static uint32_t get_fetchID (const sc_bv<180>& __data) {
+        static uint32_t get_fetchID (const sc_bv<183>& __data) {
             return __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
         }
-        static uint32_t get_sqN (const sc_bv<180>& __data) {
+        static uint32_t get_sqN (const sc_bv<183>& __data) {
             return __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
         }
-        static uint32_t get_tagDst (const sc_bv<180>& __data) {
+        static uint32_t get_tagDst (const sc_bv<183>& __data) {
             return __data.range(tagDst_s + tagDst_w - 1, tagDst_s).to_uint64();
         }
-        static uint32_t get_opcode (const sc_bv<180>& __data) {
+        static uint32_t get_opcode (const sc_bv<183>& __data) {
             return __data.range(opcode_s + opcode_w - 1, opcode_s).to_uint64();
         }
-        static uint32_t get_imm (const sc_bv<180>& __data) {
+        static uint32_t get_imm (const sc_bv<183>& __data) {
             return __data.range(imm_s + imm_w - 1, imm_s).to_uint64();
         }
-        static uint32_t get_fetchPredOffs (const sc_bv<180>& __data) {
+        static uint32_t get_fetchPredOffs (const sc_bv<183>& __data) {
             return __data.range(fetchPredOffs_s + fetchPredOffs_w - 1, fetchPredOffs_s).to_uint64();
         }
-        static uint32_t get_fetchStartOffs (const sc_bv<180>& __data) {
+        static uint32_t get_fetchStartOffs (const sc_bv<183>& __data) {
             return __data.range(fetchStartOffs_s + fetchStartOffs_w - 1, fetchStartOffs_s).to_uint64();
         }
-        static uint32_t get_fetchOffs (const sc_bv<180>& __data) {
+        static uint32_t get_fetchOffs (const sc_bv<183>& __data) {
             return __data.range(fetchOffs_s + fetchOffs_w - 1, fetchOffs_s).to_uint64();
         }
-        static uint32_t get_pc (const sc_bv<180>& __data) {
+        static uint32_t get_pc (const sc_bv<183>& __data) {
             return __data.range(pc_s + pc_w - 1, pc_s).to_uint64();
         }
-        static uint32_t get_srcB (const sc_bv<180>& __data) {
+        static uint32_t get_srcB (const sc_bv<183>& __data) {
             return __data.range(srcB_s + srcB_w - 1, srcB_s).to_uint64();
         }
-        static uint32_t get_srcA (const sc_bv<180>& __data) {
+        static uint32_t get_srcA (const sc_bv<183>& __data) {
             return __data.range(srcA_s + srcA_w - 1, srcA_s).to_uint64();
         }
     };
@@ -2917,7 +2724,7 @@ namespace  {
         bool isMgmt;
         bool isMMIO;
         uint32_t wmask;
-        uint32_t data;
+        sc_bv<128> data;
         uint32_t addr;
 
         static constexpr size_t valid_s = 0;
@@ -2931,28 +2738,28 @@ namespace  {
         static constexpr size_t isMMIO_s = 7;
         static constexpr size_t isMMIO_w = 1;
         static constexpr size_t wmask_s = 8;
-        static constexpr size_t wmask_w = 4;
-        static constexpr size_t data_s = 12;
-        static constexpr size_t data_w = 32;
-        static constexpr size_t addr_s = 44;
+        static constexpr size_t wmask_w = 16;
+        static constexpr size_t data_s = 24;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t addr_s = 152;
         static constexpr size_t addr_w = 32;
-        static constexpr size_t _size = 76;
+        static constexpr size_t _size = 184;
 
         ST_UOp() = default;
 
-        ST_UOp(const sc_bv<76>& __data) {
+        ST_UOp(const sc_bv<184>& __data) {
             valid = __data.get_bit(valid_s);
             id = __data.range(id_s + id_w - 1, id_s).to_uint64();
             nonce = __data.range(nonce_s + nonce_w - 1, nonce_s).to_uint64();
             isMgmt = __data.get_bit(isMgmt_s);
             isMMIO = __data.get_bit(isMMIO_s);
             wmask = __data.range(wmask_s + wmask_w - 1, wmask_s).to_uint64();
-            data = __data.range(data_s + data_w - 1, data_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
             addr = __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
         }
 
-        operator sc_bv<76>() const {
-            auto ret = sc_bv<76>();
+        operator sc_bv<184>() const {
+            auto ret = sc_bv<184>();
             ret.set_bit(valid_s, valid);
             ret.range(id_s + id_w - 1, id_s) = id;
             ret.range(nonce_s + nonce_w - 1, nonce_s) = nonce;
@@ -2972,7 +2779,7 @@ namespace  {
             ss << " isMgmt" << " = " << isMgmt;
             ss << " isMMIO" << " = " << isMMIO;
             ss << " wmask" << " = " << wmask;
-            ss << " data" << " = " << data;
+            ss << " data" << " = " << data.to_string();
             ss << " addr" << " = " << addr;
             return std::move(ss.str());
         }
@@ -2981,28 +2788,28 @@ namespace  {
             os << __data.to_string();
             return os;
         }
-        static bool get_valid (const sc_bv<76>& __data) {
+        static bool get_valid (const sc_bv<184>& __data) {
             return __data.get_bit(valid_s);
         }
-        static uint32_t get_id (const sc_bv<76>& __data) {
+        static uint32_t get_id (const sc_bv<184>& __data) {
             return __data.range(id_s + id_w - 1, id_s).to_uint64();
         }
-        static uint32_t get_nonce (const sc_bv<76>& __data) {
+        static uint32_t get_nonce (const sc_bv<184>& __data) {
             return __data.range(nonce_s + nonce_w - 1, nonce_s).to_uint64();
         }
-        static bool get_isMgmt (const sc_bv<76>& __data) {
+        static bool get_isMgmt (const sc_bv<184>& __data) {
             return __data.get_bit(isMgmt_s);
         }
-        static bool get_isMMIO (const sc_bv<76>& __data) {
+        static bool get_isMMIO (const sc_bv<184>& __data) {
             return __data.get_bit(isMMIO_s);
         }
-        static uint32_t get_wmask (const sc_bv<76>& __data) {
+        static uint32_t get_wmask (const sc_bv<184>& __data) {
             return __data.range(wmask_s + wmask_w - 1, wmask_s).to_uint64();
         }
-        static uint32_t get_data (const sc_bv<76>& __data) {
-            return __data.range(data_s + data_w - 1, data_s).to_uint64();
+        static sc_bv<128> get_data (const sc_bv<184>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
         }
-        static uint32_t get_addr (const sc_bv<76>& __data) {
+        static uint32_t get_addr (const sc_bv<184>& __data) {
             return __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
         }
     };
@@ -3137,22 +2944,22 @@ namespace  {
         static constexpr size_t fetchID_s = 2;
         static constexpr size_t fetchID_w = 5;
         static constexpr size_t fetchOffs_s = 7;
-        static constexpr size_t fetchOffs_w = 2;
-        static constexpr size_t rd_s = 9;
+        static constexpr size_t fetchOffs_w = 3;
+        static constexpr size_t rd_s = 10;
         static constexpr size_t rd_w = 5;
-        static constexpr size_t storeSqN_s = 14;
+        static constexpr size_t storeSqN_s = 15;
         static constexpr size_t storeSqN_w = 7;
-        static constexpr size_t loadSqN_s = 21;
+        static constexpr size_t loadSqN_s = 22;
         static constexpr size_t loadSqN_w = 7;
-        static constexpr size_t sqN_s = 28;
+        static constexpr size_t sqN_s = 29;
         static constexpr size_t sqN_w = 7;
-        static constexpr size_t tag_s = 35;
+        static constexpr size_t tag_s = 36;
         static constexpr size_t tag_w = 7;
-        static constexpr size_t flags_s = 42;
+        static constexpr size_t flags_s = 43;
         static constexpr size_t flags_w = 4;
-        static constexpr size_t timeout_s = 46;
+        static constexpr size_t timeout_s = 47;
         static constexpr size_t timeout_w = 1;
-        static constexpr size_t _size = 47;
+        static constexpr size_t _size = 48;
 
         Trap_UOp() = default;
 
@@ -3160,7 +2967,7 @@ namespace  {
             valid = (__data >> valid_s) & (~0ULL >> (64 - 1));
             compressed = (__data >> compressed_s) & (~0ULL >> (64 - 1));
             fetchID = (__data >> fetchID_s) & (~0ULL >> (64 - 5));
-            fetchOffs = (__data >> fetchOffs_s) & (~0ULL >> (64 - 2));
+            fetchOffs = (__data >> fetchOffs_s) & (~0ULL >> (64 - 3));
             rd = (__data >> rd_s) & (~0ULL >> (64 - 5));
             storeSqN = (__data >> storeSqN_s) & (~0ULL >> (64 - 7));
             loadSqN = (__data >> loadSqN_s) & (~0ULL >> (64 - 7));
@@ -3170,7 +2977,7 @@ namespace  {
             timeout = (__data >> timeout_s) & (~0ULL >> (64 - 1));
         }
 
-        Trap_UOp(const sc_bv<47>& __data) {
+        Trap_UOp(const sc_bv<48>& __data) {
             valid = __data.get_bit(valid_s);
             compressed = __data.get_bit(compressed_s);
             fetchID = __data.range(fetchID_s + fetchID_w - 1, fetchID_s).to_uint64();
@@ -3200,8 +3007,8 @@ namespace  {
             return ret;
         }
 
-        operator sc_bv<47>() const {
-            auto ret = sc_bv<47>();
+        operator sc_bv<48>() const {
+            auto ret = sc_bv<48>();
             ret.set_bit(valid_s, valid);
             ret.set_bit(compressed_s, compressed);
             ret.range(fetchID_s + fetchID_w - 1, fetchID_s) = fetchID;
@@ -3246,7 +3053,7 @@ namespace  {
             return (__data >> fetchID_s) & (~0ULL >> (64 - 5));
         }
         static uint32_t get_fetchOffs (const uint64_t& __data) {
-            return (__data >> fetchOffs_s) & (~0ULL >> (64 - 2));
+            return (__data >> fetchOffs_s) & (~0ULL >> (64 - 3));
         }
         static uint32_t get_rd (const uint64_t& __data) {
             return (__data >> rd_s) & (~0ULL >> (64 - 5));

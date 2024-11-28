@@ -756,7 +756,7 @@ void run_sim(Args& args, uint64_t timeout = 0)
     else
     {
         for (size_t i = 0; i < (1 << 24); i++)
-            wrap->top->Top->extMem->mem[i] = pram[i];
+            wrap->top->Top->extMem->mem[i >> 2][i & 3] = pram[i];
 
         wrap->Reset();
     }
