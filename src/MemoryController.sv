@@ -587,8 +587,7 @@ always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
-            transfers[i] <= 'x;
-            transfers[i].valid <= 0;
+            transfers[i] <= Transfer'{valid: 0, default: 'x};
         end
     end
     else begin
@@ -596,8 +595,7 @@ always_ff@(posedge clk or posedge rst) begin
         // GC
         for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
             if (transfers[i].valid && transfers[i].readDone && transfers[i].writeDone) begin
-                transfers[i] <= 'x;
-                transfers[i].valid <= 0;
+                transfers[i] <= Transfer'{valid: 0, default: 'x};
             end
         end
 
@@ -675,8 +673,7 @@ always_ff@(posedge clk or posedge rst) begin
             transfers[buf_rid].addrCounter <= transfers[buf_rid].addrCounter + WIDTH_W;
 
             if (isMMIO[buf_rid]) begin
-                transfers[buf_rid] <= 'x;
-                transfers[buf_rid].valid <= 0;
+                transfers[buf_rid] <= Transfer'{valid: 0, default: 'x};
 
                 sglLdRes.valid <= 1;
                 sglLdRes.id <= transfers[buf_rid].cacheAddr;
@@ -706,8 +703,7 @@ always_ff@(posedge clk or posedge rst) begin
             if ((transfers[DCW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
                 transfers[DCW_ackId].readDone <= 1;
                 if (transfers[DCW_ackId].writeDone) begin
-                    transfers[DCW_ackId] <= 'x;
-                    transfers[DCW_ackId].valid <= 0;
+                    transfers[DCW_ackId] <= Transfer'{valid: 0, default: 'x};
                 end
             end
         end
@@ -716,8 +712,7 @@ always_ff@(posedge clk or posedge rst) begin
             if ((transfers[ICW_ackId].progress >> $clog2(WIDTH_W)) == (1 << (`CLSIZE_E - 2 - $clog2(WIDTH_W))) - 1) begin
                 transfers[ICW_ackId].readDone <= 1;
                 if (transfers[ICW_ackId].writeDone) begin
-                    transfers[ICW_ackId] <= 'x;
-                    transfers[ICW_ackId].valid <= 0;
+                    transfers[ICW_ackId] <= Transfer'{valid: 0, default: 'x};
                 end
             end
         end
@@ -741,8 +736,7 @@ always_ff@(posedge clk or posedge rst) begin
             end
             transfers[s_axi_bid].writeDone <= 1;
             if (transfers[s_axi_bid].readDone) begin
-                transfers[s_axi_bid] <= 'x;
-                transfers[s_axi_bid].valid <= 0;
+                transfers[s_axi_bid] <= Transfer'{valid: 0, default: 'x};
             end
         end
     end

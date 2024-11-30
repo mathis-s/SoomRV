@@ -135,7 +135,8 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk)
-    OUT_resultUOp <= resultUOp_c;
+always_ff@(posedge clk or posedge rst)
+    if (rst) OUT_resultUOp <= ResultUOp'{valid: 0, default: 'x};
+    else OUT_resultUOp <= resultUOp_c;
 
 endmodule

@@ -174,19 +174,19 @@ end
 wire outputReady;
 if (FF_OUTPUT) begin
     always_ff@(posedge clk or posedge rst) begin
-            if (rst) begin
-                for (integer i = 0; i < NUM_INSTRS; i=i+1)
-                    OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
-            end
-            else if (IN_clear) begin
-                for (integer i = 0; i < NUM_INSTRS; i=i+1)
-                    OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
-            end
-            else begin
-                for (integer i = 0; i < NUM_INSTRS; i=i+1)
-                    if (outputReady)
-                        OUT_instr[i] <= instr_c[i];
-            end
+        if (rst) begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
+        end
+        else if (IN_clear) begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
+        end
+        else begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                if (outputReady)
+                    OUT_instr[i] <= instr_c[i];
+        end
     end
     assign outputReady = !OUT_instr[0].valid || IN_ready;
 end

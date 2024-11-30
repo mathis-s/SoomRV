@@ -75,6 +75,7 @@ always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         decrCnt <= 0;
         resetIdx <= 0;
+        decrBit <= 0;
     end
     else begin
         if (!resetIdx[$clog2(SIZE)]) begin

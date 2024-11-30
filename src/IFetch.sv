@@ -225,7 +225,6 @@ always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         issuedInterrupt <= 0;
-
         waitForInterrupt <= 1;
         wfiCount <= $bits(wfiCount)'(`RESET_DELAY - 1);
         resetWait <= 1;

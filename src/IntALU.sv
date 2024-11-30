@@ -252,10 +252,8 @@ end
 
 always_ff@(posedge clk or posedge rst) begin
 
-    OUT_uop <= 'x;
-    OUT_uop.valid <= 0;
-    OUT_amoData <= 'x;
-    OUT_amoData.valid <= 0;
+    OUT_uop <= RES_UOp'{valid: 0, default: 'x};
+    OUT_amoData <= AMO_Data_UOp'{valid: 0, default: 'x};
 
     if (rst) ;
     else if (IN_uop.valid && HasFU(IN_uop.fu) &&

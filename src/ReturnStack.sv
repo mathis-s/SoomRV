@@ -158,6 +158,11 @@ always_ff@(posedge clk or posedge rst) begin
         rindexReg <= 0;
         for (integer i = 0; i < SIZE; i=i+1)
             rstack[i] <= 0;
+
+        recoveryID <= 'x;
+        recoveryBase <= 'x;
+        recoveryOffs <= 'x;
+        recoveryOverwOwn <= 'x;
     end
     else begin
 

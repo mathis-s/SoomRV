@@ -335,11 +335,14 @@ reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
 // Load Pipeline
 always_ff@(posedge clk or posedge rst) begin
 
-    for (integer i = 0; i < NUM_AGUS; i=i+1)
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         for (integer j = 0; j < 2; j=j+1) begin
             ldOps[i][j] <= 'x;
             ldOps[i][j].valid <= 0;
         end
+        loadWasExtIOBusy[i] <= 'x;
+        loadCacheAccessFailed[i] <= 'x;
+    end
 
     if (rst) ;
     else begin
@@ -920,6 +923,9 @@ always_ff@(posedge clk or posedge rst) begin
         LSU_memc <= 'x;
         LSU_memc.cmd <= MEMC_NONE;
         assocCnt <= 0;
+        flushIdx <= 'x;
+        flushAssocIdx <= 'x;
+        flushDone <= 'x;
     end
     else begin
         if (canOutputMiss) begin

@@ -136,7 +136,11 @@ always_ff@(posedge clk or posedge rst) begin
     s_axi_bvalid <= 0;
     s_axi_bid <= 'x;
 
-    if (rst) state <= IDLE;
+    if (rst) begin
+        state <= IDLE;
+        curID <= 'x;
+        curCnt <= 'x;
+    end
     else begin
         case (state)
             IDLE: begin

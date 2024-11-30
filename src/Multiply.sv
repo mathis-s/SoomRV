@@ -40,7 +40,6 @@ assign OUT_busy = 0;
 
 always_ff@(posedge clk or posedge rst) begin
 
-
     for (integer i = 0; i < NUM_STAGES+1; i=i+1) begin
         pl[i] <= 'x;
         pl[i].valid <= 0;

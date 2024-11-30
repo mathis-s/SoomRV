@@ -65,8 +65,6 @@ SRC_FILES = \
 	src/IFetchPipeline.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
-	src/CacheInterface.sv \
-	src/MemoryInterface.sv \
 	src/Peripherals.sv \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \

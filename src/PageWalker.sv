@@ -81,11 +81,13 @@ always_ff@(posedge clk or posedge rst) begin
     OUT_res.valid <= 0;
 
     if (rst) begin
-        OUT_ldUOp <= 'x;
-        OUT_ldUOp.valid <= 0;
+        OUT_ldUOp <= PW_LD_UOp'{valid: 0, default: 'x};
         state <= IDLE;
-        OUT_res <= 'x;
-        OUT_res.busy <= 0;
+        OUT_res <= PageWalk_Res'{busy: 0, valid: 0, default: 'x};
+
+        pageWalkIter <= 'x;
+        pageWalkAddr <= 'x;
+        rqID <= 'x;
     end
     else begin
 

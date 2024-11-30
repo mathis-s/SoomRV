@@ -52,15 +52,13 @@ always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
         activeLd <= LD_UOp'{valid: 0, default: 'x};
-        OUT_memc <= '0;
-        OUT_memc.cmd <= MEMC_NONE;
+        OUT_memc <= MemController_Req'{cmd: MEMC_NONE, default: '0};
         state <= IDLE;
     end
     else begin
 
         if (invalidateActiveLd) begin
-            activeLd <= 'x;
-            activeLd.valid <= 0;
+            activeLd <= LD_UOp'{valid: 0, default: 'x};
         end
         case (state)
 

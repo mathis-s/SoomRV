@@ -265,9 +265,8 @@ always_ff@(posedge clk or posedge rst) begin
         failSc <= 0;
 
         for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-            OUT_uop[i] <= 'x;
-            OUT_uop[i].valid <= 0;
-            OUT_uop[i].validIQ <= 0;
+            OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
+            OUT_uopOrdering[i] <= 'x;
         end
     end
     else begin
@@ -284,9 +283,7 @@ always_ff@(posedge clk or posedge rst) begin
 
             for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
                 if ($signed(OUT_uop[i].sqN - IN_branch.sqN) > 0) begin
-                    OUT_uop[i] <= 'x;
-                    OUT_uop[i].valid <= 0;
-                    OUT_uop[i].validIQ <= 0;
+                    OUT_uop[i] <= R_UOp'{valid: 0, validIQ: 0, default: 'x};
                 end
             end
         end

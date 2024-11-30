@@ -202,19 +202,14 @@ end
 always_ff@(posedge clk or posedge rst) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-        OUT_fwd[i] <= 'x;
-        OUT_fwd[i].valid <= 0;
+        OUT_fwd[i] <= StFwdResult'{valid: 0, default: 'x};
     end
 
     if (rst) begin
         for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
-            evicted[i] <= 'x;
-            evicted[i].nonce <= 0;
-            evicted[i].wmask <= 0;
-            evicted[i].valid <= 0;
+            evicted[i] <= EQEntry'{valid: 0, wmask: 0, nonce: 0, default: 'x};
         end
-        OUT_uopSt <= 'x;
-        OUT_uopSt.valid <= 0;
+        OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
     end
     else begin
 

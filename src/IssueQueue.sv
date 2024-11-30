@@ -212,8 +212,7 @@ always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         insertIndex <= 0;
         reservedWBs <= 0;
-        OUT_uop <= 'x;
-        OUT_uop.valid <= 0;
+        OUT_uop <= IS_UOp'{valid: 0, default: 'x};
 
         for (integer i = 0; i < SIZE; i=i+1)
             queue[i] <= R_ST_UOp'{avail: 0, default: 'x};

@@ -125,6 +125,7 @@ InstrAligner#(.NUM_PACKETS(NUM_INST), .NUM_INSTRS(`DEC_WIDTH)) instrAligner
 always_ff@(posedge clk or posedge rst) begin
     OUT_pcFileWE <= 0;
     OUT_pcFileEntry <= 'x;
+    OUT_pcFileAddr <= 'x;
     if (rst) ;
     else if (fetch1.valid) begin
         OUT_pcFileWE <= 1;
@@ -507,6 +508,8 @@ logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
 always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         flushState <= FLUSH_QUEUED;
+        flushAssocIter <= 'x;
+        flushAddrIter <= 'x;
     end
     else begin
         case (flushState)

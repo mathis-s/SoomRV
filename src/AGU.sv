@@ -353,16 +353,14 @@ reg[31:0] pageWalkAddr;
 always_ff@(posedge clk or posedge rst) begin
 
     OUT_pw <= PageWalk_Req'{valid: 0, default: 'x};
-
-    OUT_tvalProv <= 'x;
-    OUT_tvalProv.valid <= 0;
-    OUT_uop <= 'x;
-    OUT_uop.valid <= 0;
-    OUT_aguOp <= 'x;
-    OUT_aguOp.valid <= 0;
+    OUT_tvalProv <= TValProv'{valid: 0, default: 'x};
+    OUT_uop <= FlagsUOp'{valid: 0, default: 'x};
+    OUT_aguOp <= AGU_UOp'{valid: 0, default: 'x};
 
     if (rst) begin
         pageWalkActive <= 0;
+        pageWalkAccepted <= 'x;
+        pageWalkAddr <= 'x;
     end
     else begin
 

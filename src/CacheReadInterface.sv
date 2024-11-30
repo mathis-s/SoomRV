@@ -179,10 +179,8 @@ ReadMeta[1:0] readMetaSR;
 always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
-        cur <= 'x;
-        cur.valid <= 0;
-        next <= 'x;
-        next.valid <= 0;
+        cur <= Transfer'{valid: 0, default: 'x};
+        next <= Transfer'{valid: 0, default: 'x};
         readMetaSR <= '0;
     end
     else begin
@@ -194,7 +192,6 @@ always_ff@(posedge clk or posedge rst) begin
             incoming.addr = IN_addr;
             incoming.progress = 0;
             incoming.len = IN_len;
-
             incoming.mmio = IN_mmio;
             incoming.mmioData = IN_mmioData;
         end

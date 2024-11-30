@@ -45,10 +45,10 @@ end
 logic[IDX_LEN:0] resetIdx;
 
 always_ff@(posedge clk or posedge rst) begin
-
     if (rst) begin
         write_r <= Write'{valid: 0, default: 'x};
         resetIdx <= 0;
+        writeTempReg <= 'x;
     end
     else if (!resetIdx[IDX_LEN]) begin
         pred[resetIdx[IDX_LEN-1:0]] <= 0;
@@ -71,5 +71,6 @@ always_ff@(posedge clk or posedge rst) begin
         end
     end
 end
+
 
 endmodule

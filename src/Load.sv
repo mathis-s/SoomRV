@@ -127,8 +127,8 @@ end
 always_ff@(posedge clk or posedge rst) begin
     if (rst) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            outUOpReg[i] <= 'x;
-            outUOpReg[i].valid <= 0;
+            operandIsReg[i] <= 'x;
+            outUOpReg[i] <= EX_UOp'{valid: 0, default: 'x};
         end
     end
     else begin

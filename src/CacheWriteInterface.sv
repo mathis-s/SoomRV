@@ -145,8 +145,7 @@ always_ff@(posedge clk or posedge rst) begin
     OUT_ackId <= 'x;
 
     if (rst) begin
-        cur_r <= 'x;
-        cur_r.valid <= 0;
+        cur_r <= Transfer'{valid: 0, default: 'x};
     end
     else begin
         cur_r <= cur_c;

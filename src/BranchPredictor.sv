@@ -340,6 +340,7 @@ always_ff@(posedge clk or posedge rst) begin
         pcReg <= 31'(`ENTRY_POINT >> 1);
         ignorePred <= 1;
         history <= 0;
+        pcRegNoInc <= 'x;
     end
     else begin
         if (IN_pcValid) begin

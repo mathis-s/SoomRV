@@ -32,7 +32,14 @@ always_ff@(posedge clk or posedge rst) begin
     OUT_uop <= 'x;
     OUT_uop.valid <= 0;
 
-    if (!rst) begin
+    if (rst) begin
+        uop <= EX_UOp'{valid: 0, default: 'x};
+        cnt <= 'x;
+        invert <= 'x;
+        r <= 'x;
+        d <= 'x;
+    end
+    else begin
         if (en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
             running <= 1;
             uop <= IN_uop;

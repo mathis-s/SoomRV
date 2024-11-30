@@ -62,8 +62,7 @@ reg running;
 always_ff@(posedge clk or posedge rst) begin
 
     if (rst) begin
-        OUT_uop <= 'x;
-        OUT_uop.valid <= 0;
+        OUT_uop <= RES_UOp'{valid: 0, default: 'x};
         running <= 0;
     end
     else if (!running && en && IN_uop.valid && (!IN_branch.taken || $signed(IN_uop.sqN - IN_branch.sqN) <= 0)) begin
