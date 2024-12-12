@@ -46,7 +46,7 @@ typedef struct packed
 } SQEntry;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
-always_ff@(posedge clk or posedge rst)
+always_ff@(posedge clk )
     if (rst) entryReady_r <= 0;
     else entryReady_r <= entryReady_c;
 
@@ -349,7 +349,7 @@ wire SqN nextBaseIndex = baseIndex + SqN'(deqCount);
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;
@@ -394,7 +394,7 @@ always_ff@(posedge clk or posedge rst) begin
             ) begin
                 logic[IDX_LEN-1:0] idx = IN_stDataUOp[i].storeSqN[IDX_LEN-1:0];
 
-                //assert(idx[0] == i[0]); idx[0] = i[0];
+                assert(idx[0] == i[0]); idx[0] = i[0];
 
                 entries[idx].loaded <= 1;
                 entries[idx].data <= IN_stDataUOp[i].data;
@@ -417,7 +417,7 @@ always_ff@(posedge clk or posedge rst) begin
                 (!IN_branch.taken || ($signed(IN_uopSt[i].sqN - IN_branch.sqN) <= 0 && !IN_branch.flush))
             ) begin
                 reg[IDX_LEN-1:0] index = IN_uopSt[i].storeSqN[IDX_LEN-1:0];
-                //assert(index[0] == i[0]); index[0] = i[0];
+                assert(index[0] == i[0]); index[0] = i[0];
 
                 assert(IN_uopSt[i].storeSqN <= nextBaseIndex + NUM_ENTRIES[$bits(SqN)-1:0] - 1);
                 assert(!entries[index].addrAvail);

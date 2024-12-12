@@ -70,7 +70,7 @@ reg[INTERVAL-1:0] decrCnt;
 reg decrBit;
 reg[$clog2(SIZE):0] resetIdx;
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     if (rst) begin
         decrCnt <= 0;

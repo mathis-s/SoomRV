@@ -253,7 +253,7 @@ Scheduler scheduler
 );
 
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     if (rst) begin
         counterSqN <= 0;

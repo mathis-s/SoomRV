@@ -187,7 +187,7 @@ always_ff@(posedge clk) idxs_r <= idxs_c;
 
 if (NUM_AGUS > 1) begin
     PortIdx startIdx;
-    always_ff@(posedge clk or posedge rst)
+    always_ff@(posedge clk )
         if (rst) startIdx <= 0;
         else startIdx <= (startIdx + 1);
 
@@ -333,7 +333,7 @@ reg loadWasExtIOBusy[NUM_AGUS-1:0];
 reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
 
 // Load Pipeline
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         for (integer j = 0; j < 2; j=j+1) begin
@@ -684,7 +684,7 @@ LoadResultBuffer#(`LRB_SIZE) loadResBuf[NUM_AGUS-1:0]
 );
 
 // Store Pipeline
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     if (rst) begin
         for (integer i = 0; i < 2; i=i+1)
             stOps[i] <= ST_UOp'{valid: 0, default: 'x};
@@ -914,7 +914,7 @@ always_comb begin
 end
 
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     if (rst) begin
         state <= IDLE;

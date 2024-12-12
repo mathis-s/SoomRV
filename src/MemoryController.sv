@@ -354,7 +354,7 @@ logic[WIDTH-1:0] buf_rdata;
 logic buf_rlast;
 logic buf_rvalid;
 logic buf_rready;
-FIFO#(R_LEN, 17, 1, 1) rFIFO
+FIFO#(R_LEN, 32, 1, 1) rFIFO
 (
     .clk(clk),
     .rst(rst),
@@ -439,7 +439,7 @@ logic[`CACHE_SIZE_E-3:0] DCR_CACHE_addr;
 
 logic DCR_cacheReadValid;
 logic[`AXI_ID_LEN-1:0] DCR_cacheReadId;
-CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 16, `AXI_ID_LEN) dcacheReadIF
+CacheReadInterface#(`CACHE_SIZE_E-2, 8, WIDTH, `CWIDTH*32, 32, `AXI_ID_LEN) dcacheReadIF
 (
     .clk(clk),
     .rst(rst),
@@ -484,7 +484,7 @@ AXI_AW axiAW;
 logic awFIFO_outValid;
 logic awFIFO_ready;
 assign s_axi_awvalid = awFIFO_outValid;
-FIFO#($bits(AXI_AW)-1, 2, 1, 1) awFIFO
+FIFO#($bits(AXI_AW)-1, 4, 1, 1) awFIFO
 (
     .clk(clk),
     .rst(rst),
@@ -579,7 +579,7 @@ assign DCR_dataReady = s_axi_wready;
 assign s_axi_bready = 1;
 
 // Input Transfers
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};

@@ -339,7 +339,7 @@ always_comb begin
     TMQ_enqueue = 0;
     TMQ_uopReady = 'x;
 
-    if (!rst && issUOp_c.valid &&
+    if (issUOp_c.valid &&
         (!IN_branch.taken || $signed(issUOp_c.sqN - IN_branch.sqN) <= 0) &&
         (IN_vmem.sv32en && exceptFlags == FLAGS_NONE && !IN_tlb.hit)
     ) begin
@@ -350,7 +350,7 @@ always_comb begin
 end
 
 reg[31:0] pageWalkAddr;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk) begin
 
     OUT_pw <= PageWalk_Req'{valid: 0, default: 'x};
     OUT_tvalProv <= TValProv'{valid: 0, default: 'x};

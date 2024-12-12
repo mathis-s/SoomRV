@@ -53,7 +53,7 @@ end
 
 EQEntry fusedUOp_r;
 EQEntry fusedUOp_c;
-always_ff@(posedge clk or posedge rst)
+always_ff@(posedge clk )
     if (rst) fusedUOp_r <= EQEntry'{valid: 0, default: 'x};
     else fusedUOp_r <= fusedUOp_c;
 
@@ -191,15 +191,14 @@ always_comb begin
 end
 
 ST_Ack stAck_r;
-always_ff@(posedge clk or posedge rst) begin
-    if (!rst) stAck_r <= IN_stAck;
-    else begin
-        stAck_r <= 'x;
-        stAck_r.valid <= 0;
+always_ff@(posedge clk ) begin
+    if (rst) begin
+        stAck_r <= ST_Ack'{valid: 0, default: 'x};
     end
+    else stAck_r <= IN_stAck;
 end
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= StFwdResult'{valid: 0, default: 'x};

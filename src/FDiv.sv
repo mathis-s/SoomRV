@@ -59,7 +59,7 @@ recFNToFN#(8, 24) recode
 );
 
 reg running;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     if (rst) begin
         OUT_uop <= RES_UOp'{valid: 0, default: 'x};

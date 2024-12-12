@@ -49,7 +49,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     if (rst) begin
         fullCond <= 0;
         indexIn <= 0;
@@ -75,6 +75,7 @@ always_ff@(posedge clk or posedge rst) begin
             // Insert
             if (doInsert) begin
                 mem[indexIn] <= IN_data;
+
                 // verilator lint_off WIDTHEXPAND
                 // verilator lint_off WIDTHTRUNC
                 indexIn <= (indexIn + 1) % NUM;
@@ -100,4 +101,13 @@ always_ff@(posedge clk or posedge rst) begin
         end
     end
 end
+/*
+// remove path from IN_valid to we.
+always_ff@(posedge clk) begin
+    // Insert
+    if (!full) begin
+        mem[indexIn] <= IN_data;
+    end
+end
+*/
 endmodule

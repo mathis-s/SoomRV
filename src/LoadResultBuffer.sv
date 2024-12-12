@@ -60,7 +60,7 @@ always_comb
         entryFree[i] = !entries[i].valid;
 PriorityEncoder#(SIZE, 1) freeEnc(entryFree, '{enq.idx}, '{enq.valid});
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     if (rst) begin
         for (integer i = 0; i < SIZE; i=i+1) begin
             entries[i] <= LoadResUOp'{valid: 0, default: 'x};
@@ -135,7 +135,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk or posedge rst)
+always_ff@(posedge clk )
     if (rst) OUT_resultUOp <= ResultUOp'{valid: 0, default: 'x};
     else OUT_resultUOp <= resultUOp_c;
 

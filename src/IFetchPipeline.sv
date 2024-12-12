@@ -122,7 +122,7 @@ InstrAligner#(.NUM_PACKETS(NUM_INST), .NUM_INSTRS(`DEC_WIDTH)) instrAligner
     .OUT_instr(OUT_instrs)
 );
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     OUT_pcFileWE <= 0;
     OUT_pcFileEntry <= 'x;
     OUT_pcFileAddr <= 'x;
@@ -409,7 +409,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk or posedge rst)
+always_ff@(posedge clk )
     if (rst) OUT_memc <= MemController_Req'{cmd: MEMC_NONE, default: 'x};
     else OUT_memc <= OUT_memc_c;
 
@@ -454,7 +454,7 @@ FetchID_t fetchID /* verilator public */;
 FetchID_t fetchID_c;
 IFetchOp fetch0 /* verilator public */;
 IFetchOp fetch1 /* verilator public */;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     fetch0 <= IFetchOp'{valid: 0, default: 'x};
     fetch1 <= IFetchOp'{valid: 0, default: 'x};
 
@@ -505,7 +505,7 @@ FlushState flushState;
 logic[$clog2(`CASSOC)-1:0] flushAssocIter;
 logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     if (rst) begin
         flushState <= FLUSH_QUEUED;
         flushAssocIter <= 'x;

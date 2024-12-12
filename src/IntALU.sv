@@ -250,7 +250,7 @@ else begin
 end
 
 
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     OUT_uop <= RES_UOp'{valid: 0, default: 'x};
     OUT_amoData <= AMO_Data_UOp'{valid: 0, default: 'x};

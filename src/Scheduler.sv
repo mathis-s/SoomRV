@@ -56,7 +56,7 @@ always_comb begin
 end
 
 logic[$clog2(NUM_ALUS)-1:0] prio_r;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
     if (rst) begin
         prio_r <= 0;
     end

@@ -129,7 +129,7 @@ end
 
 reg[$clog2(`AXI_NUM_TRANS)-1:0] curID;
 reg[COUNT_LEN-1:0] curCnt;
-always_ff@(posedge clk or posedge rst) begin
+always_ff@(posedge clk ) begin
 
     s_axi_awready <= 0;
     s_axi_arready <= 0;
