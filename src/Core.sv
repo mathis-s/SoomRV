@@ -34,7 +34,7 @@ assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
-CommitUOp comUOps[3:0] /*verilator public*/;
+CommitUOp comUOps[`DEC_WIDTH-1:0] /*verilator public*/;
 
 wire ifetchEn = en && !TH_disableIFetch;
 
@@ -51,7 +51,7 @@ BranchSelector#(4) bsel
     .clk(clk),
     .rst(rst),
 
-    .IN_isUOps(IS_uop[3:0]),
+    .IN_isUOps(IS_uop[NUM_BRANCH_PORTS-1:0]),
 
     .IN_branches(branchProvs[3:0]),
     .OUT_branch(branch),
@@ -521,9 +521,10 @@ PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[NUM_AGUS-1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
-always_comb
-    for (integer i = 1; i < NUM_AGUS; i=i+1)
-        PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+generate
+for (genvar i = 1; i < NUM_AGUS; i=i+1)
+    assign PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+endgenerate
 PageWalker#(NUM_AGUS+1) pageWalker
 (
     .clk(clk),

@@ -15,6 +15,8 @@
 
 // IFetch
 `define FSIZE_E 4
+parameter FETCH_BITS = 16 << (`FSIZE_E - 1);
+parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024

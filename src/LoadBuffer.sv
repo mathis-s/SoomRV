@@ -288,7 +288,7 @@ RangeMaskGen#(NUM_ENTRIES, 1) invalMaskBrGen
     .OUT_range(invalMaskBr)
 );
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     OUT_comLimit.sqN <= 'x;
     OUT_comLimit.valid <= 0;
 
@@ -350,7 +350,7 @@ always_ff@(posedge clk)
 
 LoadRsv specRsv;
 LoadRsv comRsv;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     if (rst) begin
         for (integer i = 0; i < NUM_ENTRIES; i=i+1) begin

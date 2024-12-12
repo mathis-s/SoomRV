@@ -65,8 +65,6 @@ SRC_FILES = \
 	src/IFetchPipeline.sv \
 	src/CSR.sv \
 	src/TrapHandler.sv \
-	src/CacheInterface.sv \
-	src/MemoryInterface.sv \
 	src/Peripherals.sv \
 	src/PageWalker.sv \
 	src/LoadSelector.sv \
@@ -92,6 +90,10 @@ SRC_FILES = \
 	src/ResultFlagsSplit.sv \
 	src/InstrAligner.sv \
 	src/RFReadMux.sv \
+	src/CacheArbiter.sv \
+	src/MemRTL1RW.sv \
+	src/ExternalBus.sv \
+	src/ExternalBusMem.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

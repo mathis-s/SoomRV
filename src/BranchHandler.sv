@@ -485,9 +485,10 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         lastInstr <= 'x;
+        lastInstrPC <= 'x;
         lastInstrValid <= 0;
     end
     else begin
