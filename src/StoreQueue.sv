@@ -46,7 +46,7 @@ typedef struct packed
 } SQEntry;
 
 reg[NUM_ENTRIES-1:0] entryReady_r /* verilator public */;
-always_ff@(posedge clk )
+always_ff@(posedge clk /*or posedge rst*/)
     if (rst) entryReady_r <= 0;
     else entryReady_r <= entryReady_c;
 
@@ -349,7 +349,7 @@ wire SqN nextBaseIndex = baseIndex + SqN'(deqCount);
 // Dequeue/Enqueue
 reg flushing;
 assign OUT_flush = flushing;
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         OUT_fwd[i] <= 'x;

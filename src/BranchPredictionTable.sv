@@ -44,7 +44,7 @@ end
 
 logic[IDX_LEN:0] resetIdx;
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         write_r <= Write'{valid: 0, default: 'x};
         resetIdx <= 0;

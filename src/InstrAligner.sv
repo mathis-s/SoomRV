@@ -73,7 +73,7 @@ wire FetchCycle cur_c = FetchCycle'{
 FetchCycle[BUF_SIZE-1:0] prev_r;
 wire FetchCycle[BUF_SIZE:0] cycles_c = {cur_c, prev_r};
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     if (rst) begin
         for (integer i = 0; i < BUF_SIZE; i=i+1) begin
@@ -173,7 +173,7 @@ end
 
 wire outputReady;
 if (FF_OUTPUT) begin
-    always_ff@(posedge clk ) begin
+    always_ff@(posedge clk /*or posedge rst*/) begin
         if (rst) begin
             for (integer i = 0; i < NUM_INSTRS; i=i+1)
                 OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};

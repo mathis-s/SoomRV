@@ -1540,7 +1540,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     OUT_decBranch <= DecodeBranch'{taken: 0, default: 'x};
     if (rst) begin

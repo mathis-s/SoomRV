@@ -67,7 +67,7 @@ always_ff@(posedge clk) begin
     OUT_dbgStallPC <= OUT_dbgStallPC_c;
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst)
         memoryWait <= 0;
     else if (setMemoryWait)

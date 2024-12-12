@@ -59,7 +59,7 @@ end
 
 reg ignoreCur;
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         for (integer i = 0; i < LEN; i=i+1) begin
             counters[i] <= 0;

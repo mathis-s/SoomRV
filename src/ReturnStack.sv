@@ -142,7 +142,7 @@ always_comb begin
         ));
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     forwardRindex <= 0;
 

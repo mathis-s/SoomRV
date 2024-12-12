@@ -110,7 +110,7 @@ always_comb begin
         else doAcc = 1;
     end
 end
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         accIdx_r <= 0;
     end
@@ -176,7 +176,7 @@ always_comb begin
 end
 
 ReadMeta[1:0] readMetaSR;
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     if (rst) begin
         cur <= Transfer'{valid: 0, default: 'x};

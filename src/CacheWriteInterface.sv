@@ -139,7 +139,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     OUT_ackValid <= 0;
     OUT_ackId <= 'x;

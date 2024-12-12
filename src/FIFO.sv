@@ -49,7 +49,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         fullCond <= 0;
         indexIn <= 0;

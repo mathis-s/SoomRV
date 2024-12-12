@@ -113,7 +113,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) ;
     else if (!(s_axi_rvalid && !s_axi_rready)) begin
         s_axi_rid <= 'x;
@@ -218,7 +218,7 @@ always_comb begin
     end
 end
 assign buf_wready = writeIdxValid;
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     reg[ID_LEN-1:0] idx = writeIdx;
     if (rst) ;
     else if (buf_wready && buf_wvalid) begin
@@ -258,7 +258,7 @@ always_ff@(posedge clk ) begin
 end
 
 // Write Ack Output
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
 
     if (rst) ;
@@ -357,7 +357,7 @@ FIFO#(AR_LEN, 2, 1, 1) arFIFO
 assign buf_arready = !tfs[0][buf_arid].valid && buf_arvalid;
 assign buf_awready = !tfs[1][buf_awid].valid && buf_awvalid;
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) ;
     else begin
         if (buf_arready) begin

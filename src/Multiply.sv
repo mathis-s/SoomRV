@@ -38,7 +38,7 @@ typedef struct packed
 MulPS pl[NUM_STAGES:0];
 assign OUT_busy = 0;
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     for (integer i = 0; i < NUM_STAGES+1; i=i+1) begin
         pl[i] <= 'x;

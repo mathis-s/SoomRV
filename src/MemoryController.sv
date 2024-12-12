@@ -579,7 +579,7 @@ assign DCR_dataReady = s_axi_wready;
 assign s_axi_bready = 1;
 
 // Input Transfers
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     sglStRes <= MemController_SglStRes'{default: 'x, valid: 0};
     sglLdRes <= MemController_SglLdRes'{default: 'x, valid: 0};

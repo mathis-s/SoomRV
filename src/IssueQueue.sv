@@ -199,7 +199,7 @@ struct packed
 } deq;
 PriorityEncoder #(SIZE) penc(deqCandidate_c, '{deq.idx}, '{deq.valid});
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     reg[ID_LEN:0] newInsertIndex = 'x;
 

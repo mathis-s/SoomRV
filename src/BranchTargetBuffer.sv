@@ -74,7 +74,7 @@ SetMultiple setMult;
 
 logic[$clog2(LENGTH):0] resetIdx;
 
-always_ff@(posedge clk ) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         setMult <= SetMultiple'{valid: 0, default: 'x};
         resetIdx <= 0;
