@@ -839,6 +839,46 @@ typedef struct packed
 
 typedef struct packed
 {
+    logic[32-`VIRT_IDX_LEN-1:0] addr;
+    logic valid;
+} CTEntry;
+
+
+typedef struct packed
+{
+    logic[`VIRT_IDX_LEN-1:0] addr;
+    logic valid;
+} CacheTableRead;
+
+typedef struct packed
+{
+    CTEntry[`CASSOC-1:0] data;
+} CacheTableResult;
+
+typedef enum logic[3:0]
+{
+    REGULAR, REGULAR_NO_EVICT, TRANS_IN_PROG, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, CONFLICT
+} MissType;
+
+typedef struct packed
+{
+    logic[31:0] writeAddr;
+    logic[31:0] missAddr;
+    logic[$clog2(`CASSOC)-1:0] assoc;
+    MissType mtype;
+    logic valid;
+} CacheMiss;
+
+typedef logic[`CACHE_SIZE_E-`CLSIZE_E-1:0] CacheLineIdx;
+
+typedef struct packed
+{
+    CacheLineIdx idx;
+    logic valid;
+} CacheLineSetDirty;
+
+typedef struct packed
+{
     logic[31:0] addr;
     SqN loadSqN;
     logic fail;
@@ -1091,12 +1131,6 @@ interface IF_Cache();
         output rdata, busy
     );
 endinterface
-
-typedef struct packed
-{
-    logic[32-`VIRT_IDX_LEN-1:0] addr;
-    logic valid;
-} CTEntry;
 
 typedef struct packed
 {

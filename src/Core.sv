@@ -687,19 +687,20 @@ wire CC_storeStall;
 wire LSU_AGUStall[NUM_AGUS-1:0];
 LD_UOp CC_SQ_uopLd[NUM_AGUS-1:0];
 LD_Ack LSU_ldAck[NUM_AGUS-1:0];
-wire LSU_busy;
 
 MemController_Req LSU_MC_if;
 MemController_Req BLSU_MC_if;
 ST_Ack LSU_stAck;
+
+CacheLineSetDirty LSU_setDirty;
+CacheMiss LSU_cacheMiss;
+
 LoadStoreUnit lsu
 (
     .clk(clk),
     .rst(rst),
 
-    .IN_flush(TH_startFence),
-    .IN_storeBusy(STORE_busy),
-    .OUT_busy(LSU_busy),
+    .IN_enable(1'b1), // todo: register
 
     .IN_branch(branch),
     .OUT_ldAGUStall(LSU_AGUStall),
@@ -717,19 +718,55 @@ LoadStoreUnit lsu
 
     .IF_cache(IF_cache),
     .IF_mmio(IF_mmio),
-    .IF_ct(IF_ct),
+
+    .IN_ctReadReady(CLM_ctReadReady),
+    .OUT_ctRead(CLM_ctRead),
+    .IN_ctResult(CLM_ctResult),
+
+    .OUT_setDirty(LSU_setDirty),
+    .OUT_miss(LSU_cacheMiss),
+    .IN_missReady(CLM_missReady),
 
     .IN_sqStFwd(SQ_fwd),
     .IN_sqbStFwd(SQB_fwd),
     .OUT_stAck(LSU_stAck),
 
-    .OUT_memc(LSU_MC_if),
     .OUT_BLSU_memc(BLSU_MC_if),
+    .LSU_memc(LSU_MC_if),
     .IN_memc(IN_memc),
 
     .IN_ready({NUM_AGUS{1'b1}}),
     .OUT_resultUOp(resultUOps[NUM_ALUS+:NUM_AGUS]),
     .OUT_flagsUOp(flagUOps[NUM_ALUS+:NUM_AGUS])
+);
+
+wire CLM_busy;
+wire CLM_ctReadReady[NUM_AGUS-1:0];
+CacheTableRead CLM_ctRead[NUM_AGUS-1:0];
+CacheTableResult CLM_ctResult[NUM_AGUS-1:0];
+wire CLM_missReady;
+CacheLineManager cacheLineManager
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IF_ct(IF_ct),
+
+    .IN_flush(TH_startFence),
+    .IN_storeBusy(STORE_busy),
+    .OUT_busy(CLM_busy),
+
+    .IN_setDirty(LSU_setDirty),
+
+    .IN_ctRead(CLM_ctRead),
+    .OUT_ctReadReady(CLM_ctReadReady),
+    .OUT_ctResult(CLM_ctResult),
+
+    .IN_miss(LSU_cacheMiss),
+    .OUT_missReady(CLM_missReady),
+
+    .OUT_memc(LSU_MC_if),
+    .IN_memc(IN_memc)
 );
 
 SqN ROB_maxSqN;
@@ -772,7 +809,7 @@ ROB rob
 );
 
 wire STORE_busy = !SQ_empty || SQB_busy;
-wire MEM_busy = STORE_busy || LSU_busy;
+wire MEM_busy = STORE_busy || CLM_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;

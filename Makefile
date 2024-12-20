@@ -94,6 +94,7 @@ SRC_FILES = \
 	src/MemRTL1RW.sv \
 	src/ExternalBus.sv \
 	src/ExternalBusMem.sv \
+	src/CacheLineManager.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

@@ -213,6 +213,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
     else begin
 
         if (OUT_uopSt.valid) begin
+            // todo: don't flip flop valid when this is the best store to issue.
             OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
             if (IN_stallSt)
                 evicted[OUT_uopSt.id].issued <= 0;
