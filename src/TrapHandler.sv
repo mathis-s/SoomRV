@@ -65,14 +65,15 @@ always_ff@(posedge clk) begin
     trapPCSpec_r <= trapPCSpec_c;
     OUT_flushTLB <= OUT_flushTLB_c;
     OUT_dbgStallPC <= OUT_dbgStallPC_c;
+end
 
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst)
         memoryWait <= 0;
     else if (setMemoryWait)
         memoryWait <= 1;
     else if (memoryWait && !IN_MEM_busy)
         memoryWait <= 0;
-
 end
 
 assign OUT_branch = OUT_branch_c;
@@ -172,7 +173,7 @@ always_comb begin
             ) begin
 
                 TrapCause_t trapCause = RVP_TRAP_ILLEGAL;
-                reg delegate;
+                reg delegate = 'x;
                 reg isInterrupt = !IN_trapInstr.timeout &&
                     (IN_trapInstr.flags == FLAGS_TRAP && IN_trapInstr.rd == 5'(TRAP_V_INTERRUPT));
 

@@ -266,10 +266,10 @@ FIFO#($bits(BPUpdate)-1, 4, 1, 0) updFIFO
 );
 
 BPUpdate bpUpdateActive;
-always_ff@(posedge clk) begin
-    bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
-    if (!rst && updFIFO_deq)
-        bpUpdateActive <= bpUpdate;
+always_ff@(posedge clk /*or posedge rst*/) begin
+    if (rst) bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
+    else if (updFIFO_deq) bpUpdateActive <= bpUpdate;
+    else bpUpdateActive <= BPUpdate'{valid: 0, default: 'x};
 end
 always_comb begin
     OUT_fetchLimit = FetchLimit'{valid: 0, default: 'x};
@@ -333,13 +333,14 @@ BHist_t history;
 reg[30:0] pcReg;
 reg[30:0] pcRegNoInc;
 reg ignorePred;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     recovery <= Recovery'{valid: 0, default: 'x};
 
     if (rst) begin
         pcReg <= 31'(`ENTRY_POINT >> 1);
         ignorePred <= 1;
         history <= 0;
+        pcRegNoInc <= 'x;
     end
     else begin
         if (IN_pcValid) begin

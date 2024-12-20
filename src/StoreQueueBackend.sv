@@ -16,7 +16,9 @@ module StoreQueueBackend#(parameter NUM_IN = 2, parameter NUM_EVICTED = 4)
     input ST_Ack IN_stAck
 );
 localparam AXI_BWIDTH = `AXI_WIDTH/8;
-localparam AXI_BWIDTH_E = $clog2(`AXI_WIDTH/8);
+localparam AXI_WWIDTH = `AXI_WIDTH/32;
+localparam AXI_BWIDTH_E = $clog2(AXI_BWIDTH);
+localparam AXI_WWIDTH_E = $clog2(AXI_WWIDTH);
 
 typedef struct packed
 {
@@ -51,8 +53,9 @@ end
 
 EQEntry fusedUOp_r;
 EQEntry fusedUOp_c;
-always_ff@(posedge clk)
-    fusedUOp_r <= rst ? EQEntry'{valid: 0, default: 'x} : fusedUOp_c;
+always_ff@(posedge clk /*or posedge rst*/)
+    if (rst) fusedUOp_r <= EQEntry'{valid: 0, default: 'x};
+    else fusedUOp_r <= fusedUOp_c;
 
 always_comb begin
     fusedUOp_c = fusedUOp_r;
@@ -80,7 +83,7 @@ always_comb begin
         end
         else begin
             fusedUOp_c.wmask = AXI_BWIDTH'(IN_uop[0].wmask) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*4;
-            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], 2'b0};
+            fusedUOp_c.addr = {IN_uop[0].addr[31:AXI_BWIDTH_E], {AXI_WWIDTH_E{1'b0}}};
             fusedUOp_c.data = `AXI_WIDTH'(IN_uop[0].data) << IN_uop[0].addr[AXI_BWIDTH_E-1:2]*32;
 
             // Try to fuse in younger stores
@@ -188,29 +191,29 @@ always_comb begin
 end
 
 ST_Ack stAck_r;
-always_ff@(posedge clk) begin
-    if (!rst) stAck_r <= IN_stAck;
-    else begin
-        stAck_r <= 'x;
-        stAck_r.valid <= 0;
+always_ff@(posedge clk /*or posedge rst*/) begin
+    if (rst) begin
+        stAck_r <= ST_Ack'{valid: 0, default: 'x};
     end
+    else stAck_r <= IN_stAck;
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-        OUT_fwd[i] <= 'x;
-        OUT_fwd[i].valid <= 0;
+        OUT_fwd[i] <= StFwdResult'{valid: 0, default: 'x};
     end
 
     if (rst) begin
-        for (integer i = 0; i < NUM_EVICTED; i=i+1)
-            evicted[i].valid <= 0;
-        OUT_uopSt.valid <= 0;
+        for (integer i = 0; i < NUM_EVICTED; i=i+1) begin
+            evicted[i] <= EQEntry'{valid: 0, wmask: 0, nonce: 0, default: 'x};
+        end
+        OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
     end
     else begin
 
         if (OUT_uopSt.valid) begin
+            // todo: don't flip flop valid when this is the best store to issue.
             OUT_uopSt <= ST_UOp'{valid: 0, default: 'x};
             if (IN_stallSt)
                 evicted[OUT_uopSt.id].issued <= 0;
@@ -221,7 +224,6 @@ always_ff@(posedge clk) begin
             if (evicted[stAck_r.idx].nonce == stAck_r.nonce) begin
                 evicted[stAck_r.idx].issued <= 0;
                 if (!stAck_r.fail) begin
-                    evicted[stAck_r.idx] <= 'x;
                     evicted[stAck_r.idx].wmask <= 0;
                     evicted[stAck_r.idx].valid <= 0;
                 end

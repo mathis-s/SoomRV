@@ -2,10 +2,10 @@
 
 module InstrAligner
 #(
-    localparam NUM_PACKETS = 8,
-    localparam NUM_INSTRS = 4,
-    localparam BUF_SIZE = 2,
-    localparam FF_OUTPUT = 1
+    parameter NUM_PACKETS = 8,
+    parameter NUM_INSTRS = 4,
+    parameter BUF_SIZE = 2,
+    parameter FF_OUTPUT = 1
 )
 (
     input wire clk,
@@ -39,7 +39,7 @@ logic is32bit;
 always_comb begin
     is32bit = 'x;
     // The first word may be consumed by a 32-bit instruction that started in the previous packet
-    validInstrStart_c = !(prev_r[BUF_SIZE-1].start[WINDOW_SIZE-1] && prev_r[BUF_SIZE-1].start32[WINDOW_SIZE-1]);
+    validInstrStart_c = !(prev_r[BUF_SIZE-1].start[NUM_PACKETS-1] && prev_r[BUF_SIZE-1].start32[NUM_PACKETS-1]);
 
     for (integer i = 0; i < NUM_PACKETS; i=i+1) begin
 
@@ -73,25 +73,35 @@ wire FetchCycle cur_c = FetchCycle'{
 FetchCycle[BUF_SIZE-1:0] prev_r;
 wire FetchCycle[BUF_SIZE:0] cycles_c = {cur_c, prev_r};
 
-always_ff@(posedge clk) begin
-    if (validCycle) begin
-        for (integer i = 0; i < BUF_SIZE; i=i+1) begin
-            prev_r[i].start   <= cycles_c[i+1].start & unhandled_c[(i+1)*NUM_PACKETS+:NUM_PACKETS];
-            prev_r[i].start32 <= cycles_c[i+1].start32;
-            prev_r[i].op      <= cycles_c[i+1].op;
-        end
-    end
-    else begin
-        for (integer i = 0; i < BUF_SIZE; i=i+1) begin
-            prev_r[i].start   <= prev_r[i].start & unhandled_c[i*NUM_PACKETS+:NUM_PACKETS];
-        end
-    end
+always_ff@(posedge clk /*or posedge rst*/) begin
 
-    if (rst || IN_clear) begin
+    if (rst) begin
         for (integer i = 0; i < BUF_SIZE; i=i+1) begin
             prev_r[i].start <= 0;
             prev_r[i].start32 <= 0;
             prev_r[i].op <= IF_Instr'{valid: 0, default: 'x};
+        end
+    end
+    else begin
+        if (validCycle) begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start   <= cycles_c[i+1].start & unhandled_c[(i+1)*NUM_PACKETS+:NUM_PACKETS];
+                prev_r[i].start32 <= cycles_c[i+1].start32;
+                prev_r[i].op      <= cycles_c[i+1].op;
+            end
+        end
+        else begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start   <= prev_r[i].start & unhandled_c[i*NUM_PACKETS+:NUM_PACKETS];
+            end
+        end
+
+        if (IN_clear) begin
+            for (integer i = 0; i < BUF_SIZE; i=i+1) begin
+                prev_r[i].start <= 0;
+                prev_r[i].start32 <= 0;
+                prev_r[i].op <= IF_Instr'{valid: 0, default: 'x};
+            end
         end
     end
 end
@@ -101,7 +111,7 @@ logic[WINDOW_SIZE-1:0][15:0] window_c;
 logic[WINDOW_SIZE-1:0] windowStart_c;
 logic[WINDOW_SIZE-1:0] windowStart32_c;
 
-wire lastIsSplit32 = isInstrStart32_c[BUF_SIZE*NUM_PACKETS-1];
+wire lastIsSplit32 = isInstrStart32_c[NUM_PACKETS-1];
 wire middleIsSplit32 = prev_r[BUF_SIZE-1].start32[NUM_PACKETS-1] && !IN_op.valid;
 always_comb begin
     for (integer i = 0; i <= BUF_SIZE; i=i+1) begin
@@ -163,15 +173,19 @@ end
 
 wire outputReady;
 if (FF_OUTPUT) begin
-    always_ff@(posedge clk) begin
-        for (integer i = 0; i < NUM_INSTRS; i=i+1) begin
-            if (rst || IN_clear) begin
+    always_ff@(posedge clk /*or posedge rst*/) begin
+        if (rst) begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
                 OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
-            end
-            else begin
+        end
+        else if (IN_clear) begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
+                OUT_instr[i] <= PD_Instr'{valid: 0, default: 'x};
+        end
+        else begin
+            for (integer i = 0; i < NUM_INSTRS; i=i+1)
                 if (outputReady)
                     OUT_instr[i] <= instr_c[i];
-            end
         end
     end
     assign outputReady = !OUT_instr[0].valid || IN_ready;

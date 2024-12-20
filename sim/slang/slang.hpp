@@ -270,6 +270,412 @@ namespace  {
 
     };
 
+    struct MemC_Cmd {
+        enum Type : uint8_t {
+            MEMC_NONE = 0,
+            MEMC_REPLACE = 1,
+            MEMC_CP_CACHE_TO_EXT = 2,
+            MEMC_CP_EXT_TO_CACHE = 3,
+            MEMC_READ_BYTE = 4,
+            MEMC_READ_HALF = 5,
+            MEMC_READ_WORD = 6,
+            MEMC_WRITE_BYTE = 7,
+            MEMC_WRITE_HALF = 8,
+            MEMC_WRITE_WORD = 9
+        };
+
+        static constexpr size_t _size = 4;
+
+        Type type;
+        MemC_Cmd() = default;
+        MemC_Cmd (uint8_t __data) {
+            switch (__data) {
+                case 0: type = Type::MEMC_NONE; break;
+                case 1: type = Type::MEMC_REPLACE; break;
+                case 2: type = Type::MEMC_CP_CACHE_TO_EXT; break;
+                case 3: type = Type::MEMC_CP_EXT_TO_CACHE; break;
+                case 4: type = Type::MEMC_READ_BYTE; break;
+                case 5: type = Type::MEMC_READ_HALF; break;
+                case 6: type = Type::MEMC_READ_WORD; break;
+                case 7: type = Type::MEMC_WRITE_BYTE; break;
+                case 8: type = Type::MEMC_WRITE_HALF; break;
+                case 9: type = Type::MEMC_WRITE_WORD; break;
+                default: throw std::runtime_error("Can not create MemC_Cmd from provided value");
+            }
+        }
+
+        MemC_Cmd (Type& type) { this->type = type; }
+        friend std::ostream& operator<<(std::ostream& os, const MemC_Cmd& __data) {
+            switch (__data.type) {
+                case Type::MEMC_NONE: os << "MEMC_NONE"; break;
+                case Type::MEMC_REPLACE: os << "MEMC_REPLACE"; break;
+                case Type::MEMC_CP_CACHE_TO_EXT: os << "MEMC_CP_CACHE_TO_EXT"; break;
+                case Type::MEMC_CP_EXT_TO_CACHE: os << "MEMC_CP_EXT_TO_CACHE"; break;
+                case Type::MEMC_READ_BYTE: os << "MEMC_READ_BYTE"; break;
+                case Type::MEMC_READ_HALF: os << "MEMC_READ_HALF"; break;
+                case Type::MEMC_READ_WORD: os << "MEMC_READ_WORD"; break;
+                case Type::MEMC_WRITE_BYTE: os << "MEMC_WRITE_BYTE"; break;
+                case Type::MEMC_WRITE_HALF: os << "MEMC_WRITE_HALF"; break;
+                case Type::MEMC_WRITE_WORD: os << "MEMC_WRITE_WORD"; break;
+            }
+            return os;
+        }
+
+        MemC_Cmd& operator=(const Type t) {
+            this->type = t;
+            return *this;
+        }
+
+        operator uint64_t() const {
+            return static_cast<uint64_t>(type);
+        }
+
+        Type operator() () const {
+            return type;
+        }
+
+    };
+
+    struct MemController_SglLdRes {
+        bool valid;
+        uint32_t id;
+        uint32_t data;
+
+        static constexpr size_t valid_s = 0;
+        static constexpr size_t valid_w = 1;
+        static constexpr size_t id_s = 1;
+        static constexpr size_t id_w = 12;
+        static constexpr size_t data_s = 13;
+        static constexpr size_t data_w = 32;
+        static constexpr size_t _size = 45;
+
+        MemController_SglLdRes() = default;
+
+        MemController_SglLdRes(const uint64_t& __data) {
+            valid = (__data >> valid_s) & (~0ULL >> (64 - 1));
+            id = (__data >> id_s) & (~0ULL >> (64 - 12));
+            data = (__data >> data_s) & (~0ULL >> (64 - 32));
+        }
+
+        MemController_SglLdRes(const sc_bv<45>& __data) {
+            valid = __data.get_bit(valid_s);
+            id = __data.range(id_s + id_w - 1, id_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s).to_uint64();
+        }
+
+        operator uint64_t() const {
+            uint64_t ret = 0;
+            ret |= static_cast<uint64_t>(valid) << valid_s;
+            ret |= static_cast<uint64_t>(id) << id_s;
+            ret |= static_cast<uint64_t>(data) << data_s;
+            return ret;
+        }
+
+        operator sc_bv<45>() const {
+            auto ret = sc_bv<45>();
+            ret.set_bit(valid_s, valid);
+            ret.range(id_s + id_w - 1, id_s) = id;
+            ret.range(data_s + data_w - 1, data_s) = data;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "valid" << " = " << valid;
+            ss << " id" << " = " << id;
+            ss << " data" << " = " << data;
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const MemController_SglLdRes& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_valid (const uint64_t& __data) {
+            return (__data >> valid_s) & (~0ULL >> (64 - 1));
+        }
+        static uint32_t get_id (const uint64_t& __data) {
+            return (__data >> id_s) & (~0ULL >> (64 - 12));
+        }
+        static uint32_t get_data (const uint64_t& __data) {
+            return (__data >> data_s) & (~0ULL >> (64 - 32));
+        }
+    };
+
+    struct MemController_SglStRes {
+        bool valid;
+        uint32_t id;
+
+        static constexpr size_t valid_s = 0;
+        static constexpr size_t valid_w = 1;
+        static constexpr size_t id_s = 1;
+        static constexpr size_t id_w = 12;
+        static constexpr size_t _size = 13;
+
+        MemController_SglStRes() = default;
+
+        MemController_SglStRes(const uint32_t& __data) {
+            valid = (__data >> valid_s) & (~0ULL >> (64 - 1));
+            id = (__data >> id_s) & (~0ULL >> (64 - 12));
+        }
+
+        MemController_SglStRes(const sc_bv<13>& __data) {
+            valid = __data.get_bit(valid_s);
+            id = __data.range(id_s + id_w - 1, id_s).to_uint64();
+        }
+
+        operator uint32_t() const {
+            uint32_t ret = 0;
+            ret |= static_cast<uint32_t>(valid) << valid_s;
+            ret |= static_cast<uint32_t>(id) << id_s;
+            return ret;
+        }
+
+        operator sc_bv<13>() const {
+            auto ret = sc_bv<13>();
+            ret.set_bit(valid_s, valid);
+            ret.range(id_s + id_w - 1, id_s) = id;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "valid" << " = " << valid;
+            ss << " id" << " = " << id;
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const MemController_SglStRes& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_valid (const uint32_t& __data) {
+            return (__data >> valid_s) & (~0ULL >> (64 - 1));
+        }
+        static uint32_t get_id (const uint32_t& __data) {
+            return (__data >> id_s) & (~0ULL >> (64 - 12));
+        }
+    };
+
+    struct MemController_LdDataFwd {
+        bool valid;
+        uint32_t addr;
+        sc_bv<128> data;
+
+        static constexpr size_t valid_s = 0;
+        static constexpr size_t valid_w = 1;
+        static constexpr size_t addr_s = 1;
+        static constexpr size_t addr_w = 32;
+        static constexpr size_t data_s = 33;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t _size = 161;
+
+        MemController_LdDataFwd() = default;
+
+        MemController_LdDataFwd(const sc_bv<161>& __data) {
+            valid = __data.get_bit(valid_s);
+            addr = __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
+        }
+
+        operator sc_bv<161>() const {
+            auto ret = sc_bv<161>();
+            ret.set_bit(valid_s, valid);
+            ret.range(addr_s + addr_w - 1, addr_s) = addr;
+            ret.range(data_s + data_w - 1, data_s) = data;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "valid" << " = " << valid;
+            ss << " addr" << " = " << addr;
+            ss << " data" << " = " << data.to_string();
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const MemController_LdDataFwd& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_valid (const sc_bv<161>& __data) {
+            return __data.get_bit(valid_s);
+        }
+        static uint32_t get_addr (const sc_bv<161>& __data) {
+            return __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
+        }
+        static sc_bv<128> get_data (const sc_bv<161>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
+        }
+    };
+
+    struct MemController_Req {
+        MemC_Cmd cmd;
+        bool cacheID;
+        uint32_t writeAddr;
+        uint32_t readAddr;
+        uint32_t cacheAddr;
+        sc_bv<128> data;
+        uint32_t mask;
+
+        static constexpr size_t cmd_s = 0;
+        static constexpr size_t cmd_w = 4;
+        static constexpr size_t cacheID_s = 4;
+        static constexpr size_t cacheID_w = 1;
+        static constexpr size_t writeAddr_s = 5;
+        static constexpr size_t writeAddr_w = 32;
+        static constexpr size_t readAddr_s = 37;
+        static constexpr size_t readAddr_w = 32;
+        static constexpr size_t cacheAddr_s = 69;
+        static constexpr size_t cacheAddr_w = 12;
+        static constexpr size_t data_s = 81;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t mask_s = 209;
+        static constexpr size_t mask_w = 16;
+        static constexpr size_t _size = 225;
+
+        MemController_Req() = default;
+
+        MemController_Req(const sc_bv<225>& __data) {
+            cmd = MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
+            cacheID = __data.get_bit(cacheID_s);
+            writeAddr = __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
+            readAddr = __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
+            cacheAddr = __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
+            mask = __data.range(mask_s + mask_w - 1, mask_s).to_uint64();
+        }
+
+        operator sc_bv<225>() const {
+            auto ret = sc_bv<225>();
+            ret.range(cmd_s + cmd_w - 1, cmd_s) = cmd;
+            ret.set_bit(cacheID_s, cacheID);
+            ret.range(writeAddr_s + writeAddr_w - 1, writeAddr_s) = writeAddr;
+            ret.range(readAddr_s + readAddr_w - 1, readAddr_s) = readAddr;
+            ret.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s) = cacheAddr;
+            ret.range(data_s + data_w - 1, data_s) = data;
+            ret.range(mask_s + mask_w - 1, mask_s) = mask;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "cmd" << " = " << cmd;
+            ss << " cacheID" << " = " << cacheID;
+            ss << " writeAddr" << " = " << writeAddr;
+            ss << " readAddr" << " = " << readAddr;
+            ss << " cacheAddr" << " = " << cacheAddr;
+            ss << " data" << " = " << data.to_string();
+            ss << " mask" << " = " << mask;
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const MemController_Req& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static MemC_Cmd get_cmd (const sc_bv<225>& __data) {
+            return MemC_Cmd(__data.range(cmd_s + cmd_w - 1, cmd_s).to_uint64());
+        }
+        static bool get_cacheID (const sc_bv<225>& __data) {
+            return __data.get_bit(cacheID_s);
+        }
+        static uint32_t get_writeAddr (const sc_bv<225>& __data) {
+            return __data.range(writeAddr_s + writeAddr_w - 1, writeAddr_s).to_uint64();
+        }
+        static uint32_t get_readAddr (const sc_bv<225>& __data) {
+            return __data.range(readAddr_s + readAddr_w - 1, readAddr_s).to_uint64();
+        }
+        static uint32_t get_cacheAddr (const sc_bv<225>& __data) {
+            return __data.range(cacheAddr_s + cacheAddr_w - 1, cacheAddr_s).to_uint64();
+        }
+        static sc_bv<128> get_data (const sc_bv<225>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
+        }
+        static uint32_t get_mask (const sc_bv<225>& __data) {
+            return __data.range(mask_s + mask_w - 1, mask_s).to_uint64();
+        }
+    };
+
+    struct MemController_Res {
+        bool busy;
+        uint32_t stall;
+        MemController_SglStRes sglStRes;
+        MemController_SglLdRes sglLdRes;
+        sc_bv<336> transfers;
+        MemController_LdDataFwd ldDataFwd;
+
+        static constexpr size_t busy_s = 0;
+        static constexpr size_t busy_w = 1;
+        static constexpr size_t stall_s = 1;
+        static constexpr size_t stall_w = 3;
+        static constexpr size_t sglStRes_s = 4;
+        static constexpr size_t sglStRes_w = 13;
+        static constexpr size_t sglLdRes_s = 17;
+        static constexpr size_t sglLdRes_w = 45;
+        static constexpr size_t transfers_s = 62;
+        static constexpr size_t transfers_w = 336;
+        static constexpr size_t ldDataFwd_s = 398;
+        static constexpr size_t ldDataFwd_w = 161;
+        static constexpr size_t _size = 559;
+
+        MemController_Res() = default;
+
+        MemController_Res(const sc_bv<559>& __data) {
+            busy = __data.get_bit(busy_s);
+            stall = __data.range(stall_s + stall_w - 1, stall_s).to_uint64();
+            sglStRes = MemController_SglStRes(__data.range(sglStRes_s + sglStRes_w - 1, sglStRes_s).to_uint64());
+            sglLdRes = MemController_SglLdRes(__data.range(sglLdRes_s + sglLdRes_w - 1, sglLdRes_s).to_uint64());
+            transfers = __data.range(transfers_s + transfers_w - 1, transfers_s);
+            ldDataFwd = MemController_LdDataFwd(__data.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s));
+        }
+
+        operator sc_bv<559>() const {
+            auto ret = sc_bv<559>();
+            ret.set_bit(busy_s, busy);
+            ret.range(stall_s + stall_w - 1, stall_s) = stall;
+            ret.range(sglStRes_s + sglStRes_w - 1, sglStRes_s) = sglStRes;
+            ret.range(sglLdRes_s + sglLdRes_w - 1, sglLdRes_s) = sglLdRes;
+            ret.range(transfers_s + transfers_w - 1, transfers_s) = transfers;
+            ret.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s) = sc_bv<161>(ldDataFwd);
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "busy" << " = " << busy;
+            ss << " stall" << " = " << stall;
+            ss << " sglStRes" << " = " << sglStRes.to_string();
+            ss << " sglLdRes" << " = " << sglLdRes.to_string();
+            ss << " transfers" << " = " << transfers.to_string();
+            ss << " ldDataFwd" << " = " << ldDataFwd.to_string();
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const MemController_Res& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_busy (const sc_bv<559>& __data) {
+            return __data.get_bit(busy_s);
+        }
+        static uint32_t get_stall (const sc_bv<559>& __data) {
+            return __data.range(stall_s + stall_w - 1, stall_s).to_uint64();
+        }
+        static MemController_SglStRes get_sglStRes (const sc_bv<559>& __data) {
+            return MemController_SglStRes(__data.range(sglStRes_s + sglStRes_w - 1, sglStRes_s).to_uint64());
+        }
+        static MemController_SglLdRes get_sglLdRes (const sc_bv<559>& __data) {
+            return MemController_SglLdRes(__data.range(sglLdRes_s + sglLdRes_w - 1, sglLdRes_s).to_uint64());
+        }
+        static sc_bv<336> get_transfers (const sc_bv<559>& __data) {
+            return __data.range(transfers_s + transfers_w - 1, transfers_s);
+        }
+        static MemController_LdDataFwd get_ldDataFwd (const sc_bv<559>& __data) {
+            return MemController_LdDataFwd(__data.range(ldDataFwd_s + ldDataFwd_w - 1, ldDataFwd_s));
+        }
+    };
+
     struct BranchType {
         enum Type : uint8_t {
             BT_JUMP = 0,
@@ -2157,6 +2563,254 @@ namespace  {
         }
         static uint32_t get_result (const uint64_t& __data) {
             return (__data >> result_s) & (~0ULL >> (64 - 32));
+        }
+    };
+
+    struct LD_UOp {
+        bool valid;
+        bool isMMIO;
+        bool external;
+        bool doNotCommit;
+        bool atomic;
+        uint32_t sqN;
+        uint32_t tagDst;
+        uint32_t loadSqN;
+        uint32_t storeSqN;
+        uint32_t size;
+        bool signExtend;
+        uint32_t addr;
+        bool dataValid;
+        uint32_t data;
+
+        static constexpr size_t valid_s = 0;
+        static constexpr size_t valid_w = 1;
+        static constexpr size_t isMMIO_s = 1;
+        static constexpr size_t isMMIO_w = 1;
+        static constexpr size_t external_s = 2;
+        static constexpr size_t external_w = 1;
+        static constexpr size_t doNotCommit_s = 3;
+        static constexpr size_t doNotCommit_w = 1;
+        static constexpr size_t atomic_s = 4;
+        static constexpr size_t atomic_w = 1;
+        static constexpr size_t sqN_s = 5;
+        static constexpr size_t sqN_w = 7;
+        static constexpr size_t tagDst_s = 12;
+        static constexpr size_t tagDst_w = 7;
+        static constexpr size_t loadSqN_s = 19;
+        static constexpr size_t loadSqN_w = 7;
+        static constexpr size_t storeSqN_s = 26;
+        static constexpr size_t storeSqN_w = 7;
+        static constexpr size_t size_s = 33;
+        static constexpr size_t size_w = 2;
+        static constexpr size_t signExtend_s = 35;
+        static constexpr size_t signExtend_w = 1;
+        static constexpr size_t addr_s = 36;
+        static constexpr size_t addr_w = 32;
+        static constexpr size_t dataValid_s = 68;
+        static constexpr size_t dataValid_w = 1;
+        static constexpr size_t data_s = 69;
+        static constexpr size_t data_w = 32;
+        static constexpr size_t _size = 101;
+
+        LD_UOp() = default;
+
+        LD_UOp(const sc_bv<101>& __data) {
+            valid = __data.get_bit(valid_s);
+            isMMIO = __data.get_bit(isMMIO_s);
+            external = __data.get_bit(external_s);
+            doNotCommit = __data.get_bit(doNotCommit_s);
+            atomic = __data.get_bit(atomic_s);
+            sqN = __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
+            tagDst = __data.range(tagDst_s + tagDst_w - 1, tagDst_s).to_uint64();
+            loadSqN = __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
+            storeSqN = __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
+            size = __data.range(size_s + size_w - 1, size_s).to_uint64();
+            signExtend = __data.get_bit(signExtend_s);
+            addr = __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
+            dataValid = __data.get_bit(dataValid_s);
+            data = __data.range(data_s + data_w - 1, data_s).to_uint64();
+        }
+
+        operator sc_bv<101>() const {
+            auto ret = sc_bv<101>();
+            ret.set_bit(valid_s, valid);
+            ret.set_bit(isMMIO_s, isMMIO);
+            ret.set_bit(external_s, external);
+            ret.set_bit(doNotCommit_s, doNotCommit);
+            ret.set_bit(atomic_s, atomic);
+            ret.range(sqN_s + sqN_w - 1, sqN_s) = sqN;
+            ret.range(tagDst_s + tagDst_w - 1, tagDst_s) = tagDst;
+            ret.range(loadSqN_s + loadSqN_w - 1, loadSqN_s) = loadSqN;
+            ret.range(storeSqN_s + storeSqN_w - 1, storeSqN_s) = storeSqN;
+            ret.range(size_s + size_w - 1, size_s) = size;
+            ret.set_bit(signExtend_s, signExtend);
+            ret.range(addr_s + addr_w - 1, addr_s) = addr;
+            ret.set_bit(dataValid_s, dataValid);
+            ret.range(data_s + data_w - 1, data_s) = data;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "valid" << " = " << valid;
+            ss << " isMMIO" << " = " << isMMIO;
+            ss << " external" << " = " << external;
+            ss << " doNotCommit" << " = " << doNotCommit;
+            ss << " atomic" << " = " << atomic;
+            ss << " sqN" << " = " << sqN;
+            ss << " tagDst" << " = " << tagDst;
+            ss << " loadSqN" << " = " << loadSqN;
+            ss << " storeSqN" << " = " << storeSqN;
+            ss << " size" << " = " << size;
+            ss << " signExtend" << " = " << signExtend;
+            ss << " addr" << " = " << addr;
+            ss << " dataValid" << " = " << dataValid;
+            ss << " data" << " = " << data;
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const LD_UOp& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_valid (const sc_bv<101>& __data) {
+            return __data.get_bit(valid_s);
+        }
+        static bool get_isMMIO (const sc_bv<101>& __data) {
+            return __data.get_bit(isMMIO_s);
+        }
+        static bool get_external (const sc_bv<101>& __data) {
+            return __data.get_bit(external_s);
+        }
+        static bool get_doNotCommit (const sc_bv<101>& __data) {
+            return __data.get_bit(doNotCommit_s);
+        }
+        static bool get_atomic (const sc_bv<101>& __data) {
+            return __data.get_bit(atomic_s);
+        }
+        static uint32_t get_sqN (const sc_bv<101>& __data) {
+            return __data.range(sqN_s + sqN_w - 1, sqN_s).to_uint64();
+        }
+        static uint32_t get_tagDst (const sc_bv<101>& __data) {
+            return __data.range(tagDst_s + tagDst_w - 1, tagDst_s).to_uint64();
+        }
+        static uint32_t get_loadSqN (const sc_bv<101>& __data) {
+            return __data.range(loadSqN_s + loadSqN_w - 1, loadSqN_s).to_uint64();
+        }
+        static uint32_t get_storeSqN (const sc_bv<101>& __data) {
+            return __data.range(storeSqN_s + storeSqN_w - 1, storeSqN_s).to_uint64();
+        }
+        static uint32_t get_size (const sc_bv<101>& __data) {
+            return __data.range(size_s + size_w - 1, size_s).to_uint64();
+        }
+        static bool get_signExtend (const sc_bv<101>& __data) {
+            return __data.get_bit(signExtend_s);
+        }
+        static uint32_t get_addr (const sc_bv<101>& __data) {
+            return __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
+        }
+        static bool get_dataValid (const sc_bv<101>& __data) {
+            return __data.get_bit(dataValid_s);
+        }
+        static uint32_t get_data (const sc_bv<101>& __data) {
+            return __data.range(data_s + data_w - 1, data_s).to_uint64();
+        }
+    };
+
+    struct ST_UOp {
+        bool valid;
+        uint32_t id;
+        uint32_t nonce;
+        bool isMgmt;
+        bool isMMIO;
+        uint32_t wmask;
+        sc_bv<128> data;
+        uint32_t addr;
+
+        static constexpr size_t valid_s = 0;
+        static constexpr size_t valid_w = 1;
+        static constexpr size_t id_s = 1;
+        static constexpr size_t id_w = 2;
+        static constexpr size_t nonce_s = 3;
+        static constexpr size_t nonce_w = 3;
+        static constexpr size_t isMgmt_s = 6;
+        static constexpr size_t isMgmt_w = 1;
+        static constexpr size_t isMMIO_s = 7;
+        static constexpr size_t isMMIO_w = 1;
+        static constexpr size_t wmask_s = 8;
+        static constexpr size_t wmask_w = 16;
+        static constexpr size_t data_s = 24;
+        static constexpr size_t data_w = 128;
+        static constexpr size_t addr_s = 152;
+        static constexpr size_t addr_w = 32;
+        static constexpr size_t _size = 184;
+
+        ST_UOp() = default;
+
+        ST_UOp(const sc_bv<184>& __data) {
+            valid = __data.get_bit(valid_s);
+            id = __data.range(id_s + id_w - 1, id_s).to_uint64();
+            nonce = __data.range(nonce_s + nonce_w - 1, nonce_s).to_uint64();
+            isMgmt = __data.get_bit(isMgmt_s);
+            isMMIO = __data.get_bit(isMMIO_s);
+            wmask = __data.range(wmask_s + wmask_w - 1, wmask_s).to_uint64();
+            data = __data.range(data_s + data_w - 1, data_s);
+            addr = __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
+        }
+
+        operator sc_bv<184>() const {
+            auto ret = sc_bv<184>();
+            ret.set_bit(valid_s, valid);
+            ret.range(id_s + id_w - 1, id_s) = id;
+            ret.range(nonce_s + nonce_w - 1, nonce_s) = nonce;
+            ret.set_bit(isMgmt_s, isMgmt);
+            ret.set_bit(isMMIO_s, isMMIO);
+            ret.range(wmask_s + wmask_w - 1, wmask_s) = wmask;
+            ret.range(data_s + data_w - 1, data_s) = data;
+            ret.range(addr_s + addr_w - 1, addr_s) = addr;
+            return ret;
+        }
+
+        std::string to_string() const {
+            std::stringstream ss;
+            ss << "valid" << " = " << valid;
+            ss << " id" << " = " << id;
+            ss << " nonce" << " = " << nonce;
+            ss << " isMgmt" << " = " << isMgmt;
+            ss << " isMMIO" << " = " << isMMIO;
+            ss << " wmask" << " = " << wmask;
+            ss << " data" << " = " << data.to_string();
+            ss << " addr" << " = " << addr;
+            return std::move(ss.str());
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const ST_UOp& __data) {
+            os << __data.to_string();
+            return os;
+        }
+        static bool get_valid (const sc_bv<184>& __data) {
+            return __data.get_bit(valid_s);
+        }
+        static uint32_t get_id (const sc_bv<184>& __data) {
+            return __data.range(id_s + id_w - 1, id_s).to_uint64();
+        }
+        static uint32_t get_nonce (const sc_bv<184>& __data) {
+            return __data.range(nonce_s + nonce_w - 1, nonce_s).to_uint64();
+        }
+        static bool get_isMgmt (const sc_bv<184>& __data) {
+            return __data.get_bit(isMgmt_s);
+        }
+        static bool get_isMMIO (const sc_bv<184>& __data) {
+            return __data.get_bit(isMMIO_s);
+        }
+        static uint32_t get_wmask (const sc_bv<184>& __data) {
+            return __data.range(wmask_s + wmask_w - 1, wmask_s).to_uint64();
+        }
+        static sc_bv<128> get_data (const sc_bv<184>& __data) {
+            return __data.range(data_s + data_w - 1, data_s);
+        }
+        static uint32_t get_addr (const sc_bv<184>& __data) {
+            return __data.range(addr_s + addr_w - 1, addr_s).to_uint64();
         }
     };
 

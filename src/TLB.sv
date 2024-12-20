@@ -59,17 +59,20 @@ end
 
 reg ignoreCur;
 
-always_ff@(posedge clk) begin
-    if (rst || clear) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
+    if (rst) begin
+        for (integer i = 0; i < LEN; i=i+1) begin
+            counters[i] <= 0;
+            for (integer j = 0; j < ASSOC; j=j+1)
+                tlb[i][j] <= TLBEntry'{valid: 0, default: 'x};
+        end
+        ignoreCur <= 0;
+    end
+    else if (clear) begin
         for (integer i = 0; i < LEN; i=i+1)
             for (integer j = 0; j < ASSOC; j=j+1)
-                tlb[i][j].valid <= 0;
-
-        // When an sfence.vma commits, the translation in progress
-        // is also stale.
-        if (clear) ignoreCur <= 1;
-
-        if (rst) ignoreCur <= 0;
+                tlb[i][j] <= TLBEntry'{valid: 0, default: 'x};
+        ignoreCur <= 1;
     end
     else begin
 

@@ -45,7 +45,7 @@ always_comb begin
     stage0[0] = (!queue[0].valid) + (!queue[1].valid);
     stage0[1] = (!queue[2].valid) + (!queue[3].valid);
 
-    OUT_free = stage0[0] + stage0[1];// - $clog2(SIZE)'(IN_enqueue && IN_uop.valid);
+    OUT_free = stage0[0] + stage0[1];
     if (OUT_free != 0) OUT_free = OUT_free - $clog2(SIZE)'(OUT_uop.valid);
 end
 
@@ -65,14 +65,13 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         for (integer i = 0; i < SIZE; i=i+1) begin
-            queue[i] <= 'x;
-            queue[i].valid <= 0;
+            queue[i] <= AGU_UOp'{valid: 0, default: 'x};
         end
-        OUT_uop <= 'x;
-        OUT_uop.valid <= 0;
+        OUT_uop <= AGU_UOp'{valid: 0, default: 'x};
+        ready <= 'x;
     end
     else begin
 
