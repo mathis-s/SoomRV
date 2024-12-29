@@ -220,7 +220,7 @@ wire stLookupUOp_ready[NUM_AGUS-1:0];
 ComLimit stCommitLimit[NUM_AGUS-1:0];
 
 generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
-    StoreDataIQ #(8, 2, i, `DEC_WIDTH, NUM_PORTS) iqStD
+    StoreDataIQ #(PORT_IQ_SIZE[i+NUM_AGUS], 2, i, `DEC_WIDTH, NUM_PORTS) iqStD
     (
         .clk(clk),
         .rst(rst),
@@ -741,9 +741,9 @@ LoadStoreUnit lsu
 );
 
 wire CLM_busy;
-wire CLM_ctReadReady[NUM_AGUS-1:0];
-CacheTableRead CLM_ctRead[NUM_AGUS-1:0];
-CacheTableResult CLM_ctResult[NUM_AGUS-1:0];
+wire CLM_ctReadReady[NUM_CT_READS-1:0];
+CacheTableRead CLM_ctRead[NUM_CT_READS-1:0];
+CacheTableResult CLM_ctResult[NUM_CT_READS-1:0];
 wire CLM_missReady;
 CacheLineManager cacheLineManager
 (

@@ -154,11 +154,11 @@ CacheIF cacheWriteIFs[IN_WRITES-1:0];
 always_comb begin
     cacheWriteIFs[0] = MC_DC_wr;
     cacheWriteIFs[1] = CacheIF'{
-        ce:   !(!IF_cache.re[0] && !IF_cache.we[0]),
-        we:   IF_cache.we[0],
-        wm:   IF_cache.wmask[0],
-        data: {IF_cache.wdata[0]},
-        addr: {IF_cache.wassoc[0], IF_cache.addr[0][11:2]}
+        ce:   !(!IF_cache.re[NUM_AGUS] && !IF_cache.we[NUM_AGUS]),
+        we:   IF_cache.we[NUM_AGUS],
+        wm:   IF_cache.wmask[NUM_AGUS],
+        data: {IF_cache.wdata[NUM_AGUS]},
+        addr: {IF_cache.wassoc[NUM_AGUS], IF_cache.addr[NUM_AGUS][11:2]}
     };
 end
 
@@ -248,7 +248,7 @@ if (`CWIDTH == 1) assign IF_cache.rdata[i] = cacheRData_t[1+i];
 else              assign IF_cache.rdata[i] = cacheRData_t[1+i] [CORE_raddr[i][1][0 +: $clog2(`CWIDTH)]];
 end endgenerate
 
-for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
+for (genvar i = 0; i < NUM_CT_READS; i=i+1) begin
     wire[11:0] dctAddr = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[i];
     MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable0
     (

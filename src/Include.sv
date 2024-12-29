@@ -1110,14 +1110,14 @@ endinterface
 
 interface IF_Cache();
 
-    logic[NUM_AGUS-1:0] re;
-    logic[NUM_AGUS-1:0] we;
-    logic[NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
+    logic[NUM_CT_READS-1:0] re;
+    logic[NUM_CT_READS-1:0] we;
+    logic[NUM_CT_READS-1:0][`VIRT_IDX_LEN-1:0] addr;
     logic[NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
-    logic[NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
-    logic[NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
-    logic[NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
-    logic[NUM_AGUS-1:0] busy;
+    logic[NUM_CT_READS-1:0][$clog2(`CASSOC)-1:0] wassoc;
+    logic[NUM_CT_READS-1:0][`AXI_WIDTH-1:0] wdata;
+    logic[NUM_CT_READS-1:0][`AXI_WIDTH/8-1:0] wmask;
+    logic[NUM_CT_READS-1:0] busy;
 
     modport HOST
     (
@@ -1147,9 +1147,9 @@ interface IF_CTable();
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
 
-    logic re[NUM_AGUS-1:0];
-    logic[`VIRT_IDX_LEN-1:0] raddr[NUM_AGUS-1:0];
-    CTEntry[NUM_AGUS-1:0][`CASSOC-1:0] rdata;
+    logic re[NUM_CT_READS-1:0];
+    logic[`VIRT_IDX_LEN-1:0] raddr[NUM_CT_READS-1:0];
+    CTEntry[NUM_CT_READS-1:0][`CASSOC-1:0] rdata;
 
     modport HOST
     (

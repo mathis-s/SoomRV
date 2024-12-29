@@ -110,7 +110,7 @@ always_comb begin
             )
         ) begin
             // check if we have capacity to enqueue this op now
-            if (!limit && qIdx != SIZE && !IN_branch.taken) begin
+            if (!limit && qIdx != ($clog2(SIZE)+1)'(SIZE) && !IN_branch.taken) begin
 
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];

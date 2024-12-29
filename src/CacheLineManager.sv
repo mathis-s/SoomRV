@@ -12,9 +12,9 @@ module CacheLineManager
 
     input CacheLineSetDirty IN_setDirty,
 
-    input CacheTableRead IN_ctRead[NUM_AGUS-1:0],
-    output logic OUT_ctReadReady[NUM_AGUS-1:0],
-    output CacheTableResult OUT_ctResult[NUM_AGUS-1:0],
+    input CacheTableRead IN_ctRead[NUM_CT_READS-1:0],
+    output logic OUT_ctReadReady[NUM_CT_READS-1:0],
+    output CacheTableResult OUT_ctResult[NUM_CT_READS-1:0],
 
     input CacheMiss IN_miss,
     output logic OUT_missReady,
@@ -109,7 +109,7 @@ end
 
 // Cache Table Reads
 always_comb begin
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         IF_ct.re[i] = IN_ctRead[i].valid;
         IF_ct.raddr[i] = IN_ctRead[i].addr;
         OUT_ctReadReady[i] = 1;
@@ -123,13 +123,13 @@ always_comb begin
     end
 
     if (ctWrite_c.valid)
-        for (integer i = 0; i < NUM_AGUS; i=i+1)
+        for (integer i = 0; i < NUM_CT_READS; i=i+1)
             OUT_ctReadReady[i] = 0;
 end
 
-CacheTableRead ctRead_r[NUM_AGUS-1:0];
+CacheTableRead ctRead_r[NUM_CT_READS-1:0];
 always_ff@(posedge clk) begin
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         ctRead_r[i] <= IN_ctRead[i];
     end
 end
@@ -140,9 +140,9 @@ typedef struct packed
     logic[`CASSOC-1:0] mask;
 } CacheTableReadFwd;
 
-CacheTableReadFwd readFwds[NUM_AGUS-1:0];
+CacheTableReadFwd readFwds[NUM_CT_READS-1:0];
 always_ff@(posedge clk) begin
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         readFwds[i] <= CacheTableReadFwd'{mask: 0, default: 'x};
         for (integer j = 0; j < WRITE_FWD_CYCLES; j=j+1) begin
             if (ctWrite_sr[j].valid &&
@@ -158,7 +158,7 @@ always_ff@(posedge clk) begin
 end
 
 always_comb begin
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         OUT_ctResult[i].data = IF_ct.rdata[i];
         for (integer j = 0; j < `CASSOC; j=j+1)
             if (readFwds[i].mask[j])
@@ -194,26 +194,9 @@ always_comb begin
         end
     end
 
-    // transaction on this cache line is in progress
-    for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
-        if (IN_miss.valid &&
-            IN_memc.transfers[j].valid &&
-            IN_memc.transfers[j].cacheID == 0 &&
-            IN_memc.transfers[j].cacheAddr[`CACHE_SIZE_E-3 : `CLSIZE_E-2] == {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]}
-        ) begin
-            missEvictConflict = 1;
-        end
-    end
-
-
     if ((OUT_memc.cmd == MEMC_REPLACE || OUT_memc.cmd == MEMC_CP_EXT_TO_CACHE) &&
         IN_miss.valid && OUT_memc.readAddr[31:`CLSIZE_E] == IN_miss.writeAddr[31:`CLSIZE_E])
         missEvictConflict = 1;
-
-    if ((OUT_memc.cmd == MEMC_REPLACE || OUT_memc.cmd == MEMC_CP_EXT_TO_CACHE || OUT_memc.cmd == MEMC_CP_CACHE_TO_EXT) &&
-        IN_miss.valid && OUT_memc.cacheAddr[`CACHE_SIZE_E-3 : `CLSIZE_E-2] == {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]})
-        missEvictConflict = 1;
-
 end
 
 wire canOutputMiss = (OUT_memc.cmd == MEMC_NONE || !IN_memc.stall[1]);
@@ -253,6 +236,8 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                 MissType missType = IN_miss.mtype;
 
                 if (forwardMiss) begin
+
+                    //$display("Miss %d", IN_miss.missAddr >> `CLSIZE_E);
 
                     // if not dirty, do not copy back to main memory
                     if (missType == REGULAR && !dirty[missIdx] && (!IN_setDirty.valid || IN_setDirty.idx != missIdx))

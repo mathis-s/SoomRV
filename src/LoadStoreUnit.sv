@@ -54,9 +54,9 @@ module LoadStoreUnit
     IF_Cache.HOST IF_cache,
     IF_MMIO.HOST IF_mmio,
 
-    input logic IN_ctReadReady[NUM_AGUS-1:0],
-    output CacheTableRead OUT_ctRead[NUM_AGUS-1:0],
-    input CacheTableResult IN_ctResult[NUM_AGUS-1:0],
+    input logic IN_ctReadReady[NUM_CT_READS-1:0],
+    output CacheTableRead OUT_ctRead[NUM_CT_READS-1:0],
+    input CacheTableResult IN_ctResult[NUM_CT_READS-1:0],
 
     output CacheLineSetDirty OUT_setDirty,
     output CacheMiss OUT_miss,
@@ -95,8 +95,6 @@ end
 wire isCacheBypassStUOp =
     `ENABLE_EXT_MMIO && IN_uopSt.valid && IN_uopSt.isMMIO &&
     IN_uopSt.addr >= `EXT_MMIO_START_ADDR && IN_uopSt.addr < `EXT_MMIO_END_ADDR;
-
-wire ignoreSt = isCacheBypassStUOp;
 
 PortIdx blsuLdIdx;
 wire blsuLdIdxValid;
@@ -144,18 +142,9 @@ end
 // During a cache table write cycle, we cannot issue a store as
 // the cache table write port is the same as the store read port.
 // Loads work fine but require write forwaring in the cache table.
-assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (!IN_enable || !IN_ctReadReady[uopStPort])) || !uopStPortValid) && IN_uopSt.valid;
+assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (!IN_enable || !IN_ctReadReady[STORE_PORT]))) && IN_uopSt.valid;
 
-PortIdx uopStPort;
-reg uopStPortValid;
-
-always_comb begin
-    uopStPort = 0;
-    uopStPortValid = 0;
-    if (!selLd[0].valid) begin
-        uopStPortValid = 1;
-    end
-end
+localparam STORE_PORT = NUM_CT_READS - 1;
 
 always_comb
     for (integer i = 0; i < NUM_AGUS; i=i+1)
@@ -171,10 +160,8 @@ always_comb begin
         OUT_ctRead[i].addr = selLd[i].addr[`VIRT_IDX_LEN-1:0];
     end
 
-    if (uopStPortValid) begin
-        OUT_ctRead[uopStPort].valid = uopSt.valid && !uopSt.isMMIO && !(isCacheBypassStUOp || OUT_stStall) && !ignoreSt;
-        OUT_ctRead[uopStPort].addr = uopSt.addr[`VIRT_IDX_LEN-1:0];
-    end
+    OUT_ctRead[STORE_PORT].valid = uopSt.valid && !uopSt.isMMIO && !(isCacheBypassStUOp || OUT_stStall);
+    OUT_ctRead[STORE_PORT].addr = uopSt.addr[`VIRT_IDX_LEN-1:0];
 end
 
 PortIdx[NUM_AGUS-1:0] idxs_c;
@@ -222,9 +209,6 @@ always_comb begin
         // only be available in the next cycle.
         if (!IN_enable) begin
             // do not issue load
-        end
-        else if (PortIdx'(i) == stOpPort[1] && stOps[1].valid) begin
-            // port is being used by store during store's write cycle
         end
         else if (!IN_ctReadReady[i]) begin
             // cache table port is being used to handle cache miss
@@ -323,7 +307,6 @@ end
 // delay lines, waiting for cache response
 LD_UOp ldOps[NUM_AGUS-1:0][1:0];
 ST_UOp stOps[1:0];
-PortIdx stOpPort[1:0];
 
 reg loadWasExtIOBusy[NUM_AGUS-1:0];
 reg[1:0] loadCacheAccessFailed[NUM_AGUS-1:0];
@@ -378,12 +361,12 @@ always_comb begin
     end
 
     if (storeWriteToCache) begin
-        IF_cache.we[stOpPort[1]] = 0;
-        IF_cache.re[stOpPort[1]] = 0;
-        IF_cache.addr[stOpPort[1]] = stOps[1].addr[`VIRT_IDX_LEN-1:0];
-        IF_cache.wassoc[stOpPort[1]] = storeWriteAssoc;
-        IF_cache.wdata[stOpPort[1]] = stOps[1].data;
-        IF_cache.wmask[stOpPort[1]] = stOps[1].wmask;
+        IF_cache.we[STORE_PORT] = 0;
+        IF_cache.re[STORE_PORT] = 0;
+        IF_cache.addr[STORE_PORT] = stOps[1].addr[`VIRT_IDX_LEN-1:0];
+        IF_cache.wassoc[STORE_PORT] = storeWriteAssoc;
+        IF_cache.wdata[STORE_PORT] = stOps[1].data;
+        IF_cache.wmask[STORE_PORT] = stOps[1].wmask;
     end
 end
 
@@ -410,7 +393,7 @@ end endgenerate
 logic[`CASSOC-1:0] stAssocHitUnary_c;
 always_comb begin
     for(integer j = 0; j < `CASSOC; j=j+1)
-        stAssocHitUnary_c[j] = IN_ctResult[0].data[j].valid && IN_ctResult[0].data[j].addr == stOps[1].addr[31:`VIRT_IDX_LEN];
+        stAssocHitUnary_c[j] = IN_ctResult[STORE_PORT].data[j].valid && IN_ctResult[STORE_PORT].data[j].addr == stOps[1].addr[31:`VIRT_IDX_LEN];
 end
 OHEncoder#(`CASSOC, 1) ohEncSt(stAssocHitUnary_c, stAssocHit_c.idx, stAssocHit_c.valid);
 
@@ -434,98 +417,21 @@ always_comb begin
     for (integer i = 0; i < NUM_AGUS; i=i+1)
         ldResUOp[i] = LoadResUOp'{valid: 0, default: 'x};
 
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         miss[i] = 'x;
         miss[i].valid = 0;
     end
 
+    // Handle Loads
     for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-
         // only one of these is valid
         LD_UOp ld = ldOps[i][1];
-        ST_UOp st = (PortIdx'(i) == stOpPort[1]) ? stOps[1] : ST_UOp'{valid: 0, default: 'x};
-        assert(!(ld.valid && st.valid));
 
-        if (!ld.valid && !st.valid && !blsuLoadHandled)
+        if (!ld.valid && !blsuLoadHandled)
             ld = BLSU_uopLd;
-
         curLd[i] = ld;
 
-        if (rst) ; // todo: really needed?
-        else if (st.valid) begin
-            reg cacheHit = 0;
-            reg cacheTableHit = 1;
-            reg doCacheLoad = 1;
-            reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
-            reg noEvict = !IN_ctResult[i].data[assocCnt].valid;
-
-            // check for hit in cache table
-            if (stAssocHit_c.valid) begin
-                doCacheLoad = 0;
-                cacheHit = 1;
-                cacheHitAssoc = stAssocHit_c.idx;
-                cacheTableHit = 1;
-            end
-
-            // check if address is already being transferred
-            begin
-                reg transferExists;
-                reg allowPassThru;
-                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr, 1);
-                if (transferExists) begin
-                    doCacheLoad = 0; // this is only needed for one cycle
-                    cacheHit &= allowPassThru;
-                end
-            end
-
-            // check for conflict with currently issued MemC_Cmd
-            if (cacheHit &&
-                LSU_memc.cmd != MEMC_NONE &&
-                LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[`VIRT_IDX_LEN-1:`CLSIZE_E]}
-            ) begin
-                cacheHit = 0;
-                cacheHitAssoc = 'x;
-                cacheTableHit = 1;
-                doCacheLoad = 0;
-            end
-
-            if (st.isMMIO) begin
-                // nothing to do for MMIO
-            end
-            else if (st.isMgmt) begin
-                // Management Ops
-                if (cacheTableHit) begin
-                    miss[i].valid = 1;
-                    miss[i].writeAddr = st.addr;
-                    miss[i].missAddr = st.addr;
-                    miss[i].assoc = cacheHitAssoc;
-                    case (st.data[1:0])
-                        0: miss[i].mtype = MGMT_CLEAN;
-                        1: miss[i].mtype = MGMT_INVAL;
-                        2: miss[i].mtype = MGMT_FLUSH;
-                        default: assert(0);
-                    endcase
-                end
-            end
-            else begin
-                // Unlike loads, we can only run stores
-                // now that we're sure they hit cache.
-                if (cacheHit) begin
-                    storeWriteToCache = 1;
-                    storeWriteAssoc = cacheHitAssoc;
-                    OUT_setDirty.valid = 1;
-                    OUT_setDirty.idx = {cacheHitAssoc, st.addr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
-                end
-                else begin
-                    miss[i].valid = 1;
-                    miss[i].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                    miss[i].writeAddr = {IN_ctResult[i].data[assocCnt].addr, st.addr[`VIRT_IDX_LEN-1:0]};
-                    miss[i].missAddr = st.addr;
-                    miss[i].assoc = assocCnt;
-                end
-            end
-        end
-        else if (ld.valid) begin
+        if (ld.valid) begin
             reg isExtMMIO = !ldOps[i][1].valid;
             reg isIntMMIO = ld.valid && ld.isMMIO;
             reg isMMIO = isExtMMIO || isIntMMIO;
@@ -641,6 +547,82 @@ always_comb begin
             end
         end
     end
+    begin
+        ST_UOp st = stOps[1];
+        if (st.valid) begin
+            reg cacheHit = 0;
+            reg cacheTableHit = 1;
+            reg doCacheLoad = 1;
+            reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
+            reg noEvict = !IN_ctResult[STORE_PORT].data[assocCnt].valid;
+
+            // check for hit in cache table
+            if (stAssocHit_c.valid) begin
+                doCacheLoad = 0;
+                cacheHit = 1;
+                cacheHitAssoc = stAssocHit_c.idx;
+                cacheTableHit = 1;
+            end
+
+            // check if address is already being transferred
+            begin
+                reg transferExists;
+                reg allowPassThru;
+                {allowPassThru, transferExists} = CheckTransfers(LSU_memc, IN_memc, 0, st.addr, 1);
+                if (transferExists) begin
+                    doCacheLoad = 0; // this is only needed for one cycle
+                    cacheHit &= allowPassThru;
+                end
+            end
+
+            // check for conflict with currently issued MemC_Cmd
+            if (cacheHit &&
+                LSU_memc.cmd != MEMC_NONE &&
+                LSU_memc.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2] == {cacheHitAssoc, st.addr[`VIRT_IDX_LEN-1:`CLSIZE_E]}
+            ) begin
+                cacheHit = 0;
+                cacheHitAssoc = 'x;
+                cacheTableHit = 1;
+                doCacheLoad = 0;
+            end
+
+            if (st.isMMIO) begin
+                // nothing to do for MMIO
+            end
+            else if (st.isMgmt) begin
+                // Management Ops
+                if (cacheTableHit) begin
+                    miss[STORE_PORT].valid = 1;
+                    miss[STORE_PORT].writeAddr = st.addr;
+                    miss[STORE_PORT].missAddr = st.addr;
+                    miss[STORE_PORT].assoc = cacheHitAssoc;
+                    case (st.data[1:0])
+                        0: miss[STORE_PORT].mtype = MGMT_CLEAN;
+                        1: miss[STORE_PORT].mtype = MGMT_INVAL;
+                        2: miss[STORE_PORT].mtype = MGMT_FLUSH;
+                        default: assert(0);
+                    endcase
+                end
+            end
+            else begin
+                // Unlike loads, we can only run stores
+                // now that we're sure they hit cache.
+                if (cacheHit) begin
+                    storeWriteToCache = 1;
+                    storeWriteAssoc = cacheHitAssoc;
+                    OUT_setDirty.valid = 1;
+                    OUT_setDirty.idx = {cacheHitAssoc, st.addr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
+                end
+                else begin
+                    miss[STORE_PORT].valid = 1;
+                    miss[STORE_PORT].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
+                    miss[STORE_PORT].writeAddr = {IN_ctResult[STORE_PORT].data[assocCnt].addr, st.addr[`VIRT_IDX_LEN-1:0]};
+                    miss[STORE_PORT].missAddr = st.addr;
+                    miss[STORE_PORT].assoc = assocCnt;
+                end
+            end
+        end
+    end
 end
 
 // Load Result Buffering
@@ -677,12 +659,10 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         // Progress the delay line
         if (uopSt.valid && !OUT_stStall) begin
             stOps[0] <= uopSt;
-            stOpPort[0] <= uopStPort;
         end
 
         if (stOps[0].valid) begin
             stOps[1] <= stOps[0];
-            stOpPort[1] <= stOpPort[0];
         end
     end
 end
@@ -704,7 +684,7 @@ for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
             OUT_ldAck[i].addr = curLd[i].addr;
 
             OUT_ldAck[i].doNotReIssue = 0;
-            //if (miss[i].valid && (!stOps[1].valid || stOpPort[1] != i)) begin
+            //if (miss[i].valid && (!stOps[1].valid || STORE_PORT != i)) begin
             //    if (miss[i].mtype == TRANS_IN_PROG) begin
             //        OUT_ldAck[i].doNotReIssue = 1;
             //    end
@@ -718,20 +698,20 @@ end
 
 
 wire redoStore = stOps[1].valid &&
-    (miss[stOpPort[1]].valid ?
-        (miss[stOpPort[1]].mtype == REGULAR ||
-         miss[stOpPort[1]].mtype == REGULAR_NO_EVICT ||
-         miss[stOpPort[1]].mtype == CONFLICT ||
-         miss[stOpPort[1]].mtype == TRANS_IN_PROG ||
-         ((miss[stOpPort[1]].mtype == MGMT_CLEAN ||
-           miss[stOpPort[1]].mtype == MGMT_FLUSH ||
-           miss[stOpPort[1]].mtype == MGMT_INVAL) &&
-          (!forwardMiss[stOpPort[1]] || !IN_missReady))
+    (miss[STORE_PORT].valid ?
+        (miss[STORE_PORT].mtype == REGULAR ||
+         miss[STORE_PORT].mtype == REGULAR_NO_EVICT ||
+         miss[STORE_PORT].mtype == CONFLICT ||
+         miss[STORE_PORT].mtype == TRANS_IN_PROG ||
+         ((miss[STORE_PORT].mtype == MGMT_CLEAN ||
+           miss[STORE_PORT].mtype == MGMT_FLUSH ||
+           miss[STORE_PORT].mtype == MGMT_INVAL) &&
+          (!forwardMiss[STORE_PORT] || !IN_missReady))
     ) :
         (!stOps[1].isMMIO &&
-         IF_cache.busy[stOpPort[1]]));
+         IF_cache.busy[STORE_PORT]));
 
-wire fuseStoreMiss = 0;//!missEvictConflict[stOpPort[1]] && (miss[stOpPort[1]].mtype == REGULAR || miss[stOpPort[1]].mtype == REGULAR_NO_EVICT) && forwardMiss[stOpPort[1]] && miss[stOpPort[1]].valid;
+wire fuseStoreMiss = 0;//!missEvictConflict[STORE_PORT] && (miss[STORE_PORT].mtype == REGULAR || miss[STORE_PORT].mtype == REGULAR_NO_EVICT) && forwardMiss[STORE_PORT] && miss[STORE_PORT].valid;
 
 assign OUT_stAck.addr = stOps[1].addr;
 assign OUT_stAck.data = stOps[1].data;
@@ -741,12 +721,12 @@ assign OUT_stAck.idx = stOps[1].id;
 assign OUT_stAck.valid = stOps[1].valid;
 assign OUT_stAck.fail = redoStore && !fuseStoreMiss;
 
-logic[1:0] forwardMiss;
+logic[NUM_CT_READS-1:0] forwardMiss;
 always_comb begin
     forwardMiss = 0;
     OUT_miss = CacheMiss'{valid: 0, default: 'x};
 
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         if (!OUT_miss.valid) begin
             if (miss[i].valid &&
                 miss[i].mtype != CONFLICT && miss[i].mtype != TRANS_IN_PROG
