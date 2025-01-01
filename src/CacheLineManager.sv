@@ -76,10 +76,7 @@ PrefetchExecutor prefetchExec
     .OUT_prefetchAck(OUT_prefetchAck)
 );
 
-
 wire CacheMiss miss = IN_miss.valid ? IN_miss : PF_miss;
-
-
 
 reg[SIZE-1:0] dirty;
 

@@ -52,7 +52,7 @@ always_ff@(posedge clk) free_r <= free_c;
 logic[NUM_STREAMS-1:0] issueUnary_c;
 always_comb begin
     for (int i = 0; i < NUM_STREAMS; i++) begin
-        issueUnary_c[i] = streams[i].valid && (streams[i].depth != 2);
+        issueUnary_c[i] = streams[i].valid && (streams[i].depth != PREFETCH_DEPTH);
     end
 end
 IdxN issue_c;
@@ -82,7 +82,7 @@ always_comb begin
     if (issue_c.valid) begin
         // verilator lint_off WIDTHEXPAND
         prefetch_c = Prefetch'{
-            addr: (issueStream_c.addr + (issueStream_c.depth[0] ? streamStride_c[issue_c.idx] : 0)) << `CLSIZE_E,
+            addr: (issueStream_c.addr + (issueStream_c.depth * streamStride_c[issue_c.idx])) << `CLSIZE_E,
             valid: 1
         };
         // verilator lint_on WIDTHEXPAND
@@ -98,22 +98,6 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         OUT_prefetch <= Prefetch'{valid: 0, default: 'x};
 
 end
-
-//logic[NUM_STREAMS-1:0] advance_c;
-//always_comb begin
-//    for (int i = 0; i < NUM_STREAMS; i++) begin
-//        advance_c[i] = 0;
-//        // verilator lint_off WIDTHEXPAND
-//        for (int j = 0; j < NUM_ACCESS; j++) begin
-//            // todo: advance on missing access
-//            advance_c[i] |= (streams[i].valid && IN_access[j].valid &&
-//                IN_access[j].addr == streams[i].addr/* <= streams[i].stride*/);
-//        end
-//        // verilator lint_on WIDTHEXPAND
-//    end
-//end
-//logic[NUM_STREAMS-1:0] advance_r;
-//always_ff@(posedge clk) advance_r <= advance_c;
 
 typedef struct packed
 {
@@ -132,7 +116,7 @@ always_comb begin
             PFAddr_t mod = IN_access[i].addr % (^streams[j].stride ? 1 : 2);
             if (diff > 0 && diff < 4 && mod == 0) begin
                 advance_c[i] = Advance'{
-                    depth: (diff > 2 ? 3 : diff),
+                    depth: (diff > PREFETCH_DEPTH ? ((1 << $clog2(PREFETCH_DEPTH+1))-1) : diff),
                     newAddr: IN_access[i].addr,
                     idx: i,
                     valid: 1
@@ -144,8 +128,8 @@ always_comb begin
 end
 
 // todo: downsample to 1x
-Advance advance_r[NUM_STREAMS-1:0];
-always_ff@(posedge clk) advance_r <= advance_c;
+//Advance advance_r[NUM_ACCESS-1:0];
+//always_ff@(posedge clk) advance_r <= advance_c;
 
 typedef struct packed
 {
@@ -194,20 +178,20 @@ always_ff@(posedge clk /*or posedge rst*/) begin
 
         // Advance
         for (integer i = 0; i < NUM_ACCESS; i++) begin
-            if (advance_r[i].valid) begin
+            if (advance_c[i].valid) begin
                 // verilator lint_off WIDTHEXPAND
-                streams[advance_r[i].idx].addr <= advance_r[i].newAddr;
+                streams[advance_c[i].idx].addr <= advance_c[i].newAddr;
 
-                if (advance_r[i].depth > streams[advance_r[i].idx].depth)
-                    streams[advance_r[i].idx].depth <= 0;
+                if (advance_c[i].depth > streams[advance_c[i].idx].depth)
+                    streams[advance_c[i].idx].depth <= 0;
                 else
-                    streams[i].depth <= streams[advance_r[i].idx].depth - advance_r[i].depth +
-                        1'(issue_c.valid && !OUT_prefetch.valid && issue_c.idx == advance_r[i].idx);
+                    streams[i].depth <= streams[advance_c[i].idx].depth - advance_c[i].depth +
+                        1'(issue_c.valid && !OUT_prefetch.valid && issue_c.idx == advance_c[i].idx);
 
                 // verilator lint_on WIDTHEXPAND
 
-                if (!&streams[advance_r[i].idx].useful)
-                    streams[advance_r[i].idx].useful <= streams[advance_r[i].idx].useful + 1;
+                if (!&streams[advance_c[i].idx].useful)
+                    streams[advance_c[i].idx].useful <= streams[advance_c[i].idx].useful + 1;
             end
         end
 

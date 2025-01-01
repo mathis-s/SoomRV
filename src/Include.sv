@@ -14,6 +14,7 @@ typedef logic[3:0] TageID_t;
 typedef logic[`TAGE_BASE*(1<<(`TAGE_STAGES-2))-1:0] BHist_t;
 typedef logic[$clog2(NUM_ALUS)-1:0] IntUOpOrder_t;
 typedef logic[4:0] TrapCause_t;
+typedef logic[1:0] PFStreamIdx_t;
 
 localparam Tag TAG_ZERO = {1'b1, RFTag'(0)};
 

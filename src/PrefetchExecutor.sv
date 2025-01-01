@@ -16,11 +16,9 @@ module PrefetchExecutor
     output Prefetch_ACK OUT_prefetchAck
 );
 
-wire acceptPrefetch = state == IDLE && !OUT_prefetchAck.valid;
-
 always_comb begin
     OUT_ctRead = CacheTableRead'{valid: 0, default: 'x};
-    if (IN_prefetch.valid && acceptPrefetch) begin
+    if (IN_prefetch.valid && OUT_prefetchReady) begin
         OUT_ctRead = CacheTableRead'{
             addr: IN_prefetch.addr[0+:`VIRT_IDX_LEN],
             valid: 1
@@ -37,7 +35,7 @@ typedef struct packed
 logic[`CASSOC-1:0] assocHitUnary_c;
 always_comb begin
     for(integer j = 0; j < `CASSOC; j=j+1)
-        assocHitUnary_c[j] = IN_ctResult.data[j].valid && IN_ctResult.data[j].addr == IN_prefetch.addr[31:`VIRT_IDX_LEN];
+        assocHitUnary_c[j] = IN_ctResult.data[j].valid && IN_ctResult.data[j].addr == pfOp[1].addr[31:`VIRT_IDX_LEN];
 end
 IdxN assocHit_c;
 OHEncoder#(`CASSOC, 1) ohEnc(assocHitUnary_c, assocHit_c.idx, assocHit_c.valid);
@@ -49,10 +47,10 @@ always_ff@(posedge clk /*or posedge rst*/)
 CacheMiss miss;
 always_comb begin
     miss = CacheMiss'{valid: 0, default: 'x};
-    if (state == EVAL0 && !assocHit_c.valid) begin
+    if (pfOp[1].valid && !assocHit_c.valid) begin
         miss = CacheMiss'{
-            writeAddr: {IN_ctResult.data[assocCnt].addr, IN_prefetch.addr[0+:`VIRT_IDX_LEN]},
-            missAddr: {IN_prefetch.addr},
+            writeAddr: {IN_ctResult.data[assocCnt].addr, pfOp[1].addr[0+:`VIRT_IDX_LEN]},
+            missAddr: {pfOp[1].addr},
             assoc: assocCnt,
             mtype: IN_ctResult.data[assocCnt].valid ? REGULAR : REGULAR_NO_EVICT,
             valid: 1
@@ -61,46 +59,40 @@ always_comb begin
 end
 assign OUT_miss = miss;
 
-enum logic[1:0]
-{
-    IDLE, WAIT, EVAL0
-} state;
 
-always_ff@(posedge clk /*or posedge rst*/) begin
-    OUT_prefetchAck <= Prefetch_ACK'{valid: 0, default: 'x};
-    OUT_prefetchReady <= 0;
-
+Prefetch pfOp[1:0];
+always_ff@(posedge clk) begin
     if (rst) begin
-        state <= IDLE;
+        for (int i = 0; i < 2; i=i+1)
+            pfOp[i] <= Prefetch'{valid: 0, default: 'x};
     end
     else begin
-        case (state)
-            default: begin
-                // We assume IN_prefetch stays constant until we ack with ready.
-                if (IN_prefetch.valid && IN_ctReadReady && acceptPrefetch)
-                    state <= WAIT;
+        for (int i = 0; i < 2; i=i+1)
+            pfOp[i] <= Prefetch'{valid: 0, default: 'x};
+
+        if (IN_prefetch.valid && OUT_prefetchReady) begin
+            pfOp[0] <= IN_prefetch;
+        end
+
+        if (pfOp[0].valid) begin
+            pfOp[1] <= pfOp[0];
+        end
+
+        if (pfOp[1].valid) begin
+            if (assocHit_c.valid) begin
+                OUT_prefetchAck <= Prefetch_ACK'{existing: 1, valid: 1};
             end
-
-            WAIT: state <= EVAL0;
-
-            EVAL0: begin
-                if (assocHit_c.valid) begin
-                    OUT_prefetchAck <= Prefetch_ACK'{existing: 1, valid: 1};
-                    OUT_prefetchReady <= 1;
-                    state <= IDLE;
-                end
-                else if (IN_missReady) begin
-                    OUT_prefetchAck <= Prefetch_ACK'{existing: 0, valid: 1};
-                    OUT_prefetchReady <= 1;
-                    state <= IDLE;
-                end
-                else begin
-                    state <= IDLE;
-                end
+            else if (IN_missReady) begin
+                OUT_prefetchAck <= Prefetch_ACK'{existing: 0, valid: 1};
             end
-
-        endcase
+            else begin
+                // fail
+            end
+        end
     end
 end
+
+assign OUT_prefetchReady = IN_ctReadReady;
+
 
 endmodule

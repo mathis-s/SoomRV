@@ -659,7 +659,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         frm <= 0;
 
         mstatus <= 0;
-        mcycle <= 0;
+        mcycle <= -`RESET_DELAY;
         minstret <= 0;
         mcounteren <= 0;
         mcountinhibit <= 0;
