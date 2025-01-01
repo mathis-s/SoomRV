@@ -92,11 +92,8 @@ end
 always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst)
         OUT_prefetch <= Prefetch'{valid: 0, default: 'x};
-    else if (!OUT_prefetch.valid)
+    else if (issueReady)
         OUT_prefetch <= prefetch_c;
-    else if (IN_prefetchReady)
-        OUT_prefetch <= Prefetch'{valid: 0, default: 'x};
-
 end
 
 typedef struct packed
@@ -106,22 +103,25 @@ typedef struct packed
     logic[$clog2(NUM_STREAMS)-1:0] idx;
     logic valid;
 } Advance;
-Advance advance_c[NUM_STREAMS-1:0];
+Advance advance_c[NUM_ACCESS-1:0];
 always_comb begin
     for (int i = 0; i < NUM_ACCESS; i=i+1) begin
+        logic kill = 0;
         advance_c[i] = Advance'{valid: 0, default: 'x};
         for (int j = 0; j < NUM_STREAMS; j=j+1) begin
             // verilator lint_off WIDTHTRUNC
             PFAddr_t diff = IN_access[i].addr - streams[j].addr;
             PFAddr_t mod = IN_access[i].addr % (^streams[j].stride ? 1 : 2);
-            if (diff > 0 && diff < 4 && mod == 0) begin
+            if (diff > 0 && diff < 4 && mod == 0 && !kill) begin
                 advance_c[i] = Advance'{
                     depth: (diff > PREFETCH_DEPTH ? ((1 << $clog2(PREFETCH_DEPTH+1))-1) : diff),
                     newAddr: IN_access[i].addr,
-                    idx: i,
+                    idx: j,
                     valid: 1
                 };
+                kill = 1;
             end
+            else if (diff == 0) kill = 1;
             // verilator lint_on WIDTHTRUNC
         end
     end
@@ -150,6 +150,8 @@ always_ff@(posedge clk) begin
     end
 end
 
+wire issueReady = !OUT_prefetch.valid || IN_prefetchReady;
+
 always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         for (integer i = 0; i < NUM_STREAMS; i++) begin
@@ -172,7 +174,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         end
 
         // Issue
-        if (issue_c.valid && !OUT_prefetch.valid) begin
+        if (issue_c.valid && issueReady) begin
             streams[issue_c.idx].depth <= streams[issue_c.idx].depth + 1;
         end
 
@@ -185,8 +187,8 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                 if (advance_c[i].depth > streams[advance_c[i].idx].depth)
                     streams[advance_c[i].idx].depth <= 0;
                 else
-                    streams[i].depth <= streams[advance_c[i].idx].depth - advance_c[i].depth +
-                        1'(issue_c.valid && !OUT_prefetch.valid && issue_c.idx == advance_c[i].idx);
+                    streams[advance_c[i].idx].depth <= streams[advance_c[i].idx].depth - advance_c[i].depth +
+                        1'(issue_c.valid && issueReady && issue_c.idx == advance_c[i].idx);
 
                 // verilator lint_on WIDTHEXPAND
 

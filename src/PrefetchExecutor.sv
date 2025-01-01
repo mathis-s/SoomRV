@@ -41,8 +41,6 @@ IdxN assocHit_c;
 OHEncoder#(`CASSOC, 1) ohEnc(assocHitUnary_c, assocHit_c.idx, assocHit_c.valid);
 
 reg[$clog2(`CASSOC)-1:0] assocCnt;
-always_ff@(posedge clk /*or posedge rst*/)
-    assocCnt <= rst ? 0 : assocCnt + 1;
 
 CacheMiss miss;
 always_comb begin
@@ -62,9 +60,11 @@ assign OUT_miss = miss;
 
 Prefetch pfOp[1:0];
 always_ff@(posedge clk) begin
+    OUT_prefetchAck <= Prefetch_ACK'{valid: 0, default: 'x};
     if (rst) begin
         for (int i = 0; i < 2; i=i+1)
             pfOp[i] <= Prefetch'{valid: 0, default: 'x};
+        assocCnt <= 0;
     end
     else begin
         for (int i = 0; i < 2; i=i+1)
@@ -84,6 +84,7 @@ always_ff@(posedge clk) begin
             end
             else if (IN_missReady) begin
                 OUT_prefetchAck <= Prefetch_ACK'{existing: 0, valid: 1};
+                assocCnt <= assocCnt + 1;
             end
             else begin
                 // fail
