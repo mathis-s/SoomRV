@@ -179,8 +179,8 @@ always_comb begin
     for (integer i = 0; i < NUM_AGUS; i=i+1)
         IF_cache.busy[i] = !cacheReadReady[1+i];
 
-    if (!IF_cache.we[0])
-        IF_cache.busy[0] = !cacheWriteReady[1];
+    if (!IF_cache.we[NUM_AGUS])
+        IF_cache.busy[NUM_AGUS] = !cacheWriteReady[1];
 end
 
 logic cacheReadReady[IN_READS-1:0];

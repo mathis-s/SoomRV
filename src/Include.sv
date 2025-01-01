@@ -1063,6 +1063,43 @@ typedef struct packed
     logic[3:0] validRetire;
 } ROB_PERFC_Info;
 
+typedef enum logic[1:0] {STRIDE_M_TWO, STRIDE_M_ONE, STRIDE_ONE, STRIDE_TWO} PFStride_t;
+typedef logic[31-`CLSIZE_E:0] PFAddr_t;
+typedef struct packed
+{
+    PFStride_t stride;
+    PFAddr_t addr;
+    logic valid;
+} PrefetchPattern;
+
+typedef struct packed
+{
+    PFAddr_t addr;
+    logic read;
+    logic write;
+    logic valid;
+} PrefetchMiss;
+
+typedef struct packed
+{
+    PFAddr_t addr;
+    logic w;
+    logic r;
+    logic valid;
+} PrefetchAccess;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic valid;
+} Prefetch;
+
+typedef struct packed
+{
+    logic existing;
+    logic valid;
+} Prefetch_ACK;
+
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
     logic[63:0] mtimecmp;

@@ -765,8 +765,26 @@ CacheLineManager cacheLineManager
     .IN_miss(LSU_cacheMiss),
     .OUT_missReady(CLM_missReady),
 
+    .IN_prefetch(prefetch),
+    .OUT_prefetchReady(prefetchReady),
+    .OUT_prefetchAck(prefetchAck),
+
     .OUT_memc(LSU_MC_if),
     .IN_memc(IN_memc)
+);
+
+Prefetch prefetch;
+logic prefetchReady;
+Prefetch_ACK prefetchAck;
+DataPrefetch dataPrefetch
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_aguOps(AGU_uop),
+    .IN_miss(LSU_cacheMiss),
+    .OUT_prefetch(prefetch),
+    .IN_prefetchReady(prefetchReady),
+    .IN_prefetchAck(prefetchAck)
 );
 
 SqN ROB_maxSqN;

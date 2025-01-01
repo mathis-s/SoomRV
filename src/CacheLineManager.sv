@@ -19,11 +19,67 @@ module CacheLineManager
     input CacheMiss IN_miss,
     output logic OUT_missReady,
 
+    input Prefetch IN_prefetch,
+    output logic OUT_prefetchReady,
+    output Prefetch_ACK OUT_prefetchAck,
+
     output MemController_Req OUT_memc,
     input MemController_Res IN_memc
 );
 
-localparam SIZE=(1<<(`CACHE_SIZE_E - `CLSIZE_E));
+localparam SIZE = (1<<(`CACHE_SIZE_E - `CLSIZE_E));
+
+// Find unused ct read port for prefetcher cache table accesses.
+logic[NUM_CT_READS-1:0] readUnused_c;
+always_comb begin
+    for (int i = 0; i < NUM_CT_READS; i++) begin
+        readUnused_c[i] = !IN_ctRead[i].valid && OUT_ctReadReady[i];
+    end
+end
+
+CacheTableRead ctRead_c[NUM_CT_READS-1:0];
+always_comb
+    for (int i = 0; i < NUM_CT_READS; i++)
+        ctRead_c[i] = readUnused_c[i] ? PF_ctRead : IN_ctRead[i];
+
+CacheTableRead ctRead_r[NUM_CT_READS-1:0];
+always_ff@(posedge clk) begin
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
+        ctRead_r[i] <= ctRead_c[i];
+    end
+end
+
+typedef logic[$clog2(NUM_CT_READS)-1:0] ReadIdx;
+
+ReadIdx readIdx_c;
+PriorityEncoder#(NUM_CT_READS, 1) penc(readUnused_c, '{readIdx_c}, '{null});
+ReadIdx readIdx_r[1:0];
+always_ff@(posedge clk) readIdx_r <= {readIdx_r[0], readIdx_c};
+
+CacheTableRead PF_ctRead;
+CacheMiss PF_miss;
+PrefetchExecutor prefetchExec
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IN_prefetch(IN_prefetch),
+    .OUT_prefetchReady(OUT_prefetchReady),
+
+    .OUT_ctRead(PF_ctRead),
+    .IN_ctReadReady(|readUnused_c),
+    .IN_ctResult(OUT_ctResult[readIdx_r[1]]),
+
+    .OUT_miss(PF_miss),
+    .IN_missReady(!IN_miss.valid && OUT_missReady),
+
+    .OUT_prefetchAck(OUT_prefetchAck)
+);
+
+
+wire CacheMiss miss = IN_miss.valid ? IN_miss : PF_miss;
+
+
 
 reg[SIZE-1:0] dirty;
 
@@ -56,13 +112,13 @@ always_comb begin;
         // Immediately write the new cache table entry (about to be loaded)
         // on a miss. We still need to intercept and pass through or stop
         // loads at the new address until the cache line is entirely loaded.
-        case (IN_miss.mtype)
+        case (miss.mtype)
             REGULAR_NO_EVICT,
             REGULAR: begin
                 ctWrite_c = CacheTableWrite'{
-                    data:  CTEntry'{addr: IN_miss.missAddr[31:`VIRT_IDX_LEN], valid: 1},
-                    assoc: IN_miss.assoc,
-                    addr:  IN_miss.missAddr[`VIRT_IDX_LEN-1:0],
+                    data:  CTEntry'{addr: miss.missAddr[31:`VIRT_IDX_LEN], valid: 1},
+                    assoc: miss.assoc,
+                    addr:  miss.missAddr[`VIRT_IDX_LEN-1:0],
                     valid: 1
                 };
             end
@@ -71,8 +127,8 @@ always_comb begin;
             MGMT_FLUSH: begin
                 ctWrite_c = CacheTableWrite'{
                     data:  CTEntry'{valid: 0, default: 'x},
-                    assoc: IN_miss.assoc,
-                    addr:  IN_miss.missAddr[`VIRT_IDX_LEN-1:0],
+                    assoc: miss.assoc,
+                    addr:  miss.missAddr[`VIRT_IDX_LEN-1:0],
                     valid: 1
                 };
             end
@@ -110,8 +166,8 @@ end
 // Cache Table Reads
 always_comb begin
     for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
-        IF_ct.re[i] = IN_ctRead[i].valid;
-        IF_ct.raddr[i] = IN_ctRead[i].addr;
+        IF_ct.re[i] = ctRead_c[i].valid;
+        IF_ct.raddr[i] = ctRead_c[i].addr;
         OUT_ctReadReady[i] = 1;
     end
 
@@ -127,13 +183,6 @@ always_comb begin
             OUT_ctReadReady[i] = 0;
 end
 
-CacheTableRead ctRead_r[NUM_CT_READS-1:0];
-always_ff@(posedge clk) begin
-    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
-        ctRead_r[i] <= IN_ctRead[i];
-    end
-end
-
 typedef struct packed
 {
     CTEntry data;
@@ -145,7 +194,7 @@ always_ff@(posedge clk) begin
     for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         readFwds[i] <= CacheTableReadFwd'{mask: 0, default: 'x};
         for (integer j = 0; j < WRITE_FWD_CYCLES; j=j+1) begin
-            if (ctWrite_sr[j].valid &&
+            if (ctWrite_sr[j].valid && ctRead_r[i].valid &&
                 ctWrite_sr[j].addr[`VIRT_IDX_LEN-1:`CLSIZE_E] == ctRead_r[i].addr[`VIRT_IDX_LEN-1:`CLSIZE_E]
             ) begin
                 readFwds[i] <= CacheTableReadFwd'{
@@ -173,36 +222,36 @@ always_comb begin
 
     // read after write
     for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
-        if (IN_miss.valid &&
+        if (miss.valid &&
             IN_memc.transfers[j].valid &&
-            IN_memc.transfers[j].writeAddr[31:`CLSIZE_E] == IN_miss.missAddr[31:`CLSIZE_E]
+            IN_memc.transfers[j].writeAddr[31:`CLSIZE_E] == miss.missAddr[31:`CLSIZE_E]
         ) begin
             missEvictConflict = 1;
         end
     end
     if ((OUT_memc.cmd == MEMC_REPLACE || OUT_memc.cmd == MEMC_CP_CACHE_TO_EXT) &&
-        IN_miss.valid && OUT_memc.writeAddr[31:`CLSIZE_E] == IN_miss.missAddr[31:`CLSIZE_E])
+        miss.valid && OUT_memc.writeAddr[31:`CLSIZE_E] == miss.missAddr[31:`CLSIZE_E])
         missEvictConflict = 1;
 
     // write after read
     for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
-        if (IN_miss.valid &&
+        if (miss.valid &&
             IN_memc.transfers[j].valid &&
-            IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == IN_miss.writeAddr[31:`CLSIZE_E]
+            IN_memc.transfers[j].readAddr[31:`CLSIZE_E] == miss.writeAddr[31:`CLSIZE_E]
         ) begin
             missEvictConflict = 1;
         end
     end
 
     if ((OUT_memc.cmd == MEMC_REPLACE || OUT_memc.cmd == MEMC_CP_EXT_TO_CACHE) &&
-        IN_miss.valid && OUT_memc.readAddr[31:`CLSIZE_E] == IN_miss.writeAddr[31:`CLSIZE_E])
+        miss.valid && OUT_memc.readAddr[31:`CLSIZE_E] == miss.writeAddr[31:`CLSIZE_E])
         missEvictConflict = 1;
 end
 
 wire canOutputMiss = (OUT_memc.cmd == MEMC_NONE || !IN_memc.stall[1]);
 assign OUT_missReady = canOutputMiss && !missEvictConflict;
-wire forwardMiss = OUT_missReady && IN_miss.valid &&
-    IN_miss.mtype != CONFLICT && IN_miss.mtype != TRANS_IN_PROG;
+wire forwardMiss = OUT_missReady && miss.valid &&
+    miss.mtype != CONFLICT && miss.mtype != TRANS_IN_PROG;
 
 // Cache Transfer State Machine
 enum logic[3:0]
@@ -232,12 +281,12 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         case (state)
             IDLE: begin
 
-                reg[$clog2(SIZE)-1:0] missIdx = {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
-                MissType missType = IN_miss.mtype;
+                reg[$clog2(SIZE)-1:0] missIdx = {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:`CLSIZE_E]};
+                MissType missType = miss.mtype;
 
                 if (forwardMiss) begin
 
-                    //$display("Miss %d", IN_miss.missAddr >> `CLSIZE_E);
+                    //$display("Miss %d", miss.missAddr >> `CLSIZE_E);
 
                     // if not dirty, do not copy back to main memory
                     if (missType == REGULAR && !dirty[missIdx] && (!IN_setDirty.valid || IN_setDirty.idx != missIdx))
@@ -246,18 +295,18 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                     case (missType)
                         REGULAR: begin
                             OUT_memc.cmd <= MEMC_REPLACE;
-                            OUT_memc.cacheAddr <= {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:2]};
-                            OUT_memc.writeAddr <= {IN_miss.writeAddr[31:`VIRT_IDX_LEN], IN_miss.missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
-                            OUT_memc.readAddr <= {IN_miss.missAddr[31:2], 2'b0};
+                            OUT_memc.cacheAddr <= {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:2]};
+                            OUT_memc.writeAddr <= {miss.writeAddr[31:`VIRT_IDX_LEN], miss.missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
+                            OUT_memc.readAddr <= {miss.missAddr[31:2], 2'b0};
                             OUT_memc.cacheID <= 0;
                             OUT_memc.mask <= 0;
                         end
 
                         REGULAR_NO_EVICT: begin
                             OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
-                            OUT_memc.cacheAddr <= {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:2]};
+                            OUT_memc.cacheAddr <= {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:2]};
                             OUT_memc.writeAddr <= 'x;
-                            OUT_memc.readAddr <= {IN_miss.missAddr[31:2], 2'b0};
+                            OUT_memc.readAddr <= {miss.missAddr[31:2], 2'b0};
                             OUT_memc.cacheID <= 0;
                             OUT_memc.mask <= 0;
                         end
@@ -265,8 +314,8 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                         MGMT_CLEAN,
                         MGMT_FLUSH: begin
                             OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
-                            OUT_memc.cacheAddr <= {IN_miss.assoc, IN_miss.missAddr[`VIRT_IDX_LEN-1:2]};
-                            OUT_memc.writeAddr <= {IN_miss.writeAddr[31:`VIRT_IDX_LEN], IN_miss.missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
+                            OUT_memc.cacheAddr <= {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:2]};
+                            OUT_memc.writeAddr <= {miss.writeAddr[31:`VIRT_IDX_LEN], miss.missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
                             OUT_memc.readAddr <= 'x;
                             OUT_memc.cacheID <= 0;
                             OUT_memc.mask <= 0;

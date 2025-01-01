@@ -95,6 +95,10 @@ SRC_FILES = \
 	src/ExternalBus.sv \
 	src/ExternalBusMem.sv \
 	src/CacheLineManager.sv \
+	src/DataPrefetch.sv \
+	src/PrefetchPatternDetector.sv \
+	src/PrefetchIssuer.sv \
+	src/PrefetchExecutor.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

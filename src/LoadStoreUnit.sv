@@ -346,16 +346,17 @@ end
 
 // Cache Access
 always_comb begin
-    // Loads speculatively load from all possible locations
-    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
-
+    for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         IF_cache.addr[i] = 'x;
         IF_cache.wdata[i] = 'x;
         IF_cache.wmask[i] = 'x;
         IF_cache.wassoc[i] = 'x;
         IF_cache.we[i] = 1;
         IF_cache.re[i] = 1;
+    end
 
+    // Loads speculatively load from all possible locations
+    for (integer i = 0; i < NUM_AGUS; i=i+1) begin
         IF_cache.re[i] = !(selLd[i].valid && !selLd[i].isMMIO);
         IF_cache.addr[i] = selLd[i].addr[`VIRT_IDX_LEN-1:0];
     end
@@ -397,7 +398,7 @@ always_comb begin
 end
 OHEncoder#(`CASSOC, 1) ohEncSt(stAssocHitUnary_c, stAssocHit_c.idx, stAssocHit_c.valid);
 
-CacheMiss miss[NUM_AGUS-1:0];
+CacheMiss miss[NUM_CT_READS-1:0];
 
 reg storeWriteToCache;
 reg[$clog2(`CASSOC)-1:0] storeWriteAssoc;

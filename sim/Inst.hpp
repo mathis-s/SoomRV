@@ -14,8 +14,8 @@ struct Inst
     uint32_t memAddr;
     uint32_t memData;
     uint32_t predTarget;
-    uint8_t fetchID;
-    uint8_t sqn;
+    uint16_t fetchID;
+    uint16_t sqn;
     uint8_t fu;
     uint8_t rd;
     uint16_t tag;
