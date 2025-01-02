@@ -2,7 +2,7 @@
 
 module PrefetchPatternDetector
 #(
-    parameter SR_SIZE = 5,
+    parameter SR_SIZE = 4,
     parameter FIFO_SIZE = 4
 )
 (
