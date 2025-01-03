@@ -437,7 +437,7 @@ always_comb begin
             reg isIntMMIO = ld.valid && ld.isMMIO;
             reg isMMIO = isExtMMIO || isIntMMIO;
             reg isCache = !isExtMMIO && !isIntMMIO;
-            reg noEvict = !IN_ctResult[i].data[assocCnt].valid;
+            reg noEvict = !IN_ctResult[i].data[IN_ctResult[i].assocCnt].valid;
             reg doCacheLoad = 1;
 
             reg cacheHit = 0;
@@ -491,9 +491,9 @@ always_comb begin
             ldResUOp[i].addr = ld.addr;
 
 
-            miss[i].writeAddr = {IN_ctResult[i].data[assocCnt].addr, ld.addr[`VIRT_IDX_LEN-1:0]};
+            miss[i].writeAddr = {IN_ctResult[i].data[IN_ctResult[i].assocCnt].addr, ld.addr[`VIRT_IDX_LEN-1:0]};
             miss[i].missAddr = ld.addr;
-            miss[i].assoc = assocCnt;
+            miss[i].assoc = IN_ctResult[i].assocCnt;
 
             // Go through all possible miss or hit cases
             if (!isExtMMIO && loadWasExtIOBusy[i]) begin
@@ -555,7 +555,7 @@ always_comb begin
             reg cacheTableHit = 1;
             reg doCacheLoad = 1;
             reg[$clog2(`CASSOC)-1:0] cacheHitAssoc = 'x;
-            reg noEvict = !IN_ctResult[STORE_PORT].data[assocCnt].valid;
+            reg noEvict = !IN_ctResult[STORE_PORT].data[IN_ctResult[STORE_PORT].assocCnt].valid;
 
             // check for hit in cache table
             if (stAssocHit_c.valid) begin
@@ -617,9 +617,9 @@ always_comb begin
                 else begin
                     miss[STORE_PORT].valid = 1;
                     miss[STORE_PORT].mtype = doCacheLoad ? (noEvict ? REGULAR_NO_EVICT : REGULAR) : TRANS_IN_PROG;
-                    miss[STORE_PORT].writeAddr = {IN_ctResult[STORE_PORT].data[assocCnt].addr, st.addr[`VIRT_IDX_LEN-1:0]};
+                    miss[STORE_PORT].writeAddr = {IN_ctResult[STORE_PORT].data[IN_ctResult[STORE_PORT].assocCnt].addr, st.addr[`VIRT_IDX_LEN-1:0]};
                     miss[STORE_PORT].missAddr = st.addr;
-                    miss[STORE_PORT].assoc = assocCnt;
+                    miss[STORE_PORT].assoc = IN_ctResult[STORE_PORT].assocCnt;
                 end
             end
         end
@@ -736,18 +736,6 @@ always_comb begin
                 OUT_miss = miss[i];
             end
         end
-    end
-end
-
-
-logic[$clog2(`CASSOC)-1:0] assocCnt;
-always_ff@(posedge clk /*or posedge rst*/) begin
-    if (rst) begin
-        assocCnt <= 0;
-    end
-    else begin
-        if (OUT_miss.valid && IN_missReady)
-            assocCnt <= assocCnt + 1;
     end
 end
 

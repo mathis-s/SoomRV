@@ -149,6 +149,7 @@ always_comb begin
     IF_ct.waddr = ctWrite_c.addr;
     IF_ct.wassoc = ctWrite_c.assoc;
     IF_ct.wdata = ctWrite_c.data;
+    IF_ct.widx = (ctWrite_c.assoc + 1'b1);
 end
 
 localparam WRITE_FWD_CYCLES = 2;
@@ -184,19 +185,21 @@ typedef struct packed
 {
     CTEntry data;
     logic[`CASSOC-1:0] mask;
+    logic valid;
 } CacheTableReadFwd;
 
 CacheTableReadFwd readFwds[NUM_CT_READS-1:0];
 always_ff@(posedge clk) begin
     for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
-        readFwds[i] <= CacheTableReadFwd'{mask: 0, default: 'x};
+        readFwds[i] <= CacheTableReadFwd'{valid: 0, mask: 0, default: 'x};
         for (integer j = 0; j < WRITE_FWD_CYCLES; j=j+1) begin
             if (ctWrite_sr[j].valid && ctRead_r[i].valid &&
                 ctWrite_sr[j].addr[`VIRT_IDX_LEN-1:`CLSIZE_E] == ctRead_r[i].addr[`VIRT_IDX_LEN-1:`CLSIZE_E]
             ) begin
                 readFwds[i] <= CacheTableReadFwd'{
                     data:  ctWrite_sr[j].data,
-                    mask:  `CASSOC'(1) << ctWrite_sr[j].assoc
+                    mask:  `CASSOC'(1) << ctWrite_sr[j].assoc,
+                    valid: 1
                 };
             end
         end
@@ -206,9 +209,11 @@ end
 always_comb begin
     for (integer i = 0; i < NUM_CT_READS; i=i+1) begin
         OUT_ctResult[i].data = IF_ct.rdata[i];
+        OUT_ctResult[i].assocCnt = IF_ct.ridx[i] + readFwds[i].valid;
         for (integer j = 0; j < `CASSOC; j=j+1)
-            if (readFwds[i].mask[j])
+            if (readFwds[i].mask[j]) begin
                 OUT_ctResult[i].data[j] = readFwds[i].data;
+            end
     end
 end
 

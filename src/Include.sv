@@ -15,6 +15,7 @@ typedef logic[`TAGE_BASE*(1<<(`TAGE_STAGES-2))-1:0] BHist_t;
 typedef logic[$clog2(NUM_ALUS)-1:0] IntUOpOrder_t;
 typedef logic[4:0] TrapCause_t;
 typedef logic[1:0] PFStreamIdx_t;
+typedef logic[$clog2(`CASSOC)-1:0] AssocIdx_t;
 
 localparam Tag TAG_ZERO = {1'b1, RFTag'(0)};
 
@@ -844,7 +845,6 @@ typedef struct packed
     logic valid;
 } CTEntry;
 
-
 typedef struct packed
 {
     logic[`VIRT_IDX_LEN-1:0] addr;
@@ -853,6 +853,7 @@ typedef struct packed
 
 typedef struct packed
 {
+    AssocIdx_t assocCnt;
     CTEntry[`CASSOC-1:0] data;
 } CacheTableResult;
 
@@ -1184,21 +1185,23 @@ interface IF_CTable();
     logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
+    AssocIdx_t widx;
 
     logic re[NUM_CT_READS-1:0];
     logic[`VIRT_IDX_LEN-1:0] raddr[NUM_CT_READS-1:0];
     CTEntry[NUM_CT_READS-1:0][`CASSOC-1:0] rdata;
+    AssocIdx_t[NUM_CT_READS-1:0] ridx;
 
     modport HOST
     (
-        output we, waddr, wassoc, wdata, re, raddr,
-        input rdata
+        output we, waddr, wassoc, wdata, widx, re, raddr,
+        input rdata, ridx
     );
 
     modport MEM
     (
-        input we, waddr, wassoc, wdata, re, raddr,
-        output rdata
+        input we, waddr, wassoc, wdata, widx, re, raddr,
+        output rdata, ridx
     );
 endinterface
 

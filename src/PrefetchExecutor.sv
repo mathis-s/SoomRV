@@ -40,23 +40,20 @@ end
 IdxN assocHit_c;
 OHEncoder#(`CASSOC, 1) ohEnc(assocHitUnary_c, assocHit_c.idx, assocHit_c.valid);
 
-reg[$clog2(`CASSOC)-1:0] assocCnt;
-
 CacheMiss miss;
 always_comb begin
     miss = CacheMiss'{valid: 0, default: 'x};
     if (pfOp[1].valid && !assocHit_c.valid) begin
         miss = CacheMiss'{
-            writeAddr: {IN_ctResult.data[assocCnt].addr, pfOp[1].addr[0+:`VIRT_IDX_LEN]},
+            writeAddr: {IN_ctResult.data[IN_ctResult.assocCnt].addr, pfOp[1].addr[0+:`VIRT_IDX_LEN]},
             missAddr: {pfOp[1].addr},
-            assoc: assocCnt,
-            mtype: IN_ctResult.data[assocCnt].valid ? REGULAR : REGULAR_NO_EVICT,
+            assoc: IN_ctResult.assocCnt,
+            mtype: IN_ctResult.data[IN_ctResult.assocCnt].valid ? REGULAR : REGULAR_NO_EVICT,
             valid: 1
         };
     end
 end
 assign OUT_miss = miss;
-
 
 Prefetch pfOp[1:0];
 always_ff@(posedge clk) begin
@@ -64,7 +61,6 @@ always_ff@(posedge clk) begin
     if (rst) begin
         for (int i = 0; i < 2; i=i+1)
             pfOp[i] <= Prefetch'{valid: 0, default: 'x};
-        assocCnt <= 0;
     end
     else begin
         for (int i = 0; i < 2; i=i+1)
@@ -84,7 +80,6 @@ always_ff@(posedge clk) begin
             end
             else if (IN_missReady) begin
                 OUT_prefetchAck <= Prefetch_ACK'{existing: 0, valid: 1};
-                assocCnt <= assocCnt + 1;
             end
             else begin
                 // fail

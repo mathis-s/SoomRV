@@ -250,7 +250,7 @@ end endgenerate
 
 for (genvar i = 0; i < NUM_CT_READS; i=i+1) begin
     wire[11:0] dctAddr = IF_ct.we ? IF_ct.waddr : IF_ct.raddr[i];
-    MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable0
+    MemRTL1RW#($bits(CTEntry) * `CASSOC, 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(CTEntry)) dctable
     (
         .clk(clk),
         .IN_nce(!(IF_ct.re[i] || IF_ct.we)),
@@ -259,6 +259,16 @@ for (genvar i = 0; i < NUM_CT_READS; i=i+1) begin
         .IN_data({`CASSOC{IF_ct.wdata}}),
         .IN_wm(1 << IF_ct.wassoc),
         .OUT_data(IF_ct.rdata[i])
+    );
+    MemRTL1RW#($bits(AssocIdx_t), 1 << (`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC)), $bits(AssocIdx_t)) dctableCnt
+    (
+        .clk(clk),
+        .IN_nce(!(IF_ct.re[i] || IF_ct.we)),
+        .IN_nwe(!IF_ct.we),
+        .IN_addr(dctAddr[11-:(`CACHE_SIZE_E - `CLSIZE_E - $clog2(`CASSOC))]),
+        .IN_data(IF_ct.widx),
+        .IN_wm('1),
+        .OUT_data(IF_ct.ridx[i])
     );
 end
 
