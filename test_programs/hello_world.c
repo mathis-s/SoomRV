@@ -2,7 +2,7 @@ typedef unsigned int uint32_t;
 
 static void print (const char* c)
 {
-    volatile char* out = (char*) 0xfe000000;
+    volatile char* out = (char*) 0x10000000;
     while (*c != 0)
         *out = *c++;
 }

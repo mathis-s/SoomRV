@@ -20,9 +20,9 @@ For running SoomRV on FPGA, have a look at the [SoomRV-Arty Repo](https://github
 ## Simulating
 1. Install the [RV32 Linux Toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) as well as Verilator (at least version 5.0).
 2. Run `make setup` to build submodules.
-3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces)
+3. Run `make` to build a binary with Verilator (alternatively, `make trace` will also generate VCD traces).
 4. To run bare-metal code, use `./obj_dir/VTop <assembly file>` or `<baremetal elf file>`.
-For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone. Optionally add `--perfc` to print out perf counters.
+For example, run `./obj_dir/VTop test_programs/dhry_1.s` to run Dhrystone. Optionally add `--perfc` to print out perf counters, or `-x <start_time>` to specify when to enable tracing (`-x0` for tracing from start).
 5. To run Linux, use `./obj_dir/VTop --perfc --device-tree=test_programs/linux/device_tree.dtb test_programs/linux/linux_image.elf` (or `make linux` for a full build). Log in as `root`, no password.
 Building Linux and booting it in simulation takes at least a few hours!
 

@@ -1,45 +1,73 @@
 	.file	"hello_world.c"
 	.option nopic
-	.attribute arch, "rv32i2p0_m2p0_c2p0"
+	.attribute arch, "rv32i2p1_m2p0_a2p1_c2p0_zba1p0_zbb1p0"
 	.attribute unaligned_access, 0
 	.attribute stack_align, 16
 	.text
-	.section	.rodata.str1.4,"aMS",@progbits,1
+	.align	1
+	.type	print, @function
+print:
+	addi	sp,sp,-48
+	sw	ra,44(sp)
+	sw	s0,40(sp)
+	addi	s0,sp,48
+	sw	a0,-36(s0)
+	li	a5,268435456
+	sw	a5,-20(s0)
+	j	.L2
+.L3:
+	lw	a5,-36(s0)
+	addi	a4,a5,1
+	sw	a4,-36(s0)
+	lbu	a4,0(a5)
+	lw	a5,-20(s0)
+	sb	a4,0(a5)
+.L2:
+	lw	a5,-36(s0)
+	lbu	a5,0(a5)
+	bne	a5,zero,.L3
+	nop
+	nop
+	lw	ra,44(sp)
+	lw	s0,40(sp)
+	addi	sp,sp,48
+	jr	ra
+	.size	print, .-print
+	.section	.rodata
 	.align	2
 .LC0:
 	.string	"Hello, World!\n"
-	.section	.text.startup,"ax",@progbits
+	.text
 	.align	1
 	.globl	main
 	.type	main, @function
 main:
-	addi	sp,sp,-16
+	addi	sp,sp,-32
+	sw	ra,28(sp)
+	sw	s0,24(sp)
+	addi	s0,sp,32
 	lui	a5,%hi(.LC0)
-	sw	ra,12(sp)
-	sw	s0,8(sp)
-	sw	s1,4(sp)
-	li	a4,72
-	addi	a5,a5,%lo(.LC0)
-	li	a3,-33554432
-	.align	4
-.L2:
-	addi	a5,a5,1
-	sb	a4,0(a3)
-	lbu	a4,0(a5)
-	bne	a4,zero,.L2
-	li	s0,0
-	li	s1,10
-	.align	4
-.L3:
-	mv	a0,s0
-	addi	s0,s0,1
+	addi	a0,a5,%lo(.LC0)
+	call	print
+	sw	zero,-20(s0)
+	j	.L5
+.L6:
+	lw	a5,-20(s0)
+	mv	a0,a5
 	call	printhex
-	bne	s0,s1,.L3
-	lw	ra,12(sp)
-	lw	s0,8(sp)
-	lw	s1,4(sp)
-	li	a0,0
-	addi	sp,sp,16
+	lw	a5,-20(s0)
+	addi	a5,a5,1
+	sw	a5,-20(s0)
+.L5:
+	lw	a4,-20(s0)
+	li	a5,9
+	ble	a4,a5,.L6
+	li	a5,0
+	mv	a0,a5
+	lw	ra,28(sp)
+	lw	s0,24(sp)
+	addi	sp,sp,32
 	jr	ra
 	.size	main, .-main
-	.ident	"GCC: (g1ea978e3066) 12.1.0"
+	.ident	"GCC: (g04696df0963) 14.2.0"
+	.section	.note.GNU-stack,"",@progbits
