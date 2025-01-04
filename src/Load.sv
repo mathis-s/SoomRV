@@ -98,7 +98,7 @@ end
 FuncUnit outFU[NUM_UOPS-1:0];
 
 EX_UOp outUOpReg[NUM_UOPS-1:0];
-reg[1:0] operandIsReg[NUM_UOPS-1:0];
+logic[NUM_UOPS-1:0][1:0] operandIsReg;
 
 always_comb begin
     for (integer i = 0; i < NUM_UOPS; i=i+1) begin
