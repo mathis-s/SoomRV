@@ -70,48 +70,51 @@ reg[INTERVAL-1:0] decrCnt;
 reg decrBit;
 reg[$clog2(SIZE):0] resetIdx;
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     if (rst) begin
         decrCnt <= 0;
         resetIdx <= 0;
+        decrBit <= 0;
     end
-    else if (!resetIdx[$clog2(SIZE)]) begin
-        tag[resetIdx[$clog2(SIZE)-1:0]] <= 0;
-        useful[resetIdx[$clog2(SIZE)-1:0]] <= 0;
-        resetIdx <= resetIdx + 1;
-    end
-    else if (IN_writeValid) begin
-        if (IN_writeUpdate) begin
-            // Update when altpred different from final pred
-            if (IN_writeUseful) begin
-                // Increment if correct, decrement if not.
-                if (IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b1}})
-                    useful[IN_writeAddr] <= useful[IN_writeAddr] + 1;
-                else if (!IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b0}})
-                    useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
+    else begin
+        if (!resetIdx[$clog2(SIZE)]) begin
+            tag[resetIdx[$clog2(SIZE)-1:0]] <= 0;
+            useful[resetIdx[$clog2(SIZE)-1:0]] <= 0;
+            resetIdx <= resetIdx + 1;
+        end
+        else if (IN_writeValid) begin
+            if (IN_writeUpdate) begin
+                // Update when altpred different from final pred
+                if (IN_writeUseful) begin
+                    // Increment if correct, decrement if not.
+                    if (IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b1}})
+                        useful[IN_writeAddr] <= useful[IN_writeAddr] + 1;
+                    else if (!IN_writeCorrect && useful[IN_writeAddr] != {USF_SIZE{1'b0}})
+                        useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
+                end
+            end
+            else if (IN_doAlloc) begin
+                if (useful[IN_writeAddr] == 0) begin
+                    tag[IN_writeAddr] <= IN_writeTag;
+                end
+            end
+            else if (IN_allocFailed) begin
+                assert(useful[IN_writeAddr] != 0);
+                useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
             end
         end
-        else if (IN_doAlloc) begin
-            if (useful[IN_writeAddr] == 0) begin
-                tag[IN_writeAddr] <= IN_writeTag;
-            end
-        end
-        else if (IN_allocFailed) begin
-            assert(useful[IN_writeAddr] != 0);
-            useful[IN_writeAddr] <= useful[IN_writeAddr] - 1;
-        end
-    end
 
 `ifdef TAGE_CLEAR_ENABLE
-    // Clear low or high bit of useful counters alternatingly periodically
-    if (decrCnt == 0) begin
-        for (integer i = 0; i < SIZE; i=i+1)
-            useful[i][decrBit] <= 0;
-        decrBit <= !decrBit;
-    end
-    decrCnt <= decrCnt - 1;
+        // Clear low or high bit of useful counters alternatingly periodically
+        if (decrCnt == 0) begin
+            for (integer i = 0; i < SIZE; i=i+1)
+                useful[i][decrBit] <= 0;
+            decrBit <= !decrBit;
+        end
+        decrCnt <= decrCnt - 1;
 `endif
+    end
 end
 
 endmodule

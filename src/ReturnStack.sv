@@ -142,7 +142,7 @@ always_comb begin
         ));
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     forwardRindex <= 0;
 
@@ -158,6 +158,11 @@ always_ff@(posedge clk) begin
         rindexReg <= 0;
         for (integer i = 0; i < SIZE; i=i+1)
             rstack[i] <= 0;
+
+        recoveryID <= 'x;
+        recoveryBase <= 'x;
+        recoveryOffs <= 'x;
+        recoveryOverwOwn <= 'x;
     end
     else begin
 

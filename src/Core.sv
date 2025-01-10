@@ -34,7 +34,7 @@ assign OUT_dbg.lsuBusy = 0;//AGU_LD_uop.valid || LSU_busy;
 assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
-CommitUOp comUOps[3:0] /*verilator public*/;
+CommitUOp comUOps[`DEC_WIDTH-1:0] /*verilator public*/;
 
 wire ifetchEn = en && !TH_disableIFetch;
 
@@ -51,7 +51,7 @@ BranchSelector#(4) bsel
     .clk(clk),
     .rst(rst),
 
-    .IN_isUOps(IS_uop[3:0]),
+    .IN_isUOps(IS_uop[NUM_BRANCH_PORTS-1:0]),
 
     .IN_branches(branchProvs[3:0]),
     .OUT_branch(branch),
@@ -220,7 +220,7 @@ wire stLookupUOp_ready[NUM_AGUS-1:0];
 ComLimit stCommitLimit[NUM_AGUS-1:0];
 
 generate for (genvar i = 0; i < NUM_AGUS; i=i+1) begin
-    StoreDataIQ #(8, 2, i, `DEC_WIDTH, NUM_PORTS) iqStD
+    StoreDataIQ #(PORT_IQ_SIZE[i+NUM_AGUS], 2, i, `DEC_WIDTH, NUM_PORTS) iqStD
     (
         .clk(clk),
         .rst(rst),
@@ -521,9 +521,10 @@ PageWalk_Req PW_reqs[(NUM_AGUS+1)-1:0];
 PageWalk_Res PW_res;
 wire CC_PW_LD_stall[NUM_AGUS-1:0];
 PW_LD_UOp PW_LD_uop[NUM_AGUS-1:0];
-always_comb
-    for (integer i = 1; i < NUM_AGUS; i=i+1)
-        PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+generate
+for (genvar i = 1; i < NUM_AGUS; i=i+1)
+    assign PW_LD_uop[i] = PW_LD_UOp'{valid: 0, default: 'x};
+endgenerate
 PageWalker#(NUM_AGUS+1) pageWalker
 (
     .clk(clk),
@@ -686,19 +687,20 @@ wire CC_storeStall;
 wire LSU_AGUStall[NUM_AGUS-1:0];
 LD_UOp CC_SQ_uopLd[NUM_AGUS-1:0];
 LD_Ack LSU_ldAck[NUM_AGUS-1:0];
-wire LSU_busy;
 
 MemController_Req LSU_MC_if;
 MemController_Req BLSU_MC_if;
 ST_Ack LSU_stAck;
+
+CacheLineSetDirty LSU_setDirty;
+CacheMiss LSU_cacheMiss;
+
 LoadStoreUnit lsu
 (
     .clk(clk),
     .rst(rst),
 
-    .IN_flush(TH_startFence),
-    .IN_storeBusy(STORE_busy),
-    .OUT_busy(LSU_busy),
+    .IN_enable(1'b1), // todo: register
 
     .IN_branch(branch),
     .OUT_ldAGUStall(LSU_AGUStall),
@@ -716,19 +718,73 @@ LoadStoreUnit lsu
 
     .IF_cache(IF_cache),
     .IF_mmio(IF_mmio),
-    .IF_ct(IF_ct),
+
+    .IN_ctReadReady(CLM_ctReadReady),
+    .OUT_ctRead(CLM_ctRead),
+    .IN_ctResult(CLM_ctResult),
+
+    .OUT_setDirty(LSU_setDirty),
+    .OUT_miss(LSU_cacheMiss),
+    .IN_missReady(CLM_missReady),
 
     .IN_sqStFwd(SQ_fwd),
     .IN_sqbStFwd(SQB_fwd),
     .OUT_stAck(LSU_stAck),
 
-    .OUT_memc(LSU_MC_if),
     .OUT_BLSU_memc(BLSU_MC_if),
+    .LSU_memc(LSU_MC_if),
     .IN_memc(IN_memc),
 
     .IN_ready({NUM_AGUS{1'b1}}),
     .OUT_resultUOp(resultUOps[NUM_ALUS+:NUM_AGUS]),
     .OUT_flagsUOp(flagUOps[NUM_ALUS+:NUM_AGUS])
+);
+
+wire CLM_busy;
+wire CLM_ctReadReady[NUM_CT_READS-1:0];
+CacheTableRead CLM_ctRead[NUM_CT_READS-1:0];
+CacheTableResult CLM_ctResult[NUM_CT_READS-1:0];
+wire CLM_missReady;
+CacheLineManager cacheLineManager
+(
+    .clk(clk),
+    .rst(rst),
+
+    .IF_ct(IF_ct),
+
+    .IN_flush(TH_startFence),
+    .IN_storeBusy(STORE_busy),
+    .OUT_busy(CLM_busy),
+
+    .IN_setDirty(LSU_setDirty),
+
+    .IN_ctRead(CLM_ctRead),
+    .OUT_ctReadReady(CLM_ctReadReady),
+    .OUT_ctResult(CLM_ctResult),
+
+    .IN_miss(LSU_cacheMiss),
+    .OUT_missReady(CLM_missReady),
+
+    .IN_prefetch(prefetch),
+    .OUT_prefetchReady(prefetchReady),
+    .OUT_prefetchAck(prefetchAck),
+
+    .OUT_memc(LSU_MC_if),
+    .IN_memc(IN_memc)
+);
+
+Prefetch prefetch;
+logic prefetchReady;
+Prefetch_ACK prefetchAck;
+DataPrefetch dataPrefetch
+(
+    .clk(clk),
+    .rst(rst),
+    .IN_aguOps(AGU_uop),
+    .IN_miss(LSU_cacheMiss),
+    .OUT_prefetch(prefetch),
+    .IN_prefetchReady(prefetchReady),
+    .IN_prefetchAck(prefetchAck)
 );
 
 SqN ROB_maxSqN;
@@ -771,7 +827,7 @@ ROB rob
 );
 
 wire STORE_busy = !SQ_empty || SQB_busy;
-wire MEM_busy = STORE_busy || LSU_busy;
+wire MEM_busy = STORE_busy || CLM_busy;
 
 wire TH_flushTLB;
 wire TH_startFence;

@@ -4,7 +4,7 @@ typedef logic[`RF_SIZE_EXP-1:0] RFTag;
 typedef logic[`ROB_SIZE_EXP:0] SqN;
 typedef logic[31:0] RegT;
 typedef logic[4:0] FetchID_t;
-typedef logic[2:0] FetchOff_t;
+typedef logic[`FSIZE_E-2:0] FetchOff_t;
 typedef logic[$clog2(`RETURN_SIZE)-1:0] RetStackIdx_t;
 typedef logic[1:0] StID_t;
 typedef logic[0:0] CacheID_t;
@@ -14,6 +14,8 @@ typedef logic[3:0] TageID_t;
 typedef logic[`TAGE_BASE*(1<<(`TAGE_STAGES-2))-1:0] BHist_t;
 typedef logic[$clog2(NUM_ALUS)-1:0] IntUOpOrder_t;
 typedef logic[4:0] TrapCause_t;
+typedef logic[1:0] PFStreamIdx_t;
+typedef logic[$clog2(`CASSOC)-1:0] AssocIdx_t;
 
 localparam Tag TAG_ZERO = {1'b1, RFTag'(0)};
 
@@ -337,27 +339,27 @@ typedef enum logic[3:0]
     MEMC_WRITE_BYTE,
     MEMC_WRITE_HALF,
     MEMC_WRITE_WORD
-} MemC_Cmd;
+} MemC_Cmd /* public */;
 
 typedef struct packed
 {
     logic[31:0] data;
     logic[`CACHE_SIZE_E-3:0] id;
     logic valid;
-} MemController_SglLdRes;
+} MemController_SglLdRes /* public */;
 
 typedef struct packed
 {
     logic[`CACHE_SIZE_E-3:0] id;
     logic valid;
-} MemController_SglStRes;
+} MemController_SglStRes /* public */;
 
 typedef struct packed
 {
     logic[`AXI_WIDTH-1:0] data;
     logic[31:0] addr;
     logic valid;
-} MemController_LdDataFwd;
+} MemController_LdDataFwd /* public */;
 
 typedef struct packed
 {
@@ -380,7 +382,7 @@ typedef struct packed
     logic[31:0] writeAddr;
     CacheID_t cacheID;
     MemC_Cmd cmd;
-} MemController_Req;
+} MemController_Req /* public */;
 
 typedef struct packed
 {
@@ -391,7 +393,7 @@ typedef struct packed
 
     logic[2:0] stall;
     logic busy;
-} MemController_Res;
+} MemController_Res /* public */;
 
 typedef enum logic[1:0]
 {
@@ -532,7 +534,7 @@ typedef struct packed
 
 typedef struct packed
 {
-    logic[27:0] pc;
+    logic[31-`FSIZE_E:0] pc;
     FetchID_t fetchID;
     IFetchFault fetchFault;
     FetchOff_t firstValid;
@@ -540,7 +542,7 @@ typedef struct packed
     FetchOff_t predPos;
     logic predTaken;
     logic[30:0] predTarget;
-    logic[7:0][15:0] instrs;
+    logic[FETCH_WORDS-1:0][15:0] instrs;
 
     logic valid;
 } IF_Instr /* public */;
@@ -829,13 +831,53 @@ typedef struct packed
     logic external; // not part of normal execution, ignore sqn, tagDst and rd, don't commit
     logic isMMIO;
     logic valid;
-} LD_UOp;
+} LD_UOp /* public */;
 
 typedef struct packed
 {
     logic[11:0] addr;
     logic valid;
 } ELD_UOp; // early load address for VIPT
+
+typedef struct packed
+{
+    logic[32-`VIRT_IDX_LEN-1:0] addr;
+    logic valid;
+} CTEntry;
+
+typedef struct packed
+{
+    logic[`VIRT_IDX_LEN-1:0] addr;
+    logic valid;
+} CacheTableRead;
+
+typedef struct packed
+{
+    AssocIdx_t assocCnt;
+    CTEntry[`CASSOC-1:0] data;
+} CacheTableResult;
+
+typedef enum logic[3:0]
+{
+    REGULAR, REGULAR_NO_EVICT, TRANS_IN_PROG, MGMT_CLEAN, MGMT_INVAL, MGMT_FLUSH, CONFLICT
+} MissType;
+
+typedef struct packed
+{
+    logic[31:0] writeAddr;
+    logic[31:0] missAddr;
+    logic[$clog2(`CASSOC)-1:0] assoc;
+    MissType mtype;
+    logic valid;
+} CacheMiss;
+
+typedef logic[`CACHE_SIZE_E-`CLSIZE_E-1:0] CacheLineIdx;
+
+typedef struct packed
+{
+    CacheLineIdx idx;
+    logic valid;
+} CacheLineSetDirty;
 
 typedef struct packed
 {
@@ -866,7 +908,7 @@ typedef struct packed
     StNonce_t nonce;
     StID_t id;
     logic valid;
-} ST_UOp;
+} ST_UOp /* public */;
 
 typedef struct packed
 {
@@ -1010,8 +1052,9 @@ typedef struct packed
 {
     logic ce;
     logic we;
+    logic[(FETCH_BITS/`AXI_WIDTH)-1:0] wm;
     logic[`CACHE_SIZE_E-3:0] addr;
-    logic[127:0] data;
+    logic[FETCH_BITS-1:0] data;
 } ICacheIF;
 
 typedef struct packed
@@ -1021,6 +1064,43 @@ typedef struct packed
     logic[3:0] branchRetire;
     logic[3:0] validRetire;
 } ROB_PERFC_Info;
+
+typedef enum logic[1:0] {STRIDE_M_TWO, STRIDE_M_ONE, STRIDE_ONE, STRIDE_TWO} PFStride_t;
+typedef logic[31-`CLSIZE_E:0] PFAddr_t;
+typedef struct packed
+{
+    PFStride_t stride;
+    PFAddr_t addr;
+    logic valid;
+} PrefetchPattern;
+
+typedef struct packed
+{
+    PFAddr_t addr;
+    logic read;
+    logic write;
+    logic valid;
+} PrefetchMiss;
+
+typedef struct packed
+{
+    PFAddr_t addr;
+    logic w;
+    logic r;
+    logic valid;
+} PrefetchAccess;
+
+typedef struct packed
+{
+    logic[31:0] addr;
+    logic valid;
+} Prefetch;
+
+typedef struct packed
+{
+    logic existing;
+    logic valid;
+} Prefetch_ACK;
 
 interface IF_CSR_MMIO;
     logic[63:0] mtime;
@@ -1069,34 +1149,27 @@ endinterface
 
 interface IF_Cache();
 
-    logic[NUM_AGUS-1:0] re;
-    logic[NUM_AGUS-1:0] we;
-    logic[NUM_AGUS-1:0][`VIRT_IDX_LEN-1:0] addr;
+    logic[NUM_CT_READS-1:0] re;
+    logic[NUM_CT_READS-1:0] we;
+    logic[NUM_CT_READS-1:0][`VIRT_IDX_LEN-1:0] addr;
     logic[NUM_AGUS-1:0][`CASSOC-1:0][31:0] rdata;
-    logic[NUM_AGUS-1:0][$clog2(`CASSOC)-1:0] wassoc;
-    logic[NUM_AGUS-1:0][`AXI_WIDTH-1:0] wdata;
-    logic[NUM_AGUS-1:0][`AXI_WIDTH/8-1:0] wmask;
-    logic[NUM_AGUS-1:0] busy;
-    logic[NUM_AGUS-1:0][$clog2(`CBANKS)-1:0] rbusyBank;
+    logic[NUM_CT_READS-1:0][$clog2(`CASSOC)-1:0] wassoc;
+    logic[NUM_CT_READS-1:0][`AXI_WIDTH-1:0] wdata;
+    logic[NUM_CT_READS-1:0][`AXI_WIDTH/8-1:0] wmask;
+    logic[NUM_CT_READS-1:0] busy;
 
     modport HOST
     (
         output we, wassoc, wdata, wmask, re, addr,
-        input rdata, busy, rbusyBank
+        input rdata, busy
     );
 
     modport MEM
     (
         input we, wassoc, wdata, wmask, re, addr,
-        output rdata, busy, rbusyBank
+        output rdata, busy
     );
 endinterface
-
-typedef struct packed
-{
-    logic[32-`VIRT_IDX_LEN-1:0] addr;
-    logic valid;
-} CTEntry;
 
 typedef struct packed
 {
@@ -1112,21 +1185,23 @@ interface IF_CTable();
     logic[`VIRT_IDX_LEN-1:0] waddr;
     logic[$clog2(`CASSOC)-1:0] wassoc;
     CTEntry wdata;
+    AssocIdx_t widx;
 
-    logic re[1:0];
-    logic[`VIRT_IDX_LEN-1:0] raddr[1:0];
-    CTEntry[1:0][`CASSOC-1:0] rdata;
+    logic re[NUM_CT_READS-1:0];
+    logic[`VIRT_IDX_LEN-1:0] raddr[NUM_CT_READS-1:0];
+    CTEntry[NUM_CT_READS-1:0][`CASSOC-1:0] rdata;
+    AssocIdx_t[NUM_CT_READS-1:0] ridx;
 
     modport HOST
     (
-        output we, waddr, wassoc, wdata, re, raddr,
-        input rdata
+        output we, waddr, wassoc, wdata, widx, re, raddr,
+        input rdata, ridx
     );
 
     modport MEM
     (
-        input we, waddr, wassoc, wdata, re, raddr,
-        output rdata
+        input we, waddr, wassoc, wdata, widx, re, raddr,
+        output rdata, ridx
     );
 endinterface
 
@@ -1188,7 +1263,7 @@ interface IF_ICache();
 
     logic re;
     logic[11:0] raddr;
-    logic[`CASSOC-1:0][127:0] rdata;
+    logic[`CASSOC-1:0][FETCH_BITS-1:0] rdata;
     logic busy;
 
     modport HOST

@@ -113,7 +113,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) ;
     else if (!(s_axi_rvalid && !s_axi_rready)) begin
         s_axi_rid <= 'x;
@@ -218,7 +218,7 @@ always_comb begin
     end
 end
 assign buf_wready = writeIdxValid;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     reg[ID_LEN-1:0] idx = writeIdx;
     if (rst) ;
     else if (buf_wready && buf_wvalid) begin
@@ -258,38 +258,39 @@ always_ff@(posedge clk) begin
 end
 
 // Write Ack Output
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     reg[ID_LEN-1:0] idx = fifoAW[0];
 
     if (rst) ;
-    else if (buf_awready && buf_awvalid) begin
-        fifoAWValid[fifoAWInsIdx] <= 1;
-        fifoAW[fifoAWInsIdx] <= buf_awid;
-    end
+    else begin
+        if (buf_awready && buf_awvalid) begin
+            fifoAWValid[fifoAWInsIdx] <= 1;
+            fifoAW[fifoAWInsIdx] <= buf_awid;
+        end
 
-    if (rst) ;
-    else if (!(s_axi_bvalid && !s_axi_bready)) begin
-        s_axi_bid <= 'x;
-        s_axi_bvalid <= 0;
-        if (fifoAWValid[0] && writes[idx].valid && writeDone[idx]) begin
+        if (!(s_axi_bvalid && !s_axi_bready)) begin
+            s_axi_bid <= 'x;
+            s_axi_bvalid <= 0;
+            if (fifoAWValid[0] && writes[idx].valid && writeDone[idx]) begin
 
-            s_axi_bid <= idx;
-            s_axi_bvalid <= 1;
+                s_axi_bid <= idx;
+                s_axi_bvalid <= 1;
 
-            for (integer i = 0; i < NUM_TFS-1; i=i+1) begin
-                fifoAW[i] <= fifoAW[i+1];
-                fifoAWValid[i] <= fifoAWValid[i+1];
+                for (integer i = 0; i < NUM_TFS-1; i=i+1) begin
+                    fifoAW[i] <= fifoAW[i+1];
+                    fifoAWValid[i] <= fifoAWValid[i+1];
+                end
+                fifoAW[NUM_TFS-1] <= 'x;
+                fifoAWValid[NUM_TFS-1] <= 0;
+
+                if (buf_awready && buf_awvalid) begin
+                    fifoAWValid[fifoAWInsIdx-1] <= 1;
+                    fifoAW[fifoAWInsIdx-1] <= buf_awid;
+                end
+
+                tfs[1][idx] <= 'x;
+                tfs[1][idx].valid <= 0;
             end
-            fifoAW[NUM_TFS-1] <= 'x;
-            fifoAWValid[NUM_TFS-1] <= 0;
-
-            if (buf_awready && buf_awvalid) begin
-                fifoAWValid[fifoAWInsIdx-1] <= 1;
-                fifoAW[fifoAWInsIdx-1] <= buf_awid;
-            end
-
-            tfs[1][idx] <= 'x;
-            tfs[1][idx].valid <= 0;
         end
     end
 end
@@ -356,7 +357,7 @@ FIFO#(AR_LEN, 2, 1, 1) arFIFO
 assign buf_arready = !tfs[0][buf_arid].valid && buf_arvalid;
 assign buf_awready = !tfs[1][buf_awid].valid && buf_awvalid;
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) ;
     else begin
         if (buf_arready) begin

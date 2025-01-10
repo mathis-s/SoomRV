@@ -71,7 +71,7 @@ always_comb begin
             writeHashes[i] = writeHashes[i] ^ IN_writeAddr[j*HASH_SIZE+:HASH_SIZE];
         end
 
-        for (integer j = 0; j < hist_bits; j=j+1) begin
+        for (integer j = 0; j < (BASE * (FACTOR ** i)); j=j+1) begin
             predHashes[i][j % HASH_SIZE] ^= IN_predHistory[j];
             writeHashes[i][j % HASH_SIZE] ^= IN_writeHistory[j];
 
@@ -82,8 +82,8 @@ always_comb begin
 end
 
 reg[7:0] random;
-always_ff@(posedge clk) begin
-    if (rst) random[0] <= 1;
+always_ff@(posedge clk /*or posedge rst*/) begin
+    if (rst) random <= 1;
     else random <= {random[6:0], random[7] ^ random[5] ^ random[4] ^ random[3]};
 end
 

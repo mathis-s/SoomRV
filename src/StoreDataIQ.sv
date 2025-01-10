@@ -110,7 +110,7 @@ always_comb begin
             )
         ) begin
             // check if we have capacity to enqueue this op now
-            if (!limit && qIdx != SIZE && !IN_branch.taken) begin
+            if (!limit && qIdx != ($clog2(SIZE)+1)'(SIZE) && !IN_branch.taken) begin
 
                 if (NUM_ENQUEUE == NUM_UOPS)
                     enqCandidates[i] = IN_uop[i];
@@ -142,7 +142,7 @@ struct packed
 } deq;
 PriorityEncoder #(SIZE) penc(deqCandidate_c, '{deq.idx}, '{deq.valid});
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     reg[ID_LEN:0] newInsertIndex = 'x;
 
@@ -155,6 +155,10 @@ always_ff@(posedge clk) begin
     if (rst) begin
         insertIndex <= 0;
         OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
+
+        for (integer i = 0; i < SIZE; i=i+1) begin
+            queue[i] <= R_ST_UOp'{avail: 0, offs: 0, default: 'x};
+        end
     end
     else if (IN_branch.taken) begin
 

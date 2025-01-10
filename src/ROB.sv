@@ -96,6 +96,9 @@ assign OUT_curSqN = baseIndex;
 ROBEntry deqEntries[WIDTH-1:0];
 Flags deqFlags[WIDTH-1:0];
 
+typedef logic[$clog2(WIDTH_RN)-1:0] PortIdx;
+
+
 reg[ID_LEN-1:0] deqAddrs[WIDTH-1:0];
 reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
@@ -113,12 +116,12 @@ always_comb begin
 
     // Sort the sequence by least significant bits
     for (integer i = 0; i < WIDTH; i=i+1)
-        deqAddrsSorted[deqAddrs[i][1:0]] = deqAddrs[i][ID_LEN-1:$clog2(WIDTH)];
+        deqAddrsSorted[PortIdx'(deqAddrs[i])] = deqAddrs[i][ID_LEN-1:$clog2(WIDTH)];
 end
 // With the sorted sequence we can convince synth that this is in fact a sequential access
 always_comb begin
     for (integer i = 0; i < WIDTH; i=i+1)
-        deqFlagPorts[i] = flags[{deqAddrsSorted[i], i[1:0]}];
+        deqFlagPorts[i] = flags[{deqAddrsSorted[i], PortIdx'(i)}];
 end
 generate
     for (genvar i = 0; i < WIDTH; i=i+1)
@@ -127,8 +130,8 @@ endgenerate
 always_comb begin
     // Re-order the accesses into the initial order
     for (integer i = 0; i < WIDTH; i=i+1) begin
-        deqEntries[i] = deqPorts[deqAddrs[i][1:0]];
-        deqFlags[i] = deqFlagPorts[deqAddrs[i][1:0]];
+        deqEntries[i] = deqPorts[PortIdx'(deqAddrs[i])];
+        deqFlags[i] = deqFlagPorts[PortIdx'(deqAddrs[i])];
     end
 end
 
@@ -170,7 +173,7 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         misprReplay_r <= MisprReplay'{valid: 0, default: 'x};
     end
@@ -196,13 +199,14 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk)
-    OUT_mispredFlush <= rst ? 0 : (misprReplay_c.valid && (|misprReplayFwdMask));
+always_ff@(posedge clk /*or posedge rst*/)
+    if (rst) OUT_mispredFlush <= 0;
+    else OUT_mispredFlush <= misprReplay_c.valid && (|misprReplayFwdMask);
 
 reg stop;
 
 reg didCommit;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     OUT_fpNewFlags <= 0;
 
@@ -459,7 +463,7 @@ end
 // Core Hang Detection
 logic[HANG_COUNTER_LEN-1:0] hangCounter;
 logic hangDetected;
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         hangCounter <= 0;
         hangDetected <= 0;

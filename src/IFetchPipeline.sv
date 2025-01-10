@@ -1,6 +1,6 @@
 
 
-module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=8)
+module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(`CACHE_SIZE_E-`CLSIZE_E)), parameter RQ_ID=0, parameter FIFO_SIZE=4)
 (
     input logic clk,
     input logic rst,
@@ -55,6 +55,30 @@ module IFetchPipeline#(parameter ASSOC=`CASSOC, parameter NUM_ICACHE_LINES=(1<<(
     input MemController_Res IN_memc
 );
 
+function automatic logic[1:0] CheckTransfersIF(MemController_Req memcReq, MemController_Res memcRes, CacheID_t cacheID, logic[31:0] addr, logic isStore);
+    logic[1:0] rv = 0;
+
+    for (integer i = 0; i < `AXI_NUM_TRANS; i=i+1) begin
+        if (memcRes.transfers[i].valid &&
+            memcRes.transfers[i].cacheID == cacheID &&
+            memcRes.transfers[i].readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E]
+        ) begin
+            rv[0] = 1;
+            rv[1] = (memcRes.transfers[i].progress[`CLSIZE_E-2:`FSIZE_E-2]) >
+                ({1'b0, addr[`CLSIZE_E-1:`FSIZE_E]} - {1'b0, memcRes.transfers[i].readAddr[`CLSIZE_E-1:`FSIZE_E]});
+        end
+    end
+
+    if ((memcReq.cmd == MEMC_REPLACE || memcReq.cmd == MEMC_CP_EXT_TO_CACHE) &&
+        memcReq.readAddr[31:`CLSIZE_E] == addr[31:`CLSIZE_E] &&
+        memcReq.cacheID == cacheID
+    ) begin
+        rv = 2'b01;
+    end
+
+    return rv;
+endfunction
+
 localparam NUM_INST = 1 << (`FSIZE_E - 1);
 
 logic BH_endOffsetValid;
@@ -84,7 +108,7 @@ BranchHandler#(.NUM_INST(NUM_INST)) branchHandler
 );
 
 wire IA_ready;
-InstrAligner instrAligner
+InstrAligner#(.NUM_PACKETS(NUM_INST), .NUM_INSTRS(`DEC_WIDTH)) instrAligner
 (
     .clk(clk),
     .rst(rst),
@@ -98,9 +122,10 @@ InstrAligner instrAligner
     .OUT_instr(OUT_instrs)
 );
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     OUT_pcFileWE <= 0;
     OUT_pcFileEntry <= 'x;
+    OUT_pcFileAddr <= 'x;
     if (rst) ;
     else if (fetch1.valid) begin
         OUT_pcFileWE <= 1;
@@ -255,7 +280,7 @@ always_comb begin
                 packet.instrs = assocHitInstrs;
             end
             begin
-                {allowPassThru, transferExists} = CheckTransfers(OUT_memc, IN_memc, 1, phyPC, 0);
+                {allowPassThru, transferExists} = CheckTransfersIF(OUT_memc, IN_memc, 1, phyPC, 0);
                 if (transferExists) begin
                     doCacheLoad = 0;
                     cacheHit &= allowPassThru;
@@ -384,7 +409,9 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk) OUT_memc <= rst ? MemController_Req'{cmd: MEMC_NONE, default: 'x} : OUT_memc_c;
+always_ff@(posedge clk /*or posedge rst*/)
+    if (rst) OUT_memc <= MemController_Req'{cmd: MEMC_NONE, default: 'x};
+    else OUT_memc <= OUT_memc_c;
 
 always_comb begin
     OUT_fetchBranch = BH_decBranch;
@@ -421,36 +448,18 @@ FIFO#($bits(IF_Instr)-1, FIFO_SIZE, 1, 0) outFIFO
     .OUT_data(FIFO_out[1+:$bits(packetRePred)-1])
 );
 
-always_ff@(posedge clk) begin
-    if (!(rst || IN_mispr) && packetRePred.valid)
-        assert(FIFO_ready);
-end
-
 FetchID_t fetchID /* verilator public */;
 
 // pipeline
 FetchID_t fetchID_c;
 IFetchOp fetch0 /* verilator public */;
 IFetchOp fetch1 /* verilator public */;
-
-typedef enum logic[1:0]
-{
-    FLUSH_IDLE,
-    FLUSH_QUEUED,
-    FLUSH_ACTIVE,
-    FLUSH_FINALIZE
-} FlushState;
-FlushState flushState;
-logic[$clog2(`CASSOC)-1:0] flushAssocIter;
-logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
-
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
     fetch0 <= IFetchOp'{valid: 0, default: 'x};
     fetch1 <= IFetchOp'{valid: 0, default: 'x};
 
     if (rst) begin
         fetchID <= 0;
-        flushState <= FLUSH_QUEUED;
         assocCnt <= 0;
     end
     else if (IN_mispr) begin
@@ -483,8 +492,26 @@ always_ff@(posedge clk) begin
         if (handlingMiss)
             assocCnt <= assocCnt + 1;
     end
+end
 
-    if (!rst) begin
+typedef enum logic[1:0]
+{
+    FLUSH_IDLE,
+    FLUSH_QUEUED,
+    FLUSH_ACTIVE,
+    FLUSH_FINALIZE
+} FlushState;
+FlushState flushState;
+logic[$clog2(`CASSOC)-1:0] flushAssocIter;
+logic[`CACHE_SIZE_E-`CLSIZE_E-$clog2(`CASSOC)-1:0] flushAddrIter;
+
+always_ff@(posedge clk /*or posedge rst*/) begin
+    if (rst) begin
+        flushState <= FLUSH_QUEUED;
+        flushAssocIter <= 'x;
+        flushAddrIter <= 'x;
+    end
+    else begin
         case (flushState)
             default: begin
                 flushState <= FLUSH_IDLE;

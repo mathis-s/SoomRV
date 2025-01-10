@@ -41,7 +41,7 @@ PriorityEncoder#(NUM_TAGS, NUM_ISSUE) penc
     .OUT_idxValid(issueTagsValid)
 );
 
-always_ff@(posedge clk) begin
+always_ff@(posedge clk /*or posedge rst*/) begin
 
     mispredWait <= 0;
 

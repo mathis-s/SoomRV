@@ -15,6 +15,8 @@
 
 // IFetch
 `define FSIZE_E 4
+parameter FETCH_BITS = 16 << (`FSIZE_E - 1);
+parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
@@ -98,6 +100,7 @@ parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
 parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
 parameter NUM_RF_READS_PHY = NUM_ALUS * 2 + NUM_AGUS * 1;
 parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
+parameter NUM_CT_READS = NUM_AGUS + 1; // one port for stores
 
 parameter SQ_DEQ_PORTS = 2;
 
