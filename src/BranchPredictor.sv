@@ -186,7 +186,6 @@ ReturnStack retStack
     .OUT_stall(RET_stall),
 
     .IN_valid(IN_pcValid),
-    .IN_pc(OUT_pc),
     .IN_fetchID(IN_fetchID),
     .IN_comFetchID(IN_comFetchID),
 

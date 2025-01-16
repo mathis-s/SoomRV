@@ -10,7 +10,6 @@ module ReturnStack
 
     // IFetch time push/pop
     input wire IN_valid,
-    input wire[30:0] IN_pc,
     input FetchID_t IN_fetchID,
     input FetchID_t IN_comFetchID,
 
