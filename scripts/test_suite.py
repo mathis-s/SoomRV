@@ -15,7 +15,7 @@ arr = os.popen(f"find {test_dir} -type f ! -size 0 -exec grep -IL . \"{{}}\" \\;
 arr.remove(f"{test_dir}/rv32ui-p-ma_data")
 arr.remove(f"{test_dir}/rv32ui-v-ma_data")
 
-categories = ["rv32ui", "rv32uc", "rv32si", "rv32mi"]
+categories = ["rv32mi", "rv32si", "rv32ui", "rv32um", "rv32uc", "rv32ua", "rv32uzba", "rv32uzbb", "rv32uzbs"]
 
 binary = "./obj_dir/VTop"
 
