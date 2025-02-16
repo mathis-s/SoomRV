@@ -27,6 +27,14 @@ SLANG_FLAGS = \
 SLANG_HEADER_OUTPUT = sim/slang/slang.hpp
 
 SRC_FILES = \
+	src/lib/PriorityEncoder.sv \
+	src/lib/OHEncoder.sv \
+	src/lib/RangeMaskGen.sv \
+	src/lib/PrefixSum.sv \
+	src/lib/PrefixRed.sv \
+	src/lib/OpDownsample.sv \
+	src/lib/PopCnt.sv \
+	src/lib/FIFO.sv \
 	src/Config.sv \
 	src/Include.sv  \
 	src/InstrDecoder.sv  \
@@ -44,8 +52,6 @@ SRC_FILES = \
 	src/Multiply.sv \
 	src/Divide.sv \
 	src/MMIO.sv \
-	src/LZCnt.sv \
-	src/PopCnt.sv \
 	src/BranchSelector.sv \
 	src/MemRTL.sv \
 	src/MemRTL2W.sv \
@@ -77,15 +83,11 @@ SRC_FILES = \
 	src/ExternalAXISim.sv \
 	src/CacheWriteInterface.sv \
 	src/CacheReadInterface.sv \
-	src/FIFO.sv \
 	src/RegFileRTL.sv \
 	src/BranchHandler.sv \
-	src/PriorityEncoder.sv \
 	src/StoreDataIQ.sv \
 	src/StoreDataLoad.sv \
 	src/StoreQueueBackend.sv \
-	src/OHEncoder.sv \
-	src/RangeMaskGen.sv \
 	src/Scheduler.sv \
 	src/ResultFlagsSplit.sv \
 	src/InstrAligner.sv \
@@ -99,9 +101,6 @@ SRC_FILES = \
 	src/PrefetchPatternDetector.sv \
 	src/PrefetchIssuer.sv \
 	src/PrefetchExecutor.sv \
-	src/PrefixSum.sv \
-	src/PrefixRed.sv \
-	src/OpDownsample.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

@@ -94,7 +94,6 @@ always_ff@(posedge clk) begin
 end
 
 always_comb begin
-
     newAvail_c[0] = '0;
     for (integer j = 1; j < AVAIL_SR_LEN-1; j=j+1)
         newAvail_c[j] = newAvail_r[j+1];

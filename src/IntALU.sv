@@ -29,16 +29,18 @@ assign OUT_zcFwd.result = resC;
 assign OUT_zcFwd.tag = IN_uop.tagDst;
 assign OUT_zcFwd.valid = IN_uop.valid && HasFU(IN_uop.fu) && !IN_uop.tagDst[$bits(Tag)-1];
 
-wire[5:0] resLzTz;
+wire[4:0] resLzTz;
+wire resLzTzValid;
 
 reg[31:0] srcAbitRev;
 always_comb begin
     for (integer i = 0; i < 32; i=i+1)
         srcAbitRev[i] = srcA[31-i];
 end
-LZCnt lzc (
-    .in(IN_uop.opcode == BM_CLZ ? srcA : srcAbitRev),
-    .out(resLzTz)
+PriorityEncoder#(32) lzc(
+    .IN_data(IN_uop.opcode == BM_CLZ ? srcAbitRev : srcA),
+    .OUT_idx('{resLzTz}),
+    .OUT_idxValid('{resLzTzValid})
 );
 
 wire[5:0] resPopCnt;
@@ -98,7 +100,7 @@ always_comb begin
 
         FU_BITMANIP: if (HasFU(FU_BITMANIP)) case (IN_uop.opcode)
             BM_CLZ,
-            BM_CTZ: resC = {26'b0, resLzTz};
+            BM_CTZ: resC = resLzTzValid ? {27'b0, resLzTz} : 32'd32;
             BM_CPOP: resC = {26'b0, resPopCnt};
             BM_ROL: resC = (srcA << srcB[4:0]) | (srcA >> (32 - srcB[4:0]));
             BM_ROR: resC = (srcA >> srcB[4:0]) | (srcA << (32 - srcB[4:0]));

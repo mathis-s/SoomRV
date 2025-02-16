@@ -42,7 +42,8 @@ PriorityEncoder #(.BITS(NUM_IN), .N(NUM_OUT)) penc(
 
 always_comb begin
     for (int j = 0; j < NUM_OUT; j++) begin
-        OUT_ops[j] = R_UOp'{valid: 0, validIQ: 0, default: 'x};
+        OUT_ops[j] = 'x;
+        OUT_ops[j][0] = 0;
         if (candValid_c[j] && j < IN_dynMaxNumOut)
             OUT_ops[j] = IN_ops[candIndex_c[j]];
     end
