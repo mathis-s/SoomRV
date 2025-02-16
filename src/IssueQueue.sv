@@ -241,7 +241,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         newInsertIndex = 0;
         // Set insert index to first invalid entry
         for (integer i = 0; i < SIZE; i=i+1) begin
-            if (i < insertIndex && $signed(queue[i].sqN - IN_branch.sqN) <= 0) begin
+            if (i < insertIndex && $signed(queue[i].sqN - IN_branch.sqN) < 0) begin
                 newInsertIndex = i[$clog2(SIZE):0] + 1;
             end
         end
