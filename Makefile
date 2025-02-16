@@ -99,6 +99,9 @@ SRC_FILES = \
 	src/PrefetchPatternDetector.sv \
 	src/PrefetchIssuer.sv \
 	src/PrefetchExecutor.sv \
+	src/PrefixSum.sv \
+	src/PrefixRed.sv \
+	src/OpDownsample.sv \
 	hardfloat/addRecFN.v \
 	hardfloat/compareRecFN.v \
 	hardfloat/fNToRecFN.v \

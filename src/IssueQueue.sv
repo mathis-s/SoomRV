@@ -53,6 +53,9 @@ localparam IMUL_DLY=9-4-2;
 
 localparam AGU_PORT_IDX = (PORT_IDX >= NUM_ALUS) ? (PORT_IDX - NUM_ALUS) : PORT_IDX;
 
+localparam AVAIL_SR_LEN = 5;
+
+typedef logic[1:0] AvailWait_t;
 typedef struct packed
 {
     logic[IMM_BITS-1:0] imm;
@@ -74,66 +77,71 @@ typedef struct packed
 
 R_ST_UOp queue[SIZE-1:0];
 
-reg[$clog2(SIZE):0] insertIndex;
+reg[$clog2(SIZE+1)-1:0] insertIndex;
 reg[32:0] reservedWBs;
 
-reg[NUM_OPERANDS-1:0] newAvail[SIZE-1:0];
-reg[NUM_OPERANDS-1:0] newAvail_dl[SIZE-1:0];
+reg[SIZE-1:0][NUM_OPERANDS-1:0] newAvail_c[AVAIL_SR_LEN-1:0];
+reg[SIZE-1:0][NUM_OPERANDS-1:0] newAvail_r[AVAIL_SR_LEN-1:0];
+always_ff@(posedge clk) begin
+    for (integer i = 0; i < AVAIL_SR_LEN; i=i+1) begin
+        for (integer j = 0; j < SIZE; j=j+1) begin
+            if (deq.valid && collapseMask_c[j] && !IN_stall && !IN_branch.taken)
+                newAvail_r[i][j] <= (j == (SIZE-1)) ? '0 : newAvail_c[i][j+1];
+            else
+                newAvail_r[i][j] <= newAvail_c[i][j];
+        end
+    end
+end
 
 always_comb begin
+
+    newAvail_c[0] = '0;
+    for (integer j = 1; j < AVAIL_SR_LEN-1; j=j+1)
+        newAvail_c[j] = newAvail_r[j+1];
+    newAvail_c[AVAIL_SR_LEN-1] = '0;
+
     for (integer i = 0; i < SIZE; i=i+1) begin
-
-        for (integer k = 0; k < NUM_OPERANDS; k=k+1) begin
-            newAvail[i][k] = 0;
-            newAvail_dl[i][k] = 0;
-        end
-
         for (integer j = 0; j < RESULT_BUS_COUNT; j=j+1) begin
             for (integer k = 0; k < NUM_OPERANDS; k=k+1)
                 if (IN_flagUOp[j].valid && !IN_flagUOp[j].tagDst[$bits(Tag)-1] && queue[i].tags[k] == IN_flagUOp[j].tagDst)
-                    newAvail[i][k] = 1;
+                    newAvail_c[0][i][k] = 1;
         end
 
         for (integer j = 0; j < NUM_ALUS; j=j+1) begin
             if (IN_issueUOps[j].valid && !IN_issueUOps[j].tagDst[$bits(Tag)-1]) begin
-                if (IN_issueUOps[j].fu == FU_INT || IN_issueUOps[j].fu == FU_BRANCH || IN_issueUOps[j].fu == FU_BITMANIP
-                ) begin
-                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail[i][k] = 1;
-                end
-                else if (IN_issueUOps[j].fu == FU_FPU || IN_issueUOps[j].fu == FU_FMUL) begin
-                    for (integer k = 0; k < NUM_OPERANDS; k=k+1)
-                        if (queue[i].tags[k] == IN_issueUOps[j].tagDst) newAvail_dl[i][k] = 1;
-                end
+                for (integer k = 0; k < NUM_OPERANDS; k=k+1)
+                    if (queue[i].tags[k] == IN_issueUOps[j].tagDst) begin
+                        case (IN_issueUOps[j].fu)
+                            FU_INT, FU_BRANCH, FU_BITMANIP: newAvail_c[0][i][k] = 1;
+                            FU_FPU, FU_FMUL:                newAvail_c[1][i][k] = 1;
+                            FU_MUL:    if (i < insertIndex) newAvail_c[4][i][k] = 1;
+                            default: ;
+                        endcase
+                    end
             end
         end
+    end
+end
+
+logic[NUM_OPERANDS-1:0] queueAvail_c[1:0][SIZE-1:0];
+always_comb begin
+    for (integer i = 0; i < SIZE; i=i+1) begin
+        queueAvail_c[0][i] = queue[i].avail     | newAvail_c[0][i];
+        queueAvail_c[1][i] = queueAvail_c[0][i] | newAvail_c[1][i];
     end
 end
 
 // If store data queues wish to defer any op,
 // we must defer all following ones as well to
 // maintain ordering.
-reg defer[NUM_UOPS-1:0];
+logic[NUM_UOPS-1:0] defer;
+PrefixRed#(NUM_UOPS) deferProp(IN_defer, defer);
+
+// Select enqueue candidates
+logic[NUM_UOPS-1:0] isBaseCand_c;
 always_comb begin
-    defer[0] = IN_defer[0];
-    for (integer i = 1; i < NUM_UOPS; i=i+1)
-        defer[i] = defer[i-1] | IN_defer[i];
-end
-
-R_UOp enqCandidates[NUM_ENQUEUE-1:0];
-always_comb begin
-    logic[$clog2(NUM_ENQUEUE)-1:0] idx = 0;
-    logic[$clog2(SIZE):0] qIdx = insertIndex;
-    logic limit = 0;
-
-    for (integer i = 0; i < NUM_ENQUEUE; i=i+1)
-        enqCandidates[i] = R_UOp'{valid: 0, validIQ: 0, default: 'x};
-
-    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-        OUT_stall[i] = 0;
-        // check if this is a candidate to enqueue
-        if (IN_uop[i].validIQ[PORT_IDX] && HasFU(IN_uop[i].fu) &&
-
+    for (integer i = 0; i < NUM_UOPS; i++) begin
+        isBaseCand_c[i] = IN_uop[i].validIQ[PORT_IDX] && HasFU(IN_uop[i].fu) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode <  LSU_SC_W) || (IN_uop[i].loadSqN[0]  == AGU_PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_AGU && IN_uop[i].opcode >= LSU_SC_W) || (IN_uop[i].storeSqN[0] == AGU_PORT_IDX[0])) &&
             (!(IN_uop[i].fu == FU_ATOMIC) || (IN_uop[i].storeSqN[0] == AGU_PORT_IDX[0])) &&
@@ -141,31 +149,35 @@ always_comb begin
             (PORT_IDX >= NUM_ALUS || IN_uopOrdering[i] == IntUOpOrder_t'(PORT_IDX)) &&
 
             // Edge Case: INT ports do not enqueue AMOSWAP (no int uop needed)
-            (PORT_IDX >= NUM_ALUS || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W)
-        ) begin
-            // check if we have capacity to enqueue this op now
-            if (!limit && qIdx != $bits(qIdx)'(SIZE) && !IN_branch.taken && !defer[i]) begin
-
-                if (NUM_ENQUEUE == NUM_UOPS)
-                    enqCandidates[i] = IN_uop[i];
-                else begin
-                    enqCandidates[idx] = IN_uop[i];
-                    {limit, idx} = idx + 1;
-                end
-
-                OUT_stall[i] = 0;
-                qIdx = qIdx + 1;
-            end
-            else OUT_stall[i] = 1;
-        end
+            (PORT_IDX >= NUM_ALUS || IN_uop[i].fu != FU_ATOMIC || IN_uop[i].opcode != ATOMIC_AMOSWAP_W);
     end
 end
+logic[$clog2(NUM_ENQUEUE+1)-1:0] numAllowedEnq_c;
+always_comb begin
+    // verilator lint_off WIDTHTRUNC
+    // verilator lint_off WIDTHEXPAND
+    logic[$clog2(SIZE+1)-1:0] diff = SIZE - insertIndex;
+    numAllowedEnq_c = diff < NUM_ENQUEUE ? diff : NUM_ENQUEUE;
+    // verilator lint_on WIDTHTRUNC
+    // verilator lint_on WIDTHEXPAND
+end
+R_UOp enqCandidates[NUM_ENQUEUE-1:0];
+OpDownsample#(NUM_UOPS, NUM_ENQUEUE, $bits(R_UOp)) enqDS
+(
+    .IN_ops(IN_uop),
+    .IN_opBaseValid(isBaseCand_c),
+    .IN_opValid(~(defer | {NUM_UOPS{IN_branch.taken}})),
+    .OUT_opStall(OUT_stall),
+
+    .IN_dynMaxNumOut(numAllowedEnq_c),
+    .OUT_ops(enqCandidates)
+);
 
 reg[SIZE-1:0] deqCandidate_c;
 always_comb begin
     for (integer i = 0; i < SIZE; i=i+1) begin
         deqCandidate_c[i] = (i < insertIndex) &&
-            &(queue[i].avail | newAvail[i]) &&
+            &(queueAvail_c[0][i]) &&
             (!HasFU(FU_DIV)  || queue[i].fu != FU_DIV  || !IN_doNotIssueDiv) &&
             (!HasFU(FU_FDIV) || queue[i].fu != FU_FDIV || !IN_doNotIssueFDiv) &&
             !((queue[i].fu == FU_INT || queue[i].fu == FU_BRANCH || queue[i].fu == FU_BITMANIP ||
@@ -192,6 +204,8 @@ always_comb begin
     end
 end
 
+
+
 struct packed
 {
     logic[$clog2(SIZE)-1:0] idx;
@@ -199,14 +213,20 @@ struct packed
 } deq;
 PriorityEncoder #(SIZE) penc(deqCandidate_c, '{deq.idx}, '{deq.valid});
 
+logic[SIZE-1:0] collapseMask_c;
+always_comb begin
+    for (integer i = 0; i < SIZE; i=i+1)
+        collapseMask_c[i] = (i >= deq.idx);
+end
+
 always_ff@(posedge clk /*or posedge rst*/) begin
 
     reg[ID_LEN:0] newInsertIndex = 'x;
 
     // Update availability
-    for (integer i = 0; i < SIZE; i=i+1) begin
-        queue[i].avail <= queue[i].avail | newAvail[i] | newAvail_dl[i];
-    end
+    for (integer i = 0; i < SIZE; i=i+1)
+        queue[i].avail <= queueAvail_c[1][i];
+
     reservedWBs <= {1'b0, reservedWBs[32:1]};
 
     if (rst) begin
@@ -288,9 +308,9 @@ always_ff@(posedge clk /*or posedge rst*/) begin
 
                 // Shift other ops forward
                 for (integer i = 0; i < SIZE-1; i=i+1) begin
-                    if (i >= deq.idx) begin
+                    if (collapseMask_c[i]) begin
                         queue[i] <= queue[i+1];
-                        queue[i].avail <= queue[i+1].avail | newAvail[i+1] | newAvail_dl[i+1];
+                        queue[i].avail <= queueAvail_c[1][i+1];
                     end
                 end
             end

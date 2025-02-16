@@ -52,7 +52,8 @@ end
 typedef logic[$clog2(NUM_CT_READS)-1:0] ReadIdx;
 
 ReadIdx readIdx_c;
-PriorityEncoder#(NUM_CT_READS, 1) penc(readUnused_c, '{readIdx_c}, '{null});
+logic _unusedSignal;
+PriorityEncoder#(NUM_CT_READS, 1) penc(readUnused_c, '{readIdx_c}, '{_unusedSignal});
 ReadIdx readIdx_r[1:0];
 always_ff@(posedge clk) readIdx_r <= {readIdx_r[0], readIdx_c};
 
