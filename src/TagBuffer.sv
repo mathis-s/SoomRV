@@ -19,7 +19,9 @@ module TagBuffer
 
     input wire IN_commitValid[NUM_COMMIT-1:0],
     input wire IN_commitNewest[NUM_COMMIT-1:0],
+    input dup_info IN_commit_info[NUM_COMMIT-1:0],
     input Tag IN_RAT_commitPrevTags[NUM_COMMIT-1:0],
+    input Tag IN_RAT_commitPrevTags_dup[NUM_COMMIT-1:0],
     input Tag IN_commitTagDst[NUM_COMMIT-1:0]
 );
 // half of tag space is for eliminating immediates
@@ -102,10 +104,64 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                 end
                 else begin
                     if (IN_commitNewest[i]) begin
-                        if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
-                            freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
-                            free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                        if(IN_commit_info[i].duplicated) begin
+                            if(IN_commit_info[i].original) begin
+                                if(RFTag'(IN_RAT_commitPrevTags[i]) != RFTag'(IN_RAT_commitPrevTags_dup[i])) begin
+                                    if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
+                                        freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                        free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                    end
+                                end else begin
+                                    for(integer j = 0; j < NUM_COMMIT; j=j+1) begin
+                                        if(i != j && IN_commitValid[j]) begin
+                                            if((!IN_commit_info[j].duplicated || !IN_commit_info[j].original) 
+                                                    && RFTag'(IN_RAT_commitPrevTags[i]) == RFTag'(IN_RAT_commitPrevTags_dup[j])) begin
+                                                if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
+                                                    freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                                    free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end else begin
+                                if(RFTag'(IN_RAT_commitPrevTags[i]) != RFTag'(IN_RAT_commitPrevTags_dup[i])) begin
+                                    if (!IN_RAT_commitPrevTags_dup[i][$bits(Tag)-1]) begin
+                                        freeCom[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                        free[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                    end
+                                end else begin
+                                    for(integer j = 0; j < NUM_COMMIT; j=j+1) begin
+                                        if(i != j && IN_commitValid[j]) begin
+                                            if((!IN_commit_info[j].duplicated || IN_commit_info[j].original) 
+                                                    && (RFTag'(IN_RAT_commitPrevTags_dup[i]) == RFTag'(IN_RAT_commitPrevTags[j]))) begin
+                                                if (!IN_RAT_commitPrevTags_dup[i][$bits(Tag)-1]) begin
+                                                    freeCom[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                                    free[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end else begin
+                                if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
+                                    freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                    free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                                end
+                                if (!IN_RAT_commitPrevTags_dup[i][$bits(Tag)-1]) begin
+                                    freeCom[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                    free[RFTag'(IN_RAT_commitPrevTags_dup[i])] <= 1;
+                                end
                         end
+                        
+                        
+                        
+                        
+                        // if (!IN_RAT_commitPrevTags[i][$bits(Tag)-1]) begin
+                        //     freeCom[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                        //     free[RFTag'(IN_RAT_commitPrevTags[i])] <= 1;
+                        // end
 
                         if (!IN_commitTagDst[i][$bits(Tag)-1]) begin
                             freeCom[RFTag'(IN_commitTagDst[i])] <= 0;

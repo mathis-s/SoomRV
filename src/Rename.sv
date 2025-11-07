@@ -14,9 +14,11 @@ module Rename
 
     // Tag lookup for just decoded instrs
     input D_UOp IN_uop[WIDTH_ISSUE-1:0],
+    input dup_info IN_uop_info[WIDTH_ISSUE-1:0],
 
     // Committed changes from ROB
     input CommitUOp IN_comUOp[WIDTH_COMMIT-1:0],
+    input dup_info IN_comUOp_info[WIDTH_COMMIT-1:0],
 
     // WB for uncommitted but speculatively available values
     input FlagsUOp IN_flagsUOps[WIDTH_WR-1:0],
@@ -26,6 +28,7 @@ module Rename
     input wire IN_mispredFlush,
 
     output R_UOp OUT_uop[WIDTH_ISSUE-1:0],
+    output dup_info OUT_uop_info[WIDTH_ISSUE-1:0],
     // This is just an alternating bit that switches with each regular int op,
     // for assignment to issue queues.
     output IntUOpOrder_t OUT_uopOrdering[WIDTH_ISSUE-1:0],
@@ -52,8 +55,10 @@ end
 wire RAT_lookupAvail[2*WIDTH_ISSUE-1:0];
 Tag RAT_lookupSpecTag[2*WIDTH_ISSUE-1:0];
 reg[4:0] RAT_lookupIDs[2*WIDTH_ISSUE-1:0];
+dup_info RAT_lookupIDs_info[2*WIDTH_ISSUE-1:0];
 
 reg[4:0] RAT_issueIDs[WIDTH_ISSUE-1:0];
+dup_info RAT_issueIDs_info[WIDTH_ISSUE-1:0];
 reg RAT_issueValid[WIDTH_ISSUE-1:0];
 reg RAT_issueAvail[WIDTH_ISSUE-1:0];
 SqN RAT_issueSqNs[WIDTH_ISSUE-1:0];
@@ -64,8 +69,10 @@ reg RAT_commitValid[WIDTH_COMMIT-1:0];
 reg TB_commitValid[WIDTH_COMMIT-1:0];
 
 reg[4:0] RAT_commitIDs[WIDTH_COMMIT-1:0];
+dup_info RAT_commitIDs_info[WIDTH_COMMIT-1:0];
 Tag RAT_commitTags[WIDTH_COMMIT-1:0];
 Tag RAT_commitPrevTags[WIDTH_COMMIT-1:0];
+Tag RAT_commitPrevTags_dup[WIDTH_COMMIT-1:0];
 
 reg RAT_wbValid[WIDTH_WR-1:0];
 Tag RAT_wbTags[WIDTH_WR-1:0];
@@ -101,11 +108,21 @@ always_comb begin
 
     // Issue/Lookup
     for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
-
+        // LOOKUP
         RAT_lookupIDs[2*i+0] = IN_uop[i].rs1;
         RAT_lookupIDs[2*i+1] = IN_uop[i].rs2;
+        if(IN_uop[i].opcode == BR_BNE_CHECK && IN_uop[i].fu == FU_BRANCH) begin
+            RAT_lookupIDs_info[2*i+0] = IN_uop_info[i];
+            RAT_lookupIDs_info[2*i+0].original = 1;
+            RAT_lookupIDs_info[2*i+1] = IN_uop_info[i];
+            RAT_lookupIDs_info[2*i+1].original = 0;
+        end else begin
+            RAT_lookupIDs_info[2*i+0] = IN_uop_info[i];
+            RAT_lookupIDs_info[2*i+1] = IN_uop_info[i];
+        end
 
         RAT_issueIDs[i] = IN_uop[i].rd;
+        RAT_issueIDs_info[i] = IN_uop_info[i];
         RAT_issueSqNs[i] = nextCounterSqN;
         RAT_issueValid[i] = !rst && !IN_branch.taken && frontEn && !OUT_stall && IN_uop[i].valid;
         RAT_issueAvail[i] = IN_uop[i].fu == FU_RN || isSc[i];
@@ -128,6 +145,7 @@ always_comb begin
         TB_commitValid[i] = IN_comUOp[i].valid;
 
         RAT_commitIDs[i] = IN_comUOp[i].rd;
+        RAT_commitIDs_info[i] = IN_comUOp_info[i];
         RAT_commitTags[i] = IN_comUOp[i].tagDst;
     end
 
@@ -148,18 +166,22 @@ rt
     .IN_mispredFlush(IN_mispredFlush),
 
     .IN_lookupIDs(RAT_lookupIDs),
+    .IN_lookupIDs_info(RAT_lookupIDs_info),
     .OUT_lookupAvail(RAT_lookupAvail),
     .OUT_lookupSpecTag(RAT_lookupSpecTag),
 
     .IN_issueValid(RAT_issueValid),
     .IN_issueIDs(RAT_issueIDs),
+    .IN_issueIDs_info(RAT_issueIDs_info),
     .IN_issueTags(newTags),
     .IN_issueAvail(RAT_issueAvail),
 
     .IN_commitValid(RAT_commitValid),
     .IN_commitIDs(RAT_commitIDs),
+    .IN_commitIDs_info(RAT_commitIDs_info),
     .IN_commitTags(RAT_commitTags),
     .OUT_commitPrevTags(RAT_commitPrevTags),
+    .OUT_commitPrevTags_dup(RAT_commitPrevTags_dup),
 
     .IN_wbValid(RAT_wbValid),
     .IN_wbTag(RAT_wbTags)
@@ -190,21 +212,26 @@ TagBuffer#(.NUM_ISSUE(WIDTH_ISSUE), .NUM_COMMIT(WIDTH_COMMIT)) tb
 
     .IN_commitValid(TB_commitValid),
     .IN_commitNewest(isNewestCommit),
+    .IN_commit_info(IN_comUOp_info),
     .IN_RAT_commitPrevTags(RAT_commitPrevTags),
+    .IN_RAT_commitPrevTags_dup(RAT_commitPrevTags_dup),
     .IN_commitTagDst(RAT_commitTags)
 );
 
 reg isNewestCommit[WIDTH_COMMIT-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_COMMIT; i=i+1) begin
-
+        // TODO: CHECK !!!!
         // When rd == 0, the register is (also) discarded immediately instead of being committed.
         // This is currently only used for rmw atomics with rd=x0.
         isNewestCommit[i] = IN_comUOp[i].valid && IN_comUOp[i].rd != 0;
         if (IN_comUOp[i].valid)
             for (integer j = i + 1; j < WIDTH_COMMIT; j=j+1)
                 if (IN_comUOp[j].valid && (IN_comUOp[j].rd == IN_comUOp[i].rd))
-                    isNewestCommit[i] = 0;
+                    if (IN_comUOp_info[j].original == IN_comUOp_info[i].original || !IN_comUOp_info[j].duplicated) begin
+                        isNewestCommit[i] = 0;
+                    end
+                    // isNewestCommit[i] = 0;
     end
 end
 
@@ -254,6 +281,9 @@ Scheduler scheduler
 
 
 always_ff@(posedge clk /*or posedge rst*/) begin
+    for (integer i = 0; i < WIDTH_ISSUE; i=i+1) begin
+            OUT_uop_info[i] <= IN_uop_info[i];
+    end
 
     if (rst) begin
         counterSqN <= 0;

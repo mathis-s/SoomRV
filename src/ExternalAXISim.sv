@@ -128,7 +128,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
             s_axi_rlast <= last;
             s_axi_rvalid <= 1;
 
-            if (addr[31]) begin
+            if (addr[31] || addr[31:15] == 17'b0) begin
                 // Memory
                 assert((addr & ($clog2(BWIDTH) - 1)) == 0);
                 s_axi_rdata <= mem[addr[$clog2(BWIDTH) +: MADDR_LEN]];
@@ -229,7 +229,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         assert(w.valid);
         assert(buf_wlast == last);
 
-        if (addr[31]) begin
+        if (addr[31] || addr[31:15] == 17'b0) begin
             // Memory
             assert((addr & ($clog2(BWIDTH) - 1)) == 0);
             for (integer i = 0; i < BWIDTH; i=i+1) begin

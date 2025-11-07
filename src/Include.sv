@@ -60,7 +60,8 @@ typedef enum logic[5:0]
     BR_BGEU,
     BR_V_RET,
     BR_V_JALR,
-    BR_V_JR
+    BR_V_JR,
+    BR_BNE_CHECK
 } OPCode_Branch;
 
 typedef enum logic[5:0]
@@ -584,6 +585,12 @@ typedef struct packed
     logic compressed;
     logic valid;
 } D_UOp /* public */;
+
+typedef struct packed
+{
+    logic duplicated;
+    logic original;
+} dup_info /* public */;
 
 typedef struct packed
 {

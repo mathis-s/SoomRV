@@ -35,6 +35,7 @@ assign OUT_dbg.ldNack = 0;//LSU_ldAck.valid && LSU_ldAck.fail;
 assign OUT_dbg.stNack = 0;//LSU_stAck.valid && LSU_stAck.fail;
 
 CommitUOp comUOps[`DEC_WIDTH-1:0] /*verilator public*/;
+dup_info comUOps_info[`DEC_WIDTH-1:0] /*verilator public*/;
 
 wire ifetchEn = en && !TH_disableIFetch;
 
@@ -74,6 +75,8 @@ PCFileEntry PC_readDataTH;
 MemController_Req PC_MC_if;
 PageWalk_Req PC_PW_rq;
 
+wire clone_stall;
+
 IFetch ifetch
 (
     .clk(clk),
@@ -100,7 +103,7 @@ IFetch ifetch
     .IN_pcReadTH(PC_readReqTH),
     .OUT_pcReadDataTH(PC_readDataTH),
 
-    .IN_ready(!RN_stall && frontendEn),
+    .IN_ready(!RN_stall && frontendEn && !clone_stall),
     .OUT_instrs(PD_instrs),
 
     .IN_vmem(CSR_vmem),
@@ -117,6 +120,7 @@ SqN ROB_curSqN /*verilator public*/;
 PD_Instr PD_instrs[`DEC_WIDTH-1:0] /*verilator public*/;
 
 D_UOp DE_uop[`DEC_WIDTH-1:0] /*verilator public*/;
+dup_info DE_uop_info[`DEC_WIDTH-1:0] /*verilator public*/;
 DecodeBranch decBranch;
 InstrDecoder idec
 (
@@ -131,7 +135,10 @@ InstrDecoder idec
     .IN_enCustom(1'b1),
 
     .OUT_uop(DE_uop),
-    .OUT_decBranch(decBranch)
+    .OUT_uop_info(DE_uop_info),
+    .OUT_decBranch(decBranch),
+
+    .clone_stall(clone_stall)
 );
 
 wire sqNStall = ($signed((RN_nextSqN) - ROB_maxSqN) > -(`DEC_WIDTH));
@@ -141,6 +148,7 @@ wire frontendEn /*verilator public*/ =
     !SQ_flush;
 
 R_UOp RN_uop[`DEC_WIDTH-1:0] /*verilator public*/;
+dup_info RN_uop_info[`DEC_WIDTH-1:0] /*verilator public*/;
 IntUOpOrder_t RN_uopOrdering[`DEC_WIDTH-1:0];
 SqN RN_nextLoadSqN;
 SqN RN_nextStoreSqN;
@@ -155,8 +163,10 @@ Rename#(.WIDTH_WR(NUM_PORTS)) rn
     .OUT_stall(RN_stall),
 
     .IN_uop(DE_uop),
+    .IN_uop_info(DE_uop_info),
 
     .IN_comUOp(comUOps),
+    .IN_comUOp_info(comUOps_info),
 
     .IN_flagsUOps(flagUOps[NUM_PORTS-1:0]),
 
@@ -164,6 +174,7 @@ Rename#(.WIDTH_WR(NUM_PORTS)) rn
     .IN_mispredFlush(mispredFlush),
 
     .OUT_uop(RN_uop),
+    .OUT_uop_info(RN_uop_info),
     .OUT_uopOrdering(RN_uopOrdering),
     .OUT_nextSqN(RN_nextSqN),
     .OUT_nextLoadSqN(RN_nextLoadSqN),
@@ -801,6 +812,7 @@ ROB rob
     .clk(clk),
     .rst(rst),
     .IN_uop(RN_uop),
+    .IN_uop_info(RN_uop_info),
     .IN_flagUOps(flagUOps),
 
     .IN_interruptPending(CSR_trapControl.interruptPending),
@@ -817,6 +829,7 @@ ROB rob
     .OUT_lastStoreSqN(ROB_comStoreSqN),
 
     .OUT_comUOp(comUOps),
+    .OUT_comUOp_info(comUOps_info),
     .OUT_fpNewFlags(ROB_fpNewFlags),
     .OUT_curFetchID(ROB_curFetchID),
 

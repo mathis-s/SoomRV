@@ -12,6 +12,7 @@ module ROB
     input wire rst,
 
     input R_UOp IN_uop[WIDTH_RN-1:0],
+    input dup_info IN_uop_info[WIDTH_RN-1:0],
     input FlagsUOp IN_flagUOps[NUM_FLAG_UOPS-1:0],
 
     input wire IN_interruptPending /*verilator public*/,
@@ -30,6 +31,7 @@ module ROB
     output SqN OUT_lastStoreSqN,
 
     output CommitUOp OUT_comUOp[WIDTH-1:0],
+    output dup_info OUT_comUOp_info[WIDTH-1:0],
     output reg[4:0] OUT_fpNewFlags,
     output FetchID_t OUT_curFetchID,
 
@@ -61,15 +63,18 @@ function automatic SqN GetSqN(logic[ID_LEN-1:0] idx);
 endfunction
 
 R_UOp rnUOpSorted[WIDTH_RN-1:0];
+dup_info rnUOpSorted_info[WIDTH_RN-1:0];
 always_comb begin
     for (integer i = 0; i < WIDTH_RN; i=i+1) begin
         rnUOpSorted[i] = 'x;
         rnUOpSorted[i].valid = 0;
+        rnUOpSorted_info[i] = 'x;
 
         for (integer j = 0; j < WIDTH_RN; j=j+1) begin
             // This could be one-hot...
             if (IN_uop[j].valid && IN_uop[j].sqN[$clog2(WIDTH_RN)-1:0] == i[$clog2(WIDTH_RN)-1:0]) begin
                 rnUOpSorted[i] = IN_uop[j];
+                rnUOpSorted_info[i] =  IN_uop_info[j];
             end
         end
     end
@@ -81,6 +86,7 @@ generate
 for (genvar i = 0; i < `DEC_WIDTH; i=i+1) begin : gen
     (* ram_style = "distributed" *)
     ROBEntry entries[LENGTH/`DEC_WIDTH-1:0];
+    dup_info entries_info[LENGTH/`DEC_WIDTH-1:0];
 end
 endgenerate
 
@@ -94,6 +100,7 @@ assign OUT_curSqN = baseIndex;
 // All commits/reads from the ROB are sequential.
 // This should convince synthesis of that too.
 ROBEntry deqEntries[WIDTH-1:0];
+dup_info deqEntries_info[WIDTH-1:0];
 Flags deqFlags[WIDTH-1:0];
 
 typedef logic[$clog2(WIDTH_RN)-1:0] PortIdx;
@@ -102,6 +109,7 @@ typedef logic[$clog2(WIDTH_RN)-1:0] PortIdx;
 reg[ID_LEN-1:0] deqAddrs[WIDTH-1:0];
 reg[(ID_LEN-1-$clog2(WIDTH)):0] deqAddrsSorted[WIDTH-1:0];
 ROBEntry deqPorts[WIDTH-1:0];
+dup_info deqPorts_info[WIDTH-1:0];
 Flags deqFlagPorts[WIDTH-1:0];
 always_comb begin
     reg[ID_LEN-1:0] deqBase = (misprReplay_c.valid) ? misprReplay_c.iterSqN[ID_LEN-1:0] : baseIndex[ID_LEN-1:0];
@@ -124,13 +132,18 @@ always_comb begin
         deqFlagPorts[i] = flags[{deqAddrsSorted[i], PortIdx'(i)}];
 end
 generate
-    for (genvar i = 0; i < WIDTH; i=i+1)
-        always_comb deqPorts[i] = gen[i].entries[{deqAddrsSorted[i]}];
+    for (genvar i = 0; i < WIDTH; i=i+1) begin
+        always_comb begin
+            deqPorts[i] = gen[i].entries[{deqAddrsSorted[i]}];
+            deqPorts_info[i] = gen[i].entries_info[{deqAddrsSorted[i]}];
+        end
+    end
 endgenerate
 always_comb begin
     // Re-order the accesses into the initial order
     for (integer i = 0; i < WIDTH; i=i+1) begin
         deqEntries[i] = deqPorts[PortIdx'(deqAddrs[i])];
+        deqEntries_info[i] = deqPorts_info[PortIdx'(deqAddrs[i])];
         deqFlags[i] = deqFlagPorts[PortIdx'(deqAddrs[i])];
     end
 end
@@ -227,6 +240,10 @@ always_ff@(posedge clk /*or posedge rst*/) begin
     for (integer i = 0; i < WIDTH; i=i+1) begin
         OUT_comUOp[i] <= 'x;
         OUT_comUOp[i].valid <= 0;
+    end
+    
+    for (integer i = 0; i < WIDTH; i=i+1) begin
+        OUT_comUOp_info[i] <= deqEntries_info[i];
     end
 
     if (rst) begin
@@ -418,6 +435,9 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                 reg[$clog2(WIDTH_RN)-1:0] id0 = {i[$clog2(`DEC_WIDTH)-1:0]};
 
                 ROBEntry entry = 'x;
+                dup_info entry_info = 'x;
+
+                entry_info = rnUOpSorted_info[i];
 
                 entry.tag = rnUOpSorted[i].tagDst;
                 entry.rd = rnUOpSorted[i].rd;
@@ -433,6 +453,13 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                     1: gen[1].entries[id1] <= entry;
                     2: gen[2].entries[id1] <= entry;
                     3: gen[3].entries[id1] <= entry;
+                endcase
+
+                case (id0)
+                    0: gen[0].entries_info[id1] <= entry_info;
+                    1: gen[1].entries_info[id1] <= entry_info;
+                    2: gen[2].entries_info[id1] <= entry_info;
+                    3: gen[3].entries_info[id1] <= entry_info;
                 endcase
 
                 if (rnUOpSorted[i].fu == FU_RN)

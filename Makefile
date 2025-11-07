@@ -1,3 +1,5 @@
+SV2V ?= sv2v
+
 VERILATOR_FLAGS = \
 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE -Wno-GENUNNAMED -O3 -sv \
@@ -6,9 +8,20 @@ VERILATOR_FLAGS = \
 	-LDFLAGS "-ldl" \
 	-MAKEFLAGS -j$(nproc) \
 	-CFLAGS -DNOKONATA \
-	-CFLAGS -DCOSIM \
 	-CFLAGS -DSAVEABLE \
 	-CFLAGS -DNOCOVERAGE
+
+# VERILATOR_FLAGS = \
+# 	--cc --build --threads 4 --unroll-stmts 999999 -unroll-count 999999 --assert -Wall -Wno-BLKSEQ -Wno-UNUSED \
+# 	-Wno-PINCONNECTEMPTY -Wno-DECLFILENAME -Wno-ENUMVALUE -Wno-GENUNNAMED -O3 -sv \
+# 	$(VFLAGS) \
+# 	-CFLAGS "-std=c++17 -march=native" \
+# 	-LDFLAGS "-ldl" \
+# 	-MAKEFLAGS -j$(nproc) \
+# 	-CFLAGS -DNOKONATA \
+# 	-CFLAGS -DCOSIM \
+# 	-CFLAGS -DSAVEABLE \
+# 	-CFLAGS -DNOCOVERAGE
 
 VERILATOR_CFG = --exe sim/Top_tb.cpp sim/Simif.cpp --savable ../riscv-isa-sim/libriscv.a ../riscv-isa-sim/libsoftfloat.a ../riscv-isa-sim/libdisasm.a -CFLAGS -I../riscv-isa-sim --top-module Top -Ihardfloat
 
@@ -147,3 +160,82 @@ $(SLANG_HEADER_OUTPUT): src/Config.sv src/Include.sv
 .PHONY: clean
 clean:
 	$(RM) -r obj_dir
+
+.PHONY: synth/SoC.v
+synth/SoC.v:
+	$(SV2V) \
+		src/Config.sv \
+		extra_src/RFSynth.sv \
+		src/lib/PriorityEncoder.sv \
+		src/lib/OHEncoder.sv \
+		src/lib/RangeMaskGen.sv \
+		src/lib/PrefixSum.sv \
+		src/lib/PrefixRed.sv \
+		src/lib/OpDownsample.sv \
+		src/lib/PopCnt.sv \
+		src/lib/FIFO.sv \
+		src/Include.sv  \
+		src/InstrDecoder.sv  \
+		src/Rename.sv  \
+		src/Core.sv  \
+		src/IssueQueue.sv  \
+		src/IntALU.sv  \
+		src/IFetch.sv \
+		src/Load.sv \
+		src/ROB.sv \
+		src/AGU.sv \
+		src/BranchPredictor.sv \
+		src/LoadBuffer.sv \
+		src/StoreQueue.sv \
+		src/Multiply.sv \
+		src/Divide.sv \
+		src/MMIO.sv \
+		src/BranchSelector.sv \
+		src/MemRTL.sv \
+		src/MemRTL2W.sv \
+		src/MemoryController.sv \
+		src/RenameTable.sv \
+		src/TagBuffer.sv \
+		src/FPU.sv \
+		src/FMul.sv \
+		src/FDiv.sv \
+		src/BranchTargetBuffer.sv \
+		src/BranchPredictionTable.sv \
+		src/ReturnStack.sv \
+		src/TageTable.sv \
+		src/TagePredictor.sv \
+		src/LoadStoreUnit.sv \
+		src/IFetchPipeline.sv \
+		src/CSR.sv \
+		src/TrapHandler.sv \
+		src/Peripherals.sv \
+		src/PageWalker.sv \
+		src/LoadSelector.sv \
+		src/LoadResultBuffer.sv \
+		src/TLB.sv \
+		src/BypassLSU.sv \
+		src/TValSelect.sv \
+		src/SoC.sv \
+		src/TLBMissQueue.sv \
+		src/CacheWriteInterface.sv \
+		src/CacheReadInterface.sv \
+		src/RegFileRTL.sv \
+		src/BranchHandler.sv \
+		src/StoreDataIQ.sv \
+		src/StoreDataLoad.sv \
+		src/StoreQueueBackend.sv \
+		src/Scheduler.sv \
+		src/ResultFlagsSplit.sv \
+		src/InstrAligner.sv \
+		src/RFReadMux.sv \
+		src/CacheArbiter.sv \
+		src/MemRTL1RW.sv \
+		src/CacheLineManager.sv \
+		src/DataPrefetch.sv \
+		src/PrefetchPatternDetector.sv \
+		src/PrefetchIssuer.sv \
+		src/PrefetchExecutor.sv \
+		> $@
+
+synth/SoC.edif: synth/SoC.v
+	yosys -s synth.yosys

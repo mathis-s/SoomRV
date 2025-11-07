@@ -39,12 +39,12 @@ parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define RF_SIZE_EXP 6
 
 // PC at reset
-`define ENTRY_POINT (32'h8000_0000)
+`define ENTRY_POINT (32'h8000_1000)
 
 
 // PMAs
 `define IS_MMIO_PMA(addr) \
-    ((addr) < 32'h8000_0000)
+    (((addr) >= 32'h10000000) && ((addr) < 32'h8000_0000))
 
 `define IS_MMIO_PMA_W(addr) \
     `IS_MMIO_PMA({(addr), 2'b0})
@@ -71,12 +71,11 @@ parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define EXT_MMIO_END_ADDR   32'h1100_0000
 
 `define IS_MEM_PMA(addr) \
-    ((addr) >= 32'h80000000 && (addr) < 32'h90000000)
+    (((addr) >= 32'h80000000 && (addr) < 32'h90000000) || (addr) < 32'h1000_0000)
 
 // 256 MiB main memory or MMIO
 `define IS_LEGAL_ADDR(addr) \
-    (`IS_MEM_PMA(addr) || \
-    (`IS_MMIO_PMA(addr) && (addr) >= 32'h10000000))
+    (`IS_MEM_PMA(addr) || `IS_MMIO_PMA(addr))
 
 
 // Enable floating point (zfinx) support

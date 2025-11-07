@@ -1,3 +1,4 @@
+`define DUPLICATION_PARAMETER 1 << 20
 
 `define OPC_LUI 7'b0110111
 `define OPC_AUIPC 7'b0010111
@@ -207,7 +208,10 @@ module InstrDecoder
     input wire IN_enCustom,
 
     output DecodeBranch OUT_decBranch,
-    output D_UOp OUT_uop[NUM_UOPS-1:0]
+    output D_UOp OUT_uop[NUM_UOPS-1:0],
+    output dup_info OUT_uop_info[NUM_UOPS-1:0],
+
+    output wire clone_stall
 );
 
 
@@ -219,6 +223,13 @@ I32 i32;
 
 D_UOp uopsComb[NUM_UOPS-1:0];
 DecodeBranch decBranch;
+
+reg [31:0] number_of_instructions;
+D_UOp uopsCombComb[3*NUM_UOPS-1:0];
+dup_info uopsCombComb_info[3*NUM_UOPS-1:0];
+
+reg [31:0] total_duplication_count;
+reg [31:0] this_duplication_count;
 
 always_comb begin
 
@@ -927,7 +938,7 @@ always_comb begin
                             invalidEnc = 0;
                         end
                     end*/
-`ifdef ENABLE_FP
+                    `ifdef ENABLE_FP
                     `OPC_FP: begin
                         // single precision
                         if (i32.fp.fmt == 2'b00) begin
@@ -1041,7 +1052,7 @@ always_comb begin
                             endcase
                         end
                     end
-`endif // ENABLE_FP
+                    `endif // ENABLE_FP
                     `OPC_ATOMIC: begin
                         if (instr.funct3 == 3'b010) begin
 
@@ -1538,7 +1549,71 @@ always_comb begin
         end
         uopsComb[i] = uop;
     end
+
+    // Instruction Generation
+    number_of_instructions = 0;
+    this_duplication_count = 0;
+    for (integer i = 0; i < NUM_UOPS; i=i+1) begin
+        instr = IN_instrs[i].instr;
+
+        // Duplicate Instruction (NOP)
+        if(instr.opcode == `OPC_STORE) begin
+            // replica NOP
+            uopsCombComb[number_of_instructions] = uopsComb[i];
+            uopsCombComb[number_of_instructions].rs1 = instr.rs1;
+            uopsCombComb[number_of_instructions].rs2 = instr.rs1;
+            uopsCombComb[number_of_instructions].immB = 0;
+            uopsCombComb[number_of_instructions].rd = 0;
+            uopsCombComb[number_of_instructions].fu = FU_BRANCH;
+            uopsCombComb[number_of_instructions].opcode = BR_BNE_CHECK;
+            uopsCombComb_info[number_of_instructions].duplicated = 1;
+            uopsCombComb_info[number_of_instructions].original = 0;
+            number_of_instructions = number_of_instructions + 1;
+
+            // original NOP
+            uopsCombComb[number_of_instructions] = uopsComb[i];
+            uopsCombComb[number_of_instructions].rs1 = instr.rs1;
+            uopsCombComb[number_of_instructions].rs2 = instr.rs1;
+            uopsCombComb[number_of_instructions].immB = 0;
+            uopsCombComb[number_of_instructions].rd = 0;
+            uopsCombComb[number_of_instructions].fu = FU_BRANCH;
+            uopsCombComb[number_of_instructions].opcode = BR_BNE_CHECK;
+            uopsCombComb_info[number_of_instructions].duplicated = 1;
+            uopsCombComb_info[number_of_instructions].original = 0;
+            number_of_instructions = number_of_instructions + 1;
+        end
+
+        if((instr.opcode == `OPC_REG_IMM || instr.opcode == `OPC_REG_REG || instr.opcode == `OPC_LOAD)
+            && (total_duplication_count < `DUPLICATION_PARAMETER)) begin
+            // replica Instruction
+            uopsCombComb[number_of_instructions] = uopsComb[i];
+            uopsCombComb_info[number_of_instructions].duplicated = 1;
+            uopsCombComb_info[number_of_instructions].original = 0;
+            number_of_instructions = number_of_instructions + 1;
+
+            // original Instruction
+            uopsCombComb[number_of_instructions] = uopsComb[i];
+            uopsCombComb_info[number_of_instructions].duplicated = 1;
+            uopsCombComb_info[number_of_instructions].original = 1;
+            number_of_instructions = number_of_instructions + 1;
+        end else begin
+            // Original Instruction
+            uopsCombComb[number_of_instructions] = uopsComb[i];
+            uopsCombComb_info[number_of_instructions].duplicated = 0;
+            uopsCombComb_info[number_of_instructions].original = 1;
+            number_of_instructions = number_of_instructions + 1;
+        end
+
+        if((instr.opcode == `OPC_REG_IMM || instr.opcode == `OPC_REG_REG || instr.opcode == `OPC_LOAD)) begin
+            this_duplication_count = this_duplication_count + 1;
+        end
+
+    end
+
+    clone_stall = (current_instruction_count + NUM_UOPS < number_of_instructions);
 end
+
+reg [31:0] current_instruction_count;
 
 always_ff@(posedge clk /*or posedge rst*/) begin
 
@@ -1546,19 +1621,38 @@ always_ff@(posedge clk /*or posedge rst*/) begin
     if (rst) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
+            OUT_uop_info[i] <= 'x;
             OUT_uop[i].valid <= 0;
+            current_instruction_count <= 0;
+
+            total_duplication_count <= 0;
         end
     end
     else if (IN_branch.taken) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
             OUT_uop[i] <= 'x;
+            OUT_uop_info[i] <= 'x;
             OUT_uop[i].valid <= 0;
+            current_instruction_count <= 0;
         end
     end
     else if (en) begin
         for (integer i = 0; i < NUM_UOPS; i=i+1) begin
-            OUT_uop[i] <= uopsComb[i];
+            OUT_uop[i] <= uopsCombComb[current_instruction_count + i];
+            OUT_uop_info[i] <= uopsCombComb_info[current_instruction_count + i];
+
+            if(current_instruction_count + i >= number_of_instructions) begin
+                OUT_uop[i].valid <= 0;
+            end
         end
+
+        if(current_instruction_count + NUM_UOPS < number_of_instructions) begin
+            current_instruction_count <= current_instruction_count + NUM_UOPS;
+        end else begin
+            total_duplication_count <= total_duplication_count + this_duplication_count;
+            current_instruction_count <= 0;
+        end
+
         OUT_decBranch <= decBranch;
     end
 end
