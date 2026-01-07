@@ -18,7 +18,7 @@ module MemRTL1RW
 (* ram_style = "block" *)
 reg[WORD_SIZE-1:0] mem[NUM_WORDS-1:0] /* verilator public */;
 
-reg ce_reg = 1;
+reg ce_reg /* = 1 */;
 reg we_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr_reg;
 reg[WORD_SIZE-1:0] data_reg;

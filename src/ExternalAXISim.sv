@@ -94,7 +94,7 @@ initial begin
 end
 
 // RTL sim input
-logic inputAvail /*verilator public*/ = 0;
+logic inputAvail /*verilator public*/ /* = 0 */;
 logic[7:0] inputByte /*verilator public*/;
 
 // Read Data Output
