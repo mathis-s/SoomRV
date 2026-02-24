@@ -972,11 +972,11 @@ always_comb begin
                                     uop.fu = FU_INT;
 
                                     if (i32.fp.rm == 3'b000)
-                                        uop.opcode = INT_FSGNJ_S;
+                                        uop.opcode = /* INT_FSGNJ_S  */ BM_FSGNJ_S;
                                     else if (i32.fp.rm == 3'b001)
-                                        uop.opcode = INT_FSGNJN_S;
+                                        uop.opcode = /* INT_FSGNJN_S */ BM_FSGNJN_S;
                                     else if (i32.fp.rm == 3'b010)
-                                        uop.opcode = INT_FSGNJX_S;
+                                        uop.opcode = /* INT_FSGNJX_S */ BM_FSGNJX_S;
                                     else invalidEnc = 1;
                                 end
                                 5'b00101: begin
