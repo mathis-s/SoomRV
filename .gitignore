@@ -25,6 +25,7 @@
 !.gitmodules
 !LICENSE
 !Makefile
+!CMakeLists.txt
 !README.md
 !Top_tb.cpp
 !linker.ld

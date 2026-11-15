@@ -46,12 +46,14 @@ BranchProv branch /*verilator public*/;
 wire mispredFlush /*verilator public*/;
 wire BS_PERFC_branchMispr;
 
+IS_UOp IS_uop[NUM_PORTS-1:0] /*verilator public*/;
+
 BranchSelector#(4) bsel
 (
     .clk(clk),
     .rst(rst),
 
-    .IN_isUOps(IS_uop[NUM_BRANCH_PORTS-1:0]),
+    .IN_isUOps('{IS_uop[1], IS_uop[0]}),
 
     .IN_branches(branchProvs[3:0]),
     .OUT_branch(branch),
@@ -170,7 +172,6 @@ Rename#(.WIDTH_WR(NUM_PORTS)) rn
     .OUT_nextStoreSqN(RN_nextStoreSqN)
 );
 
-IS_UOp IS_uop[NUM_PORTS-1:0] /*verilator public*/;
 wire stall[NUM_PORTS-1:0] /*verilator public*/;
 
 wire[NUM_PORTS_TOTAL-1:0][`DEC_WIDTH-1:0] IQ_stalls;
@@ -349,9 +350,12 @@ ResultUOp resultUOps[NUM_PORTS-1:0] /*verilator public*/;
 FlagsUOp flagUOps[NUM_PORTS_TOTAL-1:0] /*verilator public*/;
 
 generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
-    // verilator lint_off UNDRIVEN
     RES_UOp[(1<<$bits(FuncUnit))-1:0] resUOps;
-    // verilator lint_on UNDRIVEN
+    initial resUOps = '0;
+
+    localparam logic[15:0] resDriven =
+        ((PORT_FUS[i] & (FU_INT_OH|FU_BRANCH_OH|FU_BITMANIP_OH|FU_ATOMIC_OH)) != 0 ? FU_INT_OH : 16'd0) |
+        (PORT_FUS[i] & (FU_DIV_OH|FU_FPU_OH|FU_MUL_OH|FU_FMUL_OH|FU_FDIV_OH|FU_CSR_OH));
 
     assign stall[i] = 1'b0;
 
@@ -497,7 +501,7 @@ generate for (genvar i = 0; i < NUM_ALUS; i=i+1) begin : intPortsGen
     always_comb begin
         wbUOp = RES_UOp'{valid: 0, default: 'x};
         for (integer j = 0; j < (1 << $bits(FuncUnit)); j=j+1) begin
-            if ((PORT_FUS[i] & (1 << j)) != 0 && resUOps[j].valid)
+            if ((resDriven & (1 << j)) != 0 && resUOps[j].valid)
                 wbUOp = resUOps[j];
         end
     end

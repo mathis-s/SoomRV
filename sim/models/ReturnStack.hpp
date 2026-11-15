@@ -67,5 +67,5 @@ class ReturnStack : public Model
         if (fread(&returnIdx, sizeof(returnIdx), 1, f) != 1) abort();
     }
 
-    ReturnStack(VTop* top, processor_t* processor) : Model(top, processor) {}
+    ReturnStack(ModInst____GTop* top, processor_t* processor) : Model(top, processor) {}
 };

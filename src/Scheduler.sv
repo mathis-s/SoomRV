@@ -20,7 +20,7 @@ function automatic Candidates_t GetCandidates(FuncUnit fu, SqN sqN, SqN loadSqN,
 
     case (fu)
         default: begin
-            for (integer i = 0; i < 4; i=i+1)
+            for (integer i = 0; i < NUM_ALUS; i=i+1)
                 if (PORT_FUS[i][fu] != 0)
                     retval |= (1 << i);
         end
@@ -70,24 +70,24 @@ end
 // verilator lint_off UNOPTFLAT
 
 // Faster scheduling
-//logic[$clog2(NUM_ALUS)-1:0] prios_c[`DEC_WIDTH-1:0];
-//always_comb begin
-//    for (integer i = 0; i < `DEC_WIDTH; i=i+1)
-//        prios_c[i] = modTable[PAD'(prio_r) + PAD'(i)];
-//end
-
 logic[$clog2(NUM_ALUS)-1:0] prios_c[`DEC_WIDTH-1:0];
 always_comb begin
-    prios_c[0] = prio_r;
-    for (integer i = 1; i < `DEC_WIDTH; i=i+1)
-        prios_c[i] = modTable[PAD'(OUT_order[i-1]) + PAD'(1)];
+    for (integer i = 0; i < `DEC_WIDTH; i=i+1)
+        prios_c[i] = modTable[PAD'(prio_r) + PAD'(i)];
 end
+
+//logic[$clog2(NUM_ALUS)-1:0] prios_c[`DEC_WIDTH-1:0];
+//always_comb begin
+//    prios_c[0] = prio_r;
+//    for (integer i = 1; i < `DEC_WIDTH; i=i+1)
+//        prios_c[i] = modTable[PAD'(OUT_order[i-1]) + PAD'(1)];
+//end
 
 IntUOpOrder_t outOrderRaw[`DEC_WIDTH-1:0];
 generate for (genvar i = 0; i < `DEC_WIDTH; i=i+1)
     PriorityEncoder#(NUM_ALUS) penc (
         .IN_data((candidates[i] >> prios_c[i]) | (candidates[i] << (NUM_ALUS - prios_c[i]))),
-        .OUT_idx({outOrderRaw[i]}),
+        .OUT_idx('{outOrderRaw[i]}),
         .OUT_idxValid()
     );
 endgenerate

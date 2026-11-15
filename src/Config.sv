@@ -1,11 +1,11 @@
 
 // Branch Target Buffer
-`define BTB_ENTRIES 4096
+`define BTB_ENTRIES 64
 `define BTB_TAG_SIZE 16
 
 // TAGE Predictor
 `define BP_BASEP_ID_LEN 12
-`define TAGE_CLEAR_ENABLE
+//`define TAGE_CLEAR_ENABLE
 `define TAGE_CLEAR_INTERVAL 20
 `define TAGE_BASE 4
 `define TAGE_STAGES 6
@@ -15,8 +15,8 @@
 
 // IFetch
 `define FSIZE_E 4
-parameter FETCH_BITS = 16 << (`FSIZE_E - 1);
-parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
+localparam FETCH_BITS = 16 << (`FSIZE_E - 1);
+localparam FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define DEC_WIDTH 4
 `define PD_BUF_SIZE 4
 `define WFI_DELAY 1024
@@ -88,23 +88,23 @@ parameter FETCH_WORDS = 1 << (`FSIZE_E - 1);
 `define SQ_LINEAR
 
 //`define DEBUG
-parameter HANG_COUNTER_LEN = 16;
+localparam HANG_COUNTER_LEN = 16;
 
-parameter NUM_AGUS = 2;
-parameter NUM_ALUS = 3;
+localparam NUM_AGUS = 2;
+localparam NUM_ALUS = 3;
 // How many of the ALU ports support branches?
-parameter NUM_BRANCH_PORTS = 2;
+localparam NUM_BRANCH_PORTS = 2;
 
-parameter NUM_PORTS = NUM_AGUS + NUM_ALUS;
-parameter NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
-parameter NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
-parameter NUM_RF_READS_PHY = NUM_ALUS * 2 + NUM_AGUS * 1;
-parameter NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
-parameter NUM_CT_READS = NUM_AGUS + 1; // one port for stores
+localparam NUM_PORTS = NUM_AGUS + NUM_ALUS;
+localparam NUM_PORTS_TOTAL = NUM_ALUS + 2 * NUM_AGUS;
+localparam NUM_RF_READS = NUM_ALUS * 2 + NUM_AGUS * 2;
+localparam NUM_RF_READS_PHY = NUM_ALUS * 2 + NUM_AGUS * 1;
+localparam NUM_RF_WRITES = NUM_ALUS + NUM_AGUS;
+localparam NUM_CT_READS = NUM_AGUS + 1; // one port for stores
 
-parameter SQ_DEQ_PORTS = 2;
+localparam SQ_DEQ_PORTS = 2;
 
-parameter int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
+localparam int PORT_IQ_SIZE[NUM_PORTS-1:0] = '{
     8,
     8,
     8,
@@ -127,7 +127,7 @@ localparam[15:0] FU_CSR_OH      = 1 << FU_CSR;
 localparam[15:0] FU_TRAP_OH     = 1 << FU_TRAP;
 
 // verilator lint_off WIDTHEXPAND
-parameter logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
+localparam logic[15:0] PORT_FUS[NUM_PORTS-1:0] = '{
 
     // NUM_AGUS x AGU Ports
     FU_AGU_OH|FU_ATOMIC_OH,

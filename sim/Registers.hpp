@@ -1,4 +1,5 @@
 #pragma once
+#include "sim_header_golden.h"
 #include "model_headers.h"
 #include "sc_stub.hpp"
 #include "slang/slang.hpp"
@@ -7,12 +8,12 @@
 class Registers
 {
   public:
-    VTop* top;
+    ModInst____GTop* top;
     std::array<uint16_t, 32> regTagOverride;
 
     uint32_t ReadRegister(uint32_t rid)
     {
-        auto core = top->Top->soc->core;
+        auto core = top->soc->core;
         constexpr size_t TagImmSize = R_UOp::tagA_w - 1;
         constexpr size_t TagSelBit = 1 << TagImmSize;
         constexpr size_t TagImmMask = (1 << TagImmSize) - 1;
@@ -32,7 +33,7 @@ class Registers
         // ONLY use this for initialization!
         // If there is a previously allocated
         // physical register, it is not freed.
-        auto core = top->Top->soc->core;
+        auto core = top->soc->core;
 
         int i = 0;
         while (true)
@@ -68,5 +69,5 @@ class Registers
         memset(regTagOverride.data(), 0xFF, sizeof(regTagOverride));
     }
 
-    Registers(VTop* top) : top(top) { Cycle(); }
+    Registers(ModInst____GTop* top) : top(top) { Cycle(); }
 };

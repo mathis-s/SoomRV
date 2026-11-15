@@ -87,13 +87,14 @@ FetchOff_t BH_endOffset;
 logic BH_newPredTaken;
 FetchOff_t BH_newPredPos;
 FetchBranchProv BH_decBranch;
+IF_Instr packet;
 BranchHandler#(.NUM_INST(NUM_INST)) branchHandler
 (
     .clk(clk),
     .rst(rst),
 
     .IN_clear(IN_mispr),
-    .IN_accept(packet.valid),
+    .IN_accept(packet.valid && packet.fetchFault == IF_FAULT_NONE),
     .IN_op(fetch1),
     .IN_instrs(assocHitInstrs),
 
@@ -249,7 +250,6 @@ OHEncoder#(`CASSOC, 1) assocEnc(assocHitUnary_c, assocHit.idx, assocHit.valid);
 wire[NUM_INST-1:0][15:0] assocHitInstrs = IF_icache.rdata[assocHit.idx];
 
 // Check for errors
-IF_Instr packet;
 always_comb begin
     logic transferExists = 'x;
     logic allowPassThru = 'x;
@@ -381,6 +381,7 @@ always_comb begin
         OUT_memc_c.cmd = MEMC_CP_EXT_TO_CACHE;
         OUT_memc_c.cacheAddr = {assocCnt, phyPC[`VIRT_IDX_LEN-1:4], 2'b0};
         OUT_memc_c.readAddr = {phyPC[31:4], 4'b0}; // todo: adjust alignment based on AXI width
+        OUT_memc_c.writeAddr = '0;
         OUT_memc_c.cacheID = 1;
         OUT_memc_c.data = 0;
         OUT_memc_c.mask = 0;

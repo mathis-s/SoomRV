@@ -48,6 +48,23 @@ typedef enum logic[5:0]
     INT_ZE_H
 } OPCode_INT;
 
+typedef enum logic[3:0]
+{
+    FU_INT,
+    FU_BRANCH,
+    FU_BITMANIP,
+    FU_AGU,
+    FU_MUL,
+    FU_DIV,
+    FU_FPU,
+    FU_FMUL,
+    FU_FDIV,
+    FU_RN,
+    FU_ATOMIC,
+    FU_CSR,
+    FU_TRAP
+} FuncUnit;
+
 typedef enum logic[5:0]
 {
     BR_AUIPC,
@@ -237,23 +254,6 @@ typedef enum logic[5:0]
     TRAP_V_INTERRUPT = 16
 
 } OPCode_FU_TRAP;
-
-typedef enum logic[3:0]
-{
-    FU_INT,
-    FU_BRANCH,
-    FU_BITMANIP,
-    FU_AGU,
-    FU_MUL,
-    FU_DIV,
-    FU_FPU,
-    FU_FMUL,
-    FU_FDIV,
-    FU_RN,
-    FU_ATOMIC,
-    FU_CSR,
-    FU_TRAP
-} FuncUnit /* public */;
 
 typedef enum logic[3:0]
 {

@@ -276,7 +276,7 @@ void SpikeSimif::take_trap(bool interrupt, reg_t cause, reg_t epc, bool delegate
     soomrv_trap_t trap(cause | (interrupt ? 0x80000000 : 0));
     processor->take_trap(trap, epc);
 }
-void SpikeSimif::restore_from_top(TopWrapper& wrap, Inst& inst)
+void SpikeSimif::restore_from_top(TopWrapper<ModInst____GTop>& wrap, Inst& inst)
 {
     doRestore = false;
     processor->get_state()->pc = inst.pc;
@@ -292,28 +292,28 @@ void SpikeSimif::restore_from_top(TopWrapper& wrap, Inst& inst)
     processor->put_csr(CSR_INSTRET, (csr->minstret + 1) & 0xFFFFFFFF);
     processor->put_csr(CSR_INSTRETH, (csr->minstret + 1) >> 32);
 
-    processor->put_csr(CSR_MSTATUS, csr->__PVT__mstatus);
-    processor->put_csr(CSR_MCOUNTEREN, csr->__PVT__mcounteren);
-    processor->put_csr(CSR_MCOUNTINHIBIT, csr->__PVT__mcountinhibit);
-    processor->put_csr(CSR_MTVEC, csr->__PVT__mtvec);
-    processor->put_csr(CSR_MEDELEG, csr->__PVT__medeleg);
-    processor->put_csr(CSR_MIDELEG, csr->__PVT__mideleg);
+    processor->put_csr(CSR_MSTATUS, csr->mstatus);
+    processor->put_csr(CSR_MCOUNTEREN, csr->mcounteren);
+    processor->put_csr(CSR_MCOUNTINHIBIT, csr->mcountinhibit);
+    processor->put_csr(CSR_MTVEC, csr->mtvec);
+    processor->put_csr(CSR_MEDELEG, csr->medeleg);
+    processor->put_csr(CSR_MIDELEG, csr->mideleg);
 
-    processor->put_csr(CSR_MIP, csr->__PVT__mip);
-    processor->put_csr(CSR_MIE, csr->__PVT__mie);
-    processor->put_csr(CSR_MSCRATCH, csr->__PVT__mscratch);
-    processor->put_csr(CSR_MEPC, csr->__PVT__mepc);
-    processor->put_csr(CSR_MCAUSE, csr->__PVT__mcause);
-    processor->put_csr(CSR_MTVAL, csr->__PVT__mtval);
-    processor->put_csr(CSR_MENVCFG, csr->__PVT__menvcfg);
-    processor->put_csr(CSR_SCOUNTEREN, csr->__PVT__scounteren);
-    processor->put_csr(CSR_SEPC, csr->__PVT__sepc);
-    processor->put_csr(CSR_SSCRATCH, csr->__PVT__sscratch);
-    processor->put_csr(CSR_STVAL, csr->__PVT__stval);
-    processor->put_csr(CSR_STVEC, csr->__PVT__stvec);
-    processor->put_csr(CSR_SATP, csr->__PVT__satp);
-    processor->put_csr(CSR_SENVCFG, csr->__PVT__senvcfg);
-    processor->put_csr(CSR_SCAUSE, csr->__PVT__scause);
+    processor->put_csr(CSR_MIP, csr->mip);
+    processor->put_csr(CSR_MIE, csr->mie);
+    processor->put_csr(CSR_MSCRATCH, csr->mscratch);
+    processor->put_csr(CSR_MEPC, csr->mepc);
+    processor->put_csr(CSR_MCAUSE, csr->mcause);
+    processor->put_csr(CSR_MTVAL, csr->mtval);
+    processor->put_csr(CSR_MENVCFG, csr->menvcfg);
+    processor->put_csr(CSR_SCOUNTEREN, csr->scounteren);
+    processor->put_csr(CSR_SEPC, csr->sepc);
+    processor->put_csr(CSR_SSCRATCH, csr->sscratch);
+    processor->put_csr(CSR_STVAL, csr->stval);
+    processor->put_csr(CSR_STVEC, csr->stvec);
+    processor->put_csr(CSR_SATP, csr->satp);
+    processor->put_csr(CSR_SENVCFG, csr->senvcfg);
+    processor->put_csr(CSR_SCAUSE, csr->scause);
 
-    processor->set_privilege(csr->__PVT__priv, false);
+    processor->set_privilege(csr->priv, false);
 }

@@ -28,12 +28,16 @@ reg we_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr_reg;
 reg[$clog2(NUM_WORDS)-1:0] addr1_reg;
 reg[WORD_SIZE-1:0] data_reg;
-reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
+reg[WORD_SIZE-1:0] data_reg_p1;
 
-initial begin
-    for (integer i = 0; i < NUM_WORDS; i=i+1)
-        mem[i] = 0;
-end
+reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
+reg[WORD_SIZE-1:0] odata1_reg;
+reg[(WORD_SIZE/WRITE_SIZE)-1:0] wfwd_reg;
+
+//initial begin
+//    for (integer i = 0; i < NUM_WORDS; i=i+1)
+//        mem[i] = 0;
+//end
 
 always@(posedge clk) begin
 
@@ -60,16 +64,31 @@ always@(posedge clk) begin
     end
 
     if (!ce1_reg) begin
-        OUT_data1 <= mem[addr1_reg];
+        odata1_reg <= mem[addr1_reg];
         //if (addr1_reg == {32'h0A0}[$clog2(NUM_WORDS)-1:0] && WORD_SIZE == 128)
         //    $display("[%d] %m: read %x from %x", $time(), mem[addr1_reg], addr1_reg);
     end
+end
 
-    if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg) begin
+always_ff@(posedge clk)
+  data_reg_p1 <= data_reg;
+
+always_ff@(posedge clk) begin
+  wfwd_reg <= '0;
+  if (!ce1_reg && !ce_reg && addr1_reg == addr_reg && !we_reg) begin
         for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
             if (wm_reg[i])
-                OUT_data1[(WRITE_SIZE*i)+:WRITE_SIZE] <= data_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
+                wfwd_reg[i] <= '1;
         end
+    end
+end
+
+always_comb begin
+    for (integer i = 0; i < WORD_SIZE/WRITE_SIZE; i=i+1) begin
+        if (wfwd_reg[i])
+            OUT_data1[(WRITE_SIZE*i)+:WRITE_SIZE] = data_reg_p1[(WRITE_SIZE*i)+:WRITE_SIZE];
+        else
+            OUT_data1[(WRITE_SIZE*i)+:WRITE_SIZE] = odata1_reg[(WRITE_SIZE*i)+:WRITE_SIZE];
     end
 end
 

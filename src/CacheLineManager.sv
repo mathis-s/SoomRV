@@ -226,12 +226,14 @@ always_comb begin
     // read after write
     for (integer j = 0; j < `AXI_NUM_TRANS; j=j+1) begin
         if (miss.valid &&
-            IN_memc.transfers[j].valid &&
+            IN_memc.transfers[j].valid && // fixme: also check command/cache
             IN_memc.transfers[j].writeAddr[31:`CLSIZE_E] == miss.missAddr[31:`CLSIZE_E]
         ) begin
             missEvictConflict = 1;
         end
     end
+    // fixme: shouldn't this cover all memc commands not just ours? or do we have prio?
+    // should prob compare against selected
     if ((OUT_memc.cmd == MEMC_REPLACE || OUT_memc.cmd == MEMC_CP_CACHE_TO_EXT) &&
         miss.valid && OUT_memc.writeAddr[31:`CLSIZE_E] == miss.missAddr[31:`CLSIZE_E])
         missEvictConflict = 1;
@@ -308,7 +310,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                         REGULAR_NO_EVICT: begin
                             OUT_memc.cmd <= MEMC_CP_EXT_TO_CACHE;
                             OUT_memc.cacheAddr <= {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:2]};
-                            OUT_memc.writeAddr <= 'x;
+                            OUT_memc.writeAddr <= '0;
                             OUT_memc.readAddr <= {miss.missAddr[31:2], 2'b0};
                             OUT_memc.cacheID <= 0;
                             OUT_memc.mask <= 0;
@@ -319,7 +321,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
                             OUT_memc.cmd <= MEMC_CP_CACHE_TO_EXT;
                             OUT_memc.cacheAddr <= {miss.assoc, miss.missAddr[`VIRT_IDX_LEN-1:2]};
                             OUT_memc.writeAddr <= {miss.writeAddr[31:`VIRT_IDX_LEN], miss.missAddr[`VIRT_IDX_LEN-1:2], 2'b0};
-                            OUT_memc.readAddr <= 'x;
+                            OUT_memc.readAddr <= '0;
                             OUT_memc.cacheID <= 0;
                             OUT_memc.mask <= 0;
                         end

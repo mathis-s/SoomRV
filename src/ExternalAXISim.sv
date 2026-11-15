@@ -18,20 +18,20 @@ module ExternalAXISim
     input[0:0] s_axi_awlock, // exclusive access
     input[3:0] s_axi_awcache, // {allocate, other allocate, modifiable, bufferable}
     input s_axi_awvalid,
-    output logic s_axi_awready,
+    output logic s_axi_awready = '0,
 
     // write stream
     input[WIDTH-1:0] s_axi_wdata,
     input[(WIDTH/8)-1:0] s_axi_wstrb,
     input s_axi_wlast,
     input s_axi_wvalid,
-    output logic s_axi_wready,
+    output logic s_axi_wready = '0,
 
     // write response
     input s_axi_bready,
     output logic[ID_LEN-1:0] s_axi_bid,
     //output[1:0] s_axi_bresp,
-    output logic s_axi_bvalid,
+    output logic s_axi_bvalid = '0,
 
     // read request
     input[ID_LEN-1:0] s_axi_arid,
@@ -42,7 +42,7 @@ module ExternalAXISim
     input[0:0] s_axi_arlock,
     input[3:0] s_axi_arcache, // {other allocate, allocate, modifiable, bufferable}
     input s_axi_arvalid,
-    output logic s_axi_arready,
+    output logic s_axi_arready = '0,
 
     // read stream
     input s_axi_rready,
@@ -50,13 +50,13 @@ module ExternalAXISim
     output logic[WIDTH-1:0] s_axi_rdata,
     //output logic[1:0] s_axi_rresp,
     output logic s_axi_rlast,
-    output logic s_axi_rvalid
+    output logic s_axi_rvalid = '0
 );
 
 
 localparam NUM_TFS = 1<<ID_LEN;
 localparam BWIDTH = WIDTH / 8;
-localparam MADDR_LEN = 28 - $clog2(WIDTH / 8);
+localparam MADDR_LEN = 26 - $clog2(WIDTH / 8);
 localparam MEM_LEN = (1 << MADDR_LEN);
 
 reg[WIDTH-1:0] mem[MEM_LEN-1:0] /*verilator public*/;
@@ -77,12 +77,11 @@ typedef struct packed
 
 function logic[ADDR_LEN-1:0] GetCurAddr(Transfer t);
     case (t.btype)
-    FIXED: return t.addr;
-    INCR: return t.addr + (t.cur * BWIDTH);
-    WRAP: return ((t.addr + (t.cur * BWIDTH)) & (t.len * BWIDTH)) | (t.addr & ~(t.len * BWIDTH));
+    FIXED: GetCurAddr = t.addr;
+    INCR: GetCurAddr = t.addr + (t.cur * BWIDTH);
+    WRAP: GetCurAddr = ((t.addr + (t.cur * BWIDTH)) & (t.len * BWIDTH)) | (t.addr & ~(t.len * BWIDTH));
     default: assert(0);
     endcase
-    return -1;
 endfunction
 
 Transfer[NUM_TFS-1:0] tfs[1:0];
@@ -113,50 +112,6 @@ always_comb begin
     end
 end
 
-always_ff@(posedge clk /*or posedge rst*/) begin
-    if (rst) ;
-    else if (!(s_axi_rvalid && !s_axi_rready)) begin
-        s_axi_rid <= 'x;
-        //s_axi_rdata <= 'x;
-        s_axi_rlast <= 'x;
-        s_axi_rvalid <= 0;
-        if (readDataIdxValid) begin
-            reg last = (reads[readDataIdx].cur) == (reads[readDataIdx].len);
-            reg[ADDR_LEN-1:0] addr = GetCurAddr(reads[readDataIdx]);
-
-            s_axi_rid <= readDataIdx;
-            s_axi_rlast <= last;
-            s_axi_rvalid <= 1;
-
-            if (addr[31]) begin
-                // Memory
-                assert((addr & ($clog2(BWIDTH) - 1)) == 0);
-                s_axi_rdata <= mem[addr[$clog2(BWIDTH) +: MADDR_LEN]];
-            end
-            else begin
-                // MMIO
-
-                case (addr)
-                    `SERIAL_ADDR: begin
-                        s_axi_rdata <= 'x;
-                        s_axi_rdata[7:0] <= inputByte;
-                        inputAvail <= 0;
-                    end
-                    `SERIAL_ADDR + 5: begin
-                        s_axi_rdata <= 'x;
-                        s_axi_rdata[7:0] <= 8'h60 | (inputAvail ? 1 : 0);
-                    end
-                endcase
-            end
-
-            tfs[0][readDataIdx].cur <= reads[readDataIdx].cur + 1;
-            if (last) begin
-                tfs[0][readDataIdx] <= 'x;
-                tfs[0][readDataIdx].valid <= 0;
-            end
-        end
-    end
-end
 
 // Write Idx FIFO
 reg[ID_LEN-1:0] fifoAW[NUM_TFS-1:0];
@@ -218,81 +173,13 @@ always_comb begin
     end
 end
 assign buf_wready = writeIdxValid;
-always_ff@(posedge clk /*or posedge rst*/) begin
-    reg[ID_LEN-1:0] idx = writeIdx;
-    if (rst) ;
-    else if (buf_wready && buf_wvalid) begin
-        Transfer w = writes[idx];
-        reg last = w.cur == w.len;
-        reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
-        assert(writeIdxValid);
-        assert(w.valid);
-        assert(buf_wlast == last);
+always@(posedge clk /*or posedge rst*/) begin
 
-        if (addr[31]) begin
-            // Memory
-            assert((addr & ($clog2(BWIDTH) - 1)) == 0);
-            for (integer i = 0; i < BWIDTH; i=i+1) begin
-                if (buf_wstrb[i])
-                    mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= buf_wdata[8*i +: 8];
-            end
-        end
-        else begin
-            // MMIO
-            case (addr)
-                `SERIAL_ADDR: begin
-                    if (buf_wstrb[0]) begin
-                        $write("%c", buf_wdata[7:0]);
-                        $fflush(32'h80000001);
-                    end
-                end
-            endcase
-        end
-
-        tfs[1][idx].cur <= w.cur + 1;
-        if (last) begin
-            writeDone[idx] <= 1;
-            tfs[1][idx].cur <= 'x;
-        end
-    end
 end
 
 // Write Ack Output
-always_ff@(posedge clk /*or posedge rst*/) begin
-    reg[ID_LEN-1:0] idx = fifoAW[0];
+always@(posedge clk /*or posedge rst*/) begin
 
-    if (rst) ;
-    else begin
-        if (buf_awready && buf_awvalid) begin
-            fifoAWValid[fifoAWInsIdx] <= 1;
-            fifoAW[fifoAWInsIdx] <= buf_awid;
-        end
-
-        if (!(s_axi_bvalid && !s_axi_bready)) begin
-            s_axi_bid <= 'x;
-            s_axi_bvalid <= 0;
-            if (fifoAWValid[0] && writes[idx].valid && writeDone[idx]) begin
-
-                s_axi_bid <= idx;
-                s_axi_bvalid <= 1;
-
-                for (integer i = 0; i < NUM_TFS-1; i=i+1) begin
-                    fifoAW[i] <= fifoAW[i+1];
-                    fifoAWValid[i] <= fifoAWValid[i+1];
-                end
-                fifoAW[NUM_TFS-1] <= 'x;
-                fifoAWValid[NUM_TFS-1] <= 0;
-
-                if (buf_awready && buf_awvalid) begin
-                    fifoAWValid[fifoAWInsIdx-1] <= 1;
-                    fifoAW[fifoAWInsIdx-1] <= buf_awid;
-                end
-
-                tfs[1][idx] <= 'x;
-                tfs[1][idx].valid <= 0;
-            end
-        end
-    end
 end
 
 // Write Request FIFO
@@ -357,7 +244,7 @@ FIFO#(AR_LEN, 2, 1, 1) arFIFO
 assign buf_arready = !tfs[0][buf_arid].valid && buf_arvalid;
 assign buf_awready = !tfs[1][buf_awid].valid && buf_awvalid;
 
-always_ff@(posedge clk /*or posedge rst*/) begin
+always@(posedge clk /*or posedge rst*/) begin
     if (rst) ;
     else begin
         if (buf_arready) begin
@@ -374,6 +261,122 @@ always_ff@(posedge clk /*or posedge rst*/) begin
             tfs[1][buf_awid].len <= buf_awlen;
             tfs[1][buf_awid].cur <= 0;
             writeDone[buf_awid] <= 0;
+        end
+    end
+
+    if (rst) ;
+    else if (!(s_axi_rvalid && !s_axi_rready)) begin
+        s_axi_rid <= 'x;
+        //s_axi_rdata <= 'x;
+        s_axi_rlast <= 'x;
+        s_axi_rvalid <= 0;
+        if (readDataIdxValid) begin
+            reg last = (reads[readDataIdx].cur) == (reads[readDataIdx].len);
+            reg[ADDR_LEN-1:0] addr = GetCurAddr(reads[readDataIdx]);
+
+            s_axi_rid <= readDataIdx;
+            s_axi_rlast <= last;
+            s_axi_rvalid <= 1;
+
+            if (addr[31]) begin
+                // Memory
+                assert((addr & ($clog2(BWIDTH) - 1)) == 0);
+                s_axi_rdata <= mem[addr[$clog2(BWIDTH) +: MADDR_LEN]];
+            end
+            else begin
+                // MMIO
+
+                case (addr)
+                    `SERIAL_ADDR: begin
+                        s_axi_rdata <= 'x;
+                        s_axi_rdata[7:0] <= inputByte;
+                        inputAvail <= 0;
+                    end
+                    `SERIAL_ADDR + 5: begin
+                        s_axi_rdata <= 'x;
+                        s_axi_rdata[7:0] <= 8'h60 | (inputAvail ? 1 : 0);
+                    end
+                endcase
+            end
+
+            tfs[0][readDataIdx].cur <= reads[readDataIdx].cur + 1;
+            if (last) begin
+                tfs[0][readDataIdx] <= 'x;
+                tfs[0][readDataIdx].valid <= 0;
+            end
+        end
+    end
+
+    if (rst) ;
+    else if (buf_wready && buf_wvalid) begin
+          reg[ID_LEN-1:0] idx = writeIdx;
+
+        Transfer w = writes[idx];
+        reg last = w.cur == w.len;
+        reg[ADDR_LEN-1:0] addr = GetCurAddr(w);
+        assert(writeIdxValid);
+        assert(w.valid);
+        assert(buf_wlast == last);
+
+        if (addr[31]) begin
+            // Memory
+            assert((addr & ($clog2(BWIDTH) - 1)) == 0);
+            for (integer i = 0; i < BWIDTH; i=i+1) begin
+                if (buf_wstrb[i])
+                    mem[addr[$clog2(BWIDTH) +: MADDR_LEN]][8*i +: 8] <= buf_wdata[8*i +: 8];
+            end
+        end
+        else begin
+            // MMIO
+            case (addr)
+                `SERIAL_ADDR: begin
+                    if (buf_wstrb[0]) begin
+                        $write("%c", buf_wdata[7:0]);
+                        //$fflush(32'h80000001);
+                    end
+                end
+            endcase
+        end
+
+        tfs[1][idx].cur <= w.cur + 1;
+        if (last) begin
+            writeDone[idx] <= 1;
+            tfs[1][idx].cur <= 'x;
+        end
+    end
+
+    if (rst) ;
+    else begin
+        reg[ID_LEN-1:0] idx = fifoAW[0];
+
+        if (buf_awready && buf_awvalid) begin
+            fifoAWValid[fifoAWInsIdx] <= 1;
+            fifoAW[fifoAWInsIdx] <= buf_awid;
+        end
+
+        if (!(s_axi_bvalid && !s_axi_bready)) begin
+            s_axi_bid <= 'x;
+            s_axi_bvalid <= 0;
+            if (fifoAWValid[0] && writes[idx].valid && writeDone[idx]) begin
+
+                s_axi_bid <= idx;
+                s_axi_bvalid <= 1;
+
+                for (integer i = 0; i < NUM_TFS-1; i=i+1) begin
+                    fifoAW[i] <= fifoAW[i+1];
+                    fifoAWValid[i] <= fifoAWValid[i+1];
+                end
+                fifoAW[NUM_TFS-1] <= 'x;
+                fifoAWValid[NUM_TFS-1] <= 0;
+
+                if (buf_awready && buf_awvalid) begin
+                    fifoAWValid[fifoAWInsIdx-1] <= 1;
+                    fifoAW[fifoAWInsIdx-1] <= buf_awid;
+                end
+
+                tfs[1][idx] <= 'x;
+                tfs[1][idx].valid <= 0;
+            end
         end
     end
 end

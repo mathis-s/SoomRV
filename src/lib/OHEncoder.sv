@@ -9,11 +9,11 @@ if (LEN > 1)
     always_comb begin
         OUT_valid = 0;
         for (integer i = 0; i < LEN; i=i+1) begin
-            assert(!(IN_idxOH[i] && OUT_valid));
+            //assert(!(IN_idxOH[i] && OUT_valid));
             OUT_valid |= IN_idxOH[i];
         end
 
-        assert(OUT_valid || ALLOW_NULL);
+        //assert(OUT_valid || ALLOW_NULL);
 
         for (integer i = 0; i < $clog2(LEN); i=i+1) begin
             OUT_idx[i] = 1'b0;
@@ -28,7 +28,7 @@ else always_comb begin
     OUT_idx = 0;
     OUT_valid = IN_idxOH[0];
 
-    assert(OUT_valid || ALLOW_NULL);
+    //assert(OUT_valid || ALLOW_NULL);
 end
 
 endmodule

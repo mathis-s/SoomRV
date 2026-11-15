@@ -52,7 +52,15 @@ always_ff@(posedge clk) begin
                 missSR[i] <= missSR[i-1];
             baseMiss <= missSR[SR_SIZE-1];
         end
+
+        if (iter.valid) begin
+            if (hit_c.valid && strideEncValid && predSrcValid) begin
+                missSR[iter.idx] <= PrefetchMiss'{valid: 0, default: 'x};
+                missSR[hit_c.idx] <= PrefetchMiss'{valid: 0, default: 'x};
+            end
+        end
     end
+
 end
 
 
@@ -72,7 +80,9 @@ end
 IdxN hit_c;
 PriorityEncoder#(SR_SIZE, 1) penc(hit_oh_c, '{hit_c.idx}, '{hit_c.valid});
 
-wire PFAddr_t predAddr_c = missSR[iter.idx + 1].addr * 2 - baseMiss.addr;
+wire predSrcValid = (iter.idx != $clog2(SR_SIZE)'(SR_SIZE-1)) &&
+    missSR[iter.idx + 1].valid && baseMiss.valid;
+wire PFAddr_t predAddr_c = predSrcValid ? (missSR[iter.idx + 1].addr * 2 - baseMiss.addr) : '0;
 
 wire[`VIRT_IDX_LEN-`CLSIZE_E-1:0] stride = (`VIRT_IDX_LEN - `CLSIZE_E)'((predAddr - baseMiss.addr) >> 1);
 PFStride_t strideEnc;
@@ -105,10 +115,10 @@ always_ff@(posedge clk) begin
             iter.idx <= iter.idx + 1;
             predAddr <= predAddr_c;
 
-            if (hit_c.valid && strideEncValid) begin
+            if (hit_c.valid && strideEncValid && predSrcValid) begin
                 iter <= IdxN'{valid: 0, default: '1};
-                missSR[iter.idx] <= PrefetchMiss'{valid: 0, default: 'x};
-                missSR[hit_c.idx] <= PrefetchMiss'{valid: 0, default: 'x};
+                //missSR[iter.idx] <= PrefetchMiss'{valid: 0, default: 'x};
+                //missSR[hit_c.idx] <= PrefetchMiss'{valid: 0, default: 'x};
                 OUT_pattern <= PrefetchPattern'{
                     stride: strideEnc,
                     addr: predAddr + ($signed(predAddr - baseMiss.addr) >>> 1),

@@ -6,6 +6,7 @@
 #include "Model.hpp"
 
 #include "../model_headers.h"
+#include "TopWrapper.hpp"
 #include "riscv/processor.h"
 #include "../sc_stub.hpp"
 #include "../slang/slang.hpp"
@@ -19,10 +20,10 @@ class BranchHistory : public Model
     uint64_t ReadBrHistory(uint8_t fetchID, uint8_t fetchOffs)
     {
 #ifdef COSIM
-        auto core = top->Top->soc->core;
+        auto core = top->soc->core;
         auto bpFile = core->ifetch->bp->bpFile->mem;
 
-        BPBackup backup{sc_bv<BPBackup::_size>{(char*)&bpFile[fetchID]}};
+        BPBackup backup{sc_bv<BPBackup::_size>{(char*)bpFile[fetchID].data().data()}};
 
         if (backup.pred && backup.isRegularBranch && fetchOffs > backup.predOffs)
             return (backup.history << 1) | backup.predTaken;
@@ -109,5 +110,5 @@ class BranchHistory : public Model
         if (fread(&bhist, sizeof(bhist), 1, f) != 1) abort();
     }
 
-    BranchHistory(VTop* top, processor_t* processor) : Model(top, processor) {}
+    BranchHistory(ModInst____GTop* top, processor_t* processor) : Model(top, processor) {}
 };

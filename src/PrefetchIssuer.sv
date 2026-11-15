@@ -40,7 +40,7 @@ PrefetchStream streams[NUM_STREAMS-1:0];
 logic[NUM_STREAMS-1:0] freeUnary_c;
 always_comb begin
     for (integer i = 0; i < NUM_STREAMS; i=i+1) begin
-        freeUnary_c[i] = !streams[i].valid || !|streams[i].useful;
+        freeUnary_c[i] = !streams[i].valid || !(|streams[i].useful);
     end
 end
 IdxN free_c;
@@ -111,8 +111,8 @@ always_comb begin
         for (int j = 0; j < NUM_STREAMS; j=j+1) begin
             // verilator lint_off WIDTHTRUNC
             PFAddr_t diff = IN_access[i].addr - streams[j].addr;
-            PFAddr_t mod = IN_access[i].addr % (^streams[j].stride ? 1 : 2);
-            if (diff > 0 && diff < 4 && mod == 0 && !kill) begin
+            PFAddr_t mod = (^streams[j].stride) ? 0 : (IN_access[i].addr % 2);
+            if (IN_access[i].valid && streams[j].valid && diff > 0 && diff < 4 && mod == 0 && !kill) begin
                 advance_c[i] = Advance'{
                     depth: (diff > PREFETCH_DEPTH ? ((1 << $clog2(PREFETCH_DEPTH+1))-1) : diff),
                     newAddr: IN_access[i].addr,
@@ -192,7 +192,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
 
                 // verilator lint_on WIDTHEXPAND
 
-                if (!&streams[advance_c[i].idx].useful)
+                if (!(&streams[advance_c[i].idx].useful))
                     streams[advance_c[i].idx].useful <= streams[advance_c[i].idx].useful + 1;
             end
         end

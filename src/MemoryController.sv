@@ -339,12 +339,14 @@ assign OUT_dcacheR.wm = '0;
 assign OUT_dcacheR.data = 'x;
 
 function logic[`CACHE_SIZE_E-3:0] GetCacheRdAddr(Transfer t);
+  logic[`CACHE_SIZE_E-3:0] rv;
     case (t.cmd)
     MEMC_REPLACE, MEMC_CP_EXT_TO_CACHE:
-        return {t.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2], (t.cacheAddr[`CLSIZE_E-3:0] + t.addrCounter[`CLSIZE_E-3:0])};
+        rv = {t.cacheAddr[`CACHE_SIZE_E-3:`CLSIZE_E-2], (t.cacheAddr[`CLSIZE_E-3:0] + t.addrCounter[`CLSIZE_E-3:0])};
     default:
-        return t.cacheAddr;
+        rv = t.cacheAddr;
     endcase
+    return rv;
 endfunction
 
 // Read Data FIFO

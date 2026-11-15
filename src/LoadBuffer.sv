@@ -257,9 +257,9 @@ always_comb begin
 end
 
 IdxN loadRsv;
-wire[$clog2(NUM_ENTRIES):0] PENC_idx;
-wire PENC_valid;
-PriorityEncoder#(2*NUM_ENTRIES) penc(hasRsvOrInvalid, {PENC_idx}, {PENC_valid});
+logic[$clog2(NUM_ENTRIES):0] PENC_idx;
+logic PENC_valid;
+PriorityEncoder#(2*NUM_ENTRIES) penc(hasRsvOrInvalid, '{PENC_idx}, '{PENC_valid});
 always_comb begin
     loadRsv.idx = ($clog2(NUM_ENTRIES))'(PENC_idx);
     loadRsv.valid = PENC_valid;

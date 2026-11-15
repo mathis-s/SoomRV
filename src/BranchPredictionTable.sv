@@ -62,12 +62,12 @@ always_ff@(posedge clk /*or posedge rst*/) begin
             writeTempReg <= {pred[write_c.addr], hist[write_c.addr]};
         end
         if (write_r.valid) begin
-            if (writeTempReg != 2'b11 && write_r.taken)
-                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg + 1'b1;
-            if (writeTempReg != 2'b00 && !write_r.taken)
-                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg - 1'b1;
             if (write_r.init)
                 {pred[write_r.addr], hist[write_r.addr]} <= {write_r.taken, !write_r.taken};
+            else if (writeTempReg != 2'b00 && !write_r.taken)
+                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg - 1'b1;
+            else if (writeTempReg != 2'b11 && write_r.taken)
+                {pred[write_r.addr], hist[write_r.addr]} <= writeTempReg + 1'b1;
         end
     end
 end

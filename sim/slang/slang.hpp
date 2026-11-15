@@ -1,6 +1,7 @@
 // .h
 #pragma once
 
+#include "sc_stub.hpp"
 #include <ostream>
 #include <cstddef>
 #include <cstdint>

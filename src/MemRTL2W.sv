@@ -38,10 +38,10 @@ reg[(WORD_SIZE/WRITE_SIZE)-1:0] wm1_reg;
 
 reg dbgMultiple;
 
-initial begin
-    for (integer i = 0; i < NUM_WORDS; i=i+1)
-        mem[i] = 0;
-end
+//initial begin
+//    for (integer i = 0; i < NUM_WORDS; i=i+1)
+//        mem[i] = 0;
+//end
 
 always@(posedge clk) begin
 

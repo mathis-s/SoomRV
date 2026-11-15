@@ -1,12 +1,12 @@
 module IssueQueue
 #(
     parameter SIZE = 8,
-    parameter NUM_ENQUEUE=4,
+    parameter NUM_ENQUEUE=2,
     parameter PORT_IDX=0,
-    parameter NUM_OPERANDS = 2,
+    parameter NUM_OPERANDS = 1,
     parameter NUM_UOPS = 4,
-    parameter RESULT_BUS_COUNT = 4,
-    parameter IMM_BITS=32,
+    parameter RESULT_BUS_COUNT = 5,
+    parameter IMM_BITS=12,
     parameter FUS=0
 
 )
@@ -61,18 +61,18 @@ typedef struct packed
     logic[IMM_BITS-1:0] imm;
 
     logic[NUM_OPERANDS-1:0] avail;
-    Tag[NUM_OPERANDS-1:0] tags;
+    Tag[NUM_OPERANDS-1:0] tags; //7
 
-    logic immB;
-    SqN sqN;
-    Tag tagDst;
-    logic[5:0] opcode;
-    FetchID_t fetchID;
-    FetchOff_t fetchOffs;
-    SqN storeSqN;
-    SqN loadSqN;
-    FuncUnit fu;
-    logic compressed;
+    logic immB; // 1
+    SqN sqN; // 7
+    Tag tagDst; // 7
+    logic[5:0] opcode; // 6
+    FetchID_t fetchID; // 5
+    FetchOff_t fetchOffs; // 3
+    SqN storeSqN; // 7
+    SqN loadSqN; // 7
+    FuncUnit fu; // 4
+    logic compressed; // 1
 } R_ST_UOp;
 
 R_ST_UOp queue[SIZE-1:0];
@@ -81,14 +81,14 @@ reg[$clog2(SIZE+1)-1:0] insertIndex;
 reg[32:0] reservedWBs;
 
 reg[SIZE-1:0][NUM_OPERANDS-1:0] newAvail_c[AVAIL_SR_LEN-1:0];
-reg[SIZE-1:0][NUM_OPERANDS-1:0] newAvail_r[AVAIL_SR_LEN-1:0];
+reg[SIZE-1:0][NUM_OPERANDS-1:0] newAvail_r[AVAIL_SR_LEN-2:0];
 always_ff@(posedge clk) begin
-    for (integer i = 0; i < AVAIL_SR_LEN; i=i+1) begin
+    for (integer i = 0; i < AVAIL_SR_LEN-1; i=i+1) begin
         for (integer j = 0; j < SIZE; j=j+1) begin
             if (deq.valid && collapseMask_c[j] && !IN_stall && !IN_branch.taken)
-                newAvail_r[i][j] <= (j == (SIZE-1)) ? '0 : newAvail_c[i][j+1];
+                newAvail_r[i][j] <= (j == (SIZE-1)) ? '0 : newAvail_c[i+1][j+1];
             else
-                newAvail_r[i][j] <= newAvail_c[i][j];
+                newAvail_r[i][j] <= newAvail_c[i+1][j];
         end
     end
 end
@@ -96,7 +96,7 @@ end
 always_comb begin
     newAvail_c[0] = '0;
     for (integer j = 1; j < AVAIL_SR_LEN-1; j=j+1)
-        newAvail_c[j] = newAvail_r[j+1];
+        newAvail_c[j] = newAvail_r[j];
     newAvail_c[AVAIL_SR_LEN-1] = '0;
 
     for (integer i = 0; i < SIZE; i=i+1) begin
@@ -161,7 +161,7 @@ always_comb begin
     // verilator lint_on WIDTHEXPAND
 end
 R_UOp enqCandidates[NUM_ENQUEUE-1:0];
-OpDownsample#(NUM_UOPS, NUM_ENQUEUE, $bits(R_UOp)) enqDS
+OpDownsample#(NUM_UOPS, NUM_ENQUEUE, $bits(R_UOp), NUM_PORTS_TOTAL + 1) enqDS
 (
     .IN_ops(IN_uop),
     .IN_opBaseValid(isBaseCand_c),
@@ -234,7 +234,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         OUT_uop <= IS_UOp'{valid: 0, default: 'x};
 
         for (integer i = 0; i < SIZE; i=i+1)
-            queue[i] <= R_ST_UOp'{avail: 0, default: 'x};
+            queue[i] <= R_ST_UOp'{default: 'x};
     end
     else if (IN_branch.taken) begin
 

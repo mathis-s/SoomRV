@@ -157,7 +157,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
         OUT_uop <= StDataLookupUOp'{valid: 0, default: 'x};
 
         for (integer i = 0; i < SIZE; i=i+1) begin
-            queue[i] <= R_ST_UOp'{avail: 0, offs: 0, default: 'x};
+            queue[i] <= R_ST_UOp'{default: 'x};
         end
     end
     else if (IN_branch.taken) begin

@@ -33,10 +33,10 @@ always@(posedge clk) begin
     wm_reg <= IN_wm;
 end
 
-initial begin
-    for (integer i = 0; i < NUM_WORDS; i=i+1)
-        mem[i] = 0;
-end
+//initial begin
+//    for (integer i = 0; i < NUM_WORDS; i=i+1)
+//        mem[i] = 0;
+//end
 
 always@(posedge clk) begin
     if (!ce_reg) begin

@@ -139,7 +139,7 @@ class Fuzzer
             auto results = run(test_case);
             switch (results.flags)
             {
-                case RunResultFlags::ERROR: report(*cur_case, results);
+                case RunResultFlags::ERROR: report(*cur_case, results); break;
                 case RunResultFlags::TIMEOUT:
                 case RunResultFlags::FINISHED: break;
             }

@@ -27,10 +27,10 @@ reg[PORTS-1:0][$clog2(NUM_WORDS)-1:0] addr1_reg;
 reg[PORTS-1:0][WORD_SIZE-1:0] data_reg;
 reg[PORTS-1:0][(WORD_SIZE/WRITE_SIZE)-1:0] wm_reg;
 
-initial begin
-    for (integer i = 0; i < NUM_WORDS; i=i+1)
-        mem[i] = 0;
-end
+//initial begin
+//    for (integer i = 0; i < NUM_WORDS; i=i+1)
+//        mem[i] = 0;
+//end
 
 always_ff@(posedge clk) begin
 

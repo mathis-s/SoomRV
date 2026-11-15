@@ -129,15 +129,15 @@ wire queueFull = qindex_r == (qindexEnd_r + $bits(qindex_r)'(RQSIZE));
 
 logic recoveryContinue_c;
 always_comb begin
-    FetchID_t queueRel = (rrqueue[qindex-1].fetchID - recoveryBase);
+    FetchID_t queueRel = (rrqueue[qindex-$clog2(RQSIZE)'(1)].fetchID - recoveryBase);
     FetchID_t recRel = (recoveryID - recoveryBase);
 
     recoveryContinue_c = !queueEmpty &&
         (queueRel >  recRel ||
         (queueRel == recRel &&
             (recoveryOverwOwn ?
-                (rrqueue[qindex-1].offs >= recoveryOffs) :
-                (rrqueue[qindex-1].offs >  recoveryOffs))
+                (rrqueue[qindex-$clog2(RQSIZE)'(1)].offs >= recoveryOffs) :
+                (rrqueue[qindex-$clog2(RQSIZE)'(1)].offs >  recoveryOffs))
         ));
 end
 
@@ -194,8 +194,8 @@ always_ff@(posedge clk /*or posedge rst*/) begin
             // Recover entries by copying from rrqueue back to stack after mispredict
             if (recoveryInProgress) begin
                 if (recoveryContinue_c) begin
-                    rstack[rrqueue[qindex-1].idx] <= rrqueue[qindex-1].addr;
-                    rrqueue[qindex-1] <= 'x;
+                    rstack[rrqueue[qindex-$clog2(RQSIZE)'(1)].idx] <= rrqueue[qindex-$clog2(RQSIZE)'(1)].addr;
+                    rrqueue[qindex-$clog2(RQSIZE)'(1)] <= 'x;
                     qindex_r <= qindex_r - 1; // entry restored, ok to overwrite
                 end
                 else begin

@@ -5,7 +5,6 @@
 #include "TopWrapper.hpp"
 #include "models/Model.hpp"
 
-#include "VTop_CSR.h"
 #include "riscv/cfg.h"
 #include "riscv/csrs.h"
 #include "riscv/decode.h"
@@ -90,5 +89,5 @@ class SpikeSimif : public simif_t
         return processor->get_disassembler()->disassemble(instr);
     }
 
-    void restore_from_top(TopWrapper& wrap, Inst& inst);
+    void restore_from_top(TopWrapper<ModInst____GTop>& wrap, Inst& inst);
 };

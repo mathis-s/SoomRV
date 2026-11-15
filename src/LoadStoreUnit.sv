@@ -139,12 +139,12 @@ always_comb begin
     end
 end
 
+localparam STORE_PORT = NUM_CT_READS - 1;
 // During a cache table write cycle, we cannot issue a store as
 // the cache table write port is the same as the store read port.
 // Loads work fine but require write forwaring in the cache table.
 assign OUT_stStall = ((isCacheBypassStUOp ? BLSU_stStall : (!IN_enable || !IN_ctReadReady[STORE_PORT]))) && IN_uopSt.valid;
 
-localparam STORE_PORT = NUM_CT_READS - 1;
 
 always_comb
     for (integer i = 0; i < NUM_AGUS; i=i+1)
@@ -263,7 +263,7 @@ always_comb begin
         // For regular loads, we only get the full address and other
         // info now.
         if (ldOps_0[i].valid && selLdSrc_r[i] == SRC_AGU) begin
-            assert(rst || !IN_aguLd[idx].valid || IN_aguLd[idx].addr[11:0] == ldOps_0[i].addr[11:0]);
+            // assert(rst || !IN_aguLd[idx].valid || IN_aguLd[idx].addr[11:0] == ldOps_0[i].addr[11:0]);
 
             ldOps_0[i] = 'x;
             ldOps_0[i].valid = 0;

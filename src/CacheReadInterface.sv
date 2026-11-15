@@ -148,10 +148,12 @@ always_comb begin
     readMeta = ReadMeta'{default: 'x, valid: 0};
 
     if (cur.valid && allowNewRead) begin
-
-        OUT_CACHE_ce = 0;
-        OUT_CACHE_we = 1;
-        OUT_CACHE_addr = {cur.addr[ADDR_BITS-1:`CLSIZE_E-2], cur.addr[`CLSIZE_E-3:0] + cur.progress[`CLSIZE_E-3:0]};
+        // cache request if not MMIO
+        if (!cur.mmio) begin
+          OUT_CACHE_ce = 0;
+          OUT_CACHE_we = 1;
+          OUT_CACHE_addr = {cur.addr[ADDR_BITS-1:`CLSIZE_E-2], cur.addr[`CLSIZE_E-3:0] + cur.progress[`CLSIZE_E-3:0]};
+        end
 
         readMeta.valid = 1;
         readMeta.id = cur.id;

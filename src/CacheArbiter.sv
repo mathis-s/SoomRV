@@ -86,8 +86,10 @@ always_comb begin
         for (integer i = 0; i < OUTPUT_R; i=i+1) begin
             OUT_ports[bank][i] = IN_reads[reqIdx_r[bank][i]];
             OUT_ports[bank][i].ce = !reqIdxValid_r[bank][i];
-            OUT_readReady[reqIdx_r[bank][i]] |= reqIdxValid_r[bank][i];
-            outPortIdx[reqIdx_r[bank][i]] = OutPortIdx'(i);
+            if (reqIdxValid_r[bank][i]) begin
+                OUT_readReady[reqIdx_r[bank][i]] = '1;
+                outPortIdx[reqIdx_r[bank][i]] = OutPortIdx'(i);
+            end
         end
 
         // write-only ports
@@ -95,8 +97,8 @@ always_comb begin
             integer idx = i + OUTPUT_R;
             OUT_ports[bank][idx] = IN_writes[reqIdx_w[bank][i]];
             OUT_ports[bank][idx].ce = !reqIdxValid_w[bank][i];
-            OUT_writeReady[reqIdx_w[bank][i]] |= reqIdxValid_w[bank][i];
-            //outPortIdx[reqIdx_w[bank][idx]] = OutPortIdx'(i);
+            if (reqIdxValid_w[bank][i])
+                OUT_writeReady[reqIdx_w[bank][i]] = '1;
         end
 
         // read/write ports
@@ -107,15 +109,17 @@ always_comb begin
                 localparam i = OUT_W_CANDIDATES - 1;
                 OUT_ports[bank][idx] = IN_writes[reqIdx_w[bank][i]];
                 OUT_ports[bank][idx].ce = !reqIdxValid_w[bank][i];
-                OUT_writeReady[reqIdx_w[bank][i]] |= reqIdxValid_w[bank][i];
-                //outPortIdx[reqIdx_w[bank][idx]] = OutPortIdx'(i);
+                if (reqIdxValid_w[bank][i])
+                    OUT_writeReady[reqIdx_w[bank][i]] = '1;
             end
             else begin
                 localparam i = OUT_R_CANDIDATES - 1;
                 OUT_ports[bank][idx] = IN_reads[reqIdx_r[bank][i]];
                 OUT_ports[bank][idx].ce = !reqIdxValid_r[bank][i];
-                OUT_readReady[reqIdx_r[bank][i]] |= reqIdxValid_r[bank][i];
-                outPortIdx[reqIdx_r[bank][i]] = OutPortIdx'(i);
+                if (reqIdxValid_r[bank][i]) begin
+                    OUT_readReady[reqIdx_r[bank][i]] = '1;
+                    outPortIdx[reqIdx_r[bank][i]] = OutPortIdx'(i);
+                end
             end
         end
     end
@@ -123,8 +127,8 @@ end
 
 typedef struct packed
 {
-    BankIdx bank;
-    OutPortIdx port;
+    BankIdx bank; // 1:0 at 1
+    OutPortIdx port; // 0:0 at 0
 } Read;
 
 Read readIdxs[1:0][INPUT_READS-1:0];

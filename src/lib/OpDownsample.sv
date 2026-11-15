@@ -1,7 +1,7 @@
 // Downsample NUM_IN ops to NUM_OUT ops, selecting ops where opBaseValid and opValid are set.
 // OUT_stall is set only for baseValid ops where either opValid is false or when throughput limited by NUM_OUT or dynMaxNumOut.
 
-module OpDownsample#(parameter NUM_IN, parameter NUM_OUT, parameter OP_SIZE)
+module OpDownsample#(parameter NUM_IN=4, parameter NUM_OUT=4, parameter OP_SIZE=128, parameter VALID_BITS = 1)
 (
     input logic[OP_SIZE-1:0] IN_ops[NUM_IN-1:0],
     input logic[NUM_IN-1:0] IN_opBaseValid,
@@ -43,8 +43,9 @@ PriorityEncoder #(.BITS(NUM_IN), .N(NUM_OUT)) penc(
 always_comb begin
     for (int j = 0; j < NUM_OUT; j++) begin
         OUT_ops[j] = 'x;
-        OUT_ops[j][0] = 0;
+        OUT_ops[j][0 +: VALID_BITS] = 0;
         if (candValid_c[j] && j < IN_dynMaxNumOut)
+            // todo: detect lower bound here for j != 0 (maybe via prio enc primitive)
             OUT_ops[j] = IN_ops[candIndex_c[j]];
     end
 end
