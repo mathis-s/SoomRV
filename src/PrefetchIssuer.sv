@@ -40,7 +40,7 @@ PrefetchStream streams[NUM_STREAMS-1:0];
 logic[NUM_STREAMS-1:0] freeUnary_c;
 always_comb begin
     for (integer i = 0; i < NUM_STREAMS; i=i+1) begin
-        freeUnary_c[i] = !streams[i].valid || !|streams[i].useful;
+        freeUnary_c[i] = !streams[i].valid || !(|streams[i].useful);
     end
 end
 IdxN free_c;
@@ -192,7 +192,7 @@ always_ff@(posedge clk /*or posedge rst*/) begin
 
                 // verilator lint_on WIDTHEXPAND
 
-                if (!&streams[advance_c[i].idx].useful)
+                if (!(&streams[advance_c[i].idx].useful))
                     streams[advance_c[i].idx].useful <= streams[advance_c[i].idx].useful + 1;
             end
         end

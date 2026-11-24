@@ -27,7 +27,7 @@ typedef struct packed
     logic[NUM_PACKETS-1:0] start32;
 } FetchCycle;
 
-wire canShift = !|(unhandled_c[0+:NUM_PACKETS] & windowStart_c[0+:NUM_PACKETS]);
+wire canShift = !(|(unhandled_c[0+:NUM_PACKETS] & windowStart_c[0+:NUM_PACKETS]));
 wire validCycle = IN_accept && IN_op.valid && canShift;
 assign OUT_ready = validCycle;
 

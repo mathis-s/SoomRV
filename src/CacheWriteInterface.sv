@@ -64,7 +64,7 @@ else begin
 
     assign wm_new = 1 << IN_addr[0+:$clog2(WM_LEN)];
     assign chunkInsertIdx = IN_addr[0+:$clog2(WM_LEN)];
-    assign OUT_ready = !cur_r.valid || !&cur_r.addr[0+:CHUNK_LEN];
+    assign OUT_ready = !cur_r.valid || !(&cur_r.addr[0+:CHUNK_LEN]);
 end
 
 logic writeLast;
